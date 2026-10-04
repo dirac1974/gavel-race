@@ -71,3 +71,9 @@ The model is being used for a kid-friendly Roblox horse racing game. Roblox proh
 
 - Set `κ` and `T` from playtests.
 - Reserve dial `α` (`Purse ∝ q^(−α)`) if training needs to pay more win cash.
+
+## Agent team and game build (2026-10-04)
+
+David delegated design decisions to the team for later review (D-009). Claude Code agents now carry the project: an engineering team (model, Roblox, test, review, economy, scribe) and a design council (moderator, four designers, researcher). Rules and the build loop are in `CLAUDE.md`; decisions in `docs/memory/DECISIONS.md`; provisional ones awaiting David in `docs/memory/REVIEW_QUEUE.md`.
+
+Built so far: Python and Luau race math with exact parity, a Rojo Phase 1 prototype (meter, race session, server loop, client UI; not yet run in Studio), Race Rating from stats and conditions, an economy simulator that set Stakes thresholds, and debate 001 on gavel feel.
