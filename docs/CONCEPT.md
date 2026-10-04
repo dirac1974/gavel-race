@@ -1,5 +1,7 @@
 # Concept
 
+> Original v1 framing (wagering). The game build uses the no-wager v2 model in [V2_PROPOSAL.md](V2_PROPOSAL.md): free entry, locked cash purses, no quinella.
+
 ## Fantasy
 
 Eight horses. Posted win prices and quinella prices are on the board before the gates open. During the race a meter sweeps back and forth. The green zone is the middle. A player hits the gavel when the indicator is in that zone to give their horse a performance bump.
