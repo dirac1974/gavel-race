@@ -114,3 +114,11 @@ Template:
 - Decision: League Points to unlock Stakes: Rookie 100, Bronze 110, Silver 1,400, Gold 3,000. Simulated engaged player: Bronze ~3 h of play, Silver day 3, Gold day 20, Champion day ~56.
 - Consequences: casual players (6 races/day) don't reach Gold within 90 days; revisit once Energy and training are modeled.
 - Links: sims/economy.py, sims/README.md, GameConfig.stakesUnlockPoints
+
+## D-014 — Race Rating formula and condition weights
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Decision: Rating = (Σ w·stat over Speed, Acceleration, Stamina, Grit) × (1 + 0.05 × care) + 3 × pilot level + 2 if the strategy suits the distance + 2 × bond. Distance sets base weights (Sprint favors Acceleration, Marathon favors Stamina); Turf adds Speed, Sand adds Grit and Stamina, Rain adds Grit, Wind adds Stamina; weights renormalize to 1. Focus is not in Rating. Full non-stat bonuses add about 10 points at 60 stats, one doubling of win chance at T = 14.4.
+- Alternatives: multiplicative jockey bonus (scales unfairly with stats); Focus in Rating (double-counts with its meter effect).
+- Links: src/race_rating.py, game/src/shared/RaceRating.luau, tests/test_race_rating.py

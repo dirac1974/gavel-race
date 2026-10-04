@@ -6,7 +6,7 @@ Last updated: 2026-10-04
 
 - **Race model v2**: Python reference and Luau module agree exactly (300 fixture races, purses and finish orders included).
 - **Roblox prototype (Phase 1)**: Rojo project in `game/`. Pure modules (GameConfig, ThemePack, GavelMeter, RaceSession) are tested under Lune. Server loop and client UI are written and compile, but **have not been run in Roblox Studio**.
-- **Tests**: 471 Python tests; 17,000+ Luau checks; syntax check for every Luau file; GitHub Actions runs all of it.
+- **Tests**: 513 Python tests; 17,600+ Luau checks; syntax check for every Luau file; GitHub Actions runs all of it.
 - **Design**: debate 001 decided the gavel meter (D-010). Provisional decisions listed in REVIEW_QUEUE.md.
 
 ## In progress
@@ -16,15 +16,16 @@ Last updated: 2026-10-04
 ## Backlog (top = next)
 
 1. **Debate 002 — first 10 minutes** (onboarding), then **003 — Energy system**.
-2. **Horse data model**: stats, Potential, conditions weights, Race Rating function (pure module + Python mirror + tests).
-3. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
-4. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
-5. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
-6. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
-7. **Economy sim v2**: add Energy, training, sinks, and Diamonds to `sims/economy.py`.
+2. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
+3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
+4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
+5. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
+6. **Economy sim v2**: add Energy, training, sinks, and Diamonds to `sims/economy.py`.
+7. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
 
 ## Done
 
+- 2026-10-04: Race Rating formula (D-014) in Python and Luau; prototype races now use random conditions and starter stats.
 - 2026-10-04: Studio playtest checklist; economy simulator; Stakes thresholds (D-013).
 - 2026-10-04: gavel meter, race session, Rojo prototype, Luau tests, syntax checks, debate 001.
 - 2026-10-04: agent team, memory docs, Python tests, Luau parity, CI.

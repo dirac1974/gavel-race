@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 import gavel_race_v2 as m  # noqa: E402
+import race_rating as rr  # noqa: E402
 
 
 class ListRng:
@@ -58,8 +59,18 @@ def main() -> None:
             "finish": [i + 1 for i in m.draw_finish(p, ListRng(uniforms))],  # 1-based for Luau
         })
     windows = [{"d": d, "s": m.window_score(d)} for d in (-0.5, 0, 0.1, 0.25, 0.5, 0.99, 1, 1.5)]
+    ratings_cases = []
+    strategies = [None, "FrontRunner", "Stalker", "Closer"]
+    for _ in range(300):
+        stats = {k: round(rng.uniform(-10, 110), 2) for k in ("speed", "accel", "stamina", "grit", "focus")}
+        cond = {"distance": rng.choice(list(rr.DISTANCE_WEIGHTS)), "surface": rng.choice(list(rr.SURFACE_SHIFT)),
+                "weather": rng.choice(list(rr.WEATHER_SHIFT))}
+        care, pilot, bond = rng.uniform(-0.2, 1.2), rng.uniform(0, 1), rng.uniform(0, 1)
+        strategy = rng.choice(strategies)
+        ratings_cases.append({"stats": stats, "cond": cond, "care": care, "pilot": pilot, "bond": bond,
+                              "strategy": strategy or "", "rating": rr.rating(stats, cond, care, pilot, strategy, bond)})
     out = ROOT / "tests" / "fixtures" / "race_math.json"
-    out.write_text(json.dumps({"cases": cases, "windows": windows}))
+    out.write_text(json.dumps({"cases": cases, "windows": windows, "ratings": ratings_cases}))
     print(f"wrote {len(cases)} cases to {out.relative_to(ROOT)}")
 
 

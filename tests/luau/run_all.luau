@@ -51,6 +51,13 @@ for c, case in data.cases do
 	end
 end
 
+local RaceRating = require("../../game/src/shared/RaceRating")
+for c, rc in data.ratings do
+	local strategy = if rc.strategy == "" then nil else rc.strategy
+	local r = RaceRating.rating(rc.stats, rc.cond, rc.care, rc.pilot, strategy, rc.bond)
+	check(close(r, rc.rating, 1e-9), `rating case {c}: {r} vs {rc.rating}`)
+end
+
 for _, w in data.windows do
 	check(close(RaceMath.windowScore(w.d), w.s, 1e-9), `windowScore({w.d})`)
 end

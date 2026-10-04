@@ -156,11 +156,12 @@ remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
 	status.Text = string.format("Next race in %d", seconds)
 end)
 
-remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start)
+remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond)
 	lanes = laneList
 	chances = {}
 	for i, lane in laneList do chances[i] = lane.chance end
-	status.Text = league .. " race starting!"
+	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
+	status.Text = string.format("%s race: %s", league, conditions)
 	feedback.Text = ""
 	renderBoard()
 end)

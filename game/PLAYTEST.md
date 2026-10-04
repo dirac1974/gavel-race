@@ -10,6 +10,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] "Next race in N" counts down from 20 (or starts at once with 8 players).
 - [ ] The board lists 8 lanes: you (highlighted) plus bots, each with Win chance % and Win purse.
 - [ ] Win chances add up to about 100%.
+- [ ] The status line shows the race conditions (for example "Rookie race: Mile · Dirt · Sunny").
 
 ## Gavel windows (×3)
 - [ ] The window name appears (The Break, Backstretch, Final Stretch).

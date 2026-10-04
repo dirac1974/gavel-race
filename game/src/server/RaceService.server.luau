@@ -14,6 +14,7 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ThemePack = require(Shared:WaitForChild("ThemePack"))
 local GavelMeter = require(Shared:WaitForChild("GavelMeter"))
 local RaceSession = require(Shared:WaitForChild("RaceSession"))
+local RaceRating = require(Shared:WaitForChild("RaceRating"))
 
 local LEAGUE = "Rookie" -- prototype: one league
 local COUNTDOWN = 3
@@ -43,6 +44,10 @@ local function now(): number
 end
 
 -- Prototype player state ----------------------------------------------------
+local starterStats: { [number]: { [string]: number } } = {}
+local DISTANCES = { "Sprint", "Mile", "Classic", "Marathon" }
+local SURFACES = { "Dirt", "Turf", "Sand" }
+local WEATHERS = { "Sunny", "Rain", "Wind" }
 local function setupPlayer(player: Player)
 	local stats = Instance.new("Folder")
 	stats.Name = "leaderstats"
@@ -53,10 +58,18 @@ local function setupPlayer(player: Player)
 	local points = Instance.new("IntValue")
 	points.Name = "League Points"
 	points.Parent = stats
-	player:SetAttribute("RacerRating", 50 + math.random(-5, 5))
+	-- Prototype starter racer: random stats 40-60 (no stable or saving yet).
+	local stats = {}
+	for _, k in { "speed", "accel", "stamina", "grit", "focus" } do
+		stats[k] = math.random(40, 60)
+	end
+	starterStats[player.UserId] = stats
 end
 
 Players.PlayerAdded:Connect(setupPlayer)
+Players.PlayerRemoving:Connect(function(player: Player)
+	task.defer(function() starterStats[player.UserId] = nil end)
+end)
 for _, p in Players:GetPlayers() do setupPlayer(p) end
 
 -- Race state shared with the Tap handler ------------------------------------
@@ -92,9 +105,16 @@ end
 
 local function runRace(players: { Player })
 	local rng = Random.new()
+	local cond = {
+		distance = DISTANCES[rng:NextInteger(1, #DISTANCES)],
+		surface = SURFACES[rng:NextInteger(1, #SURFACES)],
+		weather = WEATHERS[rng:NextInteger(1, #WEATHERS)],
+	}
 	local humans = {}
 	for _, p in players do
-		table.insert(humans, { id = tostring(p.UserId), name = p.DisplayName, rating = p:GetAttribute("RacerRating") or 50, isBot = false })
+		local stats = starterStats[p.UserId] or { speed = 50, accel = 50, stamina = 50, grit = 50, focus = 50 }
+		local rating = RaceRating.rating(stats, cond, 0.5, 0, nil, 0)
+		table.insert(humans, { id = tostring(p.UserId), name = p.DisplayName, rating = rating, isBot = false })
 	end
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
 	local session = RaceSession.new({
@@ -112,7 +132,7 @@ local function runRace(players: { Player })
 		windows[w] = { open = open, close = open + league.windowSeconds }
 	end
 	current = { session = session, windows = windows, activeWindow = nil }
-	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), start)
+	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), start, cond)
 
 	for w = 1, GameConfig.windowsPerRace do
 		task.wait(math.max(0, windows[w].open - now()))
