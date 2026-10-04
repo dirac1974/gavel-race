@@ -39,6 +39,8 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 | Expected cash per race fixed | Exact | Within about 0.2–0.5% |
 | Rounding treats horses equally | No | Yes (±0.2%) |
 
+**Known edge case (tested):** if your skill is already at the floor and a rival is already capped at R = 1, other riders scoring higher raises the race average, lowers them, and can raise your chance slightly (+0.05 points in the worst case found). Whenever no clamp binds, a rival improving never raises your chance.
+
 ### Note on race-average vs. league-average skill
 
 Because the tilt rescales the whole field, adding the same constant to every `R` changes nothing. Centering on the race average therefore gives the same chances as centering on any league median, except at the clamp edges (about 0.2% of probability per race). Race-average centering was chosen because it reads naturally ("beat the field's taps"), needs no league statistic that accounts could manipulate, and limits collusion: tanking riders drag the race average down too.

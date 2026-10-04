@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+__pycache__/
+.pytest_cache/
+tests/fixtures/race_math.json

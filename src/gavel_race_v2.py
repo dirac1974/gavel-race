@@ -51,7 +51,9 @@ def base_chances(ratings: Sequence[float], cfg: Config) -> List[float]:
 
 # Step 2
 def lock_purses(q: Sequence[float], cfg: Config) -> List[int]:
-    return [5 * round(cfg.B / (5 * qi)) for qi in q]
+    # floor(x + 0.5) rather than round(): Python's round() is banker's rounding,
+    # Luau's math.round rounds half away from zero. This keeps both identical.
+    return [5 * math.floor(cfg.B / (5 * qi) + 0.5) for qi in q]
 
 
 # Step 3
@@ -72,19 +74,24 @@ def live_chances(q: Sequence[float], R: Sequence[float], cfg: Config) -> List[fl
 
 
 # Step 6
-def draw_finish(p: Sequence[float], rng: random.Random) -> List[int]:
-    left = dict(enumerate(p))
-    order = []
-    while left:
-        x = rng.random() * sum(left.values())
+def draw_finish(p: Sequence[float], rng) -> List[int]:
+    """Sequential draw (Harville). Lanes are scanned in index order so the
+    Luau port gives the identical order from the same uniform draws."""
+    taken = [False] * len(p)
+    order: List[int] = []
+    for _ in range(len(p)):
+        total = sum(v for i, v in enumerate(p) if not taken[i])
+        x = rng.random() * total
         pick = -1
-        for i, v in left.items():
+        for i, v in enumerate(p):
+            if taken[i]:
+                continue
             pick = i
             x -= v
             if x <= 0:
                 break
         order.append(pick)
-        del left[pick]
+        taken[pick] = True
     return order
 
 
