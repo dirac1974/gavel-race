@@ -41,3 +41,33 @@ Lock decimal odds `o_i` from `q_i` with a 7% overround and the tiered round. Map
 - Bet-distribution-independent house edge (fixed-odds edge depends on where money lands; the invariant assumes balanced action or is the odds-weighted moment).
 - Ordered exacta (specific 1st then 2nd) was discussed and deferred; product is either-order.
 - Jurisdiction / gaming-license framing was not part of this design.
+
+## v2 — no-wager game model (2026-10-04)
+
+The model is being used for a kid-friendly Roblox horse racing game. Roblox prohibits simulated and actual gambling, including betting free currency, so the game has no stakes: entry is free and the winner receives a purse locked before the race. v2 replaces the v1 probability adjustment; v1 stays as history. Full detail: [V2_PROPOSAL.md](V2_PROPOSAL.md).
+
+### Why v1 was changed
+
+- The `Σ p'·o = C` constraint rewarded longshots regardless of play (repo example: S = 18 horse 4% → 7.95%).
+- The linear shift went negative in about 49% of random races.
+- Skill noise blurred the gavel, and it only averages out in a linear model.
+- Tiered rounding paid favorites less (expected return 0.875 vs. 0.90–0.96).
+- Margin and the "+EV 20–30%" target require a stake.
+
+### v2 decisions
+
+1. Base chance `q = softmax(Rating / T)`, floored at 2.5%; `T` by league (Rookie 22 … Champion 12).
+2. Win purse `5 · round(B / 5q)`: every horse expects `B` at average play. No margin, no tiered rounding.
+3. Window score `100 (1 − d)`, constant-speed meter; `S` = mean of 3 windows.
+4. Skill measured against **this race's average**: `R = clamp((S − mean S) / 50, −0.5, 1)`. Same chances as a league median (the tilt is shift-invariant) except at clamp edges; chosen for clarity, no gameable statistic, and lower collusion gain.
+5. Exponential tilt `p' ∝ q · e^{κR}`, `κ = 1.0`. Always positive; better timing never lowers your own chance.
+6. Finish order by sequential draw (Harville). Flat place prizes 2nd 1.2B, 3rd 0.8B, 4th 0.4B.
+7. Quinella dropped (a pair prediction for a payout is a bet).
+8. `T` controls how often upsets happen; `κ` controls who earns them.
+9. Exact per-race cash invariance traded for ~0.2–0.5% drift, absorbed by `B`.
+10. Party members never share a cash race.
+
+### Open
+
+- Set `κ` and `T` from playtests.
+- Reserve dial `α` (`Purse ∝ q^(−α)`) if training needs to pay more win cash.

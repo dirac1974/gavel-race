@@ -1,5 +1,7 @@
 # Solution
 
+> **Superseded for the game build by [V2_PROPOSAL.md](V2_PROPOSAL.md) (2026-10-04).** This file documents v1, the wagering design, and is kept for history.
+
 All payout multipliers below are **locked before the race**. The gavel never rewrites them.
 
 ## 1. Lock win odds
