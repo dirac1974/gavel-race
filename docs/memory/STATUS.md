@@ -15,17 +15,17 @@ Last updated: 2026-10-04
 
 ## Backlog (top = next)
 
-1. **Studio playtest checklist** (`game/PLAYTEST.md`): what David should verify the first time he runs the prototype, since agents can't open Studio.
-2. **Economy simulator** (`sims/economy.py`): cohorts (casual, regular, skilled; payer, non-payer), faucets and sinks, time-to-league targets. Feeds debate 003.
-3. **Debate 002 — first 10 minutes** (onboarding), then **003 — Energy system**.
-4. **Horse data model**: stats, Potential, conditions weights, Race Rating function (pure module + Python mirror + tests).
-5. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
-6. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
-7. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
-8. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
+1. **Debate 002 — first 10 minutes** (onboarding), then **003 — Energy system**.
+2. **Horse data model**: stats, Potential, conditions weights, Race Rating function (pure module + Python mirror + tests).
+3. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
+4. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
+5. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
+6. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
+7. **Economy sim v2**: add Energy, training, sinks, and Diamonds to `sims/economy.py`.
 
 ## Done
 
+- 2026-10-04: Studio playtest checklist; economy simulator; Stakes thresholds (D-013).
 - 2026-10-04: gavel meter, race session, Rojo prototype, Luau tests, syntax checks, debate 001.
 - 2026-10-04: agent team, memory docs, Python tests, Luau parity, CI.
 - 2026-10-04: v2 model, Luau module, V2 proposal.

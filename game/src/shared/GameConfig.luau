@@ -24,7 +24,8 @@ GameConfig.rFloor = -0.5
 GameConfig.placePrizes = { 1.2, 0.8, 0.4 }       -- 2nd, 3rd, 4th, in units of B
 GameConfig.leaguePoints = { 10, 6, 4, 2 }        -- 1st..4th; everyone else gets finishPoints
 GameConfig.finishPoints = 1
-GameConfig.stakesUnlockPoints = 100
+-- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py)
+GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 1400, Gold = 3000 }
 GameConfig.maxTapRewindSeconds = 0.3             -- D-010 latency allowance
 GameConfig.missedTapScore = 0
 GameConfig.botScoreMean = 50

@@ -7,3 +7,4 @@ Provisional decisions made by the team under D-009, newest last. For each: keep,
 | D-002a | Diamonds buy cosmetics, time, space, and Exhibition entries only; never win chance or cash-league qualification | Change the Diamond catalog config and D-002a |
 | D-010 | Gavel meter: speed per league, drifting target in Gold+, two half-width targets in Champion final window, feedback labels, 0.3 s latency allowance | Edit `GameConfig.leagues` and `GameConfig.scoreLabels` |
 | D-011 | Prototype rules: missed tap = 0, disconnect = window average once, bots ±6 rating and N(50,15) scores, bots unpaid | Edit `GameConfig` (missedTapScore, bot*) |
+| D-013 | Stakes thresholds 100 / 110 / 1,400 / 3,000 League Points to hit the Bronze 3 h, Silver 3 days, Gold 3 weeks targets | Edit `GameConfig.stakesUnlockPoints` |

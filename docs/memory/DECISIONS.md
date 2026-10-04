@@ -105,3 +105,12 @@ Template:
 - Status: Accepted
 - Decided by: team (engineering)
 - Decision: purse rounding uses floor(x + 0.5) in both languages (Python's round() is banker's rounding); the finish draw scans lanes in index order. Parity tests compare 300 fixture races to 1e-9, including purses and finish orders.
+
+## D-013 — Stakes thresholds per league
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Context: flat 100-point thresholds let an engaged player (25 races/day) reach Gold on day 4.6, far ahead of the 3-week target.
+- Decision: League Points to unlock Stakes: Rookie 100, Bronze 110, Silver 1,400, Gold 3,000. Simulated engaged player: Bronze ~3 h of play, Silver day 3, Gold day 20, Champion day ~56.
+- Consequences: casual players (6 races/day) don't reach Gold within 90 days; revisit once Energy and training are modeled.
+- Links: sims/economy.py, sims/README.md, GameConfig.stakesUnlockPoints
