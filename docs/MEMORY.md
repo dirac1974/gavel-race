@@ -71,3 +71,7 @@ The model is being used for a kid-friendly Roblox horse racing game. Roblox proh
 
 - Set `κ` and `T` from playtests.
 - Reserve dial `α` (`Purse ∝ q^(−α)`) if training needs to pay more win cash.
+
+## Agent team (2026-10-04)
+
+The repo now runs as a Claude Code project: `CLAUDE.md` holds the hard rules and build loop, `.claude/agents/` defines the engineering team (model, Roblox, test, review, economy, scribe) and the design council (moderator, four designers, researcher). Living memory is in `docs/memory/`; debates in `docs/debates/`; research in `docs/research/`. Tests in `tests/`, CI in `.github/workflows/ci.yml`. How to run it: [KICKOFF.md](KICKOFF.md).

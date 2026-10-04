@@ -23,6 +23,7 @@ Roblox prohibits both simulated and actual gambling, including bets with free cu
 ## Run
 
 ```bash
+pip install -r requirements-dev.txt && python -m pytest -q   # tests
 python src/gavel_race_v2.py            # v2 reference + simulations (~5 s)
 python src/gavel_race_v2.py --races 50000 --seed 1
 python src/gavel_race.py               # v1, kept for history
@@ -34,6 +35,10 @@ Stdlib only. `src/RaceMath.luau` is the same v2 model as a Roblox server ModuleS
 
 | File | Contents |
 | --- | --- |
+| [CLAUDE.md](CLAUDE.md) | Rules and build loop for the Claude Code agent team |
+| [docs/KICKOFF.md](docs/KICKOFF.md) | Prompts to run build loops, debates, research |
+| [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) | Roblox game design: loop, economy, progression, reskins, roadmap |
+| [docs/memory/](docs/memory/) | Decisions, status, open questions, changelog |
 | [docs/V2_PROPOSAL.md](docs/V2_PROPOSAL.md) | v2 rationale, formulas, dials, simulation results, integrity rules |
 | [docs/MEMORY.md](docs/MEMORY.md) | Session memory: concept, decisions, both versions |
 | [docs/CONCEPT.md](docs/CONCEPT.md) | Original game concept and player loop (v1 framing) |

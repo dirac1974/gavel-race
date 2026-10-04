@@ -1,0 +1,7 @@
+# Changelog
+
+Newest first. One line per commit.
+
+- 2026-10-04 — Agent team, memory docs, tests, CI
+- 2026-10-04 — v2 no-wager race model: tilt, cash purses, race-relative skill
+- 2026-10-03 — Initial commit: gavel-race concept, memory docs, v1 locked-odds model
