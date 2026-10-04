@@ -100,5 +100,8 @@ do
 	for i = 1, 8 do check(close(p[i], q[i], 1e-12), "equal scores return base chances") end
 end
 
+-- Game modules ---------------------------------------------------------------
+require("./game_tests")(check, close)
+
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

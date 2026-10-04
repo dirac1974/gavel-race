@@ -83,3 +83,25 @@ Template:
 - Status: Accepted
 - Decided by: David ("make all decisions yourself and we can review later")
 - Decision: the team makes design decisions as `Accepted (provisional)`, logs reasoning and alternatives, and lists each in `REVIEW_QUEUE.md`. Hard rules 1–3 in CLAUDE.md (no wagering, Diamond limits as policy safeguards, kid safety) are not open to this delegation.
+
+## D-010 — Gavel meter feel and difficulty curve
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009 (debate 001)
+- Decision: same scoring in every league; difficulty from triangle-wave sweep speed (Rookie 2.4 s → Champion 1.1 s), a drifting target in Gold and Champion, and two half-width targets in Champion's final window. One tap per window, window 4 s in Rookie and 3 s elsewhere. Feedback labels Perfect/Great/Good/Okay/Miss with the score and win-chance change. Accessibility options; slower-meter assist only outside cash races. Taps scored at client-claimed server time if ≤ 0.3 s before arrival and inside the window.
+- Alternatives: narrower scoring band per league (breaks comparability of S); fixed difficulty (no progression).
+- Links: docs/debates/001-gavel-meter-feel.md, game/src/shared/GameConfig.luau, game/src/shared/GavelMeter.luau
+
+## D-011 — Prototype race rules
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Decision: a missed tap scores 0; a disconnect scores the window's race average once per race; bots fill lanes after 20 s, rated within ±6 of the human median, scoring Normal(50, 15); bots are never paid; 4 s of running between windows; prototype runs Rookie only and keeps currency in leaderstats (no saving yet).
+- Alternatives: missed tap = 25 for Rookie (gentler, but blurs the skill signal); bots at league-average rating (worse matchmaking for strong or weak horses).
+- Links: game/src/shared/RaceSession.luau, game/src/server/RaceService.server.luau
+
+## D-012 — Python and Luau must agree exactly
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: team (engineering)
+- Decision: purse rounding uses floor(x + 0.5) in both languages (Python's round() is banker's rounding); the finish draw scans lanes in index order. Parity tests compare 300 fixture races to 1e-9, including purses and finish orders.

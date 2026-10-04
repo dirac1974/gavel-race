@@ -32,4 +32,5 @@ jobs:
         env:
           LUNE_VERSION: "0.10.5"
       - run: python tests/fixtures/make_fixtures.py
+      - run: lune run tests/luau/syntax_check -- $(git ls-files '*.luau')
       - run: lune run tests/luau/run_all
