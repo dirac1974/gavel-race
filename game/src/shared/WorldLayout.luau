@@ -77,6 +77,7 @@ WorldLayout.places = {
 	vet = { x = 900, z = N - 4, fx = 0, fz = 1, label = "Vet", w = 60, d = 46 },
 	paddock = { x = 760, z = S + 4, fx = 0, fz = -1, label = "Training Paddock", w = 170, d = 150 },
 	market = { x = 990, z = S + 4, fx = 0, fz = -1, label = "Market Corral", w = 110, d = 110 },
+	tackShop = { x = 890, z = S + 4, fx = 0, fz = -1, label = "Tack & Paint", w = 56, d = 40 },
 	trailGate = { x = WorldLayout.STREET_X1, z = WorldLayout.STREET_Z, fx = -1, fz = 0, label = "Trail" },
 	plaza = { x = 700, z = WorldLayout.STREET_Z, fx = -1, fz = 0, label = "Fair Street" },
 	track = { x = 525, z = -500, fx = -1, fz = 0, label = "Racetrack" },

@@ -62,6 +62,9 @@ function Profile.new(now: number): Profile
 		flags = {},
 		garden = Profile.emptyGarden(),
 		chores = {},
+		diamonds = 0,
+		style = { owned = {}, equipped = {} },
+		receipts = {},
 	}
 end
 
@@ -118,6 +121,12 @@ function Profile.migrate(data: any, now: number): Profile
 		end
 	end
 	p.chores = chores
+	-- Diamonds (D-050): bought or earned, spent only on cosmetics.
+	p.diamonds = math.max(0, math.floor(tonumber(p.diamonds) or 0))
+	p.style = if typeof(p.style) == "table" then p.style else {}
+	p.style.owned = if typeof(p.style.owned) == "table" then p.style.owned else {}
+	p.style.equipped = if typeof(p.style.equipped) == "table" then p.style.equipped else {}
+	p.receipts = if typeof(p.receipts) == "table" then p.receipts else {}
 	return p :: Profile
 end
 
@@ -246,6 +255,8 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 			return g
 		end)(),
 		chores = table.clone(p.chores),
+		diamonds = p.diamonds or 0,
+		style = { owned = table.clone((p.style and p.style.owned) or {}), equipped = table.clone((p.style and p.style.equipped) or {}) },
 	}
 end
 

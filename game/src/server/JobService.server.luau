@@ -13,6 +13,20 @@ local Care = require(Shared:WaitForChild("Care"))
 local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Style = require(Shared:WaitForChild("Style"))
+
+-- Every monthly job claimed: a milestone gift of Diamonds, once per month (D-050).
+local function monthlyGift(player: Player, data)
+	local jobs = data.jobs
+	if not jobs or typeof(jobs.monthly) ~= "table" or #jobs.monthly == 0 then return end
+	if jobs.giftMonth == jobs.monthlyPeriod then return end
+	for _, j in jobs.monthly do
+		if not j.claimed then return end
+	end
+	jobs.giftMonth = jobs.monthlyPeriod
+	Style.earn(data, Style.EARN_MONTHLY_RIBBON)
+	Profiles.notify(player, string.format("Every monthly job done! +%d 💎", Style.EARN_MONTHLY_RIBBON), "diamond")
+end
 local Profile = require(Shared:WaitForChild("Profile"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
@@ -69,6 +83,7 @@ JobClaim.OnServerEvent:Connect(function(player: Player, kind: any, index: any)
 	if not data then return end
 	if index == "all" then
 		local n = Jobs.claimAllIn(data, player.UserId, kind, os.time())
+		monthlyGift(player, data)
 		if n > 0 then
 			Profiles.notify(player, string.format("%d reward%s collected!", n, if n == 1 then "" else "s"), "gift")
 			Profiles.changed(player)
@@ -77,6 +92,7 @@ JobClaim.OnServerEvent:Connect(function(player: Player, kind: any, index: any)
 	end
 	if typeof(index) ~= "number" then return end
 	local ok, def = Jobs.claim(data, player.UserId, kind, index, os.time())
+	monthlyGift(player, data)
 	if ok and def then
 		Profiles.notify(player, "Reward collected!", "gift")
 		Profiles.changed(player)

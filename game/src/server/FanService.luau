@@ -19,6 +19,7 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local TapTime = require(Shared:WaitForChild("TapTime"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
+local Style = require(Shared:WaitForChild("Style"))
 
 local FanService = {}
 
@@ -113,6 +114,11 @@ function FanService.finish(courseId: string, winnerLane: number)
 	local r = races[courseId]
 	races[courseId] = nil
 	if not r then return end
+	for player in r.cheers do -- flags come down when the race ends
+		local head = player.Character and player.Character:FindFirstChild("Head")
+		local flag = head and head:FindFirstChild("FanFlag")
+		if flag then task.delay(8, function() if flag.Parent then flag:Destroy() end end) end
+	end
 	local session = r.session
 	local entries = {}
 	local t = os.time()
@@ -145,6 +151,10 @@ function FanService.finish(courseId: string, winnerLane: number)
 			local levelBefore = Fans.level(f.xp)
 			f.xp += xp
 			f.dayXp += xp
+			local _, profile = fanData(e.player)
+			for _ = levelBefore + 1, Fans.level(f.xp) do
+				Style.earn(profile, Style.EARN_FAN_LEVEL) -- a milestone gift per Fan level (D-050)
+			end
 			if e.flagged then -- one strike per race at most
 				local last = f.strikes[#f.strikes]
 				if last and t - last >= STRIKE_EXPIRY then table.clear(f.strikes) end -- 90 days without a flag
@@ -183,6 +193,25 @@ Cheer.OnServerEvent:Connect(function(player: Player, courseId: any, lane: any)
 	end
 	r.cheers[player] = lane
 	FanStatus:FireClient(player, courseId, lane, "Cheering for " .. r.session.lanes[lane].name .. "!")
+	-- Your fan flag (earned with Fan levels) over your head while the race runs.
+	local data = Profiles.get(player)
+	local flag = data and Style.worn(data, "fan")
+	local head = player.Character and player.Character:FindFirstChild("Head")
+	if flag and head and not head:FindFirstChild("FanFlag") then
+		local bb = Instance.new("BillboardGui")
+		bb.Name = "FanFlag"
+		bb.Size = UDim2.fromOffset(36, 36)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 2.6, 0)
+		bb.MaxDistance = 120
+		local t = Instance.new("TextLabel")
+		t.Size = UDim2.fromScale(1, 1)
+		t.BackgroundTransparency = 1
+		t.TextScaled = true
+		t.Text = flag.emoji
+		t.Parent = bb
+		bb.Parent = head
+		task.delay(240, function() if bb.Parent then bb:Destroy() end end)
+	end
 end)
 
 ClapTap.OnServerEvent:Connect(function(player: Player, courseId: any, claimed: any)

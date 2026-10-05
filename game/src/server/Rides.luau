@@ -12,6 +12,88 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
+local Style = require(Shared:WaitForChild("Style"))
+
+local PATTERN_TEXT = { stars = "⭐ ⭐ ⭐", checks = "🏁", lightning = "⚡", goldtrim = "", plain = "", dots = "• • •", star = "⭐" }
+
+-- A saddle cloth in your shop colours, on the horse's back just under the saddle.
+local function addCloth(rig: Model, at: CFrame, height: number, item)
+	if not item then return end
+	local root = rig:FindFirstChild("VisualRoot")
+	if not root then return end
+	local cloth = Instance.new("Part")
+	cloth.Name = "SaddleCloth"
+	cloth.Size = Vector3.new(2.9, 1.6, 2.6)
+	cloth.Color = Color3.fromHex(item.color or "FBFBF5")
+	cloth.Material = Enum.Material.Fabric
+	cloth.CanCollide, cloth.CanTouch, cloth.CanQuery, cloth.Massless = false, false, false, true
+	cloth.CFrame = at * CFrame.new(0, height * 0.6 - 0.75, 0.5)
+	cloth.Parent = rig
+	local w = Instance.new("WeldConstraint")
+	w.Part0, w.Part1 = root, cloth
+	w.Parent = cloth
+	if item.pattern == "goldtrim" then cloth.Color = Color3.fromHex(item.color or "7B2D26") end
+	local text = PATTERN_TEXT[item.pattern or "plain"] or ""
+	if item.pattern == "goldtrim" then
+		local trim = Instance.new("SelectionBox")
+		trim.Adornee = cloth
+		trim.Color3 = Color3.fromHex("E3B341")
+		trim.LineThickness = 0.12
+		trim.SurfaceTransparency = 1
+		trim.Parent = cloth
+	end
+	if text ~= "" then
+		for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
+			local sg = Instance.new("SurfaceGui")
+			sg.Face = face
+			sg.CanvasSize = Vector2.new(200, 120)
+			sg.Parent = cloth
+			local l = Instance.new("TextLabel")
+			l.Size = UDim2.fromScale(1, 1)
+			l.BackgroundTransparency = 1
+			l.TextScaled = true
+			l.Text = text
+			l.TextColor3 = Color3.new(1, 1, 1)
+			l.Parent = sg
+		end
+	end
+end
+
+-- Your helmet while you ride (taken off when you get off or race: races use lane colours).
+local function putOnHelmet(character: Model?, item)
+	local head = character and character:FindFirstChild("Head")
+	if not head or not item or head:FindFirstChild("RideHelmet") then return end
+	local helmet = Instance.new("Part")
+	helmet.Name = "RideHelmet"
+	helmet.Shape = Enum.PartType.Ball
+	helmet.Size = Vector3.new(1.35, 1.35, 1.35)
+	helmet.Color = Color3.fromHex(item.color or "E5484D")
+	helmet.CanCollide, helmet.CanTouch, helmet.CanQuery, helmet.Massless = false, false, false, true
+	helmet.CFrame = head.CFrame * CFrame.new(0, 0.25, 0)
+	local w = Instance.new("WeldConstraint")
+	w.Part0, w.Part1 = head, helmet
+	w.Parent = helmet
+	helmet.Parent = head
+	local text = PATTERN_TEXT[item.pattern or "plain"] or ""
+	if text ~= "" then
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = Enum.NormalId.Front
+		sg.CanvasSize = Vector2.new(100, 100)
+		sg.Parent = helmet
+		local l = Instance.new("TextLabel")
+		l.Size = UDim2.fromScale(1, 1)
+		l.BackgroundTransparency = 1
+		l.TextScaled = true
+		l.Text = text
+		l.Parent = sg
+	end
+end
+
+local function takeOffHelmet(character: Model?)
+	local head = character and character:FindFirstChild("Head")
+	local helmet = head and head:FindFirstChild("RideHelmet")
+	if helmet then helmet:Destroy() end
+end
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
@@ -179,6 +261,7 @@ end
 function Rides.dismount(player: Player)
 	local rig = active[player]
 	active[player] = nil
+	takeOffHelmet(player.Character)
 	if not rig then return end
 	local seat = rig:FindFirstChild("Saddle")
 	local occupant = seat and seat.Occupant
@@ -217,6 +300,12 @@ function Rides.call(player: Player): (boolean, string?)
 	local at = CFrame.lookAt(base, base + look.Unit)
 	local rig = build(player, h, at)
 	active[player] = rig
+	local data2 = Profiles.get(player)
+	if data2 then
+		local _, size = rig:GetBoundingBox()
+		addCloth(rig, at, math.min(size.Y, 8), Style.worn(data2, "cloth"))
+		putOnHelmet(character, Style.worn(data2, "helmet"))
+	end
 	task.defer(function()
 		local seat = rig:FindFirstChild("Saddle")
 		if seat and humanoid.Parent then seat:Sit(humanoid) end

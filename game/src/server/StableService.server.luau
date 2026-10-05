@@ -16,6 +16,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Care = require(Shared:WaitForChild("Care"))
+local Style = require(Shared:WaitForChild("Style"))
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
 local GROUND_Y = WorldScene.GROUND_Y
@@ -115,7 +116,22 @@ local function horseModel(coat: string): Model
 	return m
 end
 
+-- Fixed spots in the front yard for decor from the Tack & Paint shop (D-050), in plot space
+-- (inward from the lane, across to the right looking in), each facing out to the lane.
+local YARD_SPOTS = {
+	yard_bench = { 22, 18 }, yard_lanterns = { 2, 20 }, yard_saddlerack = { 60, 30 },
+	yard_picnic = { 40, 16 }, yard_haycart = { 70, -14 }, yard_bridge = { 12, -28 },
+}
+
 local function buildBarn(i: number, owner: Player, data)
+	-- Your look from the Tack & Paint shop (free classic red until you choose).
+	local paint = Style.worn(data, "paint")
+	local plate = Style.worn(data, "plate")
+	local wallC = Color3.fromHex(paint and paint.color or "C0392B")
+	local roofC = Color3.fromHex(paint and paint.color2 or "7B2D26")
+	local trimC = Color3.fromHex(paint and paint.color3 or "FBFBF5")
+	local plateC = Color3.fromHex(plate and plate.color or "FBFBF5")
+	local starSet = Style.hasSet(data, "star")
 	local shell = plotModels[i]
 	local old = shell:FindFirstChild("Barn")
 	if old then old:Destroy() end
@@ -129,18 +145,18 @@ local function buildBarn(i: number, owner: Player, data)
 	local front = back - BARN_D
 	local mid = plotCF(i, (front + back) / 2, 0)
 	-- Back and side walls, roof; the front is open stall bays with half doors.
-	part({ Name = "BackWall", Size = Vector3.new(width, BARN_H, 1.2), Color = C.red, Material = Enum.Material.WoodPlanks,
+	part({ Name = "BackWall", Size = Vector3.new(width, BARN_H, 1.2), Color = wallC, Material = Enum.Material.WoodPlanks,
 		CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H / 2, BARN_D / 2) }, barn) -- local +Z is away from the lane
 	for _, s in { -1, 1 } do
-		part({ Name = "SideWall", Size = Vector3.new(1.2, BARN_H, BARN_D), Color = C.red, Material = Enum.Material.WoodPlanks,
+		part({ Name = "SideWall", Size = Vector3.new(1.2, BARN_H, BARN_D), Color = wallC, Material = Enum.Material.WoodPlanks,
 			CFrame = mid * CFrame.new(s * width / 2, GROUND_Y + BARN_H / 2, 0) }, barn)
 	end
 	local roofH = 7
 	for _, s in { -1, 1 } do
-		wedge({ Name = "Roof", Size = Vector3.new(width + 3, roofH, BARN_D / 2 + 2), Color = C.roofRed,
+		wedge({ Name = "Roof", Size = Vector3.new(width + 3, roofH, BARN_D / 2 + 2), Color = roofC,
 			CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H + roofH / 2, s * (BARN_D / 4 + 1)) * CFrame.Angles(0, if s > 0 then math.pi else 0, 0) }, barn)
 	end
-	part({ Name = "Trim", Size = Vector3.new(width + 0.8, 1, BARN_D + 0.8), Color = C.white, CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H, 0) }, barn)
+	part({ Name = "Trim", Size = Vector3.new(width + 0.8, 1, BARN_D + 0.8), Color = trimC, CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H, 0) }, barn)
 	part({ Name = "Floor", Size = Vector3.new(width, 0.3, BARN_D), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
 		CFrame = mid * CFrame.new(0, GROUND_Y + 0.15, 0) }, barn)
 	-- Stall bays.
@@ -148,13 +164,13 @@ local function buildBarn(i: number, owner: Player, data)
 		local across = -width / 2 + 4 + (k - 0.5) * stallW
 		local bay = plotCF(i, front + 0.6, across)
 		if k > 1 then
-			part({ Name = "Divider", Size = Vector3.new(0.8, BARN_H - 2, BARN_D - 1), Color = C.white,
+			part({ Name = "Divider", Size = Vector3.new(0.8, BARN_H - 2, BARN_D - 1), Color = trimC,
 				CFrame = plotCF(i, (front + back) / 2, across - stallW / 2, GROUND_Y + (BARN_H - 2) / 2) }, barn)
 		end
 		-- Dutch half door (lower half), crossed brace.
-		part({ Name = "Stall" .. k, Size = Vector3.new(stallW - 2, 4.4, 0.6), Color = C.white, -- the chores prompt hangs here
+		part({ Name = "Stall" .. k, Size = Vector3.new(stallW - 2, 4.4, 0.6), Color = trimC, -- the chores prompt hangs here
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn)
-		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = C.red,
+		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = wallC,
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
 		local h = data.horses[k]
 		if h then
@@ -166,7 +182,7 @@ local function buildBarn(i: number, owner: Player, data)
 			end
 			hm.Parent = barn
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
-				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" else nil, stallW - 3, 2.2, C.white)
+				bay.LookVector, h.name, if h.id == data.activeHorse or starSet then "⭐" else nil, stallW - 3, 2.2, plateC)
 			nameLabel.Name = "HorseName"
 		end
 	end
@@ -201,15 +217,24 @@ local function buildBarn(i: number, owner: Player, data)
 		end
 		hm.Parent = barn
 	end
+	-- Yard decor you've placed (Tack & Paint shop).
+	for _, it in Style.yard(data) do
+		local spot = YARD_SPOTS[it.id]
+		if spot and it.model then
+			local placed = WorldScene.placeModel(barn, it.model, plotCF(i, spot[1], spot[2], GROUND_Y))
+			if placed and it.id == "yard_lanterns" then
+				WorldScene.placeModel(barn, it.model, plotCF(i, spot[1], -spot[2], GROUND_Y)) -- the pair: both sides of the gate
+			end
+		end
+	end
 	-- Barnyard bits from the uploaded art (skipped until it loads): a horseshoe over the barn,
 	-- a feed bucket and brush by the first stall, a wheelbarrow and pitchfork round the side,
-	-- a saddle rack, and the post box at the gate (friends' carrot gifts, D-042).
+	-- and the post box at the gate (friends' carrot gifts, D-042).
 	WorldScene.placeModel(barn, "horseshoe_decor", plotCF(i, front - 0.8, 0, GROUND_Y + BARN_H + 1.5))
 	WorldScene.placeModel(barn, "feed_bucket", plotCF(i, front - 3, -width / 2 + 6, GROUND_Y))
 	WorldScene.placeModel(barn, "grooming_brush", plotCF(i, front - 3, -width / 2 + 9, GROUND_Y))
 	WorldScene.placeModel(barn, "wheelbarrow", plotCF(i, front - 14, propA - 6, GROUND_Y))
 	WorldScene.placeModel(barn, "pitchfork", plotCF(i, front - 14, propA - 11, GROUND_Y))
-	WorldScene.placeModel(barn, "saddle_rack", plotCF(i, front - 4, width / 2 - 6, GROUND_Y))
 	WorldScene.placeModel(barn, "post_box", plotCF(i, 3, GATE_W / 2 + 3, GROUND_Y))
 	-- The Stable Board noticeboard by the gate (D-043).
 	local nbCF = plotCF(i, 9, -GATE_W / 2 - 9, GROUND_Y)
@@ -355,6 +380,13 @@ end
 
 local function signature(data): string
 	local parts = { tostring(data.stalls), tostring(data.activeHorse), tostring(#data.horses) }
+	-- the look from the shop
+	for _, slot in { "paint", "plate" } do
+		local it = Style.worn(data, slot)
+		table.insert(parts, it and it.id or "")
+	end
+	table.insert(parts, tostring(Style.hasSet(data, "star")))
+	for _, it in Style.yard(data) do table.insert(parts, it.id) end
 	for _, h in data.horses do table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name) end
 	return table.concat(parts, "|")
 end
