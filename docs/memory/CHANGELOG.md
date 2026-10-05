@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: race steering S0 (D-054): Python trip model `src/trip.py`, `live_chances(..., extra)`, calibration sim and generated per-post baseline (`TripBaseline.luau`), parity fixtures, 491 tests; tuned groundPerLaneTurn 0.010 and bots.wideShare 0.20
 - 2026-10-05 — docs: debates 009 (training rides) and 010 (race steering); D-053 and D-054
 - 2026-10-05 — fix: running legs review: legs never drift, gait cross-fade, rest at race end, fitted saddle cloth (lane numbers in races), smooth normals, fallbacks
 - 2026-10-05 — feat: running legs: standing horses split into body and legs, walk/trot/gallop cycles on races, rides and wild horses (D-051)

@@ -523,6 +523,11 @@ Template:
   - **Replays** record each horse's lane per frame on this screen and add your line as a ribbon with green chevrons, wind lines and the lock marker; no ideal-line ghost.
   - **Python:** `live_chances(..., extra)` and `src/trip.py` mirror `Trip.luau` exactly (D-012).
 - Tuning: in the moderator's prototype a skilled steerer gains +0.011 to +0.023 over Smart Steer, a rider who never steers with Smart Steer off loses 0.014–0.016, and the post baseline cuts post bias from up to ±0.02 to at most 0.003. Without tuck-in most lane changes were refused. All values are in `GameConfig.steering`, and the post baselines are generated into `TripBaseline.luau` by `sims/steering.py`.
+- Calibration (S0, 2026-10-05, model engineer): two tuning changes, so every acceptance target passes on both courses and all distances (docs/research/steering-calibration.md).
+  - **Ground 0.010** per lane per 180° (was 0.012): at 0.012 a rail rider beat Smart Steer by +0.030 in Marathons (three turns count); now +0.017 to +0.028.
+  - **`bots.wideShare = 0.20`** (new): 20% of bots ride one lane wider than Smart Steer, alongside the 25% on the rail. With rail riders only, the average bot out-steered Smart Steer, and a Smart Steer kid among bots averaged τ = −0.007 (dirt Marathon); now −0.0014 to +0.0025.
+  - Tuck-in eases back to the slot behind the whole group alongside, but only if that slot is at most 1.5 lengths back; otherwise the horse waits for room. 77% of inward presses reach their lane within 3 s.
+  - The per-post baseline is calibrated on clamped τ.
 - Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
 - Alternatives:
   - cosmetic steering only (kids learn the input does nothing; kept as `scale = 0`);
