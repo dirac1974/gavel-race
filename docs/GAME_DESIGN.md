@@ -22,6 +22,8 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 
 Spectators cheer for one rider before the first gavel window, for free. They earn Fan XP from that rider's taps (Perfect 3, Great 2, Good 1) plus a flat 2 if the rider wins, up to 11 per race and 100 per day. Fan XP unlocks cosmetics only and stays much smaller than racing rewards. No picks of finishing order, nothing scaled by win chance, and riders can't cheer in their own race.
 
+Optional **Clap Along** (D-020): fans clap on their horse's hoofbeats. The three best fans per horse count (60/25/15%), so three good friends match a big crowd. A full crowd adds a tiny lift to the horse's win chance (12.5% → 12.8%), cash races included. Never buyable.
+
 ## Horses
 
 Stats 0–100 with a breed Potential cap: **Speed, Acceleration, Stamina, Grit, Focus** (Focus slightly slows the gavel meter, capped small).
