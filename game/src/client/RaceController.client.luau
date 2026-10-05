@@ -695,6 +695,7 @@ local function closeResults()
 	remotes.Dismount:FireServer()
 	rideCamera(false)
 	setJumping(true)
+	RaceState.releaseMyRace()
 end
 doneBtn.Activated:Connect(closeResults)
 watchBtn.Activated:Connect(function()
@@ -770,9 +771,12 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 		-- Riders stay on their horse for the results and replay; Done gets them off. The
 		-- server also dismounts everyone after a timeout, so restore the camera then too.
 		task.delay(GameConfig.dismountTimeoutSeconds + 0.5, function()
-			if not RaceState.active then
+			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.SeatPart == nil and not (RaceState.active and RaceState.myLane) then
 				rideCamera(false)
 				setJumping(true)
+				results.Visible = false
+				RaceState.releaseMyRace()
 			end
 		end)
 	end

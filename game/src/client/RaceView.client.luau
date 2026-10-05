@@ -68,14 +68,14 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		race.offset[i], race.target[i] = 0, 0
 		if lane.id == myId then race.myLane = i end
 	end
-	race.focus = RaceState.consider(courseId, laneList, start)
+	local focus = RaceState.consider(courseId, laneList, start)
 	races[courseId] = race
-	if race.focus then
+	if focus then
 		RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 		RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
 		RaceState.myLane = race.myLane
 		RaceState.course = courseId
-		RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {}, course = courseId }
+		RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {}, course = courseId, myLane = race.myLane }
 		RaceState.nudgeAt = -math.huge
 	end
 end)
@@ -89,10 +89,11 @@ end)
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	local race = races[courseId or "dirt"]
 	races[courseId or "dirt"] = nil
-	if race and race.focus then
+	if race and RaceState.focus == (courseId or "dirt") then
 		RaceState.active = false
 		RaceState.recording = nil
 	end
+	if race and race.myLane then RaceState.releaseMyRace() end
 end)
 
 remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
@@ -100,7 +101,7 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	if not race then return end
 	race.done = true
 	race.doneAt = serverNow()
-	if race.focus then
+	if RaceState.focus == (courseId or "dirt") then
 		RaceState.setFinal(summary)
 		if RaceState.recording then RaceState.recording.summary = summary end
 	end
@@ -111,8 +112,9 @@ RunService.RenderStepped:Connect(function(dt)
 	local t = serverNow()
 	local k = math.min(1, dt * 2.5)
 	for courseId, race in races do
+		local isFocus = RaceState.focus == courseId -- only the followed race writes the shared state
 		local base = math.max(0, (t - race.start) * GameConfig.raceSpeedStudsPerSecond)
-		local nudge = if race.focus then GameConfig.tapNudgeFeet * math.exp(-(t - (RaceState.nudgeAt or -math.huge)) / 0.6) else 0
+		local nudge = if isFocus then GameConfig.tapNudgeFeet * math.exp(-(t - (RaceState.nudgeAt or -math.huge)) / 0.6) else 0
 		local allStopped = true
 		for i = 1, race.lanes do
 			race.offset[i] += (race.target[i] - race.offset[i]) * k
@@ -126,9 +128,9 @@ RunService.RenderStepped:Connect(function(dt)
 			if moving then allStopped = false end
 			local bob = if moving then BOB_STUDS * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi)) else 0
 			place(i, p, bob, race.plan, courseId)
-			if race.focus then RaceState.progress[i] = p end
+			if isFocus then RaceState.progress[i] = p end
 		end
-		if race.focus then
+		if isFocus then
 			RaceState.rank()
 			-- Record for the replay.
 			local rec = RaceState.recording
@@ -141,7 +143,7 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		if race.done and (allStopped or t - race.doneAt > GameConfig.runInSeconds + 4) then
 			races[courseId] = nil -- the horses stay where they stopped until the next race (or the replay)
-			if race.focus then RaceState.active = false end
+			if isFocus then RaceState.active = false end
 		end
 	end
 end)
