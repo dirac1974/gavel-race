@@ -15,7 +15,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 ## Giddy-up stretches (×3)
 - [ ] The stretch name appears with "GIDDY-UP!" (The Break, Backstretch, Final Stretch).
 - [ ] Each beat sends a ring that closes on the dark hoof in the same time (0.9 s), so two rings are often on screen; the hoof flashes on the beat.
-- [ ] The board dims during taps so the ring stands out; the yellow GIDDY-UP pad pulses at the bottom.
+- [ ] The board dims during taps so the ring stands out; the yellow GIDDY-UP pad pulses at the bottom before the first ring, then holds steady while rings are on screen.
 - [ ] Tapping anywhere on the screen (or any key, or any gamepad button) counts, but not while typing in chat; each tap shows Perfect / Great / Good / Okay / Off beat.
 - [ ] Tapping twice on one beat shows "Broke stride!" and the too-fast hint.
 - [ ] Rookie tempo is steady (0.6 s per beat); there are 8 beats.

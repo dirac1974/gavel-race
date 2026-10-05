@@ -307,7 +307,13 @@ RunService.RenderStepped:Connect(function()
 			if math.abs(t - b) < 0.06 then onBeat = true break end
 		end
 		hoof.BackgroundColor3 = if onBeat then Color3.fromRGB(255, 225, 90) else Color3.fromRGB(60, 40, 30)
-		pad.BackgroundTransparency = 0.35 + 0.2 * math.abs(math.sin(t * math.pi * 2))
+		-- Pulse only before the first ring; hold steady while rings are on screen so the
+		-- pad never competes with the beat (art review).
+		if t < beats[1] - RING_LEAD then
+			pad.BackgroundTransparency = 0.35 + 0.2 * math.abs(math.sin(t * math.pi * 2))
+		else
+			pad.BackgroundTransparency = 0.35
+		end
 		if t > beats[#beats] + active.half + 0.1 then
 			hideAll()
 			active = nil
