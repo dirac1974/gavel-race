@@ -656,6 +656,19 @@ remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
 	end
 end)
 
+remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function()
+	-- The server hit an error mid-race: clear the race screens and give control back.
+	paceState, burstState = nil, nil
+	hideMeters()
+	burstBanner.Visible, results.Visible, placeBadge.Visible = false, false, false
+	if riding then
+		rideCamera(false)
+		setJumping(true)
+	end
+	riding = false
+	status.Text = "That race stopped early. Sorry! Tap RACE! to try again."
+end)
+
 remotes.IntegrityNote.OnClientEvent:Connect(function(text)
 	hint.Text = text -- private; the "Ask for a check" button needs review tooling (not built)
 end)

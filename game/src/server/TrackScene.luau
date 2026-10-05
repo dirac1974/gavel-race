@@ -19,6 +19,7 @@ local Lighting = game:GetService("Lighting")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local UiAtlas = require(Shared:WaitForChild("UiAtlas"))
+local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 
 local TrackScene = {}
 
@@ -195,18 +196,50 @@ local function buildVenue(): Folder
 	part({ Name = "Apron", Size = Vector3.new(18, 0.6, standLen + 60), Color = Color3.fromHex("BDB6A8"),
 		Material = Enum.Material.Concrete, CFrame = CFrame.new(rOut + 9, -0.2, standMid) }, f)
 	local tiers = 7
-	for k = 0, tiers - 1 do
-		local depth = 14
-		local height = 6 + k * 6
-		part({ Name = "StandTier", Size = Vector3.new(depth, height, standLen), Color = if k % 2 == 0 then STAND else STAND_DARK,
-			Material = Enum.Material.Concrete, CFrame = CFrame.new(apron + depth * (k + 0.5), height / 2, standMid) }, f)
-	end
+	-- Gate 1: a tunnel through the stand to Fair Street (D-035), so the stand is built in two
+	-- spans either side of it.
+	local gateZ0 = WorldLayout.STREET_Z - WorldLayout.TUNNEL_WIDTH / 2
+	local gateZ1 = WorldLayout.STREET_Z + WorldLayout.TUNNEL_WIDTH / 2
+	local spans = { { standZ0, gateZ0 }, { gateZ1, standZ1 } }
 	local backX = apron + 14 * tiers
 	local roofY = 6 + tiers * 6 + 24
-	part({ Name = "StandBack", Size = Vector3.new(16, roofY, standLen), Color = BRICK, Material = Enum.Material.Brick,
-		CFrame = CFrame.new(backX + 8, roofY / 2, standMid) }, f)
+	for _, span in spans do
+		local len, mid = span[2] - span[1], (span[1] + span[2]) / 2
+		for k = 0, tiers - 1 do
+			local depth = 14
+			local height = 6 + k * 6
+			part({ Name = "StandTier", Size = Vector3.new(depth, height, len), Color = if k % 2 == 0 then STAND else STAND_DARK,
+				Material = Enum.Material.Concrete, CFrame = CFrame.new(apron + depth * (k + 0.5), height / 2, mid) }, f)
+		end
+		part({ Name = "StandBack", Size = Vector3.new(16, roofY, len), Color = BRICK, Material = Enum.Material.Brick,
+			CFrame = CFrame.new(backX + 8, roofY / 2, mid) }, f)
+	end
 	for z = standZ0 + 40, standZ1 - 40, 80 do -- roof columns
-		part({ Name = "Column", Size = Vector3.new(2, roofY - 8, 2), Color = STAND, CFrame = CFrame.new(apron + 30, 6 + (roofY - 8) / 2 + 2, z) }, f)
+		if z < gateZ0 - 2 or z > gateZ1 + 2 then
+			part({ Name = "Column", Size = Vector3.new(2, roofY - 8, 2), Color = STAND, CFrame = CFrame.new(apron + 30, 6 + (roofY - 8) / 2 + 2, z) }, f)
+		end
+	end
+	-- The tunnel: a paved floor, a low ceiling under the stand, and a sign over each end.
+	local tunnelLen = backX + 16 - apron
+	part({ Name = "TunnelFloor", Size = Vector3.new(tunnelLen + 4, 0.4, WorldLayout.TUNNEL_WIDTH), Color = Color3.fromHex("BFAE95"),
+		Material = Enum.Material.Cobblestone, CFrame = CFrame.new(apron + tunnelLen / 2, -0.3, WorldLayout.STREET_Z) }, f)
+	part({ Name = "TunnelCeiling", Size = Vector3.new(tunnelLen, 2, WorldLayout.TUNNEL_WIDTH + 2), Color = STAND_DARK,
+		Material = Enum.Material.Concrete, CFrame = CFrame.new(apron + tunnelLen / 2, 17, WorldLayout.STREET_Z) }, f)
+	for _, side in { { x = apron - 0.4, face = Enum.NormalId.Left, text = "🎪 Fair Street · Stables" }, { x = backX + 16.4, face = Enum.NormalId.Right, text = "🏁 Racetrack" } } do
+		local sign = part({ Name = "GateSign", Size = Vector3.new(0.6, 6, WorldLayout.TUNNEL_WIDTH - 4), Color = Color3.fromHex("2F5D3A"),
+			CFrame = CFrame.new(side.x, 21, WorldLayout.STREET_Z) }, f)
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = side.face
+		sg.CanvasSize = Vector2.new(1040, 240)
+		sg.Parent = sign
+		local t = Instance.new("TextLabel")
+		t.Size = UDim2.fromScale(1, 1)
+		t.BackgroundTransparency = 1
+		t.Font = Enum.Font.FredokaOne
+		t.TextScaled = true
+		t.TextColor3 = Color3.new(1, 1, 1)
+		t.Text = side.text
+		t.Parent = sg
 	end
 	part({ Name = "Roof", Size = Vector3.new(backX + 16 - (apron + 24), 3, standLen + 10), Color = ROOF,
 		CFrame = CFrame.new((apron + 24 + backX + 16) / 2, roofY, standMid) }, f)
@@ -319,7 +352,7 @@ function TrackScene.laneCFrame(i: number, p: number): CFrame
 end
 
 -- Per race: the gate where this distance starts, and the horses in it.
-function TrackScene.build(plan)
+function TrackScene.build(plan, coats: { string? }?)
 	if not venue or not venue.Parent then
 		Lighting.ClockTime = 15
 		venue = buildVenue()
@@ -345,7 +378,8 @@ function TrackScene.build(plan)
 	horseFolder.Parent = folder
 	horses, saddles = {}, {}
 	for i = 1, LANES do
-		local horse = modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
+		local coat = (coats and coats[i]) or COATS[i]
+		local horse = modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
 		horse:PivotTo(TrackScene.laneCFrame(i, 0))
 		badge(i).Parent = horse

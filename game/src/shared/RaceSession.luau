@@ -56,10 +56,11 @@ function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: 
 	table.sort(ratings)
 	local median = if #ratings > 0 then ratings[math.ceil(#ratings / 2)] else 50
 	local n = 0
+	local offset = math.floor(rng:NextNumber() * #theme.botNames) -- different bot names each race
 	while #field < lanes do
 		n += 1
 		local spread = config.botRatingSpread
-		local name = theme.botNames[((n - 1) % #theme.botNames) + 1]
+		local name = theme.botNames[((n - 1 + offset) % #theme.botNames) + 1]
 		table.insert(field, {
 			id = "bot:" .. n,
 			name = name,
