@@ -5,8 +5,9 @@
 -- crosses the glowing target, one tap per pass; distance from the target sets the score
 -- and the speed meter fills from your last few passes. The target moves every 2-3 passes.
 -- In the homestretch comes the Final Burst: one tap on a big, colourful meter that counts
--- double. Tap anywhere, any key, or any gamepad button. Drawn from the shared server
--- clock; all scoring happens on the server (this screen only predicts it for feedback).
+-- double. Tap anywhere (counted as the finger goes down), or press a key or gamepad button;
+-- movement, camera and menu keys never tap (D-055). Drawn from the shared server clock; all
+-- scoring happens on the server (this screen only predicts it for feedback).
 -- Placeholder shapes show until the uploaded atlas art arrives (UiArt).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -84,8 +85,10 @@ end
 -- a little wider than normal so nearby horses are in view, turning with the horse round
 -- the bends (Follow camera). Scroll or pinch in for first person, or out for more.
 local RIDE_ZOOM, RIDE_FOV, NORMAL_FOV = 14, 80, 70
+local rideCamOn = false
 local function rideCamera(on: boolean)
 	local camera = workspace.CurrentCamera
+	rideCamOn = on
 	if on then
 		if camera then
 			camera.CameraType = Enum.CameraType.Follow
@@ -106,6 +109,24 @@ local function rideCamera(on: boolean)
 		player.CameraMinZoomDistance = 0.5
 	end
 end
+
+-- Off the race horse for any reason (Done, the timeout, the next race on the course rebuilding
+-- its horses): the normal camera and jumping come back straight away.
+local function watchSeat(character: Model)
+	local humanoid = character:WaitForChild("Humanoid", 10)
+	if not humanoid then return end
+	humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
+		if humanoid.SeatPart == nil and rideCamOn then
+			rideCamera(false)
+			setJumping(true)
+		end
+	end)
+end
+if player.Character then task.spawn(watchSeat, player.Character) end
+player.CharacterAdded:Connect(function(character)
+	if rideCamOn then rideCamera(false) end -- a new character starts on foot
+	task.spawn(watchSeat, character)
+end)
 
 -- UI construction -----------------------------------------------------------
 local gui = Instance.new("ScreenGui")
@@ -154,7 +175,10 @@ board.Position = UDim2.new(0, 12, 0, 90)
 board.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
 board.BackgroundTransparency = 0.3
 board.ZIndex = 4
+board.Visible = false
 board.Parent = gui
+local boardScale = Instance.new("UIScale")
+boardScale.Parent = board
 local rows, rowBadges = {}, {}
 for i = 1, 8 do
 	local row = label(board, UDim2.new(1, -40, 0, 24), UDim2.new(0, 34, 0, 5 + (i - 1) * 26), "", 16)
@@ -271,6 +295,8 @@ placeBadge.ZIndex = 6
 placeBadge.Visible = false
 placeBadge.Parent = gui
 round(placeBadge, UDim.new(0, 14))
+local badgeScale = Instance.new("UIScale")
+badgeScale.Parent = placeBadge
 local placeText = label(placeBadge, UDim2.new(1, 0, 0.72, 0), UDim2.fromScale(0, 0), "", 46)
 placeText.Font = Enum.Font.GothamBlack
 placeText.TextColor3 = Color3.fromHex("FFD34D")
@@ -331,6 +357,27 @@ results.ZIndex = 6
 results.Visible = false
 results.Parent = gui
 round(results, UDim.new(0, 16))
+local resultsScale = Instance.new("UIScale")
+resultsScale.Parent = results
+
+-- Small (phone) screens: the board, place badge and results card shrink with the screen, the
+-- badge sits under the race map (scaled the same way), and the card moves up (D-055).
+local function layout()
+	local camera = workspace.CurrentCamera
+	local height = if camera then camera.ViewportSize.Y else 720
+	local k = RaceState.hudScale()
+	boardScale.Scale, badgeScale.Scale, resultsScale.Scale = k, k, k
+	board.Position = UDim2.new(0, 12, 0, math.floor(90 * k))
+	placeBadge.Position = UDim2.new(1, -16, 0, math.floor(RaceState.MAP_TOP + (RaceState.MAP_HEIGHT + 10) * k))
+	results.Position = UDim2.new(0.5, 0, if height < 500 then 0.24 else 0.32, 0)
+end
+local function watchViewport()
+	local camera = workspace.CurrentCamera
+	if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(layout) end
+	layout()
+end
+watchViewport()
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchViewport)
 local rideLine = label(results, UDim2.new(1, -24, 0, 30), UDim2.new(0, 12, 0, -70), "", 26)
 rideLine.ZIndex = 7
 rideLine.Font = Enum.Font.GothamBlack
@@ -466,13 +513,33 @@ local function tap()
 	end
 end
 
-tapArea.Activated:Connect(tap)
+-- Taps count as the finger (or mouse button) goes down, like a key press, not on release.
+tapArea.InputBegan:Connect(function(input)
+	local kind = input.UserInputType
+	if input.UserInputState == Enum.UserInputState.Begin
+		and (kind == Enum.UserInputType.Touch or kind == Enum.UserInputType.MouseButton1) then
+		tap()
+	end
+end)
+-- Keys and buttons that never tap: moving, steering (D-054), the camera, chat and menus. A kid
+-- pressing W to "go" or O to zoom out shouldn't waste a pass or the Final Burst.
+local NOT_TAPS = {}
+for _, name in {
+	"W", "A", "S", "D", "Up", "Down", "Left", "Right", "I", "O", "Slash", "Tab", "Escape", "Backquote",
+	"LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt", "LeftSuper", "RightSuper",
+	"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "PageUp", "PageDown",
+	"DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Thumbstick1", "Thumbstick2", "ButtonSelect", "ButtonStart",
+} do
+	local ok, code = pcall(function() return (Enum.KeyCode :: any)[name] end)
+	if ok and code then NOT_TAPS[code] = true end
+end
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end -- typing in chat, menus, or a GUI button took it
 	local kind = input.UserInputType
-	if kind == Enum.UserInputType.Keyboard or kind == Enum.UserInputType.MouseButton1
-		or kind == Enum.UserInputType.Touch or kind.Name:sub(1, 7) == "Gamepad" then
-		tap()
+	if kind == Enum.UserInputType.Keyboard or kind.Name:sub(1, 7) == "Gamepad" then
+		if not NOT_TAPS[input.KeyCode] then tap() end
+	elseif (kind == Enum.UserInputType.MouseButton1 or kind == Enum.UserInputType.Touch) and not tapArea.Visible then
+		tap() -- the tap pad isn't up yet; tap() ignores it unless a pass or the burst is open
 	end
 end)
 
@@ -491,16 +558,22 @@ end
 
 RunService.RenderStepped:Connect(function()
 	local t = serverNow()
-	if stopGallop and not (RaceState.active and RaceState.myLane and seated()) then gallop(false) end
+	if stopGallop and not (RaceState.active and RaceState.myLane and seated() and not RaceState.myHome) then gallop(false) end
 	-- Meter state belongs to one race; a race the HUD followed before never runs on into this one.
 	if paceState and paceState.race ~= cueRace then paceState = nil end
 	if burstState and burstState.race ~= cueRace then burstState = nil end
 	if chanceArrow.Visible and os.clock() > arrowUntil then chanceArrow.Visible = false end
+	-- While the Final Burst is up it has the screen to itself: the board, race map and place
+	-- badge step aside (on a phone they would cover most of the burst bar).
+	local burstUp = burst.bar.Visible
+	RaceState.burstShowing = burstUp
+	board.Visible = RaceState.active and not burstUp
+	if not RaceState.active then placeBadge.Visible = false end
 	if RaceState.active and os.clock() - lastHud > 0.2 then
 		lastHud = os.clock()
 		renderBoard()
 		local myPlace = myLaneIndex and RaceState.place[myLaneIndex]
-		placeBadge.Visible = myPlace ~= nil
+		placeBadge.Visible = myPlace ~= nil and not burstUp
 		if myPlace then
 			placeText.Text = RaceState.ordinal(myPlace)
 			placeOf.Text = string.format("of %d", RaceState.lanes)
@@ -566,6 +639,11 @@ local pendingBurstOpen = nil
 local finishAt = 0 -- when the field reaches the line (same sums as RaceService)
 local COURSE_NAME = { dirt = "Dirt course", turf = "Turf course" }
 remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen, courseId)
+	-- The next race on the course of your results card rebuilds its horses: the card stays
+	-- (RaceState.consider keeps the focus on it), but there's nothing left to replay.
+	if results.Visible and RaceState.holdFocus and (courseId or "dirt") == RaceState.myCourse then
+		watchBtn.Visible, fullBtn.Visible = false, false
+	end
 	-- Two races can run at once (D-036): follow yours, or the newest when watching.
 	if not RaceState.consider(courseId or "dirt", laneList, start) then return end
 	-- The HUD follows this race now: drop the meters and pending cues of the one it followed before.
@@ -592,6 +670,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	feedback.Text, hint.Text = "", if riding then "Tap when the marker crosses the glow" else ""
 	burstBanner.Visible = false
 	results.Visible = false
+	RaceState.resultsOpen, RaceState.holdFocus = false, false
 	showResultIcon(nil)
 	speedFill.Size = UDim2.fromScale(0, 1)
 	renderBoard()
@@ -616,7 +695,10 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	end
 	if riding then
 		setJumping(false)
-		task.delay(math.max(0, start - serverNow() - 1), rideCamera, true)
+		local id = cueRace
+		task.delay(math.max(0, start - serverNow() - 1), function()
+			if id == cueRace and seated() then rideCamera(true) end -- only once you're in the saddle
+		end)
 	end
 	task.spawn(function()
 		-- YOU marker over your own horse (TrackScene builds it just before this event).
@@ -746,6 +828,7 @@ remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	paceState, burstState = nil, nil
 	hideMeters()
 	burstBanner.Visible, results.Visible, placeBadge.Visible = false, false, false
+	RaceState.resultsOpen, RaceState.holdFocus = false, false
 	if riding then
 		rideCamera(false)
 		setJumping(true)
@@ -763,12 +846,14 @@ end)
 local rideReport = nil -- { stars, gain, place }
 local function closeResults()
 	results.Visible = false
+	RaceState.resultsOpen, RaceState.holdFocus = false, false
 	remotes.Dismount:FireServer()
 	rideCamera(false)
 	setJumping(true)
 	RaceState.releaseMyRace()
 end
 doneBtn.Activated:Connect(closeResults)
+-- The card hides while a replay plays; if the replay can't start, ReplayClosed brings it back.
 watchBtn.Activated:Connect(function()
 	results.Visible = false
 	RaceState.ReplayRequested:Fire("finish")
@@ -778,7 +863,7 @@ fullBtn.Activated:Connect(function()
 	RaceState.ReplayRequested:Fire("full")
 end)
 RaceState.ReplayClosed.Event:Connect(function()
-	results.Visible = true -- back to the results card, not the lobby
+	if RaceState.resultsOpen then results.Visible = true end -- back to the results card, not the lobby
 end)
 
 remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace)
@@ -822,6 +907,8 @@ local function showResults(summary, raceId: number)
 	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
 	doneBtn.Visible = true
 	results.Visible = true
+	RaceState.resultsOpen = true
+	RaceState.holdFocus = rideReport ~= nil -- your own card keeps the HUD until Done
 	if raceId == cueRace then cue(0, "vo_finish") end -- "What a finish!", only if the HUD still follows this race
 	if RaceState.resultsPending then -- your own card: the Hud's coin chime plays now, with it
 		RaceState.resultsPending = false
@@ -840,8 +927,11 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	paceState, burstState = nil, nil
 	feedback.Text, hint.Text = "", ""
 	showResultIcon(nil)
-	status.Text = "And they're home!"
-	cue(finishAt, "finish_fanfare", "crowd_cheer") -- as the leader reaches the line
+	local id = cueRace
+	task.delay(math.max(0, finishAt - serverNow()), function()
+		if id == cueRace then status.Text = "And they're home!" end -- as the leader reaches the line
+	end)
+	cue(finishAt, "finish_fanfare", "crowd_cheer")
 	task.delay(GameConfig.runInSeconds, showResults, summary, cueRace)
 	rideReport = nil
 	if riding then
@@ -854,6 +944,7 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 				rideCamera(false)
 				setJumping(true)
 				results.Visible = false
+				RaceState.resultsOpen, RaceState.holdFocus = false, false
 				RaceState.releaseMyRace()
 			end
 		end)

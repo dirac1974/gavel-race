@@ -55,6 +55,17 @@ GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own scr
 GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
+-- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
+-- clock), so the order on screen is the race order in every lane.
+GameConfig.raceView = {
+	maxGapFeetPerSecond = 10, -- a horse gains or loses ground on the pace at most this fast...
+	catchUpMarginSeconds = 0.3, -- ...unless it must go faster to reach its place by the line
+	gateEaseSeconds = 0.6,    -- horses reach full gallop out of the gate over about this long
+	nudgeRiseSeconds = 0.15,  -- a good tap's nudge on your own horse eases in...
+	nudgeFallSeconds = 0.6,   -- ...and back out
+	settleSeconds = 0.6,      -- after the line, legs ease to standing before the race ends
+	spectateStuds = 250,      -- you watch a race (HUD, cheer bar) only within this of its course
+}
 GameConfig.stride = {
 	beats = 8,                 -- per stretch, ~2 taps a second
 	halfWindowSeconds = 0.08,  -- a tap scores if within this of its beat

@@ -4,14 +4,19 @@
 -- all screens show the same races. Riders are welded to their horse's saddle and move with it.
 -- Both courses (dirt and turf) can race at once; every race on screen is animated, and the
 -- one this client follows (RaceState.focus) also feeds the places, the race map and the replay.
---   Pace: every horse runs at the race's constant speed, so the field reaches the line as
---   the race ends.
+--   Pace: the race clock runs on lane 1 (the rail). Every lane's progress is lane-1 feet over
+--   the lane-1 length, so the order on screen is the race order in every lane; outer horses
+--   cover their longer path a little faster, which nobody sees (D-055). Horses ease out of
+--   the gate to full gallop and still reach the line as the race ends.
 --   Gaps: the server sends each horse's offset from the pace a few times a second. Up to
 --   the far turn it comes from live chance (skill); from the far turn to the last tap it
 --   blends toward the projected finish order (luck), so late chargers come through and the
---   order on screen at the line is the result. No reshuffle at the line.
---   Your own horse also gets a small instant nudge on a Great or Perfect tap (same size for
---   everyone, never luck), so a rider sees their tap work straight away.
+--   order on screen at the line is the result. No reshuffle at the line. A gap changes at a
+--   believable rate (no lurching at checkpoints), faster only when a horse must reach its
+--   place before the line.
+--   Your own horse also gets a small nudge on a Great or Perfect tap (same size for
+--   everyone, never luck), so a rider sees their tap work straight away. It is drawn only:
+--   places are ranked without it, so the place badge never flickers.
 -- It also records the followed race (positions 10 times a second) for the replay.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -30,12 +35,32 @@ local myId = tostring(Players.LocalPlayer.UserId)
 local BOB_HZ, BOB_STUDS = 1.8, 0.3
 local PAST_LINE = 0.012     -- past the line, horses ease to a stop within about this fraction
 local RECORD_HZ = 10
+local VIEW = GameConfig.raceView
+
+-- The tap nudge rises over nudgeRiseSeconds and fades over nudgeFallSeconds; scaled so its
+-- peak is tapNudgeFeet.
+local RISE, FALL = VIEW.nudgeRiseSeconds, VIEW.nudgeFallSeconds
+local NUDGE_PEAK = FALL / (RISE + FALL) * (RISE / (RISE + FALL)) ^ (RISE / FALL)
+local function nudgeFeet(age: number): number
+	if age < 0 or age > 6 * FALL then return 0 end
+	return GameConfig.tapNudgeFeet * (1 - math.exp(-age / RISE)) * math.exp(-age / FALL) / NUDGE_PEAK
+end
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
 
--- races[course] = { course, cfg, start, plan, lanes, myLane, offset = {}, target = {}, done, doneAt, focus }
+-- Feet covered on lane 1 after `s` seconds of a race lasting `T` seconds over `len1` feet:
+-- a quick ease out of the gate (time constant tau), then a steady gallop, reaching len1 at T.
+local function paceFeet(s: number, T: number, len1: number): number
+	if s <= 0 then return 0 end
+	local tau = VIEW.gateEaseSeconds
+	local v = len1 / (T - tau * (1 - math.exp(-T / tau)))
+	return v * (s - tau * (1 - math.exp(-s / tau)))
+end
+
+-- races[course] = { course, cfg, start, T, len1, plan, lanes, myLane, offset = {}, target = {},
+--   done, doneAt, settleAt }
 local races: { [string]: any } = {}
 
 local function horseModel(courseId: string?, i: number): Model?
@@ -82,6 +107,18 @@ function RaceState.restHorses(courseId: string?, lanes: number)
 	end
 end
 
+-- The race you follow is over and the replay wants its horses: stop animating it now.
+function RaceState.finishFollowed(): boolean
+	local id = RaceState.focus
+	local race = id and races[id]
+	if not race then return not RaceState.active end
+	if not race.done then return false end
+	RaceState.restHorses(id, race.lanes)
+	races[id] = nil
+	RaceState.active = false
+	return true
+end
+
 -- Past the line, ease to a stop instead of running on.
 local function easePastLine(p: number): number
 	if p <= 1 then return p end
@@ -92,7 +129,11 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 	courseId = courseId or "dirt"
 	local cfg = TrackLayout.courses[courseId] or TrackLayout.churchill
 	local plan = TrackLayout.plan(cfg, TrackLayout.distances[cond and cond.distance or "Sprint"] or TrackLayout.distances.Sprint)
-	local race = { course = courseId, cfg = cfg, start = start, plan = plan, lanes = #laneList, offset = {}, target = {}, done = false }
+	local len1 = plan.lengths[1]
+	local race = {
+		course = courseId, cfg = cfg, start = start, plan = plan, lanes = #laneList, offset = {}, target = {},
+		done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond,
+	}
 	for i, lane in laneList do
 		race.offset[i], race.target[i] = 0, 0
 		if lane.id == myId then race.myLane = i end
@@ -103,10 +144,20 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 		RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
 		RaceState.myLane = race.myLane
+		RaceState.myHome = false
 		RaceState.course = courseId
 		RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {}, course = courseId, myLane = race.myLane }
 		RaceState.nudgeAt = -math.huge
 	end
+	-- The stalls clear on this screen as the bell rings (the server's removal arrives a ping later).
+	task.delay(math.max(0, start - serverNow()), function()
+		if races[courseId] ~= race then return end
+		local track = RaceState.trackFolder(courseId)
+		if not track then return end
+		for _, child in track:GetChildren() do
+			if child.Name == "gate_stall" then child:Destroy() end
+		end
+	end)
 end)
 
 remotes.RaceOffsets.OnClientEvent:Connect(function(offsets, courseId)
@@ -132,33 +183,51 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	race.done = true
 	race.doneAt = serverNow()
 	if RaceState.focus == (courseId or "dirt") then
-		RaceState.setFinal(summary)
 		if RaceState.recording then RaceState.recording.summary = summary end
+		-- The result arrives about a second before the leader reaches the line. Until then the
+		-- places follow the horses (the same order by the line); the official order then holds.
+		task.delay(math.max(0, race.start + race.T - serverNow()), function()
+			if races[courseId or "dirt"] == race and RaceState.focus == (courseId or "dirt") then
+				RaceState.setFinal(summary)
+			end
+		end)
 	end
 end)
 
 local lastRecord = 0
-RunService.RenderStepped:Connect(function(dt)
+RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, function(dt)
 	local t = serverNow()
 	local k = math.min(1, dt * 2.5)
 	for courseId, race in races do
 		local isFocus = RaceState.focus == courseId -- only the followed race writes the shared state
-		local base = math.max(0, (t - race.start) * GameConfig.raceSpeedStudsPerSecond)
-		local nudge = if isFocus then GameConfig.tapNudgeFeet * math.exp(-(t - (RaceState.nudgeAt or -math.huge)) / 0.6) else 0
+		local s = t - race.start
+		local base = paceFeet(s, race.T, race.len1)
+		local gateSpeed = if s > 0 then 1 - math.exp(-s / VIEW.gateEaseSeconds) else 0
+		local nudge = if isFocus then nudgeFeet(t - (RaceState.nudgeAt or -math.huge)) else 0
+		-- Gaps change at a believable rate, unless a horse must hurry to be in its place by the line.
+		local toLine = race.start + race.T - t
+		local allowed = VIEW.maxGapFeetPerSecond * dt
 		local allStopped = true
 		for i = 1, race.lanes do
-			race.offset[i] += (race.target[i] - race.offset[i]) * k
-			local len = race.plan.lengths[i]
+			local gap = race.target[i] - race.offset[i]
+			local limit = if toLine <= VIEW.catchUpMarginSeconds then math.huge
+				else math.max(allowed, math.abs(gap) * dt / (toLine - VIEW.catchUpMarginSeconds))
+			race.offset[i] += math.clamp(gap * k, -limit, limit)
 			-- Gaps grow in over the first 30% so the field leaves the gate together.
-			local feet = base + race.offset[i] * math.min(1, base / (0.3 * len))
-			if i == race.myLane then feet += nudge end
-			local raw = math.max(0, feet / len)
+			local feet = base + race.offset[i] * math.min(1, base / (0.3 * race.len1))
+			local raw = math.max(0, feet / race.len1)
 			local p = easePastLine(raw)
-			local moving = t > race.start and raw < 1 + 3 * PAST_LINE
+			local moving = s > 0 and raw < 1 + 3 * PAST_LINE
 			if moving then allStopped = false end
-			local bob = if moving then BOB_STUDS * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi)) else 0
-			place(i, p, bob, race.plan, courseId)
-			if isFocus then RaceState.progress[i] = p end
+			local speed = if raw > 1 then math.exp(-(raw - 1) / PAST_LINE) else gateSpeed
+			local bob = BOB_STUDS * speed * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi))
+			local shown = p
+			if i == race.myLane and nudge > 0 and raw < 1 then shown = p + nudge / race.len1 end
+			place(i, shown, bob, race.plan, courseId)
+			if isFocus then
+				RaceState.progress[i] = p
+				if i == race.myLane and raw >= 1 + 2 * PAST_LINE then RaceState.myHome = true end
+			end
 		end
 		if isFocus then
 			RaceState.rank()
@@ -172,9 +241,13 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 		end
 		if race.done and (allStopped or t - race.doneAt > GameConfig.runInSeconds + 4) then
-			RaceState.restHorses(courseId, race.lanes)
-			races[courseId] = nil -- the horses stay where they stopped until the next race (or the replay)
-			if isFocus then RaceState.active = false end
+			-- Stopped: the legs ease to standing (they keep being placed, standing still), then rest.
+			race.settleAt = race.settleAt or t
+			if t - race.settleAt >= VIEW.settleSeconds then
+				RaceState.restHorses(courseId, race.lanes)
+				races[courseId] = nil -- the horses stay where they stopped until the next race (or the replay)
+				if isFocus then RaceState.active = false end
+			end
 		end
 	end
 end)

@@ -38,13 +38,15 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
+local mapScale = Instance.new("UIScale") -- shrinks on phones with the rest of the race HUD (D-055)
 
 local stripH = 8 * ROW_H
 local panelH = PAD + OVAL_H + 6 + stripH + 22 + PAD
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 0)
-panel.Position = UDim2.new(1, -16, 0, 50)
+panel.Position = UDim2.new(1, -16, 0, RaceState.MAP_TOP)
 panel.Size = UDim2.fromOffset(W, panelH)
+mapScale.Parent = panel
 panel.BackgroundColor3 = Color3.fromHex("1F2A22")
 panel.BackgroundTransparency = 0.2
 panel.Parent = gui
@@ -208,16 +210,17 @@ end
 
 RunService.RenderStepped:Connect(function(dt)
 	local plan = RaceState.plan
-	gui.Enabled = RaceState.active and plan ~= nil
+	gui.Enabled = RaceState.active and plan ~= nil and not RaceState.burstShowing
 	if not gui.Enabled then return end
+	mapScale.Scale = RaceState.hudScale()
 	local n = math.min(RaceState.lanes, 8)
 	-- Distance covered and to go, in feet, per lane.
 	local covered, togo = {}, {}
 	local lead, last = -math.huge, math.huge
 	for i = 1, n do
 		local p = RaceState.progress[i] or 0
-		covered[i] = p * plan.lengths[i]
-		togo[i] = math.max(0, plan.lengths[i] - covered[i])
+		covered[i] = p * plan.lengths[1] -- progress is timed on lane 1 for every lane (D-055)
+		togo[i] = math.max(0, plan.lengths[1] - covered[i])
 		lead, last = math.max(lead, covered[i]), math.min(last, covered[i])
 	end
 	if lead == -math.huge then return end

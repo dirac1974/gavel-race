@@ -251,10 +251,11 @@ gameRemotes:WaitForChild("Notice").OnClientEvent:Connect(function(text, icon)
 	Ui.toast(text, icon)
 end)
 
--- Hide the dock while you ride (RaceState knows your lane) and during the replay.
+-- Hide the dock while you ride (RaceState knows your lane), while a results card is up (it
+-- would cover the replay buttons on a phone) and during the replay.
 RunService.Heartbeat:Connect(function()
 	local riding = RaceState.active and RaceState.myLane ~= nil
 	local replay = Players.LocalPlayer.PlayerGui:FindFirstChild("ReplayUI")
-	local hide = riding or (replay and replay.Enabled)
+	local hide = riding or RaceState.resultsOpen or (replay and replay.Enabled)
 	if dock.Visible == hide then dock.Visible = not hide end
 end)
