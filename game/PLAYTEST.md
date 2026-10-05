@@ -136,6 +136,19 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] A full crowd only nudges a horse (12.5% → about 12.8%); nothing shows per-fan boosts.
 - [ ] Stable Board: "Cheer for a horse in a race" can appear as a daily job; GO leads to the racetrack.
 
+## More horses (Stage 8, D-037)
+
+- [ ] Market Corral: five horses stand in a row facing the street with signs (name, ★ bloodline, price); the same five on every server all week.
+- [ ] "Look" at one: card with coat, style, stat bars, bloodline stars ("more ★ = more room to grow"), "Bring home · 💵 price". Buying pays Green Cash; the horse goes to a free stall, or the pasture if stalls are full; buying again says it already lives with you.
+- [ ] The Trail meadow: four wild horses (pinto, appaloosa, buckskin, dun) graze and wander, the same on every screen.
+- [ ] "Make friends": the gentle game (tap when the heart glows 💖, not when startled 😮); three good taps = friends; uses one treat (carrot, apple or sugar cube); one new friend a day.
+- [ ] Tap the horse card in the dock: My Horses with every horse (stall or pasture, stats with Potential once revealed, Energy, bond, record).
+- [ ] "Ride this one" makes a stalled horse active (⭐); "Move to stall" then "Swap here" swaps a pasture horse into a stall.
+- [ ] "Build a stall · 💵 300/800/2000/4000" adds a bay to your barn (up to 6); the barn grows and narrows bays to fit.
+- [ ] Rename with word chips; the stall name plate updates.
+- [ ] Up to three pasture horses graze in your front yard.
+- [ ] 20 horses at most: the market and taming say your stable is full.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

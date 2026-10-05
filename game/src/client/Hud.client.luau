@@ -38,6 +38,7 @@ local OpenStarter = localEvent("OpenStarter")
 local OpenMap = localEvent("OpenMap")
 local OpenBoard = localEvent("OpenBoard")
 local OpenRacePicker = localEvent("OpenRacePicker")
+local OpenHorses = localEvent("OpenHorses")
 
 -- Dock --------------------------------------------------------------------------
 local dock = Instance.new("Frame")
@@ -116,6 +117,16 @@ for k = 1, GameConfig.energy.maxPerRacer do
 	full.LayoutOrder = k
 	hoofs[k] = full
 end
+-- Tap the horse card for My Horses (D-037).
+local horseHit = Instance.new("TextButton")
+horseHit.BackgroundTransparency = 1
+horseHit.Text = ""
+horseHit.Size = UDim2.fromScale(1, 1)
+horseHit.ZIndex = 5
+horseHit.Parent = horseCard
+horseHit.Activated:Connect(function()
+	if PlayerState.activeHorse() then OpenHorses:Fire() else OpenStarter:Fire() end
+end)
 local restLabel = Ui.text(hoofRow, "", 16, { Size = UDim2.new(0, 70, 1, 0), LayoutOrder = 99, TextXAlignment = Enum.TextXAlignment.Left })
 restLabel.TextColor3 = C.plum
 

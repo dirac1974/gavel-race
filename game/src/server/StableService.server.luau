@@ -188,6 +188,19 @@ local function buildBarn(i: number, owner: Player, data)
 		part({ Name = "Water", Size = Vector3.new(5.4, 0.2, 2), Color = C.water, Material = Enum.Material.Glass, Transparency = 0.25,
 			CanCollide = false, CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1.9) }, barn)
 	end
+	-- Pasture horses graze in the front yard (up to three shown).
+	for k = stalls + 1, math.min(#data.horses, stalls + 3) do
+		local h = data.horses[k]
+		local slot = k - stalls
+		local hm = horseModel(h.coat)
+		hm.Name = "Pasture_" .. h.id
+		hm:PivotTo(plotCF(i, 30 + slot * 12, WorldLayout.PLOT_FRONT / 2 - 18 - (slot % 2) * 6, GROUND_Y)
+			* CFrame.Angles(0, math.rad(40 * slot), 0))
+		for _, d in hm:GetDescendants() do
+			if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
+		end
+		hm.Parent = barn
+	end
 	-- Barnyard bits from the uploaded art (skipped until it loads): a horseshoe over the barn,
 	-- a feed bucket and brush by the first stall, a wheelbarrow and pitchfork round the side,
 	-- a saddle rack, and the post box at the gate (friends' carrot gifts, D-042).
@@ -341,7 +354,7 @@ local function applyCare(i: number, data, now: number)
 end
 
 local function signature(data): string
-	local parts = { tostring(data.stalls), tostring(data.activeHorse) }
+	local parts = { tostring(data.stalls), tostring(data.activeHorse), tostring(#data.horses) }
 	for _, h in data.horses do table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name) end
 	return table.concat(parts, "|")
 end
