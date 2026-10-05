@@ -232,7 +232,10 @@ def trip_run(k, baseline, geometry):
     tr = trip.trip_values(st_)
     row = trip.baseline_row(baseline, course, distance)
     tau = trip.tau(tr, posts, row, cfg)
-    run = {"course": course, "distance": distance, "posts": posts, "kinds": kinds, "q": q, "p1": p1,
+    # Lune's JSON reader can land a number one ulp off; Luau's tonumber is exact, so the inputs
+    # that drive the lanes also go as exact decimal strings.
+    exact = {"q": [repr(v) for v in q], "p1": [repr(v) for v in p1], "uniforms": [repr(v) for v in uniforms]}
+    run = {"course": course, "distance": distance, "posts": posts, "kinds": kinds, "q": q, "p1": p1, "exact": exact,
            "switchTick": switch, "ticks": ticks, "uniforms": uniforms, "intents": intents, "answers": answers,
            "snapshots": snaps, "lockX": lock_x, "afterLock": after_lock, "afterLockAnswers": lock_answers,
            "ground": list(st_.ground), "draft": list(st_.draft), "trip": tr, "tau": tau,

@@ -27,6 +27,8 @@ local RaceSession = require(Shared:WaitForChild("RaceSession"))
 local RaceRating = require(Shared:WaitForChild("RaceRating"))
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local RaceShape = require(Shared:WaitForChild("RaceShape"))
+local Trip = require(Shared:WaitForChild("Trip"))
+local TripBaseline = require(Shared:WaitForChild("TripBaseline"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
@@ -64,11 +66,13 @@ local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst s
 local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances, course
 local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results, course
 local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
-local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, course (D-033)
+local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, [trip stars, places gained by the trip,] course (D-033, D-054)
+local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on, lock time (server time), course (D-054)
+local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
-RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), course
+RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), [lane positions,] course
 RaceOffsets.Parent = remotes
 local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst, course
 local JoinRace = makeRemote("JoinRace")           -- client -> server: want (bool), course id?, horse id?
@@ -537,10 +541,25 @@ local function runRace(c, players: { Player })
 	for post, old in order do postCoats[post] = coats[old] end
 	coats = postCoats
 
+	-- Steering (D-054): the trip state, built after the posts (lane index = post), drawing its
+	-- two uniforms per lane after every other gate draw. Bots steer with Smart Steer and its bot
+	-- variety; riders with Smart Steer too (their controls come in S3). nil when
+	-- GameConfig.steering.enabled is false: today's race exactly.
+	local trip = nil
+	if GameConfig.steering.enabled then
+		local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
+		if not tripRow then
+			warn(string.format("[RaceService] no trip baseline for %s %s; posts count as equal", c.id, tostring(cond.distance)))
+			tripRow = table.create(GameConfig.lanes, 0)
+		end
+		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout)
+	end
+
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
 	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
 	local title = if card.cup then leagueName .. " Cup" elseif card.practice then "Practice" else leagueName
 	RaceStarted:FireAllClients(title, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
+	if trip then TripInfo:FireAllClients(true, tStart + trip.lockT, c.id) end
 	PaceSchedule:FireAllClients(passes, c.id)
 	fans("start", c.id, session, players, tStart, tFinish) -- cheers and Clap Along (D-019, D-020)
 	task.delay(math.max(0, tStart - now()), function() c.scene:openGate() end) -- and they're off
@@ -574,12 +593,63 @@ local function runRace(c, players: { Player })
 	-- Live chances shown on screen: closed segments, refreshed each second in the stretch drive.
 	local shownLive = table.clone(session.live)
 	local racing = true
+	-- The offsets loop runs while this race is on; a race that errors is marked aborted by
+	-- courseLoop and stops here too (no trip lock or remotes for a dead race).
+	local function alive(): boolean
+		return racing and not cur.aborted and (c.current == cur or c.current == nil)
+	end
+	-- The far-turn lock (D-054): Trip steps every fixed tick up to it, books the far turn, and the
+	-- trip tau joins the race (clamped; 0 until now, so it never depends on luck).
+	-- A late server steps the missed ticks with the live chances of now, so around checkpoint 1 a
+	-- tick or two can use the new chances a tick early or late. That is fair: live chances are the
+	-- same for every horse, it moves only when their skill gaps grow (by a tick), and tau is
+	-- measured against that same field.
+	local function advanceTrip(t: number)
+		if not trip or trip.locked or cur.aborted then return end
+		if Trip.advance(trip, session.live, t - tStart) then
+			session:setTrip(Trip.raceTau(trip))
+			shownLive = table.clone(session.live)
+			TripLocked:FireAllClients(c.id)
+			-- The chances shown pick tau up at once (when the lock comes before checkpoint 1, as it
+			-- can in a Sprint, the checkpoint's own update carries it).
+			if session.closed > 0 then LiveChances:FireAllClients(session.closed, shownLive, c.id) end
+		end
+	end
 	task.spawn(function()
 		local period = 1 / GameConfig.offsetsPerSecond
-		while racing and (c.current == cur or c.current == nil) do
-			local w = RaceShape.blendWeight(now(), tFar, postEnd, GameConfig.raceShape.blendPower)
-			RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape), c.id)
-			task.wait(period)
+		if not trip then -- steering off: today's offsets
+			while alive() do
+				local w = RaceShape.blendWeight(now(), tFar, postEnd, GameConfig.raceShape.blendPower)
+				RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape), c.id)
+				task.wait(period)
+			end
+			return
+		end
+		-- Steering: the screen shows what the server sends, at sendHz all race: Trip's gaps and lanes
+		-- up to the lock; after it, the race shape's gaps as the screen eases them, held so no horse
+		-- runs through another, with make-room lanes (Trip.frame). Lanes go out when they change and
+		-- once a second (a dropped packet is harmless).
+		local last = now()
+		local sentLanes, lanesAt = nil, -math.huge
+		while alive() do
+			local t = now()
+			advanceTrip(t)
+			local w = RaceShape.blendWeight(t, tFar, postEnd, GameConfig.raceShape.blendPower)
+			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, t - last, t - tStart)
+			last = t
+			local changed = sentLanes == nil or t - lanesAt >= 1
+			if not changed and lanes then
+				for i, x in lanes do
+					if x ~= sentLanes[i] then changed = true end
+				end
+			end
+			if changed and lanes then
+				sentLanes, lanesAt = lanes, t
+				RaceOffsets:FireAllClients(offsets, lanes, c.id)
+			else
+				RaceOffsets:FireAllClients(offsets, c.id)
+			end
+			task.wait(1 / GameConfig.steering.sendHz)
 		end
 	end)
 	local function previewStretch(seg: number)
@@ -656,6 +726,7 @@ local function runRace(c, players: { Player })
 	end
 	cur.seg = nil
 
+	advanceTrip(math.huge) -- the lock is long past by the line; make sure the trip is in
 	local result = session:finish() -- by now the order on screen is this order (D-033)
 	task.delay(GameConfig.runInSeconds + 2, function() racing = false end)
 	local summary = {}
@@ -702,7 +773,12 @@ local function runRace(c, players: { Player })
 		local i = session:laneIndex(tostring(p.UserId))
 		if i then
 			local stars = if S[i] >= 85 then 3 elseif S[i] >= 65 then 2 elseif S[i] >= 40 then 1 else 0
-			RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i], c.id)
+			if trip then -- your trip (D-054): stars, and places it gained (the results line comes in S4)
+				RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i],
+					Trip.stars(session.tau[i], GameConfig.steering), session:tripGain(i), c.id)
+			else
+				RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i], c.id)
+			end
 		end
 	end
 	recordIntegrity(players, errors, matched)
@@ -756,6 +832,7 @@ local function courseLoop(c)
 		for _, p in racers do QueueStatus:FireClient(p, false, #c.queue, nil, c.id) end
 		if #racers > 0 then
 			local ok, err = pcall(runRace, c, racers)
+			if not ok and c.current then c.current.aborted = true end -- its loops stop (RaceService alive())
 			if not ok then
 				warn(string.format("Race on %s failed: %s", c.id, tostring(err)))
 				c.current = nil

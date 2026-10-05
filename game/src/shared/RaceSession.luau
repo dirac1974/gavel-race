@@ -112,6 +112,8 @@ function RaceSession.new(params: {
 		end
 	end
 	self.crowd = {} :: { [number]: number } -- Clap Along boost per lane (D-020), 0..0.03
+	-- Steering trip per lane (D-054): 0 until the far-turn lock, then fixed (setTrip).
+	self.tau = table.create(#self.lanes, 0) :: { number }
 	self.closed = 0
 	self.passes = nil :: any
 	self.paceRanges = {} :: { [number]: { number } }
@@ -133,6 +135,14 @@ function RaceSession.drawPosts(n: number, rng: Rng): { number }
 	return order
 end
 
+-- The session's tables, by how assignPosts treats them. PER_LANE tables are indexed by lane and
+-- move with their horse; PER_SEGMENT_LANE tables are [segment][lane]; the rest don't depend on
+-- the lane order. tests/luau/steering_tests.luau fails if the session gains a table that is in
+-- none of these lists, so a new per-lane table can't be left behind by the post draw.
+RaceSession.PER_LANE = { "lanes", "q", "purses", "live", "luck", "crowd", "tau" }
+RaceSession.PER_SEGMENT_LANE = { "botScores" }
+RaceSession.NOT_PER_LANE = { "deps", "config", "league", "rng", "mathCfg", "passes", "paceRanges", "burst" }
+
 -- Renumber the lanes by post: lane `post` becomes the horse that was lane order[post]. Every
 -- per-lane value moves with its horse (rating, chances, purse, live chance, luck, bot scores,
 -- flags, crowd boost), bit for bit, so no horse's race changes. RaceService draws the order after
@@ -150,24 +160,18 @@ function RaceSession:assignPosts(order: { number })
 		assert(type(old) == "number" and old >= 1 and old <= n and old % 1 == 0 and not seen[old], "posts must be a permutation")
 		seen[old] = true
 	end
-	local function permute(t: { any }): { any }
-		local out = table.create(n)
-		for post, old in order do out[post] = t[old] end
+	local function permute(t: { [number]: any }): { [number]: any }
+		local out = {}
+		for post, old in order do out[post] = t[old] end -- works for sparse tables too
 		return out
 	end
-	self.lanes = permute(self.lanes)
-	self.q = permute(self.q)
-	self.purses = permute(self.purses)
-	self.live = permute(self.live)
-	self.luck = permute(self.luck)
-	for seg, scores in self.botScores do
-		local out = {}
-		for post, old in order do out[post] = scores[old] end -- only bots have scores
-		self.botScores[seg] = out
+	local this = self :: any
+	for _, key in RaceSession.PER_LANE do
+		this[key] = permute(this[key])
 	end
-	local crowd = {}
-	for post, old in order do crowd[post] = self.crowd[old] end
-	self.crowd = crowd
+	for _, key in RaceSession.PER_SEGMENT_LANE do
+		for seg, scores in this[key] do this[key][seg] = permute(scores) end
+	end
 end
 
 -- The post order for a race: drawn (drawPosts) when GameConfig.steering.drawPosts is on, else
@@ -395,7 +399,31 @@ function RaceSession:tilts(S: { number }): { number }
 	for i, c in self.crowd do
 		if R[i] then R[i] += c / self.mathCfg.kappa end
 	end
+	-- The steering trip joins the exponent the same way: kappa * R + c + tau (D-054). Zero until
+	-- the lock, and a zero changes nothing.
+	for i, t in self.tau do
+		if t ~= 0 and R[i] then R[i] += t / self.mathCfg.kappa end
+	end
 	return R
+end
+
+-- The far-turn lock (D-054): fix each lane's trip tau, clamped to the steering floor and
+-- ceiling, and refresh the live chances from the checkpoints closed so far. Before this, tau is
+-- 0, so the trip never depends on luck; after it, tau stays fixed for checkpoint 2, the Final
+-- Burst, the stretch previews and the finish. All-zero tau (steering cosmetic) changes nothing.
+function RaceSession:setTrip(tau: { number })
+	assert(not self.finished, "the race is over")
+	assert(#tau == #self.lanes, "one trip per lane")
+	local steer = self.config.steering or {}
+	local lo, hi = steer.floor or -0.02, steer.ceiling or 0.04
+	local any = false
+	for i, t in tau do
+		self.tau[i] = math.clamp(t, lo, hi)
+		if self.tau[i] ~= 0 then any = true end
+	end
+	if any then
+		self.live = self.deps.RaceMath.liveChances(self.q, self:tilts(self:scoresSoFar()), self.mathCfg)
+	end
 end
 
 -- Set lane i's crowd boost (Fans.boost of its crowd), used from the next segment close.
@@ -407,8 +435,20 @@ function RaceSession:ridingGain(i: number): number
 	local RaceMath, RaceShape = self.deps.RaceMath, self.deps.RaceShape
 	local R = self:tilts(self:scoresSoFar())
 	R[i] = (self.crowd[i] or 0) / self.mathCfg.kappa -- riding at the race average, crowd unchanged
+	if (self.tau[i] or 0) ~= 0 then R[i] += self.tau[i] / self.mathCfg.kappa end -- trip unchanged
 	local liveAvg = RaceMath.liveChances(self.q, R, self.mathCfg)
 	return RaceShape.placeIn(self.luck, liveAvg, i) - RaceShape.placeIn(self.luck, self.live, i)
+end
+
+-- Places lane i's trip gained (D-054): where it would have finished with tau = 0, everything
+-- else the same, minus where it did. Positive = its trip won it places. Shown only when positive.
+function RaceSession:tripGain(i: number): number
+	local RaceMath, RaceShape = self.deps.RaceMath, self.deps.RaceShape
+	if (self.tau[i] or 0) == 0 then return 0 end
+	local R = self:tilts(self:scoresSoFar())
+	R[i] -= self.tau[i] / self.mathCfg.kappa
+	local liveNoTrip = RaceMath.liveChances(self.q, R, self.mathCfg)
+	return RaceShape.placeIn(self.luck, liveNoTrip, i) - RaceShape.placeIn(self.luck, self.live, i)
 end
 
 -- Each lane's S over the closed segments (weighted; the Final Burst counts double).

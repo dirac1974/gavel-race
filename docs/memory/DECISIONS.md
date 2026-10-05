@@ -578,6 +578,31 @@ Template:
   - RaceService draws them from the race's generator after the slider's passes; `RaceSession:assignPosts` then renumbers the lanes by post, carrying every per-horse value with its horse.
   - This keeps the earlier draws (bots, luck, bot scores, passes) in order. Only the Final Burst's start, drawn when the burst opens, moves to a later draw: harmless with an unseeded, uniform start shared by every lane.
   - `GameConfig.steering.drawPosts = false` keeps the old humans-first lanes.
+- S2 (2026-10-05): the trip runs on the server, with Smart Steer for everyone (bots with their variety, riders with plain Smart Steer until S3's controls). **S2 ships cosmetic: `GameConfig.steering.scale = 0`** (tech lead). Riders can't steer yet, so their τ shouldn't move with bot variety they can't affect; S3 sets it to 1 when the buttons go live. Build calls:
+  - **Trip on the server:** `Trip.luau` mirrors `src/trip.py`, agreeing with all 200 `trip.json` runs to 1e-9 (answers exactly).
+    - Lune's JSON reader can land a number one ulp off, and two horses exactly `holdGap` apart turn that into a different race. So the fixture carries the inputs as exact decimal strings, and the test takes config values from `GameConfig`.
+    - Trip is built after the posts draw (lane = post) and draws its two uniforms per lane after every other gate draw.
+    - `RaceSession` declares its tables (`PER_LANE`, `PER_SEGMENT_LANE`, `NOT_PER_LANE`); `assignPosts` moves the per-lane ones, `tau` included, and a test fails on any unclassified table.
+  - **On screen:** with steering on, the server sends what to show for the whole race, at 10 Hz: `RaceOffsets (offsets, [lanes,] course)`, course last.
+    - The screen interpolates the 10 Hz samples instead of easing them again, so held gaps stay at 10 ft (review S1). Lanes glide linearly at the race's lane speed (S3). Clients skip their 30% gap ramp, because Trip's gaps already grow in over 8 s.
+    - Lanes go out rounded to 0.01 lane, and only when they change (plus once a second).
+    - Up to the lock, the offsets and lanes are Trip's.
+    - After the lock, the offsets are the race shape's targets as the screen would ease them. The server keeps that eased copy, carried on from Trip's offsets at the lock, and holds horses so none runs through another.
+    - **Make-room lanes after the lock** (`Trip.cosmetic`, Luau only, never touching τ) work on that shown copy. A horse closing on one ahead in its lane, or about to pass it, glides to the nearest free lane it can reach across clear lanes (outward first). Boxed in, a horse in its way moves over instead, cascading up to three horses deep.
+    - **Why holds were needed:** at the lock Smart Steer has packed the field into lanes 1 and 2, and the race shape reorders it within a second. Lane changes alone left horses running through each other in about 96% of races (review B1, reproduced).
+    - **Hold release:** holds let go 1 s before the line so the order across the line is the result. Releasing at 0.5 s left one race in 960 wrong.
+    - **Measured** (`tests/luau/overlap_report.luau` and the 64-race test in `trip_tests`): no horse within half a lane and 6 ft of another in 960 + 1,200 races (scale 0 and 1), and the order across the line was the result in every one.
+    - `GameConfig.raceView.easePerSecond` (2.5) names the view's easing rate, which was a literal, so Trip and the view share it.
+  - **Loops:** a race that errors is marked aborted, and its offsets and trip loop stop (no lock or remotes for a dead race; this also fixes the old offsets loop running on until the next race).
+  - **The lock:**
+    - `TripInfo` (on, lock time) goes out at the start and `TripLocked` at the bell.
+    - The live chances shown refresh at once with τ: a `LiveChances` resend with the closed checkpoint, never 0. When the lock comes before checkpoint 1, as it can in a Sprint, the checkpoint carries it.
+    - Clients note `TripLocked`; the bell sound and "Lanes locked!" come with the controls in S3.
+    - Catch-up ticks use the live chances of the moment. Around checkpoint 1, a tick or two may use the new chances early or late. That is fair: the chances are shared, only the gaps' timing moves, and τ is measured against the same field.
+    - `setTrip` clamps τ again and refreshes the live chances from the checkpoints closed so far. An all-zero τ (scale 0) changes nothing, bit for bit.
+    - `ridingGain` keeps your trip; `tripGain` removes only your trip.
+  - **RideReport** carries trip stars and trip places gained before the course id; the results line comes in S4.
+  - **Steering off:** `steering.enabled = false` sends exactly today's remotes (no `TripInfo`, offsets without lanes, the old `RideReport`) and draws nothing extra.
 - Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
 - Alternatives:
   - cosmetic steering only (kids learn the input does nothing; kept as `scale = 0`);

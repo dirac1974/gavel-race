@@ -219,7 +219,11 @@ local function placeAll(rec, t: number, speed: number?)
 	for i = 1, rec.lanes do
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, rec.lane and rec.lane[i]) -- recorded lane positions (D-054)
+		-- Recorded lane positions (D-054): per frame when steering moved them, else the posts.
+		local xa = (a.x and a.x[i]) or (rec.lane and rec.lane[i])
+		local xb = (b.x and b.x[i]) or xa
+		local x = if xa and xb then xa + (xb - xa) * f else nil
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, x)
 	end
 	return progress
 end

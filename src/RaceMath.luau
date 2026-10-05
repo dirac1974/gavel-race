@@ -57,10 +57,15 @@ function RaceMath.skills(scores: {number}, cfg: Config): {number}
 	return R
 end
 
--- Step 5: live win chances
-function RaceMath.liveChances(q: {number}, R: {number}, cfg: Config): {number}
+-- Step 5: live win chances. `extra` adds to each exponent: kappa * R + extra (the crowd boost
+-- and the steering trip, D-020, D-054); without it the original path runs, bit for bit.
+function RaceMath.liveChances(q: {number}, R: {number}, cfg: Config, extra: {number}?): {number}
 	local w = table.create(#q)
-	for i, qi in q do w[i] = qi * math.exp(cfg.kappa * R[i]) end
+	if extra == nil then
+		for i, qi in q do w[i] = qi * math.exp(cfg.kappa * R[i]) end
+	else
+		for i, qi in q do w[i] = qi * math.exp(cfg.kappa * R[i] + extra[i]) end
+	end
 	return normalize(w)
 end
 
