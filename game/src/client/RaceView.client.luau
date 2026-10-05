@@ -73,7 +73,10 @@ local function horseModel(courseId: string?, i: number): Model?
 	return horses and horses:FindFirstChild("Lane" .. i)
 end
 
-local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { p, t } for the legs
+local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { pos, t } for the legs
+-- A placement further than this from the last one is a jump (a replay starting or seeking), not
+-- a stride: even a 3x replay covers under 35 studs in the longest frame the legs count (0.2 s).
+local JUMP_STUDS = 60
 
 -- Lane i at progress p (lane-1 feet over railLength) and lane position `x` (default: its post,
 -- which is its lane number). `timeScale`: how fast the race clock runs (replays in slow motion),
@@ -86,16 +89,23 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?,
 	local px, pz, dx, dz = TrackLayout.railPoint(cfg, plan, p * railLength, x or i)
 	local pos = Vector3.new(px, bob, pz)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
-	-- Running legs (D-051): stride with the distance covered since the last frame.
+	-- Running legs (D-051): stride with the ground actually covered since the last frame (the
+	-- horizontal move between placed positions), so outer horses on turns and sideways glides
+	-- (steering, S2) stride as far as they travel.
 	if HorseLegs.has(horse) then
 		local now = os.clock()
 		local prev = lastPlaced[horse]
-		local dist = if prev then math.max(0, (p - prev.p) * railLength) else 0
+		local flat = Vector3.new(px, 0, pz)
+		local dist = 0
+		if prev then
+			dist = (flat - prev.pos).Magnitude
+			if dist > JUMP_STUDS then dist = 0 end
+		end
 		local dt = if prev then math.clamp(now - prev.t, 0, 0.2) else 0
 		if prev then
-			prev.p, prev.t = p, now
+			prev.pos, prev.t = flat, now
 		else
-			lastPlaced[horse] = { p = p, t = now }
+			lastPlaced[horse] = { pos = flat, t = now }
 		end
 		HorseLegs.apply(horse, dist, dt, timeScale)
 	end

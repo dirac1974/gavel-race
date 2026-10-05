@@ -526,9 +526,12 @@ local function runRace(c, players: { Player })
 	local tFar = tFinish - (cfg.finishFromTop + math.pi * r1) / speed
 
 	-- Posts (D-054): drawn from the race's generator after every draw above (bots, luck, bot
-	-- scores, the slider's passes), so none of those move; lanes are then numbered by post, so
-	-- humans no longer start on the inside. Coats follow their horses.
-	local order = RaceSession.drawPosts(#session.lanes, rng)
+	-- scores, the slider's passes), so those keep their draws; lanes are then numbered by post, so
+	-- humans no longer start on the inside. Coats follow their horses. The Final Burst's random
+	-- start (drawn when the burst opens) comes n - 1 draws later than before, which is harmless:
+	-- the generator is an unseeded Random.new(), the start is uniform, and every lane shares it.
+	-- GameConfig.steering.drawPosts = false keeps the old humans-first lanes.
+	local order = RaceSession.postOrder(GameConfig, #session.lanes, rng)
 	session:assignPosts(order)
 	local postCoats = {}
 	for post, old in order do postCoats[post] = coats[old] end

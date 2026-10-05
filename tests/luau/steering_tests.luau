@@ -119,6 +119,30 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		end
 	end
 	check(permOk, "drawPosts is a permutation")
+	-- The switch: GameConfig.steering.drawPosts (on by default); off keeps the lanes as filled
+	-- (humans first) and leaves the race's generator alone.
+	check(GameConfig.steering ~= nil and GameConfig.steering.drawPosts == true, "posts are drawn by default")
+	local calls = 0
+	local counting = makeRng(77)
+	local countingRng = {
+		NextNumber = function(self): number
+			calls += 1
+			return counting:NextNumber()
+		end,
+	}
+	local off = RaceSession.postOrder({ steering = { drawPosts = false } }, 8, countingRng)
+	local identity = calls == 0
+	for i = 1, 8 do
+		if off[i] ~= i then identity = false end
+	end
+	check(identity and #off == 8, "drawPosts = false: humans-first lanes, no draws")
+	local on = RaceSession.postOrder({ steering = { drawPosts = true } }, 8, makeRng(77))
+	local direct = RaceSession.drawPosts(8, makeRng(77))
+	local sameDraw = true
+	for i = 1, 8 do
+		if on[i] ~= direct[i] then sameDraw = false end
+	end
+	check(sameDraw, "drawPosts = true draws the posts")
 	-- Every post is equally likely for the first human (lane 1 before the draw).
 	local counts = table.create(8, 0)
 	local rng = makeRng(99)
@@ -201,8 +225,21 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		end
 	end
 	check(finishSame, "the finish and prizes by horse are the same with drawn posts")
-	local refused = pcall(function() posted:assignPosts(order) end)
-	check(not refused, "posts can't be drawn after the race has run")
+	-- The ride report: each horse's place and the places its riding gained are the same.
+	local placeA, placeB = {}, {}
+	for place, lane in ra.order do placeA[lane] = place end
+	for place, lane in rb.order do placeB[lane] = place end
+	local reportSame = true
+	for post, old in order do
+		if placeA[old] ~= placeB[post] or plain:ridingGain(old) ~= posted:ridingGain(post) then reportSame = false end
+	end
+	check(reportSame, "ride report places and riding gain by horse are the same with drawn posts")
+	local accepted = pcall(function() posted:assignPosts(order) end)
+	check(not accepted, "posts can't be drawn after the race has run")
+	local midRace = build(7)
+	midRace:closeSegment(1)
+	check(not pcall(function() midRace:assignPosts(RaceSession.drawPosts(8, makeRng(3))) end),
+		"posts can't be drawn once the first checkpoint has closed")
 	local bad = build(5)
 	check(not pcall(function() bad:assignPosts({ 1, 1, 2, 3, 4, 5, 6, 7 }) end), "assignPosts refuses a non-permutation")
 	check(not pcall(function() bad:assignPosts({ 1, 2, 3 }) end), "assignPosts needs one post per lane")

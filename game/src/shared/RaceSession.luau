@@ -136,8 +136,11 @@ end
 -- Renumber the lanes by post: lane `post` becomes the horse that was lane order[post]. Every
 -- per-lane value moves with its horse (rating, chances, purse, live chance, luck, bot scores,
 -- flags, crowd boost), bit for bit, so no horse's race changes. RaceService draws the order after
--- every draw it makes at the gate (bots, luck, bot scores, the slider's passes), so none of
--- those move either. Only before the first checkpoint closes.
+-- every draw it makes at the gate (bots, luck, bot scores, the slider's passes), so those keep
+-- their draws. The Final Burst's random start, drawn later when the burst opens, does move n - 1
+-- draws on. That is harmless: the race's generator is an unseeded Random.new(), the start is
+-- uniform either way, and it is one start shared by every lane. Only before the first checkpoint
+-- closes.
 function RaceSession:assignPosts(order: { number })
 	assert(self.closed == 0 and not self.finished, "posts are drawn at the gate")
 	local n = #self.lanes
@@ -165,6 +168,16 @@ function RaceSession:assignPosts(order: { number })
 	local crowd = {}
 	for post, old in order do crowd[post] = self.crowd[old] end
 	self.crowd = crowd
+end
+
+-- The post order for a race: drawn (drawPosts) when GameConfig.steering.drawPosts is on, else
+-- the lanes as filled (humans first, D-054 switch off) without using the generator.
+function RaceSession.postOrder(config: any, n: number, rng: Rng): { number }
+	local steering = config.steering
+	if steering and steering.drawPosts then return RaceSession.drawPosts(n, rng) end
+	local order = table.create(n)
+	for i = 1, n do order[i] = i end
+	return order
 end
 
 function RaceSession:segmentCount(): number
