@@ -66,7 +66,7 @@ Keep the glow centred so Rookies lock in "tap in the glow"; a random start costs
 3. **No whip anywhere.** Hands-and-heels riding animation; the horse surges on good taps and breaks stride when mashed.
 4. **Detection (David's delta idea):** compare each tap gap to the matching beat gap. Flag when the spread is under 12 ms over 300+ beats across 5+ races on 2+ separate days. Log only for the first month to measure real kids before any penalty.
 5. **Rider ladder:** flag 1 logged only. Flag 2: a private, neutral note with a one-tap "Ask for a check", and until a check clears them or 7 days pass, that rider's cash-race taps count as the race average (removes the edge without punishing). Flag 3: a person reviews the logs, then cash races are paused 7 days (30 on a repeat); Practice, Friend Races, care, and training stay open. No Green Cash or items taken back, strikes expire after 90 days, never public, nobody removed from boards. The Ban API only for proven modified clients.
-6. **Name:** David's call between Giddy-up, Stride, and Kick (see minority view).
+6. **Name:** Giddy-up (David's choice).
 
 ## Minority view
 
@@ -76,4 +76,4 @@ Keep the glow centred so Rookies lock in "tap in the glow"; a random start costs
 
 ## Decision
 
-D-022, Accepted (provisional), pending David's name choice. In REVIEW_QUEUE.
+D-022, Accepted (provisional). David chose the name **Giddy-up** (2026-10-04). In REVIEW_QUEUE.

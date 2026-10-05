@@ -15,7 +15,7 @@ Last updated: 2026-10-04
 
 ## Backlog (top = next)
 
-1. **Stride stretches (D-022)**: replace the single-tap windows with stride beats in `RaceSession` and a new stride module (Luau, tested under Lune), client UI (closing ring on the hoof, haptics, tap anywhere, labels), bots recalibrated, detection logging of tap-gap vs beat-gap; reuse for Clap Along. Needs the name from David.
+1. **Giddy-up stride stretches (D-022)**: replace the single-tap windows with stride beats in `RaceSession` and a new stride module (Luau, tested under Lune), client UI (closing ring on the hoof, haptics, tap anywhere, labels), bots recalibrated, detection logging of tap-gap vs beat-gap; reuse for Clap Along. Rename `Gavel*` modules and UI text to Giddy-up.
 2. **Debate 002 — first 10 minutes** (onboarding), after stride stretches exist. Energy is decided (D-015); debate 003 is retired.
 3. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
 4. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
