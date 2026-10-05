@@ -12,14 +12,27 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] Win chances add up to about 100%.
 - [ ] The status line shows the race conditions (for example "Rookie race: Mile · Dirt · Sunny").
 
-## Gavel windows (×3)
-- [ ] The window name appears (The Break, Backstretch, Final Stretch).
-- [ ] The marker sweeps smoothly at constant speed; the green zone is in the middle.
-- [ ] Tapping the big button, Space, or gamepad A sends one tap; the button hides after tapping.
-- [ ] Feedback shows a label and score (Perfect 95+, Great 80+, Good 60+, Okay 30+, Miss).
+## Giddy-up stretches (×3)
+- [ ] The stretch name appears with "GIDDY-UP!" (The Break, Backstretch, Final Stretch).
+- [ ] Each beat sends a ring that closes on the dark hoof in the same time (0.9 s), so two rings are often on screen; the hoof flashes on the beat.
+- [ ] The board dims during taps so the ring stands out; the yellow GIDDY-UP pad pulses at the bottom before the first ring, then holds steady while rings are on screen.
+- [ ] Tapping anywhere on the screen (or any key, or any gamepad button) counts, but not while typing in chat; each tap shows Perfect / Great / Good / Okay / Off beat.
+- [ ] Tapping twice on one beat shows "Broke stride!" and the too-fast hint.
+- [ ] Rookie tempo is steady (0.6 s per beat); there are 8 beats.
+- [ ] At the end of each stretch a summary appears (Perfect stretch 70+, Great 45+, Good 20+, Keep the beat).
+- [ ] Mashing the screen gives a stretch score near 0; tapping on the beat scores well.
+- [ ] After each stretch your Win chance updates with a +/− change.
+
+## Final Burst
+- [ ] "Final Burst" appears with the meter; the marker starts somewhere different each race.
+- [ ] One tap scores (Perfect 95+, Great 80+, Good 60+, Okay 30+, Miss); the tap area hides after tapping.
 - [ ] Not tapping shows "Missed!" when the window ends.
-- [ ] After each window your Win chance updates with a +/− change.
-- [ ] Perfect taps raise your chance; misses lower it.
+- [ ] Win chance swings more after the burst than after a stretch (it counts double).
+- [ ] Your burst result plays as a big banner on your screen only; a Great+ burst adds a tiny camera punch (none with Reduced Motion on).
+- [ ] Other players' Great+ bursts show only a small ✦ next to their name on the board.
+
+## Integrity (log only)
+- [ ] After each race, the Output window shows no errors from integrity tracking. (A flag prints an `[Integrity]` line; nothing is shown to players while `logOnly` is on.)
 
 ## Results
 - [ ] Results list the top 4 and your place, with Green Cash for 1st–4th.
@@ -32,6 +45,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] A player leaving mid-race doesn't break the race for others.
 
 ## Feel (write down impressions)
-- Is the Rookie meter speed (2.4 s sweep) easy enough for a young player's first race?
+- Can a young player find the beat in their first stretch, or do they mash? Is 0.6 s per beat comfortable?
+- Is the Final Burst exciting enough, and is double weight too much or too little?
 - Can you tell how your taps changed the result?
 - Is anything confusing in the first 30 seconds?
