@@ -288,6 +288,15 @@ function Profiles.start()
 	end)
 end
 
+-- Save right now (purchases: Roblox wants the grant saved before PurchaseGranted).
+-- Returns true only if the profile was written.
+function Profiles.saveNow(player: Player): boolean
+	local e = entries[player]
+	if not e then return false end
+	if e.temporary then return RunService:IsStudio() end -- a live server with no DataStore can't keep a purchase
+	return save(player, e, false)
+end
+
 function Profiles.notify(player: Player, text: string, icon: string?)
 	Notice:FireClient(player, text, icon)
 end

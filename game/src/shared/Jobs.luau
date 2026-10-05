@@ -152,7 +152,19 @@ function Jobs.refresh(p: any, userId: number, now: number): number
 		local key = kind .. "Period"
 		-- Only ever roll forward (a server whose clock is a little behind can't bring back yesterday).
 		if typeof(J[kind]) ~= "table" or per[kind] > (tonumber(J[key]) or -1) then
-			if typeof(J[kind]) == "table" then auto += claimAll(p, J[kind]) end
+			if typeof(J[kind]) == "table" then
+				auto += claimAll(p, J[kind])
+				if kind == "monthly" and #J[kind] > 0 and J.giftMonth ~= J[key] then
+					local all = true
+					for _, j in J[kind] do
+						if not j.claimed then all = false end
+					end
+					if all then
+						J.giftMonth = J[key]
+						J.giftDue = (tonumber(J.giftDue) or 0) + 1 -- JobService pays it
+					end
+				end
+			end
 			J[key] = per[kind]
 			J[kind] = newSet(Jobs.pick(kind, userId, per[kind]))
 		end

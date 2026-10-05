@@ -34,6 +34,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Leagues = require(Shared:WaitForChild("Leagues"))
+local Style = require(Shared:WaitForChild("Style"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = 3
@@ -665,6 +666,7 @@ local function runRace(c, players: { Player })
 					local h = Profile.horse(data, horseOf[player.UserId])
 					local nxt = h and Leagues.promote(h)
 					if nxt then
+						Style.earn(data, Style.EARN_PROMOTION) -- a milestone gift (D-050)
 						task.delay(GameConfig.runInSeconds + 1, function()
 							Profiles.notify(player, string.format("🏆 %s won the %s Cup and moves up to %s!", h.name, leagueName, nxt), "trophy")
 						end)
@@ -703,6 +705,7 @@ local function runRace(c, players: { Player })
 	end)
 	for _, p in players do
 		p:SetAttribute("Racing", nil)
+		p:SetAttribute("LastRaceEnd", os.time()) -- no Diamond prompts for a while after (D-050)
 		if riding[p] == c then riding[p] = nil end
 	end
 	c.current = nil
