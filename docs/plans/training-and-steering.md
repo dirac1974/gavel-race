@@ -237,29 +237,36 @@ GameConfig.training = {
 
 ### Race steering (D-054)
 
-**Config: `GameConfig.steering` (new)**
+**Config: `GameConfig.steering` (new)** — final values after the S0 calibration (`trip.CONFIG` in `src/trip.py`; docs/research/steering-calibration.md):
 
 ```lua
 GameConfig.steering = {
 	enabled = true,                -- false: today's fixed lanes
 	scale = 1,                     -- 0: steering is cosmetic (no effect on chance)
 	floor = -0.02, ceiling = 0.04, -- clamp on τ (1 point of S = 0.02)
-	groundPerLaneTurn = 0.012,     -- per lane off the rail per 180° of turn
-	draftPerSecond = 0.0012, draftCap = 0.016,
+	groundPerLaneTurn = 0.010,     -- per lane off the rail per 180° of turn (0.012 before S0)
+	draftPerSecond = 0.0010,       -- 0.0012 before S0
+	draftCap = 0.016,
 	draftNear = 4, draftFar = 24,  -- feet behind the horse ahead in your lane (0.5–3 lengths)
-	laneSeconds = 0.6, minRequestGap = 0.6, maxQueued = 1,
-	clearFeet = 8,                 -- a lane is blocked by a horse within ±1 length
-	holdGap = 10,                  -- a held horse sits this far behind the one ahead
-	tuckBackMax = 12, outwardWaitSeconds = 1.0,
+	laneSeconds = 0.6, minRequestGap = 0.6,
+	maxQueued = 1,                 -- 0 or 1 (one press waits behind the one in progress)
+	clearFeet = 8,                 -- a lane change needs 1 length clear ahead in the new lane...
+	holdGap = 10,                  -- ...and this much behind; a held horse sits this far back
+	tuckBackMax = 24,              -- ease back up to 3 lengths to slot in (12 before S0)
+	outwardWaitSeconds = 1.0,
 	tickHz = 10, sendHz = 10,
 	gapRampSeconds = 8,            -- gaps grow in over 8 s (replaces 30% of the race while steering is on)
 	lockBellSeconds = 3,
 	smart = { homeLane = 2, turnLeadSeconds = 8, resumeSeconds = 5 },
-	bots = { turnLeadMin = 4, turnLeadMax = 12, railShare = 0.25 },
+	bots = { turnLeadMin = 4, turnLeadMax = 12, railShare = 0.25, wideShare = 0.20 }, -- wideShare added in S0
 	introRaces = 3,
 	stars = { 0.015, -0.005 },     -- trip ★★★ and ★★ thresholds
+	laneBand = 0.9,                -- S0: horses closer than this (in lanes) share a lane
+	tuckReleasePerSecond = 4,      -- S0: a tuck-back fades this fast once nothing blocks
 }
 ```
+
+Before the lock, Trip moves gaps exactly as `RaceView` does (D-055: eased at 2.5/s, no faster than `GameConfig.raceView.maxGapFeetPerSecond` unless a horse must hurry to its place by the line), so server clearances match the screen.
 
 **S0. Python reference and calibration** (model-engineer; no game changes)
 - `src/gavel_race_v2.py`: `live_chances(q, R, cfg, extra=None)`, exponent κR + extra; identical output when extra is None.
@@ -292,6 +299,8 @@ GameConfig.steering = {
   | Inward request reaching its lane within 3 s | ≥ 70% |
   | Draft share of positive trip | ≤ 40% |
   | Residual post bias | < 0.005 |
+
+  S0 applied every target per course × distance, measured post bias per post for a Smart Steer kid among bots and in all-Smart lobbies, and added "a Smart Steer kid among bots averages 0 ± 0.003" (results: docs/research/steering-calibration.md).
 
 - Docs: V2_PROPOSAL step 5, "exponent κR + c + τ, τ from steering (D-054), fixed at the far turn".
 
