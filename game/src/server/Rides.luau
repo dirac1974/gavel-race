@@ -122,7 +122,7 @@ local function build(player: Player, h, at: CFrame): Model
 	seat.Name = "Saddle"
 	seat.Size = Vector3.new(2, 0.4, 2)
 	seat.Transparency = 1
-	seat.CanCollide, seat.CanTouch, seat.CanQuery = false, true, false
+	seat.CanCollide, seat.CanTouch, seat.CanQuery = false, false, false -- only Sit() seats anyone
 	seat.Massless = true
 	seat.CFrame = at * CFrame.new(0, height * 0.6, 0.5)
 	seat.Parent = rig
@@ -224,8 +224,12 @@ function Rides.call(player: Player): (boolean, string?)
 	task.spawn(function()
 		local seat = rig:WaitForChild("Saddle")
 		task.wait(1)
+		if seat.Occupant ~= humanoid and active[player] == rig then
+			Rides.dismount(player) -- the sit didn't take; don't leave a riderless horse blocking the next call
+			return
+		end
 		seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-			if not seat.Occupant and active[player] == rig then Rides.dismount(player) end
+			if seat.Occupant ~= humanoid and active[player] == rig then Rides.dismount(player) end
 		end)
 	end)
 	return true, nil
@@ -239,7 +243,18 @@ function Rides.start()
 		if not ok and why then Profiles.notify(player, why, "heart") end
 	end)
 	GetOff.OnServerEvent:Connect(function(player: Player)
-		Rides.dismount(player)
+		if active[player] then
+			Rides.dismount(player)
+			return
+		end
+		-- Sitting on someone else's horse somehow: just get off it.
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		local seat = humanoid and humanoid.SeatPart
+		if seat and seat.Name == "Saddle" and seat:IsDescendantOf(folder) then
+			local weld = seat:FindFirstChild("SeatWeld")
+			if weld then weld:Destroy() end
+			humanoid.Sit = false
+		end
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		Rides.dismount(player)
