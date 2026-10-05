@@ -136,6 +136,31 @@ function Market.buy(p: any, id: string, now: number): (boolean, string, any)
 	return true, string.format("Welcome home, %s! (%s)", h.name, where), h
 end
 
+-- Wild horses wander the meadow from a shared seed and the server clock, so every client and
+-- the server agree where each one is. Horse i has coat WILD_COATS[i].
+Market.WILD_LEG = 14 -- seconds per wander leg: graze for the first half, walk the second
+
+local function wildPoint(meadow: any, i: number, n: number): (number, number)
+	local rng = lcg(i * 1013 + n * 7907 + 5)
+	local a, r = rng:NextNumber() * math.pi * 2, math.sqrt(rng:NextNumber()) * (meadow.radius - 14)
+	return meadow.x + math.cos(a) * r, meadow.z + math.sin(a) * r
+end
+
+-- Position of wild horse i at time t: (x, z, dirX, dirZ, walking 0..1).
+function Market.wildPosition(meadow: any, i: number, t: number): (number, number, number, number, number)
+	local tt = t / Market.WILD_LEG + i * 0.37
+	local n = math.floor(tt)
+	local f = tt - n
+	local walk = math.clamp((f - 0.5) * 2, 0, 1)
+	local eased = walk * walk * (3 - 2 * walk)
+	local ax, az = wildPoint(meadow, i, n)
+	local bx, bz = wildPoint(meadow, i, n + 1)
+	local dx, dz = bx - ax, bz - az
+	local len = math.sqrt(dx * dx + dz * dz)
+	if len > 0.1 then dx, dz = dx / len, dz / len else dx, dz = 0, -1 end
+	return ax + (bx - ax) * eased, az + (bz - az) * eased, dx, dz, walk
+end
+
 -- Taming --------------------------------------------------------------------------
 function Market.canTame(p: any, now: number): (boolean, string?)
 	ensure(p)

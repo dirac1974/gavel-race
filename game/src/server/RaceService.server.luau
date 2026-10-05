@@ -33,7 +33,6 @@ local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
-local FanService = require(script.Parent:WaitForChild("FanService"))
 local Leagues = require(Shared:WaitForChild("Leagues"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
@@ -77,6 +76,13 @@ local RaceAborted = makeRemote("RaceAborted")     -- server -> all: the race sto
 local RaceCards = makeRemote("RaceCards")         -- server -> all: the next race on each course (Race Board)
 local PaceTap = makeRemote("PaceTap")             -- client -> server: claimed server time
 local BurstTap = makeRemote("BurstTap")           -- client -> server: seg, claimed server time
+-- After the remotes exist: FanService waits for RaceRemotes when it loads.
+local FanService = require(script.Parent:WaitForChild("FanService"))
+-- Fan code must never stop a race: a failure there is logged and the race carries on.
+local function fans(fn: string, ...)
+	local ok, err = pcall(FanService[fn], ...)
+	if not ok then warn("[RaceService] FanService." .. fn .. " failed: " .. tostring(err)) end
+end
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -496,7 +502,7 @@ local function runRace(c, players: { Player })
 	local title = if card.cup then leagueName .. " Cup" elseif card.practice then "Practice" else leagueName
 	RaceStarted:FireAllClients(title, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
 	PaceSchedule:FireAllClients(passes, c.id)
-	FanService.start(c.id, session, players, tStart, tFinish) -- cheers and Clap Along (D-019, D-020)
+	fans("start", c.id, session, players, tStart, tFinish) -- cheers and Clap Along (D-019, D-020)
 	task.delay(math.max(0, tStart - now()), function() c.scene:openGate() end) -- and they're off
 	local isBot = {}
 	for i, lane in session.lanes do -- racing players ride their own horse as the jockey
@@ -603,7 +609,7 @@ local function runRace(c, players: { Player })
 			end
 			if #great > 0 then BurstSparkle:FireAllClients(great, c.id) end
 		end
-		FanService.beforeClose(c.id, seg) -- the crowd's tiny boost joins this segment's close
+		fans("beforeClose", c.id, seg) -- the crowd's tiny boost joins this segment's close
 		shownLive = session:closeSegment(seg)
 		LiveChances:FireAllClients(seg, shownLive, c.id)
 	end
@@ -643,7 +649,7 @@ local function runRace(c, players: { Player })
 		end
 	end
 	RaceFinished:FireAllClients(summary, c.id)
-	FanService.finish(c.id, result.order[1])
+	fans("finish", c.id, result.order[1])
 	table.clear(c.charged) -- the race counted
 	-- Your ride: stars from your score, and places your riding gained versus riding at the race
 	-- average (same luck, everything else the same). Only gains are shown to the rider.
@@ -702,7 +708,7 @@ local function courseLoop(c)
 				warn(string.format("Race on %s failed: %s", c.id, tostring(err)))
 				c.current = nil
 				c.scene:dismountAll()
-				FanService.abort(c.id)
+				fans("abort", c.id)
 				RaceAborted:FireAllClients(c.id)
 				for p, horseId in c.charged do -- give back the Energy for a race that didn't count
 					local data = Profiles.get(p)

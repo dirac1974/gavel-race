@@ -64,6 +64,7 @@ grid.Parent = list
 
 local moving: string? = nil -- a pasture horse picked to swap into a stall
 local retiring: string? = nil -- asked once; a second tap retires
+local renameState = nil       -- { id, first, second, picked } kept while renaming
 local mode = "horses"       -- or "rename:<id>"
 
 local function statBar(parent: Instance, y: number, key: string, value: number, cap: number?)
@@ -185,14 +186,17 @@ local function renameView(id: string)
 		return render()
 	end
 	title.Text = "Rename " .. h.name
-	local first, second = NameGen.offer(Random.new(), 6)
-	local picked = { nil, nil }
+	if not renameState or renameState.id ~= id then
+		local f, s2 = NameGen.offer(Random.new(), 6)
+		renameState = { id = id, first = f, second = s2, picked = { nil, nil } }
+	end
+	local first, second, picked = renameState.first, renameState.second, renameState.picked
 	local box = Instance.new("Frame")
 	box.BackgroundTransparency = 1
 	box.Size = UDim2.new(1, 0, 0, 300)
 	box.LayoutOrder = 1
 	box.Parent = list
-	local preview = Ui.text(box, h.name, 36, { Size = UDim2.new(1, 0, 0, 44) })
+	local preview = Ui.text(box, NameGen.build(picked[1], picked[2]) or h.name, 36, { Size = UDim2.new(1, 0, 0, 44) })
 	preview.TextColor3 = C.orangeDark
 	for r, words in { first, second } do
 		local rowF = Instance.new("Frame")
@@ -214,6 +218,7 @@ local function renameView(id: string)
 				end
 				preview.Text = NameGen.build(picked[1], picked[2]) or h.name
 			end)
+			b.BackgroundColor3 = if picked[r] == w then C.gold else C.white
 		end
 	end
 	local save = Ui.button(box, "Save name", UDim2.fromOffset(200, 50), UDim2.new(0.5, -210, 0, 186), C.green, 22)
@@ -221,11 +226,11 @@ local function renameView(id: string)
 	save.Activated:Connect(function()
 		if NameGen.build(picked[1], picked[2]) then
 			gameRemotes:WaitForChild("RenameHorse"):FireServer(id, picked[1], picked[2])
-			mode = "horses"
+			mode, renameState = "horses", nil
 		end
 	end)
 	back.Activated:Connect(function()
-		mode = "horses"
+		mode, renameState = "horses", nil
 		render()
 	end)
 end
