@@ -10,8 +10,8 @@
 --   Courses (keys are the stats they train):
 --     speed    Sprint Lane: 3 laps through 18 hoops (6 per lap), only the next one glowing.
 --     accel    Gate Break: a practice gate in the infield, dash 120 studs to the flag, canter
---              round the gate loop and back in (scored in T3).
---     stamina  Hill Climb: follow Pip the lead pony for 2 laps over the hill (scored in T3).
+--              round the gate loop and back in, three times.
+--     stamina  Hill Climb: follow Pip the lead pony for 2 laps over the hill.
 --     grit     Mud Splash: a gymkhana in the paddock arena, six lanes joined by turns, with 4
 --              puddles, 3 low logs and 4 bending poles in a canter zone.
 --   A gate is a segment (a -> b) with a unit forward normal (nx, nz): riding across it along
@@ -195,7 +195,9 @@ local function buildAccel()
 	return {
 		key = "accel", kind = "gate",
 		start = { x = gx - 4, z = gz, lookX = 1, lookZ = 0 },
-		stall = { gx - 8, gz - 2.5, gx, gz + 2.5 },        -- where a break must start from
+		-- where a break must start from: the stall and a little round it (8 x 5 studs of stall)
+		stall = { gx - 10, gz - 4, gx + 1, gz + 4 },
+		doorX = gx, stallWidth = 5,
 		flag = gate(flagX, gz, 0, 1, 8, 1, 0),
 		route = loop,
 		returnLength = loop.length - ac.dash,               -- flag back into the stall
@@ -208,6 +210,14 @@ local PONY_LEAD = (CFG.stamina.ringNear + CFG.stamina.ringFar) / 2
 
 local function lcg(x: number): number
 	return (x * 16807) % 2147483647 -- Park-Miller: exact in doubles
+end
+
+-- Gate Break: how long after the n-th "Ready" the bell rings, from the session seed.
+function TC.bellDelay(seed: number, n: number): number
+	local ac = CFG.accel
+	local x = ((math.floor(math.abs(seed)) + n * 7919) % 2147483646) + 1
+	for _ = 1, 3 do x = lcg(x) end
+	return ac.bellMin + (ac.bellMax - ac.bellMin) * (x / 2147483647)
 end
 
 local function ponyPhases(seed: number): { number }
@@ -394,7 +404,7 @@ function TC.idealSeconds(key: string, seed: number?): number
 	if key == "speed" then return c.finish / CFG.gallop end
 	if key == "accel" then
 		local ac = CFG.accel
-		return ac.breaks * (c.bellMean + ac.dash / CFG.gallop) + (ac.breaks - 1) * c.returnLength / CFG.canter
+		return ac.breaks * (ac.settleSeconds + c.bellMean + ac.dash / CFG.gallop) + (ac.breaks - 1) * c.returnLength / CFG.canter
 	end
 	if key == "stamina" then
 		local target = c.finish
@@ -416,6 +426,42 @@ function TC.idealSeconds(key: string, seed: number?): number
 		return total
 	end
 	return 0
+end
+
+-- Steering aims (Easy Rein, D-053): a point `ahead` studs further round the oval at `lateral`.
+function TC.ovalCarrot(x: number, z: number, ahead: number, lateral: number): (number, number)
+	local d = TC.ovalProject(x, z)
+	local cx, cz = TC.ovalPoint(d + ahead, lateral)
+	return cx, cz
+end
+
+-- ...or `ahead` studs further along a route polyline from the nearest point, searching only a
+-- few points round `hint` (the last answer) so a lane next door is never mistaken for yours.
+-- Returns x, z and the new hint.
+function TC.routeCarrot(route: any, x: number, z: number, hint: number?, ahead: number): (number, number, number)
+	local pts = route.points
+	local h = math.clamp(hint or 1, 1, math.max(1, #pts - 1))
+	-- the nearest spot on a segment (k -> k+1) near the hint
+	local best, bestT, bestD = h, 0, math.huge
+	for k = math.max(1, h - 2), math.min(#pts - 1, h + 8) do
+		local ax, az, bx, bz = pts[k].x, pts[k].z, pts[k + 1].x, pts[k + 1].z
+		local dx, dz = bx - ax, bz - az
+		local len2 = dx * dx + dz * dz
+		local f = if len2 > 0 then math.clamp(((x - ax) * dx + (z - az) * dz) / len2, 0, 1) else 0
+		local d = (ax + dx * f - x) ^ 2 + (az + dz * f - z) ^ 2
+		if d < bestD then best, bestT, bestD = k, f, d end
+	end
+	local px = pts[best].x + (pts[best + 1].x - pts[best].x) * bestT
+	local pz = pts[best].z + (pts[best + 1].z - pts[best].z) * bestT
+	local left = ahead
+	for k = best + 1, #pts do
+		local dx, dz = pts[k].x - px, pts[k].z - pz
+		local len = math.sqrt(dx * dx + dz * dz)
+		if len >= left then return px + dx / len * left, pz + dz / len * left, best end
+		left -= len
+		px, pz = pts[k].x, pts[k].z
+	end
+	return px, pz, best
 end
 
 function TC.parSeconds(key: string): number

@@ -9,6 +9,8 @@
 --   horse rides at the course's own speed by itself (a gallop on the oval, an arena lope in the
 --   gymkhana, a canter through the poles) and is pulled gently toward the next hoop within
 --   magnetStuds of its edge. Gamepad R2 gallops too (L3 kept; ButtonX stays the prompt key).
+--   TrainingState.speed overrides the pace (Pip, the practice gate) and Easy Rein steers
+--   strongly toward TrainingState.aim.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -209,9 +211,23 @@ RunService.RenderStepped:Connect(function()
 	if TrainingState.active and TrainingState.phase == "ride" and root and TrainingState.course then
 		-- Courses ride at their own speed: a part-pushed stick still rides at full course speed
 		-- (only the direction counts), with a small deadzone so a resting thumb doesn't steer.
+		TrainingState.stick = move.Magnitude -- Gate Break waits for a let-go stick in the stall
 		local dir = if move.Magnitude > COURSE_DEADZONE then move.Unit else Vector3.zero
-		hh.WalkSpeed = TrainingCourses.speedAt(TrainingState.course, root.Position.X, root.Position.Z)
-		hh:Move(magnet(worldMove(dir), root.Position), false)
+		-- TrainingState.speed: the course's own pace this moment (Pip's speed in his ring, a
+		-- canter back to the practice gate, a stop inside it).
+		hh.WalkSpeed = TrainingState.speed or TrainingCourses.speedAt(TrainingState.course, root.Position.X, root.Position.Z)
+		local steer = worldMove(dir)
+		local aim = TrainingState.aim
+		if TrainingState.easyRein and aim and steer.Magnitude > 0 then
+			-- Easy Rein (D-053): a strong pull toward the next hoop, ring, flag or piece
+			local to = Vector3.new(aim.x - root.Position.X, 0, aim.z - root.Position.Z)
+			if to.Magnitude > 1 then
+				-- pulling well away from the aim (more than 90°) still turns you round
+				local w = if steer.Unit:Dot(to.Unit) >= 0 then 0.75 else 0.15
+				steer = (steer.Unit * (1 - w) + to.Unit * w).Unit
+			end
+		end
+		hh:Move(magnet(steer, root.Position), false)
 		return
 	end
 	hh.WalkSpeed = if galloping then GALLOP else WALK

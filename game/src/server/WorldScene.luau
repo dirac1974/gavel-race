@@ -658,12 +658,22 @@ local function buildOval(f: Instance)
 		local flagX = flag.ax
 		strip(f, c.stall[1] - 6, gz, flagX + 10, gz, 10, DIRT, Enum.Material.Ground, 0.1)
 		local pos = Vector3.new(c.start.x, GROUND_Y, gz)
-		if not WorldScene.placeModel(f, "gate_stall", CFrame.lookAt(pos, pos + Vector3.new(1, 0, 0)) * CFrame.new(0, 0, 1)) then
+		local gate = WorldScene.placeModel(f, "gate_stall", CFrame.lookAt(pos, pos + Vector3.new(1, 0, 0)) * CFrame.new(0, 0, 1))
+		if not gate then
+			gate = Instance.new("Model")
 			for _, s in { -1, 1 } do
-				part({ Name = "StallSide", Size = Vector3.new(8, 6, 0.6), Color = C.white, CFrame = CFrame.new(c.start.x, GROUND_Y + 3, gz + s * 3) }, f)
+				part({ Name = "StallSide", Size = Vector3.new(8, 6, 0.6), Color = C.white, CFrame = CFrame.new(c.start.x, GROUND_Y + 3, gz + s * 3) }, gate)
 			end
-			part({ Name = "StallTop", Size = Vector3.new(8, 0.8, 6.6), Color = C.red, CFrame = CFrame.new(c.start.x, GROUND_Y + 6.4, gz) }, f)
+			part({ Name = "StallTop", Size = Vector3.new(8, 0.8, 6.6), Color = C.red, CFrame = CFrame.new(c.start.x, GROUND_Y + 6.4, gz) }, gate)
+			gate.Parent = f
 		end
+		-- The practice gate never stops a horse (D-053): no collisions, CourseProps. (Race gates
+		-- are a different model and race horses aren't ride rigs.)
+		gate.Name = "PracticeGate"
+		for _, d in gate:GetDescendants() do
+			if d:IsA("BasePart") then d.CanCollide, d.CanQuery, d.CanTouch = false, false, false end
+		end
+		CollisionGroups.set(gate, CollisionGroups.PROPS)
 		ghostPart({ Name = "FlagLine", Size = Vector3.new(0.8, 0.2, flag.bz - flag.az), Color = C.white,
 			CFrame = CFrame.new(flagX, GROUND_Y + 0.14, gz) }, f)
 		prop({ Name = "FlagPole", Size = Vector3.new(0.5, 9, 0.5), Color = C.white, CFrame = CFrame.new(flagX, GROUND_Y + 4.5, flag.az - 1.5) }, f)

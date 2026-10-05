@@ -2,7 +2,7 @@
 -- PaddockClient (D-039, D-040, D-053): the training picker at the Training Paddock and the
 -- heartbeat check-up at the Vet.
 --   Train (D-053): four picture tiles for the ride-through courses on your active horse
---     (Sprint Lane and Mud Splash now; Gate Break and Hill Climb "Coming soon"), plus "Quick
+--     (GameConfig.training.courses says which are open; a closed one says "Coming soon"), plus "Quick
 --     train" for the old games. Picking a course (here or at its picture sign's "Ride" prompt)
 --     asks TrainingRideClient to start it. GameConfig.training.mode = "meters" shows only the
 --     games, as before D-053.

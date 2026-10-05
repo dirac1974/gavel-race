@@ -2,6 +2,8 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — fix: training T3 review — Hill Climb counts time off the track as out of the ring, Pip and the countdown on the server's clock with a one-way allowance, no launch from the gate with a held stick, early twice rides on to the flag, secret bell seed, standing-start freezes read true, per-ride par, Easy Rein can turn round (D-053)
+- 2026-10-05 — feat: training rides T3: server-scored Gate Break (practice gate, bell from the seed, early go reruns, latency allowance) and Hill Climb (Pip the lead pony, ring scoring), Easy Rein steering help in Settings (D-053)
 - 2026-10-05 — feat: riding feel (D-056): phone Hop button, riding trots with a leg-driven bob, shins collider, get off where the horse stood, room check when calling, stall plaque while out, 💎 pill and shop doors shut around races, taming fixed, wild horses turn smoothly, bridge and Race Board fixed
 - 2026-10-05 — fix: training rides review — freezes no longer lose Sprint Lane progress (stale samples skipped, jumps clamped, progress snaps to hoops), TrainingRide attribute cleared on errors, guidance to the finish, Walkers collision group, full course speed on a part-pushed stick, timeouts need real riding, off-course samples kept off the floor, horse-call throttle (D-053)
 - 2026-10-05 — feat: training rides (T2): server-scored Sprint Lane and Mud Splash from 10 Hz samples, course picker with Quick train, 3-2-1, glowing next hoop, hoofprints, lap dots, phone Jump button, end card with stars, stat bar and ribbons; TrainingRiders and CourseProps collision groups; Rides.horseOf returns the horse id (D-053)
