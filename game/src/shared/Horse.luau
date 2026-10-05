@@ -34,6 +34,7 @@ export type Horse = {
 	stamps: { [string]: boolean },
 	born: number,
 	lastRaceAt: number,
+	daily: { day: number, treats: number, petted: boolean },
 }
 
 export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number }
@@ -69,6 +70,7 @@ function Horse.new(id: string, name: string, coat: string, stats: Stats, potenti
 		stamps = {},
 		born = now,
 		lastRaceAt = 0,
+		daily = { day = day(now), treats = 0, petted = false },
 	}
 end
 
@@ -194,6 +196,8 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		fed = h.care.fed,
 		groomed = h.care.groomed,
 		bond = h.bond,
+		treatsToday = if h.daily and h.daily.day == day(now) then h.daily.treats else 0,
+		pettedToday = h.daily ~= nil and h.daily.day == day(now) and h.daily.petted,
 		record = table.clone(h.record),
 		stamps = table.clone(h.stamps),
 	}
@@ -223,6 +227,10 @@ function Horse.repair(h: any, now: number): Horse
 	h.stamps = h.stamps or {}
 	h.born = tonumber(h.born) or now
 	h.lastRaceAt = tonumber(h.lastRaceAt) or 0
+	h.daily = if typeof(h.daily) == "table" then h.daily else {}
+	h.daily.day = tonumber(h.daily.day) or day(now)
+	h.daily.treats = math.max(0, math.floor(tonumber(h.daily.treats) or 0))
+	h.daily.petted = h.daily.petted == true
 	h.name = if typeof(h.name) == "string" and #h.name > 0 then string.sub(h.name, 1, 40) else "Comet"
 	return h :: Horse
 end

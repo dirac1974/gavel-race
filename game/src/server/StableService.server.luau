@@ -15,6 +15,7 @@ local Profile = require(Shared:WaitForChild("Profile"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
+local Care = require(Shared:WaitForChild("Care"))
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
 local GROUND_Y = WorldScene.GROUND_Y
@@ -139,7 +140,7 @@ local function buildBarn(i: number, owner: Player, data)
 				CFrame = plotCF(i, (front + back) / 2, across - STALL_W / 2, GROUND_Y + (BARN_H - 2) / 2) }, barn)
 		end
 		-- Dutch half door (lower half), crossed brace.
-		part({ Name = "HalfDoor", Size = Vector3.new(STALL_W - 2, 4.4, 0.6), Color = C.white,
+		part({ Name = "Stall" .. k, Size = Vector3.new(STALL_W - 2, 4.4, 0.6), Color = C.white, -- the chores prompt hangs here
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn)
 		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = C.red,
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
@@ -157,7 +158,7 @@ local function buildBarn(i: number, owner: Player, data)
 			nameLabel.Name = "HorseName"
 		end
 	end
-	-- Props: hay and a water trough by the barn, three garden beds (Stage 3) along the side.
+	-- Props: hay and a water trough by the barn.
 	local hay = WorldScene.placeModel(barn, "hay_bale", plotCF(i, front - 4, width / 2 + 4, GROUND_Y))
 	if not hay then
 		part({ Name = "HayBale", Size = Vector3.new(4, 3, 3), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
@@ -170,17 +171,123 @@ local function buildBarn(i: number, owner: Player, data)
 		part({ Name = "Water", Size = Vector3.new(5.4, 0.2, 2), Color = C.water, Material = Enum.Material.Glass, Transparency = 0.25,
 			CanCollide = false, CFrame = plotCF(i, front - 4, -width / 2 - 5, GROUND_Y + 1.9) }, barn)
 	end
-	for k = 1, 3 do
-		local bed = plotCF(i, 26 + (k - 1) * 14, -WorldLayout.PLOT_FRONT / 2 + 10, GROUND_Y)
-		if not WorldScene.placeModel(barn, "garden_bed", bed) then
-			part({ Name = "GardenBed", Size = Vector3.new(10, 1.6, 8), Color = C.wood, Material = Enum.Material.WoodPlanks,
-				CFrame = bed * CFrame.new(0, 0.8, 0) }, barn)
-			part({ Name = "Soil", Size = Vector3.new(9, 0.3, 7), Color = Color3.fromHex("6B4A2E"), Material = Enum.Material.Ground,
-				CFrame = bed * CFrame.new(0, 1.6, 0) }, barn)
-		end
-	end
 	barn:SetAttribute("Owner", owner.UserId)
 	barn.Parent = shell
+end
+
+-- Garden beds and what's growing (D-038): crops grow from little sprouts to full size and
+-- sparkle when they're ready to pick. Rebuilt only when a crop's stage changes.
+local CROP_SLOT = { carrot = "carrot_crop", apple = "apple_tree_small", oats = "oat_crop" }
+local CROP_COLOUR = { carrot = Color3.fromHex("FF8A1F"), apple = Color3.fromHex("E5484D"), oats = Color3.fromHex("E8C76A") }
+local gardenSigs: { [number]: string } = {}
+
+local function cropStage(b, now: number): number
+	if b.seed == "" then return -1 end
+	return math.floor(Care.cropProgress(b, now) * 4) -- 0..3 growing, 4 ready
+end
+
+local function buildGarden(i: number, owner: Player, data, now: number)
+	local shell = plotModels[i]
+	local old = shell:FindFirstChild("Garden")
+	if old then old:Destroy() end
+	local garden = Instance.new("Model")
+	garden.Name = "Garden"
+	for k = 1, Care.BEDS do
+		local bedCF = plotCF(i, 26 + (k - 1) * 14, -WorldLayout.PLOT_FRONT / 2 + 10, GROUND_Y)
+		local bed = Instance.new("Model")
+		bed.Name = "Bed" .. k
+		local box = WorldScene.placeModel(bed, "garden_bed", bedCF)
+		if not box then
+			part({ Name = "Box", Size = Vector3.new(10, 1.6, 8), Color = C.wood, Material = Enum.Material.WoodPlanks,
+				CFrame = bedCF * CFrame.new(0, 0.8, 0) }, bed)
+			part({ Name = "Soil", Size = Vector3.new(9, 0.3, 7), Color = Color3.fromHex("6B4A2E"), Material = Enum.Material.Ground,
+				CFrame = bedCF * CFrame.new(0, 1.6, 0) }, bed)
+		end
+		local b = data.garden[k]
+		local seed = b and Care.SEEDS[b.seed]
+		if seed then
+			local progress = Care.cropProgress(b, now)
+			local size = 0.35 + 0.65 * progress
+			local crop = WorldScene.model(CROP_SLOT[seed.crop])
+			if crop then
+				crop:ScaleTo(crop:GetScale() * size)
+				crop:PivotTo(bedCF * CFrame.new(0, 1.7, 0))
+				for _, d in crop:GetDescendants() do
+					if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
+				end
+				crop.Parent = bed
+			else
+				for r = -1, 1 do
+					for c = -1, 1, 2 do
+						local leaf = part({ Name = "Sprout", Size = Vector3.new(0.6, 2.2 * size, 0.6), Color = Color3.fromHex("4CAF50"), CanCollide = false,
+							CFrame = bedCF * CFrame.new(c * 2.2, 1.7 + 1.1 * size, r * 2.2) }, bed)
+						if progress >= 1 then
+							part({ Name = "Crop", Shape = Enum.PartType.Ball, Size = Vector3.new(1.3, 1.3, 1.3), Color = CROP_COLOUR[seed.crop],
+								CanCollide = false, CFrame = leaf.CFrame * CFrame.new(0, -0.6 * size, 0) }, bed)
+						end
+					end
+				end
+			end
+			if progress >= 1 then
+				local glow = part({ Name = "ReadyGlow", Size = Vector3.new(1, 1, 1), Transparency = 1, CanCollide = false,
+					CFrame = bedCF * CFrame.new(0, 3, 0) }, bed)
+				local pe = Instance.new("ParticleEmitter")
+				pe.Rate = 6
+				pe.Lifetime = NumberRange.new(1, 1.6)
+				pe.Speed = NumberRange.new(1, 2)
+				pe.SpreadAngle = Vector2.new(60, 60)
+				pe.Size = NumberSequence.new(0.6, 0)
+				pe.LightEmission = 1
+				pe.Color = ColorSequence.new(Color3.fromHex("FFE066"))
+				pe.Parent = glow
+			end
+		end
+		bed:SetAttribute("Owner", owner.UserId)
+		bed.Parent = garden
+	end
+	garden:SetAttribute("Owner", owner.UserId)
+	garden.Parent = shell
+end
+
+local function gardenSignature(data, now: number): string
+	local parts = {}
+	for k = 1, Care.BEDS do
+		local b = data.garden[k]
+		table.insert(parts, (b and b.seed or "") .. ":" .. tostring(b and cropStage(b, now) or -1))
+	end
+	return table.concat(parts, "|")
+end
+
+-- Care shows on the horse: a sparkle when brushed today, a star on the name plate at full care.
+local function applyCare(i: number, data, now: number)
+	local barn = plotModels[i]:FindFirstChild("Barn")
+	if not barn then return end
+	local today = now // 86400
+	for k = 1, math.min(data.stalls, #data.horses) do
+		local h = data.horses[k]
+		local hm = barn:FindFirstChild("Horse_" .. h.id)
+		if hm then
+			local shiny = h.care.day == today and h.care.groomed
+			local fed = h.care.day == today and h.care.fed
+			local anchor = hm.PrimaryPart or hm:FindFirstChildWhichIsA("BasePart", true)
+			local sparkle = anchor and anchor:FindFirstChild("Shine")
+			if anchor and shiny and not sparkle then
+				sparkle = Instance.new("ParticleEmitter")
+				sparkle.Name = "Shine"
+				sparkle.Rate = 3
+				sparkle.Lifetime = NumberRange.new(0.8, 1.2)
+				sparkle.Speed = NumberRange.new(0.5, 1)
+				sparkle.Size = NumberSequence.new(0.5, 0)
+				sparkle.LightEmission = 1
+				sparkle.Color = ColorSequence.new(Color3.new(1, 1, 1))
+				sparkle.Parent = anchor
+			elseif sparkle and not shiny then
+				sparkle:Destroy()
+			end
+			hm:SetAttribute("Fed", fed)
+			hm:SetAttribute("Groomed", shiny)
+		end
+	end
 end
 
 local function signature(data): string
@@ -203,12 +310,22 @@ local function refresh(player: Player)
 		signatures[i] = sig
 		buildBarn(i, player, data)
 	end
+	local now = os.time()
+	local gsig = gardenSignature(data, now)
+	if gardenSigs[i] ~= gsig then
+		gardenSigs[i] = gsig
+		buildGarden(i, player, data, now)
+	end
+	applyCare(i, data, now)
 end
 
 local function clearPlot(i: number)
 	local shell = plotModels[i]
 	local barn = shell:FindFirstChild("Barn")
 	if barn then barn:Destroy() end
+	local garden = shell:FindFirstChild("Garden")
+	if garden then garden:Destroy() end
+	gardenSigs[i] = nil
 	shell:SetAttribute("OwnerId", nil)
 	shell:SetAttribute("Visits", nil)
 	local label = shell:FindFirstChild("OwnerLabel", true)
@@ -281,6 +398,14 @@ end)
 
 for i = 1, WorldLayout.PLOT_COUNT do plotModels[i] = buildShell(i) end
 Rides.start()
+
+-- Crops grow and care resets at rollover while nobody touches anything: check every 20 s.
+task.spawn(function()
+	while true do
+		task.wait(20)
+		for player in plotOf do task.spawn(refresh, player) end
+	end
+end)
 for _, p in Players:GetPlayers() do
 	if Profiles.get(p) and assign(p) then refresh(p) end
 	p.CharacterAdded:Connect(function() onCharacter(p) end)

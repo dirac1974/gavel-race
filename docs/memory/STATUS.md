@@ -20,6 +20,12 @@ Last updated: 2026-10-04
 - `Rides`/`RideClient`: ride your active horse anywhere (Humanoid rig owned by the rider; walk 16, gallop 46; stand/gallop models switched by speed, bob via Motor6D).
 - `WorldClient`: privacy walls solid for players who aren't allowed in (default Friends), Map panel, Race Board prompt. `Guide`: pathfinding hoofprints for GO buttons (used from Stage 5).
 
+**Stage 3 — Care and food** (branch `claude/stage3-care`, stacked on Stage 2):
+- `Care` (pure, tested): feed (hay/grain), groom, treats (3 a day), pet, garden (carrot 1 h, apple 4 h, oats 8 h; never withers), chores (hay + cash, 4 h per stall), Feed & Seed prices and selling crops.
+- `CareService`: checks ownership, distance to your plot or the shop, rate limits; `CareFx` hearts and sparkles for everyone.
+- `CareClient`: care card per horse, brushing game, garden and shop cards, prompts on your own plot only.
+- `StableService`: stall doors named for chores, garden beds with crops growing in stages and a sparkle when ready, a sparkle on horses brushed today; refreshes every 20 s.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.

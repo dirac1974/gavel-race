@@ -193,4 +193,71 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		far = math.max(far, math.sqrt((p.x - W.STREET_X0) ^ 2 + (p.z - W.STREET_Z) ^ 2))
 	end
 	check(far / 48 <= 20, "every plot within a 20 s gallop of the grandstand")
+
+	-- Care (Stage 3) -------------------------------------------------------------------
+	local Care = require("../../game/src/shared/Care")
+	local cp = Profile.new(T0)
+	local ch = Horse.starter(Profile.newHorseId(cp), "Biscuit", "bay", rng, T0)
+	Profile.addHorse(cp, ch)
+	ch.energy = 3
+	local ok, msg = Care.feed(cp, ch, "hay", T0, E)
+	check(ok and cp.items.hay == 9 and ch.care.fed and ch.energy == 4 and string.find(msg, "Energy") ~= nil, "feeding uses hay, fills care, tops up energy")
+	ok = Care.feed(cp, ch, "hay", T0 + 10, E)
+	check(not ok and cp.items.hay == 9, "one meal a day, no hay wasted")
+	ok = Care.feed(cp, ch, "carrot", T0 + 86400, E)
+	check(not ok, "carrots are treats, not meals")
+	cp.items.hay = nil
+	ok, msg = Care.feed(cp, ch, "hay", T0 + 86400, E)
+	check(not ok and string.find(msg, "Muck out") ~= nil, "out of hay points to chores")
+	ok = Care.groom(cp, ch, T0, E)
+	check(ok and ch.care.groomed and not Care.groom(cp, ch, T0 + 5, E), "groom once a day")
+
+	-- Treats: bond, a few a day.
+	cp.items.carrot = 10
+	local bond0 = ch.bond
+	for _ = 1, Care.TREATS_PER_DAY do Care.treat(cp, ch, "carrot", T0) end
+	check(ch.bond == bond0 + 2 * Care.TREATS_PER_DAY and cp.items.carrot == 10 - Care.TREATS_PER_DAY, "treats add bond")
+	ok = Care.treat(cp, ch, "carrot", T0 + 60)
+	check(not ok and cp.items.carrot == 10 - Care.TREATS_PER_DAY, "treat limit per day keeps carrots")
+	check(Care.treat(cp, ch, "carrot", T0 + 86400), "treats again tomorrow")
+	check(not Care.treat(cp, ch, "hay", T0 + 86400), "hay isn't a treat")
+	local b1 = ch.bond
+	Care.pet(cp, ch, T0 + 86400)
+	local ok2 = Care.pet(cp, ch, T0 + 86400 + 60)
+	check(ch.bond == b1 + 1 and ok2, "petting: bond once a day, always allowed")
+
+	-- Garden: plant, grow offline, harvest, never wither.
+	cp.items.seed_carrot = 1
+	check(Care.plant(cp, 1, "seed_carrot", T0) and cp.items.seed_carrot == nil, "plant uses a seed")
+	check(not Care.plant(cp, 1, "seed_carrot", T0), "one crop per bed")
+	check(not Care.plant(cp, 4, "seed_carrot", T0) and not Care.plant(cp, 1.5, "seed_carrot", T0), "only beds 1-3")
+	check(not Care.harvest(cp, 1, T0 + 60), "not ready early")
+	check(close(Care.cropProgress(cp.garden[1], T0 + 1800), 0.5, 1e-9), "half grown at half time")
+	local carrots = cp.items.carrot or 0
+	check(Care.harvest(cp, 1, T0 + 10 * 86400) and cp.items.carrot == carrots + 3 and cp.garden[1].seed == "", "harvest days later: never withers")
+	check(not Care.plant(cp, 2, "seed_apple", T0), "need the seed")
+
+	-- Chores: always hay, cooldown per stall.
+	local hay0, cash0 = cp.items.hay or 0, cp.cash
+	check(Care.chore(cp, 1, T0) and cp.items.hay == hay0 + 1 and cp.cash == cash0 + 2, "chore pays hay and cash")
+	check(not Care.chore(cp, 1, T0 + 60), "stall stays clean for a while")
+	check(Care.chore(cp, 2, T0 + 60), "other stall is fine")
+	check(not Care.chore(cp, 3, T0) and not Care.chore(cp, 0, T0), "only your stalls")
+	check(Care.chore(cp, 1, T0 + Care.CHORE.cooldownSeconds), "clean again later")
+
+	-- Shop: buy within cash, sell crops only.
+	cp.cash = 20
+	check(Care.buy(cp, "hay", 5) and cp.cash == 10, "buy hay")
+	check(not Care.buy(cp, "grain", 5) and cp.cash == 10, "can't overspend")
+	check(not Care.buy(cp, "diamond", 1) and not Care.buy(cp, "hay", 0) and not Care.buy(cp, "hay", 2.5) and not Care.buy(cp, "hay", 999),
+		"only listed items, sane amounts")
+	cp.items.apple = 3
+	check(Care.sell(cp, "apple", 3) and cp.cash == 16 and cp.items.apple == nil, "sell apples")
+	check(not Care.sell(cp, "hay", 1), "hay isn't bought back")
+
+	-- Garden and chores survive migration.
+	cp.garden[2] = { seed = "seed_oats", at = T0 }
+	local mig = Profile.migrate(cp, T0)
+	check(mig.garden[2].seed == "seed_oats" and #mig.garden == Profile.BEDS and mig.chores["1"] ~= nil, "garden and chores saved")
+	check(#Profile.migrate(nil, T0).garden == Profile.BEDS, "new profile has empty beds")
 end
