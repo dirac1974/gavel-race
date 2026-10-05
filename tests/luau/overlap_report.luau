@@ -1,16 +1,19 @@
 --!strict
 -- Overlap report (D-054 S2): how often horses overlap on screen, before the far-turn lock, in the
 -- first 5 s after it, and from the lock to the line. Run: lune run tests/luau/overlap_report [races]
+-- [riders] [manual]: riders = lanes pressing ◀ ▶ at random (S3), "manual" = with Smart Steer off.
 local process = require("@lune/process")
 local simulate = require("./race_overlap")
 
 local races = tonumber(process.args[1]) or 120
+local opts = { riders = tonumber(process.args[2]) or 0, manual = process.args[3] == "manual" }
+local answers = {}
 local totals = { races = 0, before = 0, first5 = 0, after = 0, frames = 0, beforeFrames = 0, first5Frames = 0, afterFrames = 0, lastTwo = 0, lastTwoFrames = 0, orderBad = 0 }
 for _, course in { "dirt", "turf" } do
 	for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
 		local cell = { before = 0, first5 = 0, after = 0 }
 		for seed = 1, races do
-			local s = simulate(course, distance, seed * 7919 + 3)
+			local s = simulate(course, distance, seed * 7919 + 3, nil, opts)
 			totals.races += 1
 			totals.frames += s.frames
 			totals.beforeFrames += s.before
@@ -22,6 +25,7 @@ for _, course in { "dirt", "turf" } do
 			if s.lastTwo > 0 then totals.lastTwo += 1 end
 			totals.lastTwoFrames += s.lastTwo
 			if not s.orderOk then totals.orderBad += 1 end
+			for answer, count in s.answers do answers[answer] = (answers[answer] or 0) + count end
 		end
 		totals.before += cell.before
 		totals.first5 += cell.first5
@@ -35,3 +39,9 @@ print(string.format("all: races with an overlap before the lock %d/%d, first 5 s
 	totals.beforeFrames, totals.first5Frames, totals.afterFrames, totals.frames))
 print(string.format("in the last 2 s (holds let go): %d races, %d frames; order across the line differs from the result in %d/%d races",
 	totals.lastTwo, totals.lastTwoFrames, totals.orderBad, totals.races))
+if opts.riders > 0 then
+	local parts = {}
+	for answer, count in answers do table.insert(parts, answer .. " " .. count) end
+	table.sort(parts)
+	print("riders' presses: " .. table.concat(parts, ", "))
+end

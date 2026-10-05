@@ -3,8 +3,10 @@
 -- far-turn lock, tau, the race shape's offsets and make-room lanes after it, the send rates) and
 -- draws it the way RaceView does with steering on (60 fps: the sent offsets interpolated, lanes
 -- gliding linearly at most frame/laneSeconds), and counts horses overlapping on screen: closer than
--- half a lane sideways and 6 ft lengthwise (a horse is 8 ft long). Used by trip_tests.luau and
--- tests/luau/overlap_report.luau (D-054 S2).
+-- half a lane sideways and 6 ft lengthwise (a horse is 8 ft long). Used by trip_tests.luau,
+-- steer_controls_tests.luau and tests/luau/overlap_report.luau (D-054 S2, S3).
+-- opts.riders = how many lanes are riders pressing ◀ ▶ at random (S3; their presses go through
+-- Trip.submit like RaceService's SteerRequest); opts.manual = those riders have Smart Steer off.
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -29,16 +31,21 @@ local function makeRng(seed0: number)
 	}
 end
 
-export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean, lineOrder: { number }, result: { number } }
+export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean, lineOrder: { number }, result: { number }, answers: { [string]: number } }
 
-return function(courseId: string, distanceName: string, seed: number, config: any?): Stats
+return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local cfgGame = config or GameConfig
 	local steer = cfgGame.steering
 	local track = TrackLayout.courses[courseId]
 	local plan = TrackLayout.plan(track, TrackLayout.distances[distanceName])
 	local rng = makeRng(seed)
 	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape }
-	local lanes = RaceSession.fillWithBots({}, cfgGame.lanes, cfgGame, ThemePack, rng)
+	local humans, manual = {}, {}
+	for r = 1, (opts and opts.riders) or 0 do
+		table.insert(humans, { id = "rider" .. r, name = "Rider " .. r, rating = 50, isBot = false })
+		if opts.manual then manual["rider" .. r] = true end
+	end
+	local lanes = RaceSession.fillWithBots(humans, cfgGame.lanes, cfgGame, ThemePack, rng)
 	local session = RaceSession.new({ deps = deps, config = cfgGame, leagueName = "Silver", lanes = lanes, rng = rng })
 	local league = cfgGame.leagues.Silver
 	-- RaceService's timeline (race time: 0 at the gate).
@@ -53,8 +60,16 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local tFar = tFinish - (track.finishFromTop + math.pi * TrackLayout.laneRadius(track, 1)) / speed
 	local closes = { mid + 0.35, preEnd + 0.35, burstClose + 0.35, postEnd + 0.35 }
 	session:assignPosts(RaceSession.postOrder(cfgGame, #session.lanes, rng))
-	local trip = Trip.start(cfgGame, session, track, plan, TripBaseline[courseId][distanceName], rng, TrackLayout)
+	local trip = Trip.start(cfgGame, session, track, plan, TripBaseline[courseId][distanceName], rng, TrackLayout, manual)
 	assert(trip, "steering is on")
+	-- Riders press at random, 0.4 to 2 s apart, more often in than out (their own generator, so the
+	-- race's draws are unchanged).
+	local pressRng = makeRng(seed * 31 + 7)
+	local nextPress, seqs = {}, {}
+	for _, h in humans do
+		nextPress[h.id] = pressRng:NextNumber() * 2
+		seqs[h.id] = 0
+	end
 	local n = #session.lanes
 	local shownLive = table.clone(session.live)
 	-- Client state.
@@ -64,7 +79,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		lane[i], laneTarget[i] = i, i
 	end
 	local sampleAt = 0
-	local stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {} }
+	local stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {}, answers = trip.answers }
 	local seg = 1
 	local lastFrame = 0
 	local serverDt = 1 / steer.sendHz
@@ -75,6 +90,13 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		while seg <= #closes and closes[seg] <= T do
 			shownLive = session:closeSegment(seg)
 			seg += 1
+		end
+		for _, h in humans do
+			if T >= nextPress[h.id] and T < trip.lockT then
+				seqs[h.id] += 1
+				Trip.submit(trip, session, h.id, if pressRng:NextNumber() < 0.6 then -1 else 1, seqs[h.id], T)
+				nextPress[h.id] = T + 0.4 + 1.6 * pressRng:NextNumber()
+			end
 		end
 		if not trip.locked and Trip.advance(trip, session.live, T) then
 			session:setTrip(Trip.raceTau(trip))

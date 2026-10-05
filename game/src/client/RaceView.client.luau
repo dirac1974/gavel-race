@@ -16,7 +16,8 @@
 --   gaps as they ease, held so no horse runs through another, with make-room lanes. The screen
 --   interpolates between those 10 Hz samples instead of easing them again, and lanes glide
 --   linearly at the race's lane speed. Steering's gaps already grow in from the gate, so the
---   30% ramp below is skipped for those races.
+--   30% ramp below is skipped for those races. Your own lane change starts on your screen the
+--   moment you press (S3) and hands over to the server's lane once it gets there.
 --   Gaps: the server sends each horse's offset from the pace a few times a second. Up to
 --   the far turn it comes from live chance (skill); from the far turn to the last tap it
 --   blends toward the projected finish order (luck), so late chargers come through and the
@@ -72,7 +73,8 @@ end
 
 -- races[course] = { course, cfg, start, T, len1, plan, lanes, myLane, offset = {}, target = {},
 --   lane = {} (x per lane, updated in place: RaceState.lane is the same table), laneTarget = {},
---   steering (TripInfo), lockAt, locked (TripLocked), from = {}, to = {}, sampleAt, done, doneAt, settleAt }
+--   steering (TripInfo), lockAt, locked (TripLocked), from = {}, to = {}, sampleAt, predict (your
+--   own glide, S3), done, doneAt, settleAt }
 local races: { [string]: any } = {}
 
 local function horseModel(courseId: string?, i: number): Model?
@@ -171,6 +173,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 		RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
 		RaceState.lane = race.lane
+		RaceState.offset = race.offset
 		RaceState.myLane = race.myLane
 		RaceState.myHome = false
 		RaceState.course = courseId
@@ -188,6 +191,30 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		end
 	end)
 end)
+
+-- Your own glide (D-054 S3): a press starts your horse over on your screen at once, toward the
+-- lane the server will give it, if that lane has room here (Trip's rule: clearFeet ahead, holdGap
+-- behind). The server's lane takes over when it gets there; if it hasn't started over within
+-- PREDICT_SECONDS (refused, or the server saw it blocked), your horse glides to the server's lane.
+-- A lane without room starts nothing here: the server's tuck-in shows instead.
+local PREDICT_SECONDS = STEER.laneSeconds + 0.9
+function RaceState.predictSteer(dir: number): boolean
+	local race = RaceState.focus and races[RaceState.focus]
+	local me = race and race.myLane
+	if not me or not race.steering or race.locked then return false end
+	local server = race.laneTarget[me]
+	local from = if race.predict then race.predict.target else math.round(server)
+	local target = math.clamp(from + dir, 1, race.lanes)
+	if target == from or math.abs(target - math.round(server)) > 1 + STEER.maxQueued then return false end
+	for j = 1, race.lanes do
+		if j ~= me and math.abs(race.lane[j] - target) < STEER.laneBand then
+			local ahead = race.offset[j] - race.offset[me]
+			if ahead < STEER.clearFeet and ahead > -STEER.holdGap then return false end
+		end
+	end
+	race.predict = { target = target, from = server, at = os.clock() }
+	return true
+end
 
 -- (offsets, courseId) without steering; (offsets, lanes, courseId) with it. The course id is
 -- always last.
@@ -222,8 +249,8 @@ remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt,
 	end
 end)
 
--- The far-turn bell (D-054): lanes are locked; from here they only make room on screen. The
--- bell and "Lanes locked!" come with the steering controls (S3).
+-- The far-turn bell (D-054): lanes are locked; from here they only make room on screen (the
+-- bell and "Lanes locked!" are RaceController's, for riders with the steering buttons).
 remotes:WaitForChild("TripLocked").OnClientEvent:Connect(function(courseId)
 	local race = races[courseId or "dirt"]
 	if race then race.locked = true end
@@ -283,8 +310,19 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 					else math.max(allowed, math.abs(gap) * dt / (toLine - VIEW.catchUpMarginSeconds))
 				race.offset[i] += math.clamp(gap * k, -limit, limit)
 			end
-			-- In place: RaceState.lane is this table.
-			race.lane[i] += math.clamp(race.laneTarget[i] - race.lane[i], -glide, glide)
+			-- In place: RaceState.lane is this table. Your own lane follows your press until the
+			-- server's lane gets there (or plainly isn't coming).
+			local laneTo = race.laneTarget[i]
+			local pr = if i == race.myLane then race.predict else nil
+			if pr then
+				local moving = math.abs(laneTo - pr.target) < math.abs(pr.from - pr.target) - 0.01
+				if race.locked or math.abs(laneTo - pr.target) < 0.01 or (not moving and clock - pr.at > PREDICT_SECONDS) then
+					race.predict = nil
+				else
+					laneTo = pr.target
+				end
+			end
+			race.lane[i] += math.clamp(laneTo - race.lane[i], -glide, glide)
 			-- Gaps grow in over the first 30% so the field leaves the gate together (with steering,
 			-- the server's gaps already grow in from the gate).
 			local ramp = if race.steering then 1 else math.min(1, base / (0.3 * race.len1))

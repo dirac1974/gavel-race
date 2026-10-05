@@ -294,11 +294,25 @@ This week's course (T5):
 ## Steering on the server (steering S2, D-054)
 - [ ] From the gate, horses hold their posts, then head toward the rail before each turn. Most settle one off the rail (lane 2); about a quarter of the bots take the rail, a few sit one lane wider.
 - [ ] A horse blocked from moving in eases back (up to about 3 lengths) and slots in behind; horses never overlap or bump. Often a line of horses forms in lane 2 and others wait outside it.
-- [ ] Your own horse steers itself the same way (Smart Steer); there are no steering controls yet (S3).
-- [ ] At the far turn lanes lock (no bell or message until S3). After it, horses never run through each other: a horse catching another in its lane swings out to pass, or waits a moment behind it until there's room. Lane changes glide smoothly (no stutter); nothing pops or jumps.
-- [ ] Steering is cosmetic for now (`GameConfig.steering.scale = 0`): lanes move, but no one's chances change until the controls arrive (S3).
+- [ ] If you don't press anything, your own horse steers itself the same way (Smart Steer).
+- [ ] At the far turn lanes lock. After it, horses never run through each other: a horse catching another in its lane swings out to pass, or waits a moment behind it until there's room. Lane changes glide smoothly (no stutter); nothing pops or jumps.
 - [ ] The order across the line is still the result, and the results card looks as before (the trip line comes in S4).
 - [ ] Output shows no RaceService errors around the far turn. With `GameConfig.steering.enabled = false` the horses stay in their posts all race, exactly as before.
+
+## Steering controls (steering S3, D-054)
+To see the buttons on a new profile, ride 3 races first (or set `totals.races` to 3 in the saved profile).
+- [ ] **First three races:** no ◀ ▶ buttons, no bell, no chips; your horse uses Smart Steer even if Settings has it Off.
+- [ ] **Fourth race:** ◀ In and Out ▶ appear bottom-left at "GO!", with a see-through thumb pressing ◀ In and "Steer to the rail before the turn ◀" for about 5 s. The tip shows once, never again.
+- [ ] **Phone, two thumbs:** the buttons are big (at least 88 px), sit above where the thumbstick would be, and nothing hides behind them: on a narrow phone the tap words move to the right of them. There's no thumbstick or jump button during the race. Every other touch still taps the slider.
+- [ ] **Keyboard:** A or ← moves you in, D or → out, while you tap Space. Your character never walks, and steering keys never show "Tap: SPACE or click".
+- [ ] **Gamepad:** D-pad left and right steer, and so does a flick of the left stick (one lane per flick; let the stick come back to the middle before the next). A and R2 still tap.
+- [ ] **No steering press ever scores as a tap:** press only ◀ ▶ (or A/D, or the D-pad) through a few passes: no tap word, the speed meter dips as for untapped passes, and the Final Burst is never spent.
+- [ ] Your horse starts gliding the moment you press, even with lag (network simulator at 200 ms). If the lane has no room, it eases back and tucks in instead; it never swerves out and back.
+- [ ] **Smart Steer:** after a press your horse is left alone for 5 s, then heads in before the turns again, never out (a rider who took the rail keeps it). With Settings → Smart Steer Off, your horse changes lane only when you press.
+- [ ] **The lock:** three soft bell ticks (silent until `lock_tick` is uploaded), then "Lanes locked!" at the far turn on every distance. The buttons grey, then fade before the Final Burst. With Reduced Motion on, nothing pops or shakes.
+- [ ] **Chips:** "Saved ground!" leaving a turn on the rail; "Tucked in!" with wind lines while you sit behind a horse in your lane; "The rail is shorter on turns ◀" when you steer yourself and are wide going into a turn (at most twice a race). No chip ever says you lost a place, and nothing counts down.
+- [ ] Steering counts now (`GameConfig.steering.scale = 1`): at the lock the arrow on your place badge may move a little. Results look as before (the trip line comes in S4).
+- [ ] Output prints one `[Trip]` line per race at the lock (riders' posts, Smart Steer or not, tau, how presses were answered). A rider leaving mid-race goes to Smart Steer, with no errors.
 
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.

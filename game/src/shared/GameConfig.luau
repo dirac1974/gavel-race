@@ -62,8 +62,8 @@ GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line 
 GameConfig.steering = {
 	drawPosts = true,              -- posts drawn at random at the gate; false = the old humans-first lanes
 	enabled = true,                -- false: today's fixed lanes and offsets, exactly
-	scale = 0,                     -- 0: steering is cosmetic (lanes move, chances don't). 0 until the
-	                               -- rider controls (S3) go live, then 1 (src/trip.py's value)
+	scale = 1,                     -- 0: steering is cosmetic (lanes move, chances don't). S2 shipped 0;
+	                               -- 1 from S3, when the rider controls went live (src/trip.py's value)
 	floor = -0.02, ceiling = 0.04, -- clamp on tau (1 point of S = 0.02)
 	groundPerLaneTurn = 0.010,     -- per lane off the rail per 180 degrees of turn
 	draftPerSecond = 0.0010, draftCap = 0.016,
@@ -83,6 +83,22 @@ GameConfig.steering = {
 	stars = { 0.015, -0.005 },     -- trip three-star and two-star thresholds
 	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
 	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
+	requestsPerSecond = 8,         -- S3, game only: a rider's steering requests past this a second are dropped
+}
+-- The steering controls on screen (D-054 S3; RaceController). Chips and tips only show to riders
+-- who have the buttons (from their introRaces + 1-th race).
+GameConfig.steerHud = {
+	buttonPx = 104,          -- ◀ In / Out ▶ size on big screens...
+	minButtonPx = 88,        -- ...never smaller (phones)
+	tipSeconds = 5,          -- the ghost-thumb tip on the first race with the buttons
+	chipSeconds = 1.8,       -- "Saved ground!", "Tucked in!", the turn tip and "Lanes locked!"
+	railLane = 1.5,          -- "Saved ground!": through a turn on the rail (mean lane under this)...
+	belowField = 0.25,       -- ...or at least this many lanes inside the field's mean
+	tuckedSeconds = 1,       -- "Tucked in!" after this long tucked in (wind lines from 0.3 s)
+	tuckedAgainSeconds = 10, -- and not again within this long
+	wideLanes = 1,           -- the turn tip: this many lanes or more outside Smart Steer's home lane...
+	tipsPerRace = 2,         -- ...at most this often a race
+	hideAfterLockSeconds = 2.5, -- the greyed buttons fade this long after "Lanes locked!"
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.
