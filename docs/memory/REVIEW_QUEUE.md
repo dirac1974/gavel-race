@@ -6,7 +6,7 @@ Provisional decisions made by the team under D-009, newest last. For each: keep,
 | --- | --- | --- |
 | D-002a | Diamonds buy cosmetics, time, space, and Exhibition entries only; never win chance or cash-league qualification | Change the Diamond catalog config and D-002a |
 | D-010 | Gavel meter: speed per league, drifting target in Gold+, two half-width targets in Champion final window, feedback labels, per-player latency allowance capped at 0.3 s (D-021) | Edit `GameConfig.leagues` and `GameConfig.scoreLabels` |
-| D-011 | Prototype rules: missed tap = 0, disconnect = window average once, bots ±6 rating and N(50,15) scores, bots unpaid | Edit `GameConfig` (missedTapScore, bot*) |
+| D-011 | Prototype rules: missed tap = 0, disconnect = window average once, bots ±6 rating, scores N(40,15) per stretch and N(55,15) for the burst (D-022), bots unpaid | Edit `GameConfig` (missedTapScore, bot*) |
 | D-013 | Stakes thresholds 100 / 110 / 1,400 / 3,000 League Points to hit the Bronze 3 h, Silver 3 days, Gold 3 weeks targets | Edit `GameConfig.stakesUnlockPoints` |
 | D-014 | Race Rating formula: condition-weighted stats, +5% care, +3 pilot, +2 strategy, +2 bond; Focus excluded | Edit the weight tables and bonus constants in `race_rating.py` and `RaceRating.luau` together (parity tests enforce it) |
 | D-015 | Energy: 5 per horse, 1 per cash race, +1 per 20 min, care top-ups, Rookie free, Practice races when tired | Edit `GameConfig.energy` |

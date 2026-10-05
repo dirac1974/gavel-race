@@ -3,7 +3,13 @@
 -- no clocks of its own (callers pass times), randomness only through the rng
 -- passed in. Dependencies are injected so it runs under Lune tests.
 --
--- Flow: RaceSession.new -> (submitTap / dropWindow ...) -> closeWindow(w) x3 -> finish()
+-- Segments (D-022): three Giddy-up stretches, then the Final Burst, which counts
+-- double. S = weighted mean of segment scores, so the race maths is unchanged.
+--
+-- Flow: RaceSession.new
+--   stretch: openStretch(seg, start) -> scoreStretch(id, seg, taps) ... -> closeSegment(seg)
+--   burst:   burstSpec() -> submitBurst(id, seg, t) ... -> closeSegment(seg)
+--   -> finish()
 
 export type Rng = { NextNumber: (self: any) -> number }
 
@@ -15,14 +21,19 @@ export type LaneInput = {
 }
 
 export type Lane = LaneInput & {
-	scores: { number? },   -- per window
+	scores: { number? },   -- per segment
 	droppedUsed: boolean,
+	averageOnly: boolean,  -- D-022 flag 2: scores count as the segment average
 }
 
 export type Prize = { id: string, place: number, cash: number, leaguePoints: number, isBot: boolean }
 
+export type StretchResult = { score: number, gapErrors: { number }, matched: number }
+
 local RaceSession = {}
 RaceSession.__index = RaceSession
+
+local DROPPED = -1
 
 -- Box-Muller normal from two uniforms.
 local function gauss(rng: Rng, mean: number, sd: number): number
@@ -54,7 +65,7 @@ function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: 
 end
 
 function RaceSession.new(params: {
-	deps: { RaceMath: any, GavelMeter: any },
+	deps: { RaceMath: any, BurstMeter: any, Stride: any },
 	config: any,
 	leagueName: string,
 	lanes: { LaneInput },
@@ -72,25 +83,29 @@ function RaceSession.new(params: {
 	self.lanes = {} :: { Lane }
 	local ratings = {}
 	for i, l in params.lanes do
-		self.lanes[i] = { id = l.id, name = l.name, rating = l.rating, isBot = l.isBot, scores = {}, droppedUsed = false }
+		self.lanes[i] = {
+			id = l.id, name = l.name, rating = l.rating, isBot = l.isBot,
+			scores = {}, droppedUsed = false, averageOnly = false,
+		}
 		ratings[i] = l.rating
 	end
 	local RaceMath = self.deps.RaceMath
 	self.q = RaceMath.baseChances(ratings, self.mathCfg)
 	self.purses = RaceMath.lockPurses(self.q, self.mathCfg)
 	self.live = table.clone(self.q)
-	self.closedWindows = 0
+	self.closed = 0
+	self.beats = {} :: { [number]: { number } }
+	self.burst = nil :: any
 	self.finished = false
 	return self
 end
 
-function RaceSession:meterSpec(window: number)
-	local league = self.league
-	return {
-		sweepSeconds = league.sweepSeconds,
-		targetDrift = league.targetDrift,
-		twoTargets = league.twoTargetFinal and window == self.config.windowsPerRace,
-	}
+function RaceSession:segmentCount(): number
+	return #self.config.segments
+end
+
+function RaceSession:kind(seg: number): string
+	return self.config.segments[seg]
 end
 
 function RaceSession:laneIndex(id: string): number?
@@ -100,68 +115,143 @@ function RaceSession:laneIndex(id: string): number?
 	return nil
 end
 
--- A tap `t` seconds after window `w` opened (already resolved by the caller
--- with GavelMeter.resolveTapTime). One tap per lane per window.
-function RaceSession:submitTap(id: string, window: number, t: number): number?
+-- Giddy-up stretches -----------------------------------------------------------
+
+function RaceSession:strideSpec()
+	local league, s = self.league, self.config.stride
+	return {
+		beats = s.beats,
+		intervalLo = league.strideIntervalLo,
+		intervalHi = league.strideIntervalHi,
+		drift = league.strideDrift,
+		leadChange = league.leadChange,
+		half = s.halfWindowSeconds,
+	}
+end
+
+-- Beat times for stretch `seg`, first beat at `start` (server time). Shared by all lanes.
+function RaceSession:openStretch(seg: number, start: number): { number }
+	assert(seg == self.closed + 1 and self:kind(seg) == "stride", "open the current stretch")
+	assert(self.beats[seg] == nil, "stretch already open")
+	local beats = self.deps.Stride.schedule(self.rng, start, self:strideSpec())
+	self.beats[seg] = beats
+	return beats
+end
+
+-- Score one rider's taps (server times, already resolved) for the open stretch.
+-- Once per lane per stretch; bots and unknown ids return nil.
+function RaceSession:scoreStretch(id: string, seg: number, taps: { number }): StretchResult?
 	local i = self:laneIndex(id)
-	if not i or self.finished or window ~= self.closedWindows + 1 then return nil end
+	if not i or self.finished or seg ~= self.closed + 1 or self.beats[seg] == nil then return nil end
 	local lane = self.lanes[i]
-	if lane.isBot or lane.scores[window] ~= nil then return nil end
-	local s = self.deps.GavelMeter.score(t, self:meterSpec(window))
-	lane.scores[window] = s
+	if lane.isBot or lane.scores[seg] ~= nil then return nil end
+	local Stride, beats, half = self.deps.Stride, self.beats[seg], self.config.stride.halfWindowSeconds
+	local s = Stride.score(beats, taps, half)
+	lane.scores[seg] = s
+	local matched = 0
+	for _, m in (Stride.match(beats, taps, half)) do
+		if m then matched += 1 end
+	end
+	return { score = s, gapErrors = Stride.gapErrors(beats, taps, half), matched = matched }
+end
+
+-- Final Burst ------------------------------------------------------------------
+
+-- The burst meter, with a random start picked once and shared by every lane.
+function RaceSession:burstSpec()
+	if self.burst == nil then
+		local league = self.league
+		self.burst = {
+			sweepSeconds = league.sweepSeconds,
+			targetDrift = league.targetDrift,
+			twoTargets = league.twoTargetFinal,
+			phase = self.deps.BurstMeter.randomPhase(self.rng),
+		}
+	end
+	return self.burst
+end
+
+-- One tap `t` seconds after the burst opened (already resolved by the caller).
+function RaceSession:submitBurst(id: string, seg: number, t: number): number?
+	local i = self:laneIndex(id)
+	if not i or self.finished or seg ~= self.closed + 1 or self:kind(seg) ~= "burst" then return nil end
+	local lane = self.lanes[i]
+	if lane.isBot or lane.scores[seg] ~= nil then return nil end
+	local s = self.deps.BurstMeter.score(t, self:burstSpec())
+	lane.scores[seg] = s
 	return s
 end
 
--- A disconnect during window `w`: scored at the window's race average once per race.
-function RaceSession:dropWindow(id: string, window: number): boolean
+-- Shared ---------------------------------------------------------------------------
+
+-- A disconnect during segment `seg`: scored at the segment's race average once per race.
+function RaceSession:dropSegment(id: string, seg: number): boolean
 	local i = self:laneIndex(id)
 	if not i then return false end
 	local lane = self.lanes[i]
-	if lane.droppedUsed or lane.scores[window] ~= nil then return false end
+	if lane.droppedUsed or lane.scores[seg] ~= nil then return false end
 	lane.droppedUsed = true
-	lane.scores[window] = -1 -- placeholder, replaced in closeWindow
+	lane.scores[seg] = DROPPED
 	return true
 end
 
-local function averageScore(lane: Lane, upTo: number): number
-	local sum = 0
-	for w = 1, upTo do sum += lane.scores[w] or 0 end
-	return sum / upTo
+-- D-022 flag 2 (only when Integrity is out of log-only mode).
+function RaceSession:setAverageOnly(id: string, on: boolean)
+	local i = self:laneIndex(id)
+	if i then self.lanes[i].averageOnly = on end
 end
 
--- Close window `w`: bots tap, missing humans score missedTapScore, dropped
--- lanes get the window average. Returns live chances.
-function RaceSession:closeWindow(window: number): { number }
-	assert(window == self.closedWindows + 1, "windows must close in order")
+local function weightedScore(lane: Lane, upTo: number, weights: { number }): number
+	local sum, wsum = 0, 0
+	for seg = 1, upTo do
+		local w = weights[seg] or 1
+		sum += w * (lane.scores[seg] or 0)
+		wsum += w
+	end
+	return if wsum > 0 then sum / wsum else 0
+end
+
+-- Close segment `seg`: bots score, missing humans score missedTapScore, dropped and
+-- average-only lanes get the segment average. Returns live chances.
+function RaceSession:closeSegment(seg: number): { number }
+	assert(seg == self.closed + 1, "segments must close in order")
 	local config = self.config
+	local isBurst = self:kind(seg) == "burst"
+	local botMean = if isBurst then config.botBurstMean else config.botStrideMean
+	local botSd = if isBurst then config.botBurstSd else config.botStrideSd
 	local played, sum = 0, 0
 	for _, lane in self.lanes do
 		if lane.isBot then
-			lane.scores[window] = math.clamp(gauss(self.rng, config.botScoreMean, config.botScoreSd), 0, 100)
-		elseif lane.scores[window] == nil then
-			lane.scores[window] = config.missedTapScore
+			lane.scores[seg] = math.clamp(gauss(self.rng, botMean, botSd), 0, 100)
+		elseif lane.scores[seg] == nil then
+			lane.scores[seg] = config.missedTapScore
 		end
-		local s = lane.scores[window] :: number
-		if s >= 0 then
+		local s = lane.scores[seg] :: number
+		if s ~= DROPPED and not lane.averageOnly then
 			played += 1
 			sum += s
 		end
 	end
-	local windowAverage = if played > 0 then sum / played else 50
+	local average = if played > 0 then sum / played else 50
 	for _, lane in self.lanes do
-		if lane.scores[window] == -1 then lane.scores[window] = windowAverage end
+		if lane.scores[seg] == DROPPED or lane.averageOnly then lane.scores[seg] = average end
 	end
-	self.closedWindows = window
-	local S = {}
-	for i, lane in self.lanes do S[i] = averageScore(lane, window) end
+	self.closed = seg
 	local RaceMath = self.deps.RaceMath
-	self.live = RaceMath.liveChances(self.q, RaceMath.skills(S, self.mathCfg), self.mathCfg)
+	self.live = RaceMath.liveChances(self.q, RaceMath.skills(self:scoresSoFar(), self.mathCfg), self.mathCfg)
 	return self.live
+end
+
+-- Each lane's S over the closed segments (weighted; the Final Burst counts double).
+function RaceSession:scoresSoFar(): { number }
+	local S = {}
+	for i, lane in self.lanes do S[i] = weightedScore(lane, self.closed, self.config.segmentWeights) end
+	return S
 end
 
 -- Draw the finish order and compute prizes. Bots are never paid.
 function RaceSession:finish(): { order: { number }, prizes: { Prize } }
-	assert(self.closedWindows == self.config.windowsPerRace, "close all windows first")
+	assert(self.closed == self:segmentCount(), "close all segments first")
 	assert(not self.finished, "already finished")
 	self.finished = true
 	local order = self.deps.RaceMath.drawFinish(self.live, self.rng)

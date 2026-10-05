@@ -1,8 +1,11 @@
 --!nonstrict
 -- RaceService: Phase 1 prototype race loop.
 -- Everyone in the server races together (up to 8), bots fill the rest.
+-- Each race: three Giddy-up stretches (tap on the horse's stride), then the Final
+-- Burst (one tap on a sweeping meter, counts double) (D-022).
 -- All scoring and the finish draw happen here; clients only send tap times.
--- Prototype limits: no saving (leaderstats only), no parties, starter ratings.
+-- Prototype limits: no saving (leaderstats only), no parties, starter ratings,
+-- integrity trackers live for the session only (they move to DataStore later).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -12,16 +15,19 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local RaceMath = require(Shared:WaitForChild("RaceMath"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ThemePack = require(Shared:WaitForChild("ThemePack"))
-local GavelMeter = require(Shared:WaitForChild("GavelMeter"))
+local BurstMeter = require(Shared:WaitForChild("BurstMeter"))
+local Stride = require(Shared:WaitForChild("Stride"))
+local TapTime = require(Shared:WaitForChild("TapTime"))
+local Integrity = require(Shared:WaitForChild("Integrity"))
 local RaceSession = require(Shared:WaitForChild("RaceSession"))
 local RaceRating = require(Shared:WaitForChild("RaceRating"))
 
 local LEAGUE = "Rookie" -- prototype: one league
 local COUNTDOWN = 3
-local LATENCY_GRACE = 0.35 -- wait after a window closes for late packets
+local LATENCY_GRACE = 0.35 -- wait after a segment closes for late packets
 
 local remotes = Instance.new("Folder")
-remotes.Name = "GavelRemotes"
+remotes.Name = "RaceRemotes"
 remotes.Parent = ReplicatedStorage
 
 local function makeRemote(name: string): RemoteEvent
@@ -31,20 +37,29 @@ local function makeRemote(name: string): RemoteEvent
 	return r
 end
 
-local LobbyStatus = makeRemote("LobbyStatus")   -- server -> all: seconds until start
-local RaceStarted = makeRemote("RaceStarted")   -- server -> all: lanes, chances, purses
-local WindowOpened = makeRemote("WindowOpened") -- server -> all: window, open, close, meter spec
-local TapResult = makeRemote("TapResult")       -- server -> one: score, label
-local LiveChances = makeRemote("LiveChances")   -- server -> all: chances after a window
-local RaceFinished = makeRemote("RaceFinished") -- server -> all: results
-local Tap = makeRemote("Tap")                   -- client -> server: window, claimed server time
+local LobbyStatus = makeRemote("LobbyStatus")     -- server -> all: seconds until start
+local RaceStarted = makeRemote("RaceStarted")     -- server -> all: league, lanes, start, conditions
+local StretchOpened = makeRemote("StretchOpened") -- server -> all: seg, beat times, name, half window
+local StretchResult = makeRemote("StretchResult") -- server -> one: seg, score, label
+local BurstOpened = makeRemote("BurstOpened")     -- server -> all: seg, open, close, meter spec, name
+local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst score, label
+local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances after it
+local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results
+local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
+local StrideTap = makeRemote("StrideTap")         -- client -> server: seg, claimed server time
+local BurstTap = makeRemote("BurstTap")           -- client -> server: seg, claimed server time
 
 local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
+local function today(): number
+	return math.floor(os.time() / 86400)
+end
+
 -- Prototype player state ----------------------------------------------------
 local starterStats: { [number]: { [string]: number } } = {}
+local trackers: { [number]: any } = {}
 local DISTANCES = { "Sprint", "Mile", "Classic", "Marathon" }
 local SURFACES = { "Dirt", "Turf", "Sand" }
 local WEATHERS = { "Sunny", "Rain", "Wind" }
@@ -59,43 +74,105 @@ local function setupPlayer(player: Player)
 	points.Name = "League Points"
 	points.Parent = stats
 	-- Prototype starter racer: random stats 40-60 (no stable or saving yet).
-	local stats = {}
+	local racer = {}
 	for _, k in { "speed", "accel", "stamina", "grit", "focus" } do
-		stats[k] = math.random(40, 60)
+		racer[k] = math.random(40, 60)
 	end
-	starterStats[player.UserId] = stats
+	starterStats[player.UserId] = racer
+	trackers[player.UserId] = Integrity.new()
 end
 
 Players.PlayerAdded:Connect(setupPlayer)
-Players.PlayerRemoving:Connect(function(player: Player)
-	task.defer(function() starterStats[player.UserId] = nil end)
-end)
 for _, p in Players:GetPlayers() do setupPlayer(p) end
 
--- Race state shared with the Tap handler ------------------------------------
-local current = nil -- { session, windows = { {open, close} }, activeWindow }
+-- Race state shared with the tap handlers -------------------------------------
+-- { session, seg, kind ("stride" | "burst" | nil when closed), open, close,
+--   taps = { [userId] = {times} }, allowances = { [userId] = seconds } }
+local current = nil
 
-Tap.OnServerEvent:Connect(function(player: Player, window: any, claimed: any)
-	if not current or typeof(window) ~= "number" or typeof(claimed) ~= "number" then return end
-	if window ~= current.activeWindow then return end
-	local w = current.windows[window]
-	local arrival = now()
-	-- Latency is snapshotted when the window opens so a lag spike mid-window can't widen it.
-	local allowance = (w.allowances and w.allowances[player.UserId])
-		or GavelMeter.rewindAllowance(player:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
-	local t = GavelMeter.resolveTapTime(claimed, arrival, w.open, w.close, allowance)
+-- Latency is snapshotted when a segment opens so a lag spike mid-segment can't widen it (D-021).
+local function snapshotAllowances(): { [number]: number }
+	local out = {}
+	for _, p in Players:GetPlayers() do
+		out[p.UserId] = TapTime.rewindAllowance(p:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	end
+	return out
+end
+
+local function resolveTap(player: Player, seg: any, claimed: any, kind: string): number?
+	if not current or current.kind ~= kind or seg ~= current.seg or typeof(claimed) ~= "number" then return nil end
+	local allowance = current.allowances[player.UserId]
+		or TapTime.rewindAllowance(player:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	return TapTime.resolve(claimed, now(), current.open, current.close, allowance)
+end
+
+StrideTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
+	local t = resolveTap(player, seg, claimed, "stride")
 	if not t then return end
-	local score = current.session:submitTap(tostring(player.UserId), window, t - w.open)
+	local list = current.taps[player.UserId]
+	if not list then
+		list = {}
+		current.taps[player.UserId] = list
+	end
+	if #list < GameConfig.stride.beats * GameConfig.stride.maxTapsPerBeat + 4 then
+		table.insert(list, t)
+	end
+end)
+
+BurstTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
+	local t = resolveTap(player, seg, claimed, "burst")
+	if not t then return end
+	local score = current.session:submitBurst(tostring(player.UserId), seg, t - current.open)
 	if score then
-		TapResult:FireClient(player, window, score, GameConfig.labelFor(score))
+		TapResult:FireClient(player, seg, score, GameConfig.labelFor(score))
 	end
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
-	if current and current.activeWindow then
-		current.session:dropWindow(tostring(player.UserId), current.activeWindow)
+	if current and current.seg then
+		current.session:dropSegment(tostring(player.UserId), current.seg)
 	end
+	task.defer(function()
+		starterStats[player.UserId] = nil
+		trackers[player.UserId] = nil -- session-only until DataStore (STATUS backlog)
+	end)
 end)
+
+-- Integrity (D-022) ------------------------------------------------------------
+local function applyIntegrity(session, players: { Player })
+	local cfg = GameConfig.integrity
+	for _, p in players do
+		local tr = trackers[p.UserId]
+		if tr then
+			local action = Integrity.action(Integrity.activeStrikes(tr, today(), cfg), cfg)
+			if action == "warn" or action == "review" then
+				-- Edge removed while a check is pending; the pause after review needs tooling (not built).
+				session:setAverageOnly(tostring(p.UserId), true)
+			end
+		end
+	end
+end
+
+local function recordIntegrity(players: { Player }, gaps: { [number]: { number } }, matched: { [number]: number })
+	local cfg = GameConfig.integrity
+	for _, p in players do
+		local tr = trackers[p.UserId]
+		if tr then
+			Integrity.addRace(tr, gaps[p.UserId] or {}, matched[p.UserId] or 0, today())
+			local spread = Integrity.spread(tr)
+			if Integrity.check(tr, today(), cfg) then
+				local strikes = Integrity.activeStrikes(tr, today(), cfg)
+				local action = Integrity.action(strikes, cfg)
+				print(string.format("[Integrity] %s (%d): strike %d, gap spread %.1f ms, action %s",
+					p.Name, p.UserId, strikes, spread * 1000, action))
+				if action == "warn" then
+					IntegrityNote:FireClient(p, "Your taps looked automatic, so they count as practice for now. "
+						.. "Auto-clickers and scripts aren't allowed in cash races. If that wasn't you, tap Ask for a check.")
+				end
+			end
+		end
+	end
+end
 
 -- Main loop -------------------------------------------------------------------
 local function lanesSummary(session)
@@ -104,6 +181,10 @@ local function lanesSummary(session)
 		out[i] = { id = lane.id, name = lane.name, isBot = lane.isBot, chance = session.q[i], purse = session.purses[i] }
 	end
 	return out
+end
+
+local function waitUntil(t: number)
+	task.wait(math.max(0, t - now()))
 end
 
 local function runRace(players: { Player })
@@ -121,37 +202,56 @@ local function runRace(players: { Player })
 	end
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
 	local session = RaceSession.new({
-		deps = { RaceMath = RaceMath, GavelMeter = GavelMeter },
+		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, Stride = Stride },
 		config = GameConfig,
 		leagueName = LEAGUE,
 		lanes = lanes,
 		rng = rng,
 	})
+	applyIntegrity(session, players)
 	local league = GameConfig.leagues[LEAGUE]
-	local start = now() + COUNTDOWN
-	local windows = {}
-	for w = 1, GameConfig.windowsPerRace do
-		local open = start + w * GameConfig.windowGapSeconds + (w - 1) * league.windowSeconds
-		windows[w] = { open = open, close = open + league.windowSeconds }
-	end
-	current = { session = session, windows = windows, activeWindow = nil }
-	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), start, cond)
+	local strideCfg = GameConfig.stride
+	current = { session = session, seg = nil, kind = nil, taps = {}, allowances = {} }
+	local t = now() + COUNTDOWN
+	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), t, cond)
 
-	for w = 1, GameConfig.windowsPerRace do
-		task.wait(math.max(0, windows[w].open - now()))
-		windows[w].allowances = {}
-		for _, p in Players:GetPlayers() do
-			windows[w].allowances[p.UserId] = GavelMeter.rewindAllowance(
-				p:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	local gaps: { [number]: { number } } = {}
+	local matched: { [number]: number } = {}
+	for seg, kind in GameConfig.segments do
+		t += GameConfig.windowGapSeconds
+		waitUntil(t)
+		current.seg, current.taps, current.allowances = seg, {}, snapshotAllowances()
+		if kind == "stride" then
+			local beats = session:openStretch(seg, t + strideCfg.leadInSeconds)
+			current.open, current.close = t, beats[#beats] + strideCfg.halfWindowSeconds
+			current.kind = "stride"
+			StretchOpened:FireAllClients(seg, beats, ThemePack.windows[seg] or "", strideCfg.halfWindowSeconds)
+			waitUntil(current.close + LATENCY_GRACE)
+			current.kind = nil
+			for _, p in players do
+				local res = session:scoreStretch(tostring(p.UserId), seg, current.taps[p.UserId] or {})
+				if res then
+					local list = gaps[p.UserId] or {}
+					for _, e in res.gapErrors do table.insert(list, e) end
+					gaps[p.UserId] = list
+					matched[p.UserId] = (matched[p.UserId] or 0) + res.matched
+					StretchResult:FireClient(p, seg, res.score, GameConfig.labelFor(res.score, GameConfig.stretchLabels))
+				end
+			end
+		else
+			local spec = session:burstSpec()
+			current.open, current.close = t, t + league.windowSeconds
+			current.kind = "burst"
+			BurstOpened:FireAllClients(seg, current.open, current.close, spec, ThemePack.words.burst)
+			waitUntil(current.close + LATENCY_GRACE)
+			current.kind = nil
 		end
-		current.activeWindow = w
-		WindowOpened:FireAllClients(w, windows[w].open, windows[w].close, session:meterSpec(w), ThemePack.windows[w])
-		task.wait(math.max(0, windows[w].close + LATENCY_GRACE - now()))
-		current.activeWindow = nil
-		LiveChances:FireAllClients(w, session:closeWindow(w))
+		LiveChances:FireAllClients(seg, session:closeSegment(seg))
+		t = current.close + LATENCY_GRACE
 	end
+	current.seg = nil
 
-	task.wait(2) -- final stretch animation time
+	task.wait(2) -- run to the line
 	local result = session:finish()
 	local summary = {}
 	for _, prize in result.prizes do
@@ -167,6 +267,7 @@ local function runRace(players: { Player })
 		end
 	end
 	RaceFinished:FireAllClients(summary)
+	recordIntegrity(players, gaps, matched)
 	current = nil
 end
 

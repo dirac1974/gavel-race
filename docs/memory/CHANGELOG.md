@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: Giddy-up stretches and Final Burst in the prototype (D-022); integrity logging; burst start made uniform
 - 2026-10-04 — Debate 007: stride stretches replace single taps, macro detection and rider ladder (D-022)
 - 2026-10-04 — D-020: strikes for flagged fans (quiet, warning, 30-day block)
 - 2026-10-04 — D-020: crowd = best fan + assists; Top Fans board after each race
