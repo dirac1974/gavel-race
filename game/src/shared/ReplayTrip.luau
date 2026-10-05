@@ -4,11 +4,22 @@
 -- horse }? } }, lane = { posts }?, events = { { t, kind, ... } }, myLane?, steer? (you had the ◀ ▶
 -- buttons), lockAt? (server time of the far-turn lock) }. Recordings from before steering have no
 -- x, no lane list or no events: every function here copes.
--- Trip events (RaceController and RaceView record them): "lock" { t }, "saved" { t, t0, t1 }
--- (a turn from t0 to t1 you left having saved ground), "tuck" { t, t0, t1 } (tucked in from t0 to
--- t1), "steer" { t, dir } (your presses).
+-- Trip events (RaceController records them, built here): "saved" { t, t0, t1 } (a turn from t0 to
+-- t1 you left having saved ground), "tuck" { t, t0, t1 } (tucked in from t0 to t1), "steer" { t,
+-- dir } (your presses). The lock time is rec.lockAt (RaceView, from TripInfo).
 
 local ReplayTrip = {}
+
+-- "Saved ground!" at t on leaving a turn that runs from turnStart to turnEnd feet along the rail
+-- (pace feet, as Trip counts turns), in a race that started at server time `start`.
+function ReplayTrip.saved(t: number, start: number, turnStart: number, turnEnd: number, speed: number): any
+	return { t = t, kind = "saved", t0 = start + turnStart / speed, t1 = start + turnEnd / speed }
+end
+
+-- Tucked in from t0 to t1 (server time).
+function ReplayTrip.tuck(t0: number, t1: number): any
+	return { t = t1, kind = "tuck", t0 = t0, t1 = t1 }
+end
 
 -- Horse i's lane position between frames a and b (fraction f): the recorded lanes, else its post
 -- (the recording's lane list), else its lane number.

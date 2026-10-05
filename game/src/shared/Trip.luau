@@ -584,12 +584,20 @@ end
 local VIEW_SUBSTEP = 1 / 60
 local HOLD_RELEASE_SECONDS = 1 -- holds let go this long before the line, so the order there is the result
 local MAKE_WAY_DEPTH = 3       -- how far a boxed-in horse's way out may be cleared (Trip.cosmetic)
+Trip.halfSteps = true          -- the S4 half-lane step at the finish (tests compare it on and off)
 
 -- A horse on screen may not run through the one ahead in its lane: it sits holdGap behind until
--- the make-room lanes let it out (as Trip holds before the lock).
-local function holdView(st: any)
+-- the make-room lanes let it out (as Trip holds before the lock). A horse taking a half-lane step
+-- (S4) is in neither lane once it is more than 0.45 lanes from the other horse: holding it (or its
+-- new neighbour) back then would jerk one of them backwards on screen. And a hold never pulls a
+-- horse back faster than HOLD_PULL_FRACTION of twice the gap limit (S4 review): following a horse
+-- needs no more than that, so only a sudden snap (two horses meeting in a lane closer than holdGap)
+-- is spread over a few frames instead of a jerk. before = offsets at the start of this substep of h s.
+local HOLD_PULL_FRACTION = 0.95
+local function holdView(st: any, before: { number }, h: number)
 	local band, gap = st.cfg.laneBand, st.cfg.holdGap
-	local view, x = st.view, st.shown
+	local view, x, tgt = st.view, st.shown, st.shownTgt
+	local pull = HOLD_PULL_FRACTION * 2 * st.race.maxGapFeetPerSecond * h
 	local ord = table.create(st.n)
 	for i = 1, st.n do ord[i] = i end
 	table.sort(ord, function(a: number, b: number): boolean
@@ -601,7 +609,11 @@ local function holdView(st: any)
 		local i = ord[a]
 		for b = 1, a - 1 do
 			local j = ord[b]
-			if math.abs(x[i] - x[j]) < band and view[j] - view[i] < gap then view[i] = view[j] - gap end
+			local apart = math.abs(x[i] - x[j])
+			local halfway = (tgt[i] % 1 ~= 0 or tgt[j] % 1 ~= 0) and apart > 0.45
+			if apart < band and not halfway and view[j] - view[i] < gap then
+				view[i] = math.max(view[j] - gap, math.min(view[i], before[i] - pull))
+			end
 		end
 	end
 end
@@ -614,6 +626,7 @@ function Trip.viewStep(st: any, targets: { number }, dt: number, toLine: number)
 		local h = math.min(VIEW_SUBSTEP, left)
 		local k = math.min(1, h * race.viewEasePerSecond)
 		local allowed = race.maxGapFeetPerSecond * h
+		local before = table.clone(st.view)
 		for i = 1, st.n do
 			local gap = targets[i] - st.view[i]
 			local limit = if tl <= margin then math.huge else math.max(allowed, math.abs(gap) * h / (tl - margin))
@@ -621,7 +634,7 @@ function Trip.viewStep(st: any, targets: { number }, dt: number, toLine: number)
 		end
 		left -= h
 		tl -= h
-		if tl > HOLD_RELEASE_SECONDS then holdView(st) end
+		if tl > HOLD_RELEASE_SECONDS then holdView(st, before, h) end
 	end
 end
 
@@ -656,17 +669,23 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 	local clear = cfg.clearFeet
 	local cross = 2 * st.race.maxGapFeetPerSecond * cfg.laneSeconds -- closing while crossing a lane
 	-- Half-lane steps start this long before the holds let go, so the step is done by then.
-	local stepping = st.geo.length / st.speed - t <= HOLD_RELEASE_SECONDS + cfg.laneSeconds
+	local stepping = Trip.halfSteps and st.geo.length / st.speed - t <= HOLD_RELEASE_SECONDS + cfg.laneSeconds
+	-- j is in `lane`: there, heading there, or gliding across it on the way (S4 review: a horse that
+	-- moved onto another's path got held back as the other crossed, a jerk on screen).
 	local function inLane(j: number, lane: number): boolean
-		return math.abs(x[j] - lane) < band or tgt[j] == lane
+		if math.abs(x[j] - lane) < band or tgt[j] == lane then return true end
+		return lane > math.min(x[j], tgt[j]) and lane < math.max(x[j], tgt[j])
 	end
-	-- j stands in i's way in `lane`: alongside (within clearFeet), or ahead and being closed on.
-	-- (A horse i will stay behind may be a little under holdGap ahead: the hold eases i back a
-	-- foot or two.) A horse behind i there adapts in turn (held, or moving over).
+	-- j stands in i's way in `lane`: within holdGap ahead or behind, ahead and being closed on by i,
+	-- or behind and closing on i (S4 review: closer than holdGap, or with one catching the other,
+	-- the hold would pull one of them back when they meet, a jerk on screen).
 	local function blocks(i: number, j: number, lane: number): boolean
 		if j == i or not inLane(j, lane) then return false end
 		local d = view[j] - view[i]
-		return math.abs(d) < clear or (d > 0 and targets[i] > targets[j] - cfg.holdGap and d < st.lookahead)
+		local gap = cfg.holdGap
+		return math.abs(d) < gap
+			or (d > 0 and targets[i] > targets[j] - gap and d < st.lookahead)
+			or (d < 0 and targets[j] > targets[i] - gap and -d < st.lookahead)
 	end
 	local function free(i: number, lane: number): boolean
 		for j = 1, n do

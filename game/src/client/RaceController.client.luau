@@ -30,6 +30,7 @@ local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local RaceInput = require(Shared:WaitForChild("RaceInput"))
 local ResultsText = require(Shared:WaitForChild("ResultsText"))
+local ReplayTrip = require(Shared:WaitForChild("ReplayTrip"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -392,7 +393,9 @@ local RIBBONS = { "ribbon_blue", "ribbon_red", "ribbon_yellow", "ribbon_white" }
 local results = Instance.new("Frame")
 results.AnchorPoint = Vector2.new(0.5, 0)
 results.Position = UDim2.new(0.5, 0, 0.32, 0)
-results.Size = UDim2.fromOffset(360, 5 * 40 + 12)
+local RESULT_ROWS, ROW_HEIGHT = 5, 40
+local CARD_HEIGHT, GAIN_ROW = RESULT_ROWS * ROW_HEIGHT + 12, 30
+results.Size = UDim2.fromOffset(360, CARD_HEIGHT)
 results.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
 results.BackgroundTransparency = 0.25
 results.ZIndex = 6
@@ -425,7 +428,6 @@ watchViewport()
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchViewport)
 -- Above the card: "You rode ★★☆", and under it "Good trip ★★☆" (steering, D-054). In the card's
 -- foot: places your riding gained, and places your trip gained, each only when it's a gain.
-local CARD_HEIGHT, GAIN_ROW = 5 * 40 + 12, 30
 local rideLine = label(results, UDim2.new(1, -24, 0, 30), UDim2.new(0, 12, 0, -70), "", 26)
 rideLine.ZIndex = 7
 rideLine.Font = Enum.Font.GothamBlack
@@ -459,15 +461,15 @@ local fullBtn = button(results, "Whole race ×3", UDim2.new(0.34, 0, 0, 40), UDi
 local doneBtn = button(results, "Done ✕", UDim2.new(0, 110, 0, 36), UDim2.new(1, -110, 0, -110), Color3.new(1, 1, 1))
 
 local resultRows = {}
-for i = 1, 5 do
+for i = 1, RESULT_ROWS do
 	local icon = Instance.new("ImageLabel")
 	icon.Size = UDim2.fromOffset(28, 34)
-	icon.Position = UDim2.new(0, 12, 0, 8 + (i - 1) * 40)
+	icon.Position = UDim2.new(0, 12, 0, 8 + (i - 1) * ROW_HEIGHT)
 	icon.BackgroundTransparency = 1
 	icon.ZIndex = 7
 	icon.Visible = false
 	icon.Parent = results
-	local text = label(results, UDim2.new(1, -60, 0, 34), UDim2.new(0, 50, 0, 8 + (i - 1) * 40), "", 22)
+	local text = label(results, UDim2.new(1, -60, 0, 34), UDim2.new(0, 50, 0, 8 + (i - 1) * ROW_HEIGHT), "", 22)
 	text.ZIndex = 7
 	text.TextXAlignment = Enum.TextXAlignment.Left
 	resultRows[i] = { icon = icon, text = text }
@@ -863,7 +865,7 @@ end
 -- A tucked-in span ends: the replay draws its wind lines (S4).
 local function endTuck(s, t: number)
 	if s.tuckFrom and RaceState.recording then
-		table.insert(RaceState.recording.events, { t = t, kind = "tuck", t0 = s.tuckFrom, t1 = t })
+		table.insert(RaceState.recording.events, ReplayTrip.tuck(s.tuckFrom, t))
 	end
 	s.tuckFrom = nil
 end
@@ -923,8 +925,7 @@ local function updateSteer(t: number, dt: number)
 			if s.pressed and acc.time > 0.5 and (own < SHUD.railLane or own <= field - SHUD.belowField) then
 				showChip("Saved ground!")
 				if RaceState.recording then -- the replay's green chevrons through this turn (S4)
-					table.insert(RaceState.recording.events, { t = t, kind = "saved",
-						t0 = s.start + turn[1] / SPEED, t1 = s.start + turn[2] / SPEED })
+					table.insert(RaceState.recording.events, ReplayTrip.saved(t, s.start, turn[1], turn[2], SPEED))
 				end
 			end
 		end
@@ -1507,7 +1508,7 @@ local function showResults(summary, raceId: number)
 	-- buttons), then places your riding and your trip gained, each only if it's a gain.
 	if rideReport then
 		rideLine.Text = ResultsText.rideLine(rideReport.stars)
-		tripLine.Text = ResultsText.tripLine(rideReport.tripStars)
+		tripLine.Text = ResultsText.tripLine(rideReport.tripStars, STEER.scale) or "" -- none while steering is cosmetic
 		gainLine.Text = ResultsText.gainLine("riding", rideReport.gain)
 		tripGainLine.Text = ResultsText.gainLine("trip", rideReport.tripGain)
 	else

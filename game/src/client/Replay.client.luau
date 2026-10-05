@@ -197,7 +197,7 @@ local function buildTrip(rec): { any }
 			local sign = Instance.new("BillboardGui")
 			sign.Size = UDim2.fromOffset(150, 34)
 			sign.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
-			sign.AlwaysOnTop = true
+			sign.MaxDistance = 400 -- not through the grandstand from across the course
 			local l = Instance.new("TextLabel")
 			l.Size = UDim2.fromScale(1, 1)
 			l.BackgroundTransparency = 1
@@ -327,16 +327,18 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, _start, _c
 	end
 end)
 
+-- Places every horse at time t; returns their progress and lane positions.
 local function placeAll(rec, t: number, speed: number?)
 	local a, b, f = frameAt(rec, t)
-	local progress = {}
+	local progress, lanes = {}, {}
 	for i = 1, rec.lanes do
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
 		-- Recorded lane positions (D-054): per frame when steering moved them, else the posts.
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, ReplayTrip.laneAt(rec, a, b, f, i))
+		lanes[i] = ReplayTrip.laneAt(rec, a, b, f, i)
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i])
 	end
-	return progress
+	return progress, lanes
 end
 
 local function myPlace(progress, me: number): number
@@ -358,7 +360,7 @@ RunService.RenderStepped:Connect(function(dt)
 	if playing.clock >= playing.slowFrom and playing.clock < playing.crossT then speed = 0.5 end
 	playing.clock += dt * speed
 	local t = playing.clock
-	local progress = placeAll(rec, t, speed)
+	local progress, lanes = placeAll(rec, t, speed)
 	local me = rec.myLane
 
 	-- Camera.
@@ -380,7 +382,7 @@ RunService.RenderStepped:Connect(function(dt)
 		local target = pivot.Position + Vector3.new(0, 4, 0)
 		-- Side view from just outside the outer rail (broadcast angle), so no horse runs through it.
 		local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
-		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, (rec.lane and rec.lane[subject]) or subject) + 12
+		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, lanes[subject] or subject) + 12 -- its lane now
 		local eye = if playing.view == "side"
 			then target + pivot.RightVector * outside + Vector3.new(0, 6, 0)
 			else target - pivot.LookVector * 18 + Vector3.new(0, 7, 0)

@@ -638,8 +638,16 @@ Template:
     - The race records the lock time and event (RaceView), plus saved turns, tucked-in spans and whether you had the buttons (RaceController); your presses were already recorded.
   - **The half-lane step** (S3 follow-up): in the last moments, when holds let go so the order across the line is the result, a horse still boxed in behind another in its lane (no free lane, nothing able to make way) edges half a lane over if nobody near is within half a lane of the spot.
     - It starts `laneSeconds` before the holds let go, so the step is done by then.
-    - Offsets don't change, so the finish order can't.
-    - Measured over 960 races each for all bots, 2 riders, 3 riders on Smart Steer off, and the rider's-own-screen runs at 0.1 s and 0.25 s: no overlaps anywhere and the order across the line right in every race. The step happened in 2 to 12 races per 960.
+    - Lanes, not targets: the step never changes where a horse finishes. Its shown offset does change a little: once it is half a lane over, the hold behind the horse ahead lets it go, a moment before the holds let everyone go, so it reaches its place slightly sooner (under a foot apart on the way in the test case, 0.08 ft at the line). The order across the line is the same with the step on or off.
+    - **No backward jerks** (S4 review). The first version started the step while holds still applied; a horse at x = 1.5 counted as in both lanes, so the hold pulled it or its new neighbour back 7–8 ft in a tick (70–80 ft/s). Now:
+      - a horse taking a half-lane step isn't held against a horse more than 0.45 lanes from it;
+      - a hold never pulls a horse back faster than 19 ft/s on screen. A steady hold needs at most twice the 10 ft/s gap limit, so only sudden snaps are spread over a few frames.
+    - **Make-room after the lock, tightened** (the S4 review's backward-speed check found S2 snaps of 24–88 ft/s in a few races in a hundred):
+      - a horse gliding across a lane counts as in it, so nobody moves onto its path;
+      - a move needs `holdGap` (10 ft) clear ahead and behind in the new lane, not `clearFeet` (8 ft);
+      - a move never goes in front of a horse that is catching up with you.
+    - Measured over 960 races each for all bots, 2 riders, 3 riders on Smart Steer off, and the rider's-own-screen runs at 0.1 s and 0.25 s (`overlap_report`): no overlaps anywhere, the order across the line right in every race, and no horse drawn falling back faster than 20 ft/s after the lock. The step happened in 10 to 13 races per 960.
+    - Before the lock, Trip's own holds still hop a horse arriving in a lane back by up to 30 ft/s in bot fields and about 50 ft/s with riders pressing, for one tick. Trip needs `clearFeet` ahead to move but holds at `holdGap`, and that rule is mirrored in `src/trip.py`. Smoothing it means a model change with new fixtures, so it's left for a follow-up.
     - Alternatives: release the holds earlier (S2: at 0.5 s one race in 960 crossed in the wrong order, and an earlier release doesn't separate two horses whose finishing gap is under a length), keep holding non-passing pairs (shifts a horse off its place, which can reorder it against another lane's horse), or a minimum finishing gap in the race shape (changes every finish to fix one in hundreds).
 - Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
 - Alternatives:

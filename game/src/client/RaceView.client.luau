@@ -252,10 +252,6 @@ end)
 remotes:WaitForChild("TripLocked").OnClientEvent:Connect(function(courseId)
 	local race = races[courseId or "dirt"]
 	if race then race.locked = true end
-	local rec = RaceState.recording
-	if race and rec and rec.course == (courseId or "dirt") then
-		table.insert(rec.events, { t = serverNow(), kind = "lock" })
-	end
 end)
 
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
