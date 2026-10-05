@@ -18,15 +18,16 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
 
 local MarketBuy = Profiles.remote("MarketBuy")     -- client -> server: listing id
-local Tame = Profiles.remote("Tame")               -- client -> server: wild coat, game score
+local Tame = Profiles.remote("Tame")               -- client -> server: wild horse index, game score
 local BuyStall = Profiles.remote("BuyStall")       -- client -> server
 local SwapStall = Profiles.remote("SwapStall")     -- client -> server: stalled id, pasture id
 local Rename = Profiles.remote("RenameHorse")      -- client -> server: horse id, first word, second word
 
 local last: { [Player]: number } = {}
-local function busy(player: Player, gap: number?): boolean
-	if os.clock() - (last[player] or 0) < (gap or 0.4) then return true end
-	last[player] = os.clock()
+local function busy(player: Player, gap: number?, key: string?): boolean
+	local k = (key or "market") .. ":" .. player.UserId
+	if os.clock() - (last[k] or 0) < (gap or 0.4) then return true end
+	last[k] = os.clock()
 	return false
 end
 
@@ -101,12 +102,19 @@ MarketBuy.OnServerEvent:Connect(function(player: Player, id: any)
 	if ok then Profiles.changed(player) end
 end)
 
-Tame.OnServerEvent:Connect(function(player: Player, coat: any, score: any)
-	if busy(player, 3) or typeof(coat) ~= "string" or typeof(score) ~= "number" then return end
+Tame.OnServerEvent:Connect(function(player: Player, index: any, score: any)
+	if typeof(index) ~= "number" or typeof(score) ~= "number" then return end
+	local coat = Market.WILD_COATS[index]
+	if not coat then return end
+	if busy(player, 3, "tame") then
+		Profiles.notify(player, "Easy does it: try again in a moment", "heart")
+		return
+	end
 	local data = Profiles.get(player)
 	if not data then return end
-	local m = WorldLayout.meadow
-	if not near(player, m.x, m.z, m.radius + 30) then return end
+	-- The wild horse is where every client draws it: the tamer must be next to it.
+	local x, z = Market.wildPosition(WorldLayout.meadow, index, workspace:GetServerTimeNow())
+	if not near(player, x, z, 30) then return end
 	if score < 50 then
 		Profiles.notify(player, "The wild horse trotted off. Try again, gently!", "heart")
 		return
@@ -140,7 +148,7 @@ SwapStall.OnServerEvent:Connect(function(player: Player, stalledId: any, pasture
 end)
 
 Rename.OnServerEvent:Connect(function(player: Player, id: any, first: any, second: any)
-	if busy(player) or typeof(id) ~= "string" then return end
+	if busy(player, 3, "rename") or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
 	local ok, msg = Market.rename(data, id, if typeof(first) == "string" then first else nil, if typeof(second) == "string" then second else nil)
@@ -148,7 +156,9 @@ Rename.OnServerEvent:Connect(function(player: Player, id: any, first: any, secon
 	if ok then Profiles.changed(player) end
 end)
 
-Players.PlayerRemoving:Connect(function(player: Player) last[player] = nil end)
+Players.PlayerRemoving:Connect(function(player: Player)
+	for _, k in { "market", "tame", "rename", "retire" } do last[k .. ":" .. player.UserId] = nil end
+end)
 
 -- Build the corral now, rebuild when models load and when the week turns.
 task.defer(buildCorral)

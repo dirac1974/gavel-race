@@ -20,8 +20,7 @@ local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local C = Ui.colors
 
 local GROUND_Y = -0.5
-local LEG = 14            -- seconds per wander leg
-local COUNT = 4
+local COUNT = #Market.WILD_COATS -- one of each natural rare coat
 
 local folder = Instance.new("Folder")
 folder.Name = "WildHorses"
@@ -48,14 +47,6 @@ local function modelFor(coat: string): Model
 	return p
 end
 
--- Deterministic wander: leg n of horse i goes between two seeded points in the meadow.
-local function pointFor(i: number, n: number): Vector3
-	local rng = Market.lcg(i * 1013 + n * 7907 + 5)
-	local m = WorldLayout.meadow
-	local a, r = rng:NextNumber() * math.pi * 2, math.sqrt(rng:NextNumber()) * (m.radius - 14)
-	return Vector3.new(m.x + math.cos(a) * r, GROUND_Y, m.z + math.sin(a) * r)
-end
-
 local horses = {}
 local function build()
 	folder:ClearAllChildren()
@@ -74,7 +65,7 @@ local function build()
 		prompt.MaxActivationDistance = 14
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = anchor
-		horses[i] = { model = m, coat = coat, prompt = prompt, still = false }
+		horses[i] = { model = m, coat = coat, prompt = prompt, still = false, index = i }
 	end
 end
 build()
@@ -88,16 +79,10 @@ RunService.Heartbeat:Connect(function()
 	local t = workspace:GetServerTimeNow()
 	for i, h in horses do
 		if h.model.Parent and not h.still then
-			local tt = t / LEG + i * 0.37
-			local n = math.floor(tt)
-			local f = tt - n
-			-- graze for the first half of a leg, then walk to the next spot
-			local walk = math.clamp((f - 0.5) * 2, 0, 1)
-			local eased = walk * walk * (3 - 2 * walk)
-			local a, b = pointFor(i, n), pointFor(i, n + 1)
-			local pos = a:Lerp(b, eased)
-			local dir = (b - a)
-			local look = if dir.Magnitude > 0.1 then dir.Unit else Vector3.new(0, 0, -1)
+			-- graze for the first half of a leg, then walk to the next spot (Market.wildPosition)
+			local x, z, dx, dz, walk = Market.wildPosition(WorldLayout.meadow, i, t)
+			local pos = Vector3.new(x, GROUND_Y, z)
+			local look = Vector3.new(dx, 0, dz)
 			local bob = if walk > 0 and walk < 1 then 0.12 * math.abs(math.sin(t * 6 + i)) else 0
 			h.model:PivotTo(CFrame.lookAt(pos + Vector3.new(0, bob, 0), pos + look + Vector3.new(0, bob, 0)))
 		end
@@ -142,13 +127,18 @@ local closeBtn = Ui.button(card, "✕", UDim2.fromOffset(40, 40), UDim2.new(1, -
 local session = nil -- { horse, phase, phaseUntil, good, bad, conns }
 local NEED = 3
 
+local function setPrompts(on: boolean)
+	for _, h in horses do h.prompt.Enabled = on end
+end
+
 local function finish(score: number)
 	if not session then return end
 	local s = session
 	session = nil
 	s.horse.still = false
+	setPrompts(true)
 	for _, c in s.conns do c:Disconnect() end
-	gameRemotes:WaitForChild("Tame"):FireServer(s.horse.coat, score)
+	gameRemotes:WaitForChild("Tame"):FireServer(s.horse.index, score)
 	task.delay(0.8, function() gui.Enabled = false end)
 end
 
@@ -179,17 +169,20 @@ closeBtn.Activated:Connect(function()
 		for _, c in session.conns do c:Disconnect() end
 		session = nil
 	end
+	setPrompts(true)
 	gui.Enabled = false
 end)
 
 local function start(h)
+	if session then return end
 	local d = PlayerState.data
 	if d and d.market and not d.market.canTame then
 		Ui.toast("You made a new friend today, or need a treat (carrot, apple or sugar cube).", "heart", "🥕")
 		return
 	end
 	h.still = true
-	title.Text = "Make friends with the wild " .. h.coat:gsub("_", " ")
+	setPrompts(false)
+	title.Text = "Make friends with the wild " .. (string.gsub(h.coat, "_", " "))
 	fill.Size = UDim2.fromScale(0, 1)
 	session = { horse = h, phase = "wait", phaseUntil = os.clock() + 1.2, good = 0, bad = 0, conns = {} }
 	gui.Enabled = true
