@@ -18,6 +18,10 @@ RaceState.ReplayRequested = Instance.new("BindableEvent") -- arg: "finish" | "fu
 RaceState.ReplayClosed = Instance.new("BindableEvent")
 RaceState.recording = nil  -- { start, plan, lanes, frames = { {t, p1..pn} }, events = { {t, kind, ...} }, summary }
 RaceState.myLane = nil
+-- Your race has finished but its results card isn't up yet (RaceController). The Hud holds the
+-- coin chime until then: the prize lands just before the leader reaches the line.
+RaceState.resultsPending = false
+RaceState.ResultsShown = Instance.new("BindableEvent") -- arg: true when your results card shows, false if it never will
 
 -- Two courses can race at once (D-036). Each client follows one race, the "focus": the race
 -- it rides in, or else the newest race when watching. RaceView and RaceController both ask

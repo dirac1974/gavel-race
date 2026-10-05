@@ -440,3 +440,11 @@ Template:
 - Alternatives: Meshy rigging (humanoids only), separate per-pose models (no motion), Roblox Animation Editor rigs (needs Studio work by hand on every coat).
 - Links: tools/meshy/split_legs.py, game/src/shared/HorseLegs.luau, game/src/client/RaceView.client.luau, game/src/server/Rides.luau
 
+## D-052 — Sound and the race announcer
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team (audio lead, small call)
+- Decision: one warm, upbeat announcer voice (ElevenLabs premade "Liam", Flash v2.5) with eight short lines, plus short friendly sound effects (docs/audio/AUDIO_PLAN.md). Race cues follow the shared clock: bell and "And they're off!" at the gate, "Into the far turn!", whoosh and "Final Burst!", "Down the stretch they come!" when the burst closes, fanfare and cheer at the line, "What a finish!" on the results card, "Photo finish!" in a replay. Riders hear their own race and their own hoofbeats; spectators hear race cues at half volume, and only within about 250 studs of that race's course. The Green Cash chime waits for your results card, so it never gives the result away. UI buttons pop quietly. Sound is on by default with an On/Off choice in Settings (`settings.sound`).
+- Why: sound tells young players what's happening without reading, and on a phone their eyes are on the slider; the announcer names the race moments the HUD already shows.
+- Alternatives: no announcer (less excitement, more reading), a different voice per moment (costs more, less familiar), sound off by default (most kids never find it), spectator cues heard everywhere in the world (an announcer in the stables and on the trail).
+- Links: game/src/client/Sound.luau, game/src/client/RaceController.client.luau, tools/audio/sounds.json

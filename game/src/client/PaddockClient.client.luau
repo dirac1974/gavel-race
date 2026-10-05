@@ -17,6 +17,8 @@ local ContextActionService = game:GetService("ContextActionService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
@@ -91,6 +93,7 @@ end
 -- character never hops and typing in chat never counts. onRelease is for the hold game.
 local function tapper(onTap: () -> (), label: string?, onRelease: (() -> ())?): TextButton
 	local b = Ui.button(body, label or "TAP!", UDim2.new(0.6, 0, 0, 64), UDim2.new(0.2, 0, 1, -70), C.orange, 30)
+	b:SetAttribute("NoPop", true) -- a pop on every game tap would cover the beat
 	b.MouseButton1Down:Connect(onTap)
 	if onRelease then
 		b.MouseButton1Up:Connect(onRelease)
@@ -354,8 +357,13 @@ local function heartGame(done)
 	local times = {}
 	for k = 1, beats do times[k] = start + (k - 1) * interval + (if k % 2 == 0 then 0.03 else -0.02) end
 	local used, total, finished = {}, 0, false
-	heartbeat(function()
+	local heard = 0 -- beats played as sound so far
+	heartbeat(function(dt)
 		local t = now()
+		if heard < beats and t + dt > times[heard + 1] then -- the beat lands in this frame: play it now, not a frame late
+			heard += 1
+			if Sound then Sound.play("heartbeat") end
+		end
 		local pulse = 0
 		for _, bt in times do
 			local d = t - bt

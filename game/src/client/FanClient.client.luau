@@ -16,6 +16,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local C = Ui.colors
 local LANE = {
@@ -61,6 +63,7 @@ cl.Parent = chips
 local clap = Ui.button(gui, "👏 CLAP!", UDim2.fromOffset(170, 90), UDim2.new(1, -24, 1, -230), C.gold, 30) -- clear of the jump button
 clap.AnchorPoint = Vector2.new(1, 1)
 clap.Visible = false
+clap:SetAttribute("NoPop", true) -- it claps instead
 local ring = Instance.new("Frame")
 ring.AnchorPoint = Vector2.new(0.5, 0.5)
 ring.Position = UDim2.fromScale(0.5, 0.5)
@@ -176,6 +179,7 @@ local function doClap()
 	if not watching or not watching.cheered or watching.finished then return end
 	local t = serverNow()
 	remotes:WaitForChild("ClapTap"):FireServer(watching.course, t)
+	if Sound then Sound.play("clap") end
 	local b = nearestBeat(t)
 	local err = if b then math.abs(t - b) else 1
 	local label = if err <= 0.02 then "Perfect!" elseif err <= 0.045 then "Great!" elseif err <= 0.08 then "Good" else "Keep the beat"

@@ -31,7 +31,7 @@ export type Profile = {
 	nextHorseId: number,
 	days: { played: number, last: number },
 	totals: { races: number, wins: number, cashEarned: number },
-	settings: { visits: string },
+	settings: { visits: string, sound: boolean? },
 	flags: { [string]: boolean },
 	garden: { { seed: string, at: number } },
 	chores: { [string]: number },

@@ -411,6 +411,18 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	end
 	check(okLen, "turf races run about their distance in every lane")
 	check(TrackLayout.courses.dirt == dirtCfg and TrackLayout.courses.turf == turfCfg, "course table")
+	-- Spectator sound range (D-052): distance from a course's outer edge.
+	local outer = TrackLayout.outerRadius(dirtCfg)
+	check(TrackLayout.distanceToTrack(dirtCfg, 0, 0) == 0, "infield counts as at the track")
+	check(TrackLayout.distanceToTrack(dirtCfg, outer - 1, 300) == 0, "on the home straight")
+	check(close(TrackLayout.distanceToTrack(dirtCfg, outer + 100, -200), 100, 1e-9), "beside a straight")
+	check(close(TrackLayout.distanceToTrack(dirtCfg, 0, dirtCfg.straight / 2 + outer + 60), 60, 1e-9), "beyond a turn")
+	local grand = WorldLayout.places.track
+	check(TrackLayout.distanceToTrack(dirtCfg, grand.x, grand.z) < 250, "the grandstand is within earshot")
+	local plot1 = WorldLayout.plot(1)
+	check(TrackLayout.distanceToTrack(dirtCfg, plot1.x, plot1.z) > 250, "the stables are out of earshot")
+	check(TrackLayout.distanceToTrack(turfCfg, grand.x, grand.z) > TrackLayout.distanceToTrack(dirtCfg, grand.x, grand.z),
+		"the turf course is further from the grandstand")
 
 	-- Spectators (Stage 7) -------------------------------------------------------------
 	local Fans = require("../../game/src/shared/Fans")

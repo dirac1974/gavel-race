@@ -18,7 +18,7 @@ Last updated: 2026-10-05
 ## Backlog (top = next)
 
 1. **Studio playtest of the world** (David): `game/PLAYTEST.md`, every section; enable API access in Game Settings → Security to test saving. Fix what breaks.
-2. **Sound and voice**: announcer lines, hoofbeats, crowd, UI clicks (needs David's OK for ElevenLabs credits, OPEN_QUESTIONS 4).
+2. **Sound effects**: generate and upload the 15 effects once the ElevenLabs key has Sound Effects access (docs/audio/AUDIO_PLAN.md); the code already plays them when their ids arrive. Then listen in Studio and tune `LEVEL` in `Sound.luau`.
 3. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
 4. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
 5. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
@@ -32,6 +32,7 @@ Last updated: 2026-10-05
 
 ## Done
 
+- 2026-10-05: sound (D-052): `Sound.luau` with race cues, UI pops, care and job sounds, Sound On/Off setting; 8 announcer lines generated (29 ElevenLabs credits) and uploaded to Roblox (all approved); sound effects waiting on the key permission.
 - 2026-10-05: world build merged (PRs #17–#27): saving and owning horses, the world (Fair Street, Barn Lane, riding, map), care and food, two courses with the Race Board, Stable Board jobs, training and the vet, spectators (cheer, Clap Along, Fan XP), more horses (market, taming, stalls), leagues (Cups, Practice, Hall of Fame), polish (tour, settings, For grown-ups). Art pass (#20): 51 Meshy models and 66 icons uploaded; Meshy balance 460.
 - 2026-10-04: Stage 1 your horse (PR #17): saved profiles, starter pick, race queue, dock HUD.
 - 2026-10-04: world design (D-035 to D-047) from the design council's world workshop; build stages planned.

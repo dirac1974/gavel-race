@@ -12,3 +12,6 @@ Models/
 *.rbxl
 *.rbxlx
 *.rbxl.lock
+
+# Earlier takes of re-rolled sounds (tools/audio/generate_audio.py keeps them locally)
+assets/audio/takes/
