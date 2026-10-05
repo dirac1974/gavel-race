@@ -17,6 +17,7 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 - Race length follows the distance: Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~2 min, Marathon ~2:21. Rookie runs Sprint and Mile.
 - The pace slider runs the whole race (D-026): tap as the marker crosses the glowing target, one tap per pass. The target moves every 2–3 passes; the speed meter fills from your last few passes.
 - In the homestretch: the **Final Burst**, one tap on a big rainbow meter, worth double (40% of the rider's score).
+- During the race: your place ("3rd of 8") on screen and over your horse, the side board in running order, and a minimap of the oval (D-030).
 - Lobby shows each horse's Win Chance % and locked win purse. Live Win Chance updates three times during the race and after the burst.
 - The horses cross the line in the drawn finish order; prizes: winner gets the locked purse; 2nd 1.2B, 3rd 0.8B, 4th 0.4B. League Points: win 10, 2nd 6, 3rd 4, 4th 2, finish 1.
 

@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — fix: horses face forward; feat: live places on the board and a place badge, minimap (D-030)
 - 2026-10-04 — The game is Giddy-Up: "Tap it. Shout it. Win it." (D-029)
 - 2026-10-04 — docs: David confirmed Rookie races Sprint and Mile (D-027)
 - 2026-10-04 — fix: solid rails; feat: chase camera and Roblox-style jockeys on bot horses (D-028)

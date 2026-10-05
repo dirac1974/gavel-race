@@ -22,6 +22,15 @@ local SIZES = {
 	gate_stall = { axis = "Y", studs = 8.0 },
 }
 
+-- Turn applied after import so each model faces -Z (Roblox forward). Playtest showed the
+-- imported horses already face -Z (the 180-degree turn from docs/art/IMPORT.md put them
+-- backwards), so no turn by default; set math.pi for a slot that comes in reversed.
+local YAW = {
+	horse = 0,
+	finish_post = 0,
+	gate_stall = 0,
+}
+
 local models = Instance.new("Folder")
 models.Name = "RaceModels"
 models.Parent = ReplicatedStorage
@@ -66,11 +75,12 @@ local function normalize(container: Model, slot: string): Model
 	local _, extents = model:GetBoundingBox()
 	local current = if size.axis == "Y" then extents.Y else math.max(extents.X, extents.Z)
 	if current > 0 then model:ScaleTo(model:GetScale() * size.studs / current) end
-	-- Meshy fronts face +Z; Roblox forward is -Z: turn 180 degrees about the centre, then put
-	-- an unrotated pivot at the bottom centre so PivotTo(CFrame.new(p)) faces -Z standing on p.
+	-- Turn to face -Z (YAW above), then put an unrotated pivot at the bottom centre so
+	-- PivotTo(CFrame.new(p)) faces -Z standing on p.
+	local yaw = if isHorse then YAW.horse else (YAW[slot] or 0)
 	local cf = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(cf.Position)
-	model:PivotTo(CFrame.new(cf.Position) * CFrame.Angles(0, math.pi, 0))
+	model:PivotTo(CFrame.new(cf.Position) * CFrame.Angles(0, yaw, 0))
 	local cf2, ext = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(cf2.Position - Vector3.new(0, ext.Y / 2, 0))
 	return model

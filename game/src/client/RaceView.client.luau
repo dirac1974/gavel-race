@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
+local RaceState = require(script.Parent:WaitForChild("RaceState"))
 
 local CFG = TrackLayout.churchill
 local LEAD_SCALE = 0.25      -- lap fraction of lead per unit of (win chance - fair share)
@@ -66,6 +67,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 	for i = 1, #laneList do
 		race.offset[i], race.target[i] = 0, 0
 	end
+	RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
+	RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
 end)
 
 remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
@@ -85,6 +88,7 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 	end
 	for i = 1, race.lanes do cross[i] = cross[i] or (FIRST_CROSS + race.lanes * CROSS_GAP) end
 	race.runIn = { t0 = t, from = from, cross = cross }
+	task.delay(GameConfig.runInSeconds, RaceState.setFinal, summary) -- official order once they're home
 end)
 
 RunService.RenderStepped:Connect(function(dt)
@@ -102,8 +106,8 @@ RunService.RenderStepped:Connect(function(dt)
 			if tau <= tc then
 				p = p0 + speed * tau
 			else
-				local over = tau - tc
-				p = 1 + speed * over * math.max(0, 1 - over / 3) -- slows to a walk past the line
+				local over = math.min(tau - tc, 3)
+				p = 1 + speed * (over - over * over / 6) -- eases to a stop 3 s past the line, never backwards
 			end
 			moving = tau < tc + 3
 		else
@@ -112,8 +116,11 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		local bob = if moving then BOB_STUDS * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi)) else 0
 		place(i, p, bob)
+		RaceState.progress[i] = p
 	end
+	RaceState.rank()
 	if race.runIn and t - race.runIn.t0 > GameConfig.runInSeconds + 4 then
 		race = nil -- the server rebuilds the track at the next race
+		RaceState.active = false
 	end
 end)

@@ -257,3 +257,11 @@ Template:
 - Alternatives (taglines): "Say it, tap it, ride it!", "Every tap's a Giddy-Up!", "The race you can shout!".
 - Links: game/src/shared/ThemePack.luau, docs/GAME_DESIGN.md, CLAUDE.md
 
+## D-030 — Live places and a minimap
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("it should show which place you are in near your number... the board on the side should also show which place each horse is currently in... a minimap oval of the track in the upper right during the race")
+- Decision: each client ranks the horses every frame from the shared race timeline (RaceState), so every screen agrees: a big place badge ("3rd of 8") at the top right for the rider, the same place on the YOU marker over their horse, and the side board re-sorted by running order with places. After the run-in the official finish order replaces the running order. A minimap of the oval (same geometry as the track) sits in the top-right corner during the race: numbered dots in lane colours, the rider's own dot larger with a white ring, the finish line marked, homestretch along the bottom.
+- Also fixed: horses ran backwards. The imported models already face Roblox's forward, so the 180-degree turn from the import notes is removed (`AssetService` YAW table, 0 by default).
+- Links: game/src/client/RaceState.luau, game/src/client/Minimap.client.luau, game/src/client/RaceController.client.luau, game/src/server/AssetService.server.luau
+
