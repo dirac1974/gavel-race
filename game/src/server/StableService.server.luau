@@ -22,7 +22,7 @@ local GROUND_Y = WorldScene.GROUND_Y
 local C = WorldScene.colors
 local part, wedge = WorldScene.part, WorldScene.wedge
 
-local STALL_W = 14
+local STALL_MAX_W = 14
 local BARN_D = 24
 local BARN_H = 15
 local GATE_W = 14
@@ -62,11 +62,21 @@ local function buildShell(i: number): Model
 		local x1, z1 = WorldLayout.plotPoint(i, a1, c1)
 		WorldScene.fence(m, x0, z0, x1, z1)
 	end
+	-- Neighbouring plots share a side: only the lower-numbered plot builds the shared fence.
+	local function neighbourOn(across: number): number?
+		local x, z = WorldLayout.plotPoint(i, D / 2, across * 1.05)
+		for j = 1, WorldLayout.PLOT_COUNT do
+			local r = WorldLayout.plotRect(j)
+			if j ~= i and x >= r[1] and x <= r[3] and z >= r[2] and z <= r[4] then return j end
+		end
+		return nil
+	end
 	fenceIA(1, -h, 1, -GATE_W / 2)
 	fenceIA(1, GATE_W / 2, 1, h)
-	fenceIA(1, h, D, h)
+	local right, left = neighbourOn(h), neighbourOn(-h)
+	if not right or right > i then fenceIA(1, h, D, h) end
 	fenceIA(D, h, D, -h)
-	fenceIA(D, -h, 1, -h)
+	if not left or left > i then fenceIA(D, -h, 1, -h) end
 	-- Privacy walls (D-042): invisible and passable on the server; each client turns them
 	-- solid for itself when the owner's setting doesn't let it in.
 	local walls = Instance.new("Folder")
@@ -112,13 +122,15 @@ local function buildBarn(i: number, owner: Player, data)
 	local barn = Instance.new("Model")
 	barn.Name = "Barn"
 	local stalls = data.stalls
-	local width = stalls * STALL_W + 8
+	-- Bays narrow a little for big barns so the barn always fits the plot front.
+	local stallW = math.min(STALL_MAX_W, (WorldLayout.PLOT_FRONT - 24) / stalls)
+	local width = stalls * stallW + 8
 	local back = WorldLayout.PLOT_DEPTH - 6
 	local front = back - BARN_D
 	local mid = plotCF(i, (front + back) / 2, 0)
 	-- Back and side walls, roof; the front is open stall bays with half doors.
 	part({ Name = "BackWall", Size = Vector3.new(width, BARN_H, 1.2), Color = C.red, Material = Enum.Material.WoodPlanks,
-		CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H / 2, -BARN_D / 2) }, barn)
+		CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H / 2, BARN_D / 2) }, barn) -- local +Z is away from the lane
 	for _, s in { -1, 1 } do
 		part({ Name = "SideWall", Size = Vector3.new(1.2, BARN_H, BARN_D), Color = C.red, Material = Enum.Material.WoodPlanks,
 			CFrame = mid * CFrame.new(s * width / 2, GROUND_Y + BARN_H / 2, 0) }, barn)
@@ -126,21 +138,21 @@ local function buildBarn(i: number, owner: Player, data)
 	local roofH = 7
 	for _, s in { -1, 1 } do
 		wedge({ Name = "Roof", Size = Vector3.new(width + 3, roofH, BARN_D / 2 + 2), Color = C.roofRed,
-			CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H + roofH / 2, s * (BARN_D / 4 + 1)) * CFrame.Angles(0, if s > 0 then 0 else math.pi, 0) }, barn)
+			CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H + roofH / 2, s * (BARN_D / 4 + 1)) * CFrame.Angles(0, if s > 0 then math.pi else 0, 0) }, barn)
 	end
 	part({ Name = "Trim", Size = Vector3.new(width + 0.8, 1, BARN_D + 0.8), Color = C.white, CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H, 0) }, barn)
 	part({ Name = "Floor", Size = Vector3.new(width, 0.3, BARN_D), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
 		CFrame = mid * CFrame.new(0, GROUND_Y + 0.15, 0) }, barn)
 	-- Stall bays.
 	for k = 1, stalls do
-		local across = -width / 2 + 4 + (k - 0.5) * STALL_W
+		local across = -width / 2 + 4 + (k - 0.5) * stallW
 		local bay = plotCF(i, front + 0.6, across)
 		if k > 1 then
 			part({ Name = "Divider", Size = Vector3.new(0.8, BARN_H - 2, BARN_D - 1), Color = C.white,
-				CFrame = plotCF(i, (front + back) / 2, across - STALL_W / 2, GROUND_Y + (BARN_H - 2) / 2) }, barn)
+				CFrame = plotCF(i, (front + back) / 2, across - stallW / 2, GROUND_Y + (BARN_H - 2) / 2) }, barn)
 		end
 		-- Dutch half door (lower half), crossed brace.
-		part({ Name = "Stall" .. k, Size = Vector3.new(STALL_W - 2, 4.4, 0.6), Color = C.white, -- the chores prompt hangs here
+		part({ Name = "Stall" .. k, Size = Vector3.new(stallW - 2, 4.4, 0.6), Color = C.white, -- the chores prompt hangs here
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn)
 		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = C.red,
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
@@ -154,22 +166,23 @@ local function buildBarn(i: number, owner: Player, data)
 			end
 			hm.Parent = barn
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
-				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" else nil, STALL_W - 3, 2.2, C.white)
+				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" else nil, stallW - 3, 2.2, C.white)
 			nameLabel.Name = "HorseName"
 		end
 	end
-	-- Props: hay and a water trough by the barn.
-	local hay = WorldScene.placeModel(barn, "hay_bale", plotCF(i, front - 4, width / 2 + 4, GROUND_Y))
+	-- Props: hay and a water trough in front of the barn, inside the plot whatever the barn's size.
+	local propA, propB = WorldLayout.PLOT_FRONT / 2 - 10, -(WorldLayout.PLOT_FRONT / 2 - 10)
+	local hay = WorldScene.placeModel(barn, "hay_bale", plotCF(i, front - 6, propA, GROUND_Y))
 	if not hay then
 		part({ Name = "HayBale", Size = Vector3.new(4, 3, 3), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
-			CFrame = plotCF(i, front - 4, width / 2 + 4, GROUND_Y + 1.5) }, barn)
+			CFrame = plotCF(i, front - 6, propA, GROUND_Y + 1.5) }, barn)
 	end
-	local trough = WorldScene.placeModel(barn, "water_trough", plotCF(i, front - 4, -width / 2 - 5, GROUND_Y))
+	local trough = WorldScene.placeModel(barn, "water_trough", plotCF(i, front - 6, propB, GROUND_Y))
 	if not trough then
 		part({ Name = "Trough", Size = Vector3.new(6, 2, 2.6), Color = C.wood, Material = Enum.Material.Wood,
-			CFrame = plotCF(i, front - 4, -width / 2 - 5, GROUND_Y + 1) }, barn)
+			CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1) }, barn)
 		part({ Name = "Water", Size = Vector3.new(5.4, 0.2, 2), Color = C.water, Material = Enum.Material.Glass, Transparency = 0.25,
-			CanCollide = false, CFrame = plotCF(i, front - 4, -width / 2 - 5, GROUND_Y + 1.9) }, barn)
+			CanCollide = false, CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1.9) }, barn)
 	end
 	-- The Stable Board noticeboard by the gate (D-043).
 	local nbCF = plotCF(i, 9, -GATE_W / 2 - 9, GROUND_Y)
@@ -432,6 +445,7 @@ end)
 for _, p in Players:GetPlayers() do
 	if Profiles.get(p) and assign(p) then refresh(p) end
 	p.CharacterAdded:Connect(function() onCharacter(p) end)
+	if p.Character then task.spawn(onCharacter, p) end
 end
 
 -- Uploaded models replace part-built buildings, props and horses once they load.

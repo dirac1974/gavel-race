@@ -56,7 +56,8 @@ end
 local function currentRide(): Model?
 	local h = myHumanoid()
 	local seat = h and h.SeatPart
-	if seat and seat.Name == "Saddle" and seat.Parent and seat.Parent.Parent and seat.Parent.Parent.Name == "RideHorses" then
+	if seat and seat.Name == "Saddle" and seat.Parent and seat.Parent.Parent and seat.Parent.Parent.Name == "RideHorses"
+		and seat.Parent:GetAttribute("Owner") == player.UserId then
 		return seat.Parent
 	end
 	return nil
@@ -98,18 +99,30 @@ local function setCharacterJump(enabled: boolean)
 end
 
 -- Steering ----------------------------------------------------------------------------
+local function steadyHorse(rig: Model)
+	-- State changes only work on the machine that simulates the humanoid: this one.
+	local hh = rig:FindFirstChildOfClass("Humanoid")
+	if not hh then return end
+	for _, state in { Enum.HumanoidStateType.FallingDown, Enum.HumanoidStateType.Ragdoll, Enum.HumanoidStateType.Climbing,
+		Enum.HumanoidStateType.Swimming, Enum.HumanoidStateType.Seated } do
+		hh:SetStateEnabled(state, false)
+	end
+end
+
 RunService.RenderStepped:Connect(function()
 	local ride = currentRide()
+	local racing = RaceState.active and RaceState.myLane ~= nil
 	if ride ~= riding then
 		riding = ride
-		setCharacterJump(ride == nil) -- Space hops the horse instead of throwing you off
+		if ride then steadyHorse(ride) end
+		-- Space hops the horse instead of throwing you off; in a race RaceController owns jumping.
+		if not racing then setCharacterJump(ride == nil) end
 		rideBtn.Text = if ride then "👋 Get off" else "🐴 Ride"
 		rideBtn.BackgroundColor3 = if ride then C.white else C.gold
 		gallopBtn.Visible = ride ~= nil and UserInputService.TouchEnabled
 		if not ride then setGallop(false) end
 	end
 	-- Hide the ride button while racing or with no horse yet.
-	local racing = RaceState.active and RaceState.myLane ~= nil
 	rideSlot.Visible = not racing and PlayerState.data ~= nil and #PlayerState.data.horses > 0
 	if not riding then return end
 	local hh = riding:FindFirstChildOfClass("Humanoid")
