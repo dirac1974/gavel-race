@@ -168,6 +168,18 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Setting visits to Nobody closes your gate to friends too; Friends lets friends in.
 - [ ] Break reminder on: a gentle "time for a stretch?" note after each hour of play; off by default.
 
+## Tack & Paint, the Diamond store (D-050)
+
+- [ ] 💎 in the dock (next to Green Cash) and the "Browse" prompt at the Tack & Paint shop on Fair Street open the shop; it never opens by itself.
+- [ ] Tabs: Tack, Jockey, Barn Look, Front Yard, Fan Gear, Diamonds. Free starters show "Wearing ✓"; fan flags say "Earned at Fan level 3/5".
+- [ ] Buy asks first: "Use 75 💎? You'll have 25 left." Not enough: "You need 25 more 💎". After buying it's worn at once and shows "Return (+75💎)" for a day.
+- [ ] Barn paint changes your barn's walls, roof and trim; gold plates change the stall name plates; yard pieces appear in their spots (lanterns both sides of the gate).
+- [ ] Riding around the world shows your cloth on your horse and your helmet; races keep lane colours.
+- [ ] Owning the stars cloth, star helmet and star flag puts a ⭐ on every name plate.
+- [ ] Diamonds tab: packs show "Coming soon" until product ids are set; once set, Roblox's window confirms; buying in line, racing, on results or within 2 minutes of a race says "after your race"; past 250 Robux today it says come back tomorrow.
+- [ ] Studio test purchase: Diamonds arrive once; rejoin and they're still there (with API access on).
+- [ ] For grown-ups explains Diamonds, the never-sold list, the caps, this month's Diamond purchases and refunds.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

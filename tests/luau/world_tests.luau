@@ -554,4 +554,47 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Tour.skip(f2)
 	check(Tour.current(f2) == nil, "the tour can be skipped")
 	check(Tour.text(Tour.STEPS[2], "Comet") == "Great ride! Head to your barn and give Comet some hay.", "horse name in the text")
+
+	-- Diamond store (D-050) ---------------------------------------------------------------
+	local Style = require("../../game/src/shared/Style")
+	local DiamondProducts = require("../../game/src/shared/DiamondProducts")
+	local flat = true
+	for _, pack in DiamondProducts.packs do
+		if pack.diamonds ~= pack.robux or pack.robux % 25 ~= 0 then flat = false end
+	end
+	check(flat, "1 Diamond = 1 Robux in every pack")
+	local sane = true
+	for _, it in Style.ITEMS do
+		if it.price % 25 ~= 0 then sane = false end
+		if it.fanLevel and Style.forSale(it) then sane = false end
+		local lower = string.lower(it.name)
+		for _, w in { "lucky", "coat", "horse ", "cash", "energy", "speed", "trophy", "rosette", "reroll" } do
+			if string.find(lower, w, 1, true) then sane = false end
+		end
+	end
+	check(sane, "shop sells looks only (no luck, coats, cash, speed, trophies or rerolls); prices in steps of 25")
+	local sp = Profile.new(T0)
+	check(sp.diamonds == 0 and Style.worn(sp, "cloth").id == "cloth_plain" and Style.worn(sp, "paint").id == "paint_classic", "free starters worn")
+	check(not Style.buy(sp, "cloth_stars", T0) and sp.diamonds == 0, "can't buy without Diamonds")
+	sp.diamonds = 100
+	local okB = Style.buy(sp, "cloth_stars", T0)
+	check(okB and sp.diamonds == 25 and Style.worn(sp, "cloth").id == "cloth_stars", "buy and wear")
+	check(not Style.buy(sp, "cloth_stars", T0) and not Style.buy(sp, "fan_star", T0), "no double buys; fan gear isn't sold")
+	check(Style.canReturn(sp, "cloth_stars", T0 + 3600) and not Style.canReturn(sp, "cloth_stars", T0 + 86400), "return window is a day")
+	check(Style.giveBack(sp, "cloth_stars", T0 + 60) and sp.diamonds == 100 and Style.worn(sp, "cloth").id == "cloth_plain", "a return gives every Diamond back")
+	sp.diamonds = 200
+	Style.buy(sp, "yard_bench", T0)
+	Style.buy(sp, "yard_lanterns", T0)
+	check(#Style.yard(sp) == 2 and Style.unequip(sp, "yard_bench") and #Style.yard(sp) == 1, "yard pieces placed one by one")
+	check(not Style.owns(sp, "fan_star"), "star flag needs Fan level 3")
+	sp.fan = { xp = 250 }
+	check(Style.owns(sp, "fan_star") and Style.equip(sp, "fan_star"), "earned at Fan level 3")
+	sp.diamonds = 75
+	Style.buy(sp, "helmet_star", T0)
+	check(not Style.hasSet(sp, "star"), "Star Set needs the cloth too")
+	sp.diamonds = 75
+	Style.buy(sp, "cloth_stars", T0)
+	check(Style.hasSet(sp, "star"), "Star Set complete")
+	local migrated = Profile.migrate(sp, T0)
+	check(migrated.diamonds == sp.diamonds and migrated.style.owned.cloth_stars, "Diamonds and looks saved")
 end

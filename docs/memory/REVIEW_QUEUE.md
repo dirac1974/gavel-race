@@ -34,3 +34,4 @@ Provisional decisions made by the team under D-009, newest last. For each: keep,
 | D-047 | Breeding (later): From Bronze, Green Cash fees only | See docs/WORLD_DESIGN.md; values in `GameConfig` once built |
 | D-048 | Promotion (Stakes) races are called Cups in the game: "Rookie Cup"; same rules | Rename the UI strings in `RacePicker`, `HorsesClient`, `Advice`, `RaceService` |
 | D-049 | First ten minutes: five-step tour (race, feed, brush, plant, Stable Board) with GO and Skip; settings can replay it | Empty `Tour.STEPS` or hide the card in `GrownUps.client.luau` |
+| D-050 | Diamond store (Tack & Paint): 1 Diamond = 1 Robux packs 50/100/250, looks only, caps 250 per 24 h and 1,000 per 30 days, 24 h returns, no prompts around races, free Diamonds from promotions and monthly jobs only | Prices and caps in `DiamondProducts.luau`, items in `Style.luau`; set every productId to 0 to switch packs off |

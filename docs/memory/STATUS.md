@@ -24,7 +24,7 @@ Last updated: 2026-10-05
 5. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
 6. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
 7. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
-8. **Diamond store** (D-044, waits for David's sign-off on D-002a).
+8. ~~Diamond store~~: built (D-050). David to create the three developer products and paste their ids into `DiamondProducts.luau`.
 9. **Cross-server Cup finals and Derby Day** (D-036 later).
 10. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
 11. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.

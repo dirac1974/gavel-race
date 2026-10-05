@@ -353,6 +353,12 @@ local function buildPlaces(root: Instance)
 			WorldScene.shop(f, cf, p.w, p.d, 16, C.white, Color3.fromHex("3E8E7E"), { C.white, C.mint }, "Vet", "💚")
 		end
 	end
+	-- Tack & Paint (D-050): the Diamond shop for looks; opens only when you walk in and tap.
+	do
+		local p = WorldLayout.places.tackShop
+		local cf = placeCF("tackShop")
+		WorldScene.shop(f, cf, p.w, p.d, 16, Color3.fromHex("F3E3C3"), Color3.fromHex("7D6B91"), { Color3.fromHex("7D6B91"), C.white }, "Tack & Paint", "🎨")
+	end
 	-- Training Paddock (Stage 6): fenced arena with cones and little jumps.
 	do
 		local p = WorldLayout.places.paddock
