@@ -1,4 +1,18 @@
 {
+ "apple": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 258,
+  "y": 0
+ },
+ "brush": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 388,
+  "y": 0
+ },
  "burst_bar": {
   "h": 128,
   "sheet": "ui_atlas_1",
@@ -27,6 +41,34 @@
   "x": 0,
   "y": 0
  },
+ "camera": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 518,
+  "y": 0
+ },
+ "care_star": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 648,
+  "y": 0
+ },
+ "carrot": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 778,
+  "y": 0
+ },
+ "cash": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 0,
+  "y": 178
+ },
  "chance_down": {
   "h": 128,
   "sheet": "ui_atlas_2",
@@ -41,12 +83,68 @@
   "x": 388,
   "y": 0
  },
+ "clipboard": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 130,
+  "y": 178
+ },
+ "diamond": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 260,
+  "y": 178
+ },
+ "dist_long": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 390,
+  "y": 178
+ },
+ "dist_short": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 520,
+  "y": 178
+ },
+ "energy_hoof": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 650,
+  "y": 178
+ },
+ "energy_hoof_empty": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 780,
+  "y": 178
+ },
  "finish_checker": {
   "h": 128,
   "sheet": "ui_atlas_2",
   "w": 128,
   "x": 518,
   "y": 0
+ },
+ "flag_ready": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 0,
+  "y": 308
+ },
+ "friends": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 130,
+  "y": 308
  },
  "giddyup_pad": {
   "h": 176,
@@ -62,6 +160,55 @@
   "x": 0,
   "y": 436
  },
+ "gift": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 260,
+  "y": 308
+ },
+ "go_button": {
+  "h": 112,
+  "sheet": "ui_atlas_world_2",
+  "w": 256,
+  "x": 0,
+  "y": 260
+ },
+ "go_button_pressed": {
+  "h": 112,
+  "sheet": "ui_atlas_world_2",
+  "w": 256,
+  "x": 258,
+  "y": 260
+ },
+ "grain": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 390,
+  "y": 308
+ },
+ "grownups": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 520,
+  "y": 308
+ },
+ "hay": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 650,
+  "y": 308
+ },
+ "heart": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 780,
+  "y": 308
+ },
  "hoof": {
   "h": 128,
   "sheet": "ui_atlas_2",
@@ -75,6 +222,41 @@
   "w": 256,
   "x": 258,
   "y": 0
+ },
+ "hoofprint": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 0,
+  "y": 438
+ },
+ "job_care": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 130,
+  "y": 438
+ },
+ "job_cheer": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 260,
+  "y": 438
+ },
+ "job_explore": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 390,
+  "y": 438
+ },
+ "job_ride": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 520,
+  "y": 438
  },
  "label_good": {
   "h": 128,
@@ -230,6 +412,20 @@
   "x": 780,
   "y": 390
  },
+ "lane_dot_empty": {
+  "h": 64,
+  "sheet": "ui_atlas_world_2",
+  "w": 64,
+  "x": 774,
+  "y": 260
+ },
+ "lane_dot_full": {
+  "h": 64,
+  "sheet": "ui_atlas_world_2",
+  "w": 64,
+  "x": 840,
+  "y": 260
+ },
  "lane_sparkle": {
   "h": 128,
   "sheet": "ui_atlas_2",
@@ -237,12 +433,110 @@
   "x": 0,
   "y": 520
  },
+ "league_bronze": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 650,
+  "y": 438
+ },
+ "league_champion": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 780,
+  "y": 438
+ },
+ "league_gold": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 0,
+  "y": 568
+ },
+ "league_rookie": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 130,
+  "y": 568
+ },
+ "league_silver": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 260,
+  "y": 568
+ },
+ "lock": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 390,
+  "y": 568
+ },
+ "map": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 520,
+  "y": 568
+ },
+ "map_fair": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 650,
+  "y": 568
+ },
+ "map_stable": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 780,
+  "y": 568
+ },
+ "map_track": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 0,
+  "y": 698
+ },
+ "map_trail": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 130,
+  "y": 698
+ },
+ "map_vet": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 260,
+  "y": 698
+ },
+ "oats": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 390,
+  "y": 698
+ },
  "ribbon_blue": {
   "h": 160,
   "sheet": "ui_atlas_1",
   "w": 128,
   "x": 514,
   "y": 436
+ },
+ "ribbon_progress": {
+  "h": 64,
+  "sheet": "ui_atlas_world_2",
+  "w": 256,
+  "x": 516,
+  "y": 260
  },
  "ribbon_red": {
   "h": 160,
@@ -265,11 +559,179 @@
   "x": 0,
   "y": 614
  },
+ "seed_apple": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 520,
+  "y": 698
+ },
+ "seed_carrot": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 650,
+  "y": 698
+ },
+ "seed_oats": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 780,
+  "y": 698
+ },
+ "settings": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 0,
+  "y": 828
+ },
+ "sleeping_horse": {
+  "h": 176,
+  "sheet": "ui_atlas_world_1",
+  "w": 256,
+  "x": 0,
+  "y": 0
+ },
+ "stamp_checkup": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 130,
+  "y": 828
+ },
+ "stamp_farrier": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 260,
+  "y": 828
+ },
+ "stamp_potential": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 390,
+  "y": 828
+ },
+ "stamp_teeth": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 520,
+  "y": 828
+ },
+ "stamp_vaccine": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 650,
+  "y": 828
+ },
+ "stat_accel": {
+  "h": 128,
+  "sheet": "ui_atlas_world_1",
+  "w": 128,
+  "x": 780,
+  "y": 828
+ },
+ "stat_grit": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 0,
+  "y": 0
+ },
+ "stat_speed": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 130,
+  "y": 0
+ },
+ "stat_stamina": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 260,
+  "y": 0
+ },
+ "stethoscope": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 390,
+  "y": 0
+ },
+ "surface_dirt": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 520,
+  "y": 0
+ },
+ "surface_turf": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 650,
+  "y": 0
+ },
+ "treat": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 780,
+  "y": 0
+ },
+ "trophy": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 0,
+  "y": 130
+ },
+ "weather_rain": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 130,
+  "y": 130
+ },
+ "weather_sunny": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 260,
+  "y": 130
+ },
+ "weather_wind": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 390,
+  "y": 130
+ },
+ "welcome_sun": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 520,
+  "y": 130
+ },
  "you_marker": {
   "h": 256,
   "sheet": "ui_atlas_1",
   "w": 256,
   "x": 516,
   "y": 0
+ },
+ "zzz_resting": {
+  "h": 128,
+  "sheet": "ui_atlas_world_2",
+  "w": 128,
+  "x": 650,
+  "y": 130
  }
 }
