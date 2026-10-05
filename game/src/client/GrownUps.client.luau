@@ -201,8 +201,7 @@ local function renderTour()
 		step = i and Tour.STEPS[i]
 	end
 	currentStep = if step then table.find(Tour.STEPS, step) else nil
-	local racing = RaceState.active and RaceState.myLane ~= nil
-	tourCard.Visible = step ~= nil and not racing
+	tourCard.Visible = step ~= nil and not RaceState.active
 	if step then
 		local h = PlayerState.activeHorse()
 		tourText.Text = "🧭 " .. Tour.text(step, h and h.name)
@@ -219,9 +218,11 @@ tourSkip.Activated:Connect(function()
 end)
 PlayerState.watch(function() renderTour() end)
 RunService.Heartbeat:Connect(function()
-	local racing = RaceState.active and RaceState.myLane ~= nil
-	if racing and tourCard.Visible then tourCard.Visible = false end
-	if gear.Visible == racing then gear.Visible = not racing end -- the race HUD owns the top right
+	-- While any race is on screen (riding or watching) the race map and board own the top.
+	local busy = RaceState.active == true
+	local showTour = currentStep ~= nil and not busy
+	if tourCard.Visible ~= showTour then tourCard.Visible = showTour end
+	if gear.Visible == busy then gear.Visible = not busy end
 end)
 
 -- Break reminder ---------------------------------------------------------------------
@@ -230,8 +231,9 @@ local nextReminder = 60 * 60
 RunService.Heartbeat:Connect(function()
 	local d = PlayerState.data
 	if not d or not d.settings or not d.settings.breakReminder then return end
-	if os.clock() - sessionStart >= nextReminder then
-		nextReminder += 60 * 60
+	local elapsed = os.clock() - sessionStart
+	if elapsed >= nextReminder then
+		nextReminder = (math.floor(elapsed / 3600) + 1) * 3600 -- one note, even if it was just turned on
 		Ui.toast("You've been riding for a while. Time for a stretch and a drink of water? 🌤️", "welcome_sun", "🌤️")
 	end
 end)

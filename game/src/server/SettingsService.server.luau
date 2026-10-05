@@ -70,7 +70,7 @@ SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
 	elseif key == "breakReminder" and typeof(value) == "boolean" then
 		data.settings.breakReminder = value
 	elseif key == "tour" and value == "restart" then
-		data.flags.tourStep, data.flags.tourDone = 1, nil
+		data.flags.tourStep, data.flags.tourDone, data.flags.tourDid = 1, nil, nil
 	else
 		return
 	end
