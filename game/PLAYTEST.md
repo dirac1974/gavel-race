@@ -12,6 +12,9 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] In front of the spawn: a dirt track with white rails, eight starting stalls, a finish post and a checkered line.
 - [ ] Eight horses (bay, chestnut, grey, black, palomino, then repeats) face down the track, each with a lane badge 1–8. Without the models, brown block horses stand in.
 - [ ] Your horse has a YOU marker above it.
+- [ ] When the race starts you're seated on your horse as its jockey and the camera rides along; Space or tapping doesn't throw you off.
+- [ ] Your rider sits on the horse's back (not floating or sunk in). If not, note roughly how far off; `SADDLE_HEIGHT` and `SADDLE_BACK` in `TrackScene.luau` tune it.
+- [ ] About 3 s after the results you're back on the grass beside the gate and can jump again. Players who join mid-race stay on the grass.
 - [ ] After each segment the horses move up the track, with the likelier winners slightly ahead; at the end they run to the line in finish order.
 - [ ] The hoof, rings, GIDDY-UP pad, burst meter, tap-result shapes, board lane badges and result ribbons show the drawn art (placeholders until the UI sheets clear moderation).
 

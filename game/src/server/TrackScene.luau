@@ -5,7 +5,8 @@
 -- ReplicatedStorage.RaceModels, or block placeholders until they load). During a race
 -- the horses move up the track after each segment, spaced by live win chance, then run
 -- to the line in the drawn finish order. Lane badges float over each horse; each client
--- adds its own YOU marker.
+-- adds its own YOU marker. Racing players ride their lane's horse as the jockey: each
+-- horse carries an invisible saddle Seat, and the default camera follows the rider.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,6 +31,10 @@ local UiAtlas = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("U
 
 local root: Folder? = nil
 local horses: { Model } = {}
+local saddles: { Seat } = {}
+-- Saddle position on a model, as fractions of its bounding box (gallop pose; tune in Studio).
+local SADDLE_HEIGHT = 0.6     -- of the model's height, measured from the hooves
+local SADDLE_BACK = 0.06      -- of its length, toward the tail (+Z; horses face -Z)
 
 local function laneX(i: number): number
 	return (i - (LANES + 1) / 2) * LANE_WIDTH
@@ -58,6 +63,7 @@ local function placeholderHorse(i: number): Model
 	head.CFrame = CFrame.new(0, 5.6, -4)
 	head.Parent = m
 	m.WorldPivot = CFrame.new(0, 0, 0)
+	m:SetAttribute("SaddleY", 5.3) -- top of the block body
 	m.Name = "Placeholder" .. i
 	return m
 end
@@ -136,6 +142,19 @@ function TrackScene.build()
 		badge(i).Parent = horse
 		horse.Parent = horseFolder
 		horses[i] = horse
+		-- The saddle is anchored inside the model, so PivotTo moves it, and a seated rider
+		-- (welded to it by the Seat) moves with the horse.
+		local _, size = horse:GetBoundingBox()
+		local saddle = Instance.new("Seat")
+		saddle.Name = "Saddle"
+		saddle.Size = Vector3.new(2, 0.4, 2)
+		saddle.Transparency = 1
+		saddle.Anchored = true
+		saddle.CanCollide = false
+		saddle.CanTouch = false -- nobody sits by walking into it; the server seats riders
+		saddle.CFrame = horse:GetPivot() * CFrame.new(0, horse:GetAttribute("SaddleY") or size.Y * SADDLE_HEIGHT, size.Z * SADDLE_BACK)
+		saddle.Parent = horse
+		saddles[i] = saddle
 	end
 	folder.Parent = workspace
 	root = folder
@@ -173,6 +192,34 @@ function TrackScene.finish(order: { number }, seconds: number)
 		progress[laneIdx] = 1.06 - (place - 1) * 0.035
 	end
 	TrackScene.moveTo(progress, seconds)
+end
+
+-- Put a racing player's character in the saddle of lane `i`.
+function TrackScene.seatRider(i: number, character: Model?): boolean
+	local saddle = saddles[i]
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not saddle or not humanoid or humanoid.Health <= 0 then return false end
+	character:PivotTo(saddle.CFrame + Vector3.new(0, 3, 0))
+	saddle:Sit(humanoid)
+	return true
+end
+
+-- After a race: everyone off, standing beside the starting gate for the next one.
+function TrackScene.dismountAll()
+	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+	local base = if spawn then spawn.CFrame else CFrame.new(-42, 0, START_Z)
+	for i, saddle in saddles do
+		local humanoid = saddle.Occupant
+		if humanoid then
+			local character = humanoid.Parent
+			local weld = saddle:FindFirstChild("SeatWeld")
+			if weld then weld:Destroy() end
+			humanoid.Sit = false
+			if character then
+				character:PivotTo(base * CFrame.new((i - 4.5) * 3, 3.5, 0))
+			end
+		end
+	end
 end
 
 function TrackScene.reset()

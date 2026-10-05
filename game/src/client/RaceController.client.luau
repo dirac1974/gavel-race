@@ -30,6 +30,12 @@ local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
 local RING_LEAD = GameConfig.stride.ringLeadSeconds
 
+-- While riding, a jump would throw you out of the saddle, and Space is also a tap key.
+local function setJumping(enabled: boolean)
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, enabled) end
+end
+
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
@@ -458,6 +464,9 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, _start, con
 	burstBanner.Visible = false
 	results.Visible = false
 	showResultIcon(nil)
+	for _, lane in laneList do
+		if lane.id == myId then setJumping(false) end -- you're riding this race
+	end
 	task.spawn(function()
 		-- YOU marker over your own horse on the track (TrackScene builds it just before this event).
 		local myLane = nil
@@ -574,6 +583,7 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 		end
 	end
 	results.Visible = true
+	task.delay(3.5, setJumping, true) -- the server dismounts riders 3 s after results
 	status.Text = "Results"
 	feedback.Text = ""
 	showResultIcon(nil)

@@ -217,6 +217,13 @@ local function runRace(players: { Player })
 	current = { session = session, seg = nil, kind = nil, taps = {}, allowances = {} }
 	local t = now() + COUNTDOWN
 	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), t, cond)
+	-- Racing players ride their own horse as the jockey.
+	for i, lane in session.lanes do
+		if not lane.isBot then
+			local p = Players:GetPlayerByUserId(tonumber(lane.id))
+			if p then TrackScene.seatRider(i, p.Character) end
+		end
+	end
 
 	local gaps: { [number]: { number } } = {}
 	local matched: { [number]: number } = {}
@@ -281,6 +288,7 @@ local function runRace(players: { Player })
 	end
 	RaceFinished:FireAllClients(summary)
 	recordIntegrity(players, gaps, matched)
+	task.delay(3, TrackScene.dismountAll) -- results first, then back beside the gate
 	current = nil
 end
 
@@ -302,6 +310,7 @@ while true do
 		if not ok then
 			warn("Race failed: " .. tostring(err))
 			current = nil
+			TrackScene.dismountAll()
 		end
 	end
 	task.wait(5) -- results screen
