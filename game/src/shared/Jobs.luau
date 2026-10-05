@@ -26,7 +26,6 @@ Jobs.DAILY = {
 	{ id = "d_great5", event = "great_tap", target = 5, text = "Land 5 Great or Perfect taps", icon = "care_star", go = "raceBoard", reward = { cash = 6, items = { treat = 1 } } },
 	{ id = "d_burst", event = "burst_great", target = 1, text = "Hit a Great Final Burst", icon = "care_star", go = "raceBoard", reward = { cash = 6, items = { grain = 1 } } },
 	{ id = "d_plant", event = "plant", target = 1, text = "Plant a seed", icon = "seed_carrot", go = "stable", reward = { cash = 3, items = { seed_oats = 1 } } },
-	{ id = "d_harvest", event = "harvest", target = 1, text = "Pick a crop", icon = "carrot", go = "stable", reward = { cash = 4, items = { seed_carrot = 1 } } },
 	{ id = "d_chore", event = "chore", target = 1, text = "Muck out a stall", icon = "hay", go = "stable", reward = { cash = 3, items = { hay = 2 } } },
 	{ id = "d_treat", event = "treat", target = 2, text = "Give 2 treats", icon = "carrot", go = "stable", reward = { cash = 3, items = { apple = 1 } } },
 	{ id = "d_ride", event = "ride", target = 1, text = "Go for a ride on your horse", icon = "hoofprint", go = "stable", reward = { cash = 3, items = { carrot = 1 } } },
@@ -144,7 +143,8 @@ function Jobs.refresh(p: any, userId: number, now: number): number
 	local auto = 0
 	for kind in POOLS do
 		local key = kind .. "Period"
-		if J[key] ~= per[kind] or typeof(J[kind]) ~= "table" then
+		-- Only ever roll forward (a server whose clock is a little behind can't bring back yesterday).
+		if typeof(J[kind]) ~= "table" or per[kind] > (tonumber(J[key]) or -1) then
 			if typeof(J[kind]) == "table" then auto += claimAll(p, J[kind]) end
 			J[key] = per[kind]
 			J[kind] = newSet(Jobs.pick(kind, userId, per[kind]))
@@ -167,6 +167,14 @@ function Jobs.record(p: any, userId: number, event: string, n: number, now: numb
 		end
 	end
 	return finished
+end
+
+-- Claim every finished job in one set (the ribbon's 🎁 button). Returns how many.
+function Jobs.claimAllIn(p: any, userId: number, kind: string, now: number): number
+	Jobs.refresh(p, userId, now)
+	local set = POOLS[kind] and p.jobs[kind]
+	if not set then return 0 end
+	return claimAll(p, set)
 end
 
 function Jobs.claim(p: any, userId: number, kind: string, index: number, now: number): (boolean, Def?)

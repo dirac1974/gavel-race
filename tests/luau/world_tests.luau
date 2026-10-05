@@ -225,6 +225,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Care.pet(cp, ch, T0 + 86400)
 	local ok2 = Care.pet(cp, ch, T0 + 86400 + 60)
 	check(ch.bond == b1 + 1 and ok2, "petting: bond once a day, always allowed")
+	local _, _, counted3 = Care.pet(cp, ch, T0 + 86400 + 120)
+	check(counted3 == false, "only the first pets of the day count toward jobs")
 
 	-- Garden: plant, grow offline, harvest, never wither.
 	cp.items.seed_carrot = 1
@@ -322,6 +324,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		Jobs.claim(jp, 12345, "daily", i, T0 + 86400)
 	end
 	check(Jobs.allDoneToday(jp), "all done today")
+	-- A server whose clock is behind can't roll the jobs back.
+	local before2 = jp.jobs.daily[1].id
+	Jobs.refresh(jp, 12345, T0)
+	check(jp.jobs.daily[1].id == before2 and jp.jobs.daily[1].claimed, "jobs only roll forward")
+	-- Claim all in one set.
+	local wk = jp.jobs.weekly
+	for i = 1, 2 do
+		local d = Jobs.def(wk[i].id)
+		Jobs.record(jp, 12345, d.event, d.target, T0 + 86400)
+	end
+	check(Jobs.claimAllIn(jp, 12345, "weekly", T0 + 86400) >= 2, "claim all in a set")
 	local jv = Jobs.view(jp)
 	check(#jv.daily == 3 and jv.daily[1].text ~= nil and jv.rerollUsed, "jobs view for the board")
 

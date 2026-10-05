@@ -4,6 +4,8 @@
 -- ("Comet misses you", "Comet is hungry" are never written). Pure, works on the client's
 -- profile view, tested under Lune.
 
+local Care = if script then require(script.Parent.Care) :: any else require("./Care")
+
 local Advice = {}
 
 export type Tip = { emoji: string, fact: string, next: string, go: string? }
@@ -45,7 +47,7 @@ function Advice.forHorse(h: any, profile: any, now: number): Tip
 	end
 	-- Garden ready?
 	for _, b in profile.garden or {} do
-		if b.seed ~= "" and b.ready then
+		if b.seed ~= "" and (b.ready or Care.cropProgress(b, now) >= 1) then
 			return { emoji = "🥕", fact = fact, next = "Next: crops are ready to pick", go = "stable" }
 		end
 	end

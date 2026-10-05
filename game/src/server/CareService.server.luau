@@ -68,7 +68,7 @@ CareAction.OnServerEvent:Connect(function(player: Player, horseId: any, action: 
 		return
 	end
 	local now = os.time()
-	local ok, msg
+	local ok, msg, counted = nil, nil, true
 	if action == "feed" and typeof(item) == "string" then
 		ok, msg = Care.feed(data, h, item, now, GameConfig.energy)
 	elseif action == "groom" then
@@ -76,14 +76,14 @@ CareAction.OnServerEvent:Connect(function(player: Player, horseId: any, action: 
 	elseif action == "treat" and typeof(item) == "string" then
 		ok, msg = Care.treat(data, h, item, now)
 	elseif action == "pet" then
-		ok, msg = Care.pet(data, h, now)
+		ok, msg, counted = Care.pet(data, h, now)
 	else
 		return
 	end
 	reply(player, ok, msg, if action == "groom" then "care_star" else "heart")
 	if ok then
 		CareFx:FireAllClients(player:GetAttribute("PlotIndex"), horseId, action)
-		Progress.record(player, action, 1)
+		if counted then Progress.record(player, action, 1) end
 	end
 end)
 
