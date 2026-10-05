@@ -8,7 +8,8 @@ local RaceState = {
 	active = false,
 	plan = nil,          -- TrackLayout plan for this race's distance
 	lanes = 0,
-	progress = {},       -- lane -> progress
+	progress = {},       -- lane -> progress: s / railLength (lane-1 feet, D-055, D-054)
+	lane = {},           -- lane -> lane position x on the track (D-054): its post until steering (S2)
 	place = {},          -- lane -> current place (1 = leading)
 	order = {},          -- place -> lane
 }
@@ -16,7 +17,7 @@ local RaceState = {
 -- Replay requests from the results panel (RaceController) to the replay player (Replay).
 RaceState.ReplayRequested = Instance.new("BindableEvent") -- arg: "finish" | "full"
 RaceState.ReplayClosed = Instance.new("BindableEvent")
-RaceState.recording = nil  -- { start, plan, lanes, frames = { {t, p1..pn} }, events = { {t, kind, ...} }, summary }
+RaceState.recording = nil  -- { start, plan, lanes, lane = {x..}, frames = { {t, p1..pn} }, events = { {t, kind, ...} }, summary }
 RaceState.myLane = nil
 -- Your race has finished but its results card isn't up yet (RaceController). The Hud holds the
 -- coin chime until then: the prize lands just before the leader reaches the line.

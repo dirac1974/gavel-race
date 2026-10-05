@@ -525,6 +525,15 @@ local function runRace(c, players: { Player })
 	local r1 = TrackLayout.laneRadius(cfg, 1)
 	local tFar = tFinish - (cfg.finishFromTop + math.pi * r1) / speed
 
+	-- Posts (D-054): drawn from the race's generator after every draw above (bots, luck, bot
+	-- scores, the slider's passes), so none of those move; lanes are then numbered by post, so
+	-- humans no longer start on the inside. Coats follow their horses.
+	local order = RaceSession.drawPosts(#session.lanes, rng)
+	session:assignPosts(order)
+	local postCoats = {}
+	for post, old in order do postCoats[post] = coats[old] end
+	coats = postCoats
+
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
 	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
 	local title = if card.cup then leagueName .. " Cup" elseif card.practice then "Practice" else leagueName
