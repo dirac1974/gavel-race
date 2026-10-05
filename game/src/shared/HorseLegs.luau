@@ -15,19 +15,24 @@ local HorseLegs = {}
 HorseLegs.LEGS = { "LegFL", "LegFR", "LegBL", "LegBR" }
 
 -- offset: where each leg is in the cycle (0..1); amp: swing in degrees; stride: studs per cycle.
+-- Strides are short enough that a planted hoof barely slides (D-056): riding at 16 studs/s trots
+-- at 2.3 strides a second, a race gallop at 56 runs about 3.1.
 HorseLegs.GAITS = {
-	walk = { stride = 9, amp = 18, offset = { LegBL = 0, LegFL = 0.25, LegBR = 0.5, LegFR = 0.75 } },
-	trot = { stride = 12, amp = 26, offset = { LegFL = 0, LegBR = 0, LegFR = 0.5, LegBL = 0.5 } },
-	gallop = { stride = 22, amp = 36, offset = { LegBL = 0, LegBR = 0.1, LegFL = 0.45, LegFR = 0.55 } },
+	walk = { stride = 5, amp = 24, offset = { LegBL = 0, LegFL = 0.25, LegBR = 0.5, LegFR = 0.75 } },
+	trot = { stride = 7, amp = 30, offset = { LegFL = 0, LegBR = 0, LegFR = 0.5, LegBL = 0.5 } },
+	gallop = { stride = 18, amp = 40, offset = { LegBL = 0, LegBR = 0.1, LegFL = 0.45, LegFR = 0.55 } },
 }
+HorseLegs.WALK_BELOW = 12   -- studs/s: slower walks, faster trots (D-056)
+HorseLegs.GALLOP_FROM = 36  -- studs/s: faster gallops
 
 HorseLegs.MIX_RATE = 4 -- gait cross-fade per second (a quarter second)
 
--- Gait for a speed in studs per second (riding walks at 16 and gallops at 46; races run at 40+).
+-- Gait for a speed in studs per second (riding goes at 16, a trot, and gallops at 46; races
+-- run at 40+).
 function HorseLegs.gaitFor(speed: number): string
 	if speed < 1 then return "stand" end
-	if speed < 20 then return "walk" end
-	if speed < 36 then return "trot" end
+	if speed < HorseLegs.WALK_BELOW then return "walk" end
+	if speed < HorseLegs.GALLOP_FROM then return "trot" end
 	return "gallop"
 end
 
