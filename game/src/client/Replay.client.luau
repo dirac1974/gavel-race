@@ -219,7 +219,7 @@ local function placeAll(rec, t: number, speed: number?)
 	for i = 1, rec.lanes do
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed)
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, rec.lane and rec.lane[i]) -- recorded lane positions (D-054)
 	end
 	return progress
 end
@@ -265,7 +265,7 @@ RunService.RenderStepped:Connect(function(dt)
 		local target = pivot.Position + Vector3.new(0, 4, 0)
 		-- Side view from just outside the outer rail (broadcast angle), so no horse runs through it.
 		local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
-		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, subject) + 12
+		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, (rec.lane and rec.lane[subject]) or subject) + 12
 		local eye = if playing.view == "side"
 			then target + pivot.RightVector * outside + Vector3.new(0, 6, 0)
 			else target - pivot.LookVector * 18 + Vector3.new(0, 7, 0)
@@ -303,7 +303,8 @@ RunService.RenderStepped:Connect(function(dt)
 			if row.place == 1 then first = row.lane elseif row.place == 2 then second = row.lane end
 		end
 		if first and second and progress[first] and progress[second]
-			and (progress[first] - progress[second]) * rec.plan.lengths[1] < HORSE_LENGTH then -- lane-1 feet (D-055)
+			and (progress[first] - progress[second]) * TrackLayout.railLength(TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill, rec.plan)
+				< HORSE_LENGTH then -- lane-1 feet (D-055)
 			caption.Text = "PHOTO FINISH"
 			if Sound then Sound.play("vo_photo") end
 			playing.frozenUntil = os.clock() + 2.5

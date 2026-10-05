@@ -8,6 +8,10 @@
 --   the lane-1 length, so the order on screen is the race order in every lane; outer horses
 --   cover their longer path a little faster, which nobody sees (D-055). Horses ease out of
 --   the gate to full gallop and still reach the line as the race ends.
+--   Where: rail coordinates (D-054). A horse is drawn at s = progress * railLength feet along
+--   the lane-1 path and lane position x (TrackLayout.railPoint), so horses at the same s are
+--   abreast on turns too. x is the horse's post for now (lane number = post since posts are
+--   drawn); steering (S2) moves it.
 --   Gaps: the server sends each horse's offset from the pace a few times a second. Up to
 --   the far turn it comes from live chance (skill); from the far turn to the last tap it
 --   blends toward the projected finish order (luck), so late chargers come through and the
@@ -60,7 +64,7 @@ local function paceFeet(s: number, T: number, len1: number): number
 end
 
 -- races[course] = { course, cfg, start, T, len1, plan, lanes, myLane, offset = {}, target = {},
---   done, doneAt, settleAt }
+--   lane = {} (x per lane), done, doneAt, settleAt }
 local races: { [string]: any } = {}
 
 local function horseModel(courseId: string?, i: number): Model?
@@ -69,27 +73,39 @@ local function horseModel(courseId: string?, i: number): Model?
 	return horses and horses:FindFirstChild("Lane" .. i)
 end
 
-local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { p, t } for the legs
+local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { pos, t } for the legs
+-- A placement further than this from the last one is a jump (a replay starting or seeking), not
+-- a stride: even a 3x replay covers under 35 studs in the longest frame the legs count (0.2 s).
+local JUMP_STUDS = 60
 
--- `timeScale`: how fast the race clock runs (replays in slow motion), so the legs pick the gait
--- for the race's real speed.
-local function place(i: number, p: number, bob: number, plan, courseId: string?, timeScale: number?)
+-- Lane i at progress p (lane-1 feet over railLength) and lane position `x` (default: its post,
+-- which is its lane number). `timeScale`: how fast the race clock runs (replays in slow motion),
+-- so the legs pick the gait for the race's real speed.
+local function place(i: number, p: number, bob: number, plan, courseId: string?, timeScale: number?, x: number?)
 	local horse = horseModel(courseId, i)
 	if not horse then return end
 	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
-	local x, z, dx, dz = TrackLayout.lanePoint(cfg, plan, i, p)
-	local pos = Vector3.new(x, bob, z)
+	local railLength = TrackLayout.railLength(cfg, plan)
+	local px, pz, dx, dz = TrackLayout.railPoint(cfg, plan, p * railLength, x or i)
+	local pos = Vector3.new(px, bob, pz)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
-	-- Running legs (D-051): stride with the distance covered since the last frame.
+	-- Running legs (D-051): stride with the ground actually covered since the last frame (the
+	-- horizontal move between placed positions), so outer horses on turns and sideways glides
+	-- (steering, S2) stride as far as they travel.
 	if HorseLegs.has(horse) then
 		local now = os.clock()
 		local prev = lastPlaced[horse]
-		local dist = if prev then math.max(0, (p - prev.p) * plan.lengths[i]) else 0
+		local flat = Vector3.new(px, 0, pz)
+		local dist = 0
+		if prev then
+			dist = (flat - prev.pos).Magnitude
+			if dist > JUMP_STUDS then dist = 0 end
+		end
 		local dt = if prev then math.clamp(now - prev.t, 0, 0.2) else 0
 		if prev then
-			prev.p, prev.t = p, now
+			prev.pos, prev.t = flat, now
 		else
-			lastPlaced[horse] = { p = p, t = now }
+			lastPlaced[horse] = { pos = flat, t = now }
 		end
 		HorseLegs.apply(horse, dist, dt, timeScale)
 	end
@@ -132,10 +148,11 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 	local len1 = plan.lengths[1]
 	local race = {
 		course = courseId, cfg = cfg, start = start, plan = plan, lanes = #laneList, offset = {}, target = {},
-		done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond,
+		lane = {}, done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond,
 	}
 	for i, lane in laneList do
 		race.offset[i], race.target[i] = 0, 0
+		race.lane[i] = i -- x = the post (lanes are numbered by post, D-054); steering moves it in S2
 		if lane.id == myId then race.myLane = i end
 	end
 	local focus = RaceState.consider(courseId, laneList, start) -- a stale focus ends its HUD there
@@ -143,10 +160,12 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 	if focus then
 		RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 		RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
+		RaceState.lane = race.lane
 		RaceState.myLane = race.myLane
 		RaceState.myHome = false
 		RaceState.course = courseId
-		RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {}, course = courseId, myLane = race.myLane }
+		RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {}, course = courseId,
+			myLane = race.myLane, lane = table.clone(race.lane) }
 		RaceState.nudgeAt = -math.huge
 	end
 	-- The stalls clear on this screen as the bell rings (the server's removal arrives a ping later).
@@ -223,7 +242,7 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			local bob = BOB_STUDS * speed * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi))
 			local shown = p
 			if i == race.myLane and nudge > 0 then shown = p + nudge / race.len1 end
-			place(i, shown, bob, race.plan, courseId)
+			place(i, shown, bob, race.plan, courseId, nil, race.lane[i])
 			if isFocus then
 				RaceState.progress[i] = p
 				if i == race.myLane and raw >= 1 + 2 * PAST_LINE then RaceState.myHome = true end

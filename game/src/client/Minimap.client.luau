@@ -217,13 +217,15 @@ RunService.RenderStepped:Connect(function(dt)
 	if not gui.Enabled then return end
 	mapScale.Scale = RaceState.hudScale()
 	local n = math.min(RaceState.lanes, 8)
+	local courseCfg = TrackLayout.courses[RaceState.course or "dirt"] or CFG
+	local railLength = TrackLayout.railLength(courseCfg, plan)
 	-- Distance covered and to go, in feet, per lane.
 	local covered, togo = {}, {}
 	local lead, last = -math.huge, math.huge
 	for i = 1, n do
 		local p = RaceState.progress[i] or 0
-		covered[i] = p * plan.lengths[1] -- progress is timed on lane 1 for every lane (D-055)
-		togo[i] = math.max(0, plan.lengths[1] - covered[i])
+		covered[i] = p * railLength -- progress is lane-1 feet for every lane (D-055, D-054)
+		togo[i] = math.max(0, railLength - covered[i])
 		lead, last = math.max(lead, covered[i]), math.min(last, covered[i])
 	end
 	if lead == -math.huge then return end
@@ -255,7 +257,8 @@ RunService.RenderStepped:Connect(function(dt)
 		else
 			gapText.Text = lengths(lead - covered[myLane]) .. " behind the leader"
 		end
-		local x, z = TrackLayout.lanePoint(TrackLayout.courses[RaceState.course or "dirt"] or CFG, plan, myLane, RaceState.progress[myLane] or 0)
+		local x, z = TrackLayout.railPoint(courseCfg, plan, (RaceState.progress[myLane] or 0) * railLength,
+			RaceState.lane[myLane] or myLane)
 		myOvalDot.Position = toOval(x, z)
 		myOvalDot.Visible = true
 		title.Text = if togo[myLane] < CFG.finishFromTop then "Homestretch!" else string.format("%d ft to go", math.floor(togo[myLane] / 10 + 0.5) * 10)

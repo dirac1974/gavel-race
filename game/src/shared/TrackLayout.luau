@@ -160,9 +160,80 @@ function TrackLayout.plan(cfg: Config, distance: number): Plan
 	}
 end
 
--- Lane i at race progress p (0 at the gate, 1 at the finish; past 1 runs on).
+-- Lane i at race progress p (0 at the gate, 1 at the finish; past 1 runs on), along lane i's own
+-- path. Races place horses with railPoint (D-054); this stays for the lap maths and tests.
 function TrackLayout.lanePoint(cfg: Config, plan: Plan, i: number, p: number): (number, number, number, number)
 	return TrackLayout.atDistance(cfg, TrackLayout.laneRadius(cfg, i), plan.starts[i] + p * plan.lengths[i])
+end
+
+-- Rail coordinates (D-054): a horse is at (s, x), s = feet from the gate along the lane-1 path
+-- (the race clock's distance, D-055) and x = lane position, 1 (the rail) .. lanes, fractional
+-- while changing lanes. The race is railLength feet long in s for every horse.
+function TrackLayout.railLength(_cfg: Config, plan: Plan): number
+	return plan.lengths[1]
+end
+
+-- Point and unit heading at (s, x). On a straight x sets the distance from the rail; on a turn
+-- the horse is at lane 1's angle for that s, on its own radius, so horses at the same s are
+-- abreast everywhere (outer horses run a little further, which nobody sees: D-055). At s = 0 every
+-- lane is at its gate stall, at s = railLength on the finish line. Past the line it runs on.
+function TrackLayout.railPoint(cfg: Config, plan: Plan, s: number, x: number): (number, number, number, number)
+	local r1 = TrackLayout.laneRadius(cfg, 1)
+	local r = TrackLayout.laneRadius(cfg, x)
+	local L, cx, cz = cfg.straight, cfg.centerX, cfg.centerZ
+	local d = (plan.gateD + s) % TrackLayout.lapLength(cfg, r1)
+	local turn = math.pi * r1
+	if d < L then -- home straight
+		return cx + r, cz + L / 2 - d, 0, -1
+	end
+	d -= L
+	if d < turn then -- clubhouse turn
+		local a = d / r1
+		return cx + r * math.cos(a), cz - L / 2 - r * math.sin(a), -math.sin(a), -math.cos(a)
+	end
+	d -= turn
+	if d < L then -- backstretch
+		return cx - r, cz - L / 2 + d, 0, 1
+	end
+	d -= L
+	local a = d / r1 -- far turn
+	return cx - r * math.cos(a), cz + L / 2 + r * math.sin(a), math.sin(a), math.cos(a)
+end
+
+export type Segment = { kind: string, start: number, length: number }
+export type PhaseA = { segments: { Segment }, turns: { { number } }, lockS: number, turnLength: number, length: number }
+
+-- Steering phase A (D-054): from the gate to the final far-turn entry, where lanes lock, as
+-- straights ("S") and turns ("T") along the lane-1 path in s. Turns before the lock count live;
+-- the far turn is booked at the lock. Mirrors trip.phase_a in src/trip.py step by step (the same
+-- operations in the same order, so the numbers agree exactly); tests/luau/run_all.luau checks it
+-- against tests/fixtures/trip.json.
+function TrackLayout.phaseA(cfg: Config, plan: Plan): PhaseA
+	local r1 = TrackLayout.laneRadius(cfg, 1)
+	local turn = math.pi * r1
+	local length = plan.lengths[1]
+	local lockS = length - cfg.finishFromTop - turn
+	local kinds = { "S", "T", "S", "T" } -- home straight, clubhouse turn, backstretch, far turn
+	local lens = { cfg.straight, turn, cfg.straight, turn }
+	local k = if plan.gateStraight == "home" then 1 else 3
+	local within = plan.gateOffset
+	local segments: { Segment } = {}
+	local turns = {}
+	local s = 0
+	while lockS - s > 1e-9 do
+		local rem = lens[k] - within
+		local run = math.min(rem, lockS - s)
+		table.insert(segments, { kind = kinds[k], start = s, length = run })
+		if kinds[k] == "T" then table.insert(turns, { s, s + run }) end
+		s = s + run
+		if run >= rem then
+			k = k % 4 + 1
+			within = 0
+		else
+			within = within + run
+		end
+	end
+	return { segments = segments, turns = turns, lockS = lockS, turnLength = turn, length = length }
 end
 
 -- The finish line across the main track: x range and z.

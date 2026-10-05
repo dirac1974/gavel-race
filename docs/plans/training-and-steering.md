@@ -316,6 +316,7 @@ Before the lock, Trip moves gaps exactly as `RaceView` does (D-055: eased at 2.5
   - `Minimap.client.luau` and `Replay.client.luau` use railLength;
   - `TrackScene.luau` `laneCFrame` uses railPoint.
 - `RaceService.server.luau`: shuffle the lane list with the race's random generator after `fillWithBots` (posts are drawn, no longer humans first).
+  - As built (PR #41): the draw comes after the session and the slider's passes, so the earlier draws keep their order. `RaceSession:assignPosts` renumbers the lanes, and `GameConfig.steering.drawPosts` switches it.
 - Tests: `railPoint` at integer x matches `lanePoint`'s radius on turns and is continuous across segment joins; abreast at equal s; post shuffle is a permutation; existing race tests unchanged.
 
 **S2. Trip on the server, Smart Steer for everyone** (no rider input yet)

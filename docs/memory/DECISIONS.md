@@ -564,6 +564,10 @@ Template:
   - **Trade-off (provisional):** drafting favours the horses behind a line. In bot fields, the on-screen leader after checkpoint 1 averages τ −0.002 to +0.002 and the last horse +0.001 to +0.005, about 0.3 points of S at most. By tapping alone the gap is under 0.001.
     - Reversible: `draftPerSecond = 0` makes the trip ground only.
     - Proposed, not built: a draft baseline by running position.
+- S1 (2026-10-05, PR #41): posts are drawn after the session is built, not right after `fillWithBots` as the plan said.
+  - RaceService draws them from the race's generator after the slider's passes; `RaceSession:assignPosts` then renumbers the lanes by post, carrying every per-horse value with its horse.
+  - This keeps the earlier draws (bots, luck, bot scores, passes) in order. Only the Final Burst's start, drawn when the burst opens, moves to a later draw: harmless with an unseeded, uniform start shared by every lane.
+  - `GameConfig.steering.drawPosts = false` keeps the old humans-first lanes.
 - Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
 - Alternatives:
   - cosmetic steering only (kids learn the input does nothing; kept as `scale = 0`);
