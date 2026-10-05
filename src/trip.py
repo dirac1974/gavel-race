@@ -7,12 +7,13 @@ Stdlib only. Written to be mirrored line by line in Luau:
   position, then index), so no tie depends on sort stability;
 - step(), lock() and tau() use only +, -, *, /, comparisons, min, max and abs (never exp,
   log or pow), so Python and Luau doubles stay bit-identical;
-- nothing iterates a dict where the order could matter.
+- nothing iterates a dict where the order could matter;
+- a bad lane index or post raises (Python would wrap a negative index; Luau would read nil).
 
-Coordinates: s = feet along the lane-1 path from the gate (the shared pace is speed * t);
-off = feet ahead of the pace; x = lateral lane position, 1 (the rail) .. lanes, fractional
-while gliding. Lane indices are 0-based here and 1-based in Luau; lane positions and posts
-are 1-based in both.
+Coordinates: s = feet along the lane-1 path from the gate (the shared pace is speed * t, the
+server's timeline: RaceService's tFar is the lock); off = feet ahead of the pace; x = lateral
+lane position, 1 (the rail) .. lanes, fractional while gliding. Lane indices are 0-based here
+and 1-based in Luau; lane positions and posts are 1-based in both.
 
 One race: geo = phase_a(course, distance); st = new_state(posts, q, uniforms, geo);
 step(st, live, intents, t, dt) on every 10 Hz tick while t < lock time; lock(st);
@@ -27,26 +28,28 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 EPS = 1e-9
 LONG_AGO = -1e9  # "never" for request and change times
+KINDS = ("bot", "smart", "manual")
 
 # Mirrors GameConfig.steering (S2 copies this block). S0 calibration changed
-# groundPerLaneTurn (0.012 -> 0.010) and added bots.wideShare and the last three keys, which
-# the plan's block left implicit. All values are tuning: docs/research/steering-calibration.md.
+# groundPerLaneTurn (0.012 -> 0.010), draftPerSecond (0.0012 -> 0.0010) and tuckBackMax
+# (12 -> 24), and added bots.wideShare, laneBand and tuckReleasePerSecond, which the plan's
+# block left implicit. All values are tuning: docs/research/steering-calibration.md.
 CONFIG: Dict = {
     "enabled": True,              # False: today's fixed lanes (tau = 0)
     "scale": 1.0,                 # 0: steering is cosmetic
     "floor": -0.02,               # clamp on tau (1 point of S = 0.02)
     "ceiling": 0.04,
-    "groundPerLaneTurn": 0.010,   # per lane off the rail per 180 degrees of turn (D-054 said 0.012; S0 calibration)
-    "draftPerSecond": 0.0012,
+    "groundPerLaneTurn": 0.010,   # per lane off the rail per 180 degrees of turn (plan: 0.012)
+    "draftPerSecond": 0.0010,     # (plan: 0.0012)
     "draftCap": 0.016,
     "draftNear": 4.0,             # feet behind the horse ahead in your lane (0.5-3 lengths)
     "draftFar": 24.0,
     "laneSeconds": 0.6,           # one lane's glide
     "minRequestGap": 0.6,         # at most one lane change started per this many seconds
-    "maxQueued": 1,
-    "clearFeet": 8.0,             # a lane is blocked by a horse within +-1 length
-    "holdGap": 10.0,              # a held horse sits this far behind the one ahead
-    "tuckBackMax": 12.0,          # ease back at most this far to slot in behind a horse
+    "maxQueued": 1,               # 0 or 1: one press can wait behind the one in progress
+    "clearFeet": 8.0,             # a lane change needs this much room ahead in the new lane...
+    "holdGap": 10.0,              # ...and this much behind; a held horse sits this far back
+    "tuckBackMax": 24.0,          # ease back at most this far to slot in behind horses (plan: 12)
     "outwardWaitSeconds": 1.0,    # a blocked move outward cancels after this long
     "tickHz": 10,
     "sendHz": 10,
@@ -57,12 +60,16 @@ CONFIG: Dict = {
     "introRaces": 3,
     "stars": [0.015, -0.005],     # trip three-star and two-star thresholds
     "laneBand": 0.9,              # horses closer than this (in lanes) share a lane
-    "smoothPerSecond": 2.5,       # offsets ease toward their target at this rate (the client lerp)
     "tuckReleasePerSecond": 4.0,  # a tuck-back fades this fast once nothing is blocked
 }
 
-# Mirrors GameConfig: raceSpeedStudsPerSecond, raceShape.leadFeetPerShare, lanes.
-RACE: Dict = {"speed": 56.0, "leadFeetPerShare": 320.0, "lanes": 8}
+# Mirrors GameConfig: raceSpeedStudsPerSecond, raceShape.leadFeetPerShare, lanes, and the
+# race view's gap easing before the lock (RaceView.client.luau, D-055): ease at
+# viewEasePerSecond (RaceView's literal `dt * 2.5`), but never faster than
+# raceView.maxGapFeetPerSecond unless the horse must hurry to be in place by the line
+# (raceView.catchUpMarginSeconds).
+RACE: Dict = {"speed": 56.0, "leadFeetPerShare": 320.0, "lanes": 8,
+              "viewEasePerSecond": 2.5, "maxGapFeetPerSecond": 10.0, "catchUpMarginSeconds": 0.3}
 
 # Mirrors TrackLayout.churchill / churchillTurf and TrackLayout.distances.
 COURSES: Dict[str, Dict] = {
@@ -140,7 +147,8 @@ def phase_a(course: str, distance: str) -> Dict:
             within = within + run
     turns = [(g["start"], g["start"] + g["length"]) for g in segments if g["kind"] == "T"]
     return {"course": course, "distance": distance, "segments": segments, "turns": turns,
-            "turnLength": turn, "lockS": lock_s, "length": plan["length"], "r1": r1}
+            "turnLength": turn, "lockS": lock_s, "length": plan["length"], "r1": r1,
+            "gate": {"straight": plan["straight"], "offset": plan["offset"], "laps": plan["laps"]}}
 
 
 def _turn_info(geo: Dict, s: float) -> Tuple[bool, float]:
@@ -161,16 +169,16 @@ class TripState:
 
     def __init__(self) -> None:
         self.cfg: Dict = CONFIG
+        self.race: Dict = RACE
         self.geo: Dict = {}
         self.n = 0
         self.lanes = 8
         self.speed = 56.0
         self.lead = 320.0
         self.posts: List[int] = []
-        self.live: List[float] = []
         self.x: List[float] = []          # lateral lane position
         self.tgt: List[int] = []          # lane being held or glided into
-        self.off: List[float] = []        # feet ahead of the pace (held, smoothed)
+        self.off: List[float] = []        # feet ahead of the pace (held, eased as on screen)
         self.skill: List[float] = []      # this tick's skill target (ramped), before any tuck
         self.tuck: List[float] = []       # feet below the skill target, to slot in behind a horse
         self.drafting: List[bool] = []    # tucked in behind a horse this tick
@@ -187,19 +195,31 @@ class TripState:
         self.locked = False
 
 
+def _check_lane(st: TripState, i: int) -> None:
+    if not isinstance(i, int) or i < 0 or i >= st.n:
+        raise IndexError(f"lane index {i!r} out of range 0..{st.n - 1}")
+
+
 def new_state(posts: Sequence[int], q: Sequence[float], uniforms: Sequence[float], geo: Dict,
               cfg: Dict = CONFIG, kinds: Optional[Sequence[str]] = None, race: Dict = RACE) -> TripState:
-    """posts[i] = lane i's starting lane position. q = base chances (the live chances until
-    the first checkpoint). uniforms = two per lane in lane order (rail, lead), drawn from the
-    race generator after all existing draws; bots use them for variety, everyone consumes
-    them. kinds[i] = "bot" (Smart Steer with variety, the default), "smart" (a rider with
-    Smart Steer on) or "manual" (Smart Steer off)."""
+    """posts[i] = lane i's starting lane position (1..lanes). q = base chances (unused before
+    the first step; kept so the call matches Trip.new). uniforms = two per lane in lane order
+    (rail, lead), drawn from the race generator after all existing draws; bots use them for
+    variety, everyone consumes them. kinds[i] = "bot" (Smart Steer with variety, the default),
+    "smart" (a rider with Smart Steer on) or "manual" (Smart Steer off)."""
     n = len(posts)
+    lanes = race["lanes"]
+    if len(q) != n or len(uniforms) < 2 * n or (kinds is not None and len(kinds) != n):
+        raise ValueError("posts, q, uniforms (two per lane) and kinds must cover every lane")
+    for p in posts:
+        if not isinstance(p, int) or p < 1 or p > lanes:
+            raise IndexError(f"post {p!r} out of range 1..{lanes}")
+    if cfg["maxQueued"] not in (0, 1):
+        raise ValueError("maxQueued is 0 or 1 (one waiting press at most)")
     st = TripState()
-    st.cfg, st.geo, st.n = cfg, geo, n
-    st.lanes, st.speed, st.lead = race["lanes"], race["speed"], race["leadFeetPerShare"]
+    st.cfg, st.race, st.geo, st.n = cfg, race, geo, n
+    st.lanes, st.speed, st.lead = lanes, race["speed"], race["leadFeetPerShare"]
     st.posts = list(posts)
-    st.live = list(q)
     st.x = [float(p) for p in posts]
     st.tgt = [int(p) for p in posts]
     st.off = [0.0] * n
@@ -217,6 +237,8 @@ def new_state(posts: Sequence[int], q: Sequence[float], uniforms: Sequence[float
     for i in range(n):
         u_rail, u_lead = uniforms[2 * i], uniforms[2 * i + 1]
         kind = kinds[i] if kinds is not None else "bot"
+        if kind not in KINDS:
+            raise ValueError(f"unknown kind {kind!r}")
         if kind == "bot":
             st.smart.append(True)
             if u_rail < bots["railShare"]:
@@ -235,6 +257,7 @@ def new_state(posts: Sequence[int], q: Sequence[float], uniforms: Sequence[float
 
 def set_smart(st: TripState, i: int, on: bool) -> None:
     """Settings toggle, or a disconnect (on = True)."""
+    _check_lane(st, i)
     st.smart[i] = on
 
 
@@ -244,7 +267,8 @@ def accept_intent(st: TripState, i: int, d: int, t: float) -> str:
     """A rider's lane-change request. Returns "accepted" (starts on this tick if the lane is
     clear), "queued", "cancelled" (the opposite of a press still waiting), or a refusal:
     "locked", "invalid", "bounds", "rate". Every press but a locked or invalid one pauses
-    Smart Steer for resumeSeconds."""
+    Smart Steer for resumeSeconds. At most one press waits behind the one in progress."""
+    _check_lane(st, i)
     cfg = st.cfg
     if st.locked:
         return "locked"
@@ -274,6 +298,7 @@ def accept_intent(st: TripState, i: int, d: int, t: float) -> str:
 
 def lane_after(st: TripState, i: int) -> int:
     """The lane the rider ends up in once every waiting press is done."""
+    _check_lane(st, i)
     return st.tgt[i] + st.want[i] + st.queued[i]
 
 
@@ -323,10 +348,12 @@ def _try_move(st: TripState, i: int, d: int, t: float, tucking: List[bool], manu
 
 
 def _slot(st: TripState, i: int, lane: int) -> Tuple[float, bool]:
-    """Where horse i could enter `lane`, and whether it is blocked now: its own offset if
-    nothing in that lane (or gliding into it) is within clearFeet, else holdGap behind the
-    rearmost such horse, repeated down a line of horses. Each pass moves the slot past a
-    horse that then stops counting, so n passes always finish."""
+    """Where horse i could enter `lane`, and whether it is blocked now. A horse in that lane
+    (or gliding into it) blocks when it is less than clearFeet ahead or less than holdGap
+    behind, so the mover never pushes the horse behind it back. The slot is the mover's own
+    offset when nothing blocks, else holdGap behind the rearmost blocker, repeated down a line
+    of horses. Each pass moves the slot past a horse that then stops counting, so n passes
+    always finish."""
     band, clear, gap = st.cfg["laneBand"], st.cfg["clearFeet"], st.cfg["holdGap"]
     p = st.off[i]
     blocked = False
@@ -334,10 +361,12 @@ def _slot(st: TripState, i: int, lane: int) -> Tuple[float, bool]:
         lowest = 0.0
         found = False
         for j in range(st.n):
-            if j != i and (abs(st.x[j] - lane) < band or st.tgt[j] == lane) and abs(st.off[j] - p) < clear:
-                if not found or st.off[j] < lowest:
-                    lowest = st.off[j]
-                found = True
+            if j != i and (abs(st.x[j] - lane) < band or st.tgt[j] == lane):
+                a = st.off[j] - p
+                if a < clear and a > -gap:
+                    if not found or st.off[j] < lowest:
+                        lowest = st.off[j]
+                    found = True
         if not found:
             break
         blocked = True
@@ -349,21 +378,33 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
     """One server tick at race time t (seconds since the gate) lasting dt. intents = this
     tick's (lane index, direction) requests in arrival order; returns accept_intent's answer
     for each."""
+    for lane_i, _d in intents:
+        _check_lane(st, lane_i)
     if st.locked:
         return ["locked" for _ in intents]
-    cfg = st.cfg
+    cfg, race = st.cfg, st.race
     n = st.n
-    st.live = list(live)
-    # 1. Skill targets (gaps ramp in from the gate), minus any tuck-back; ease toward them.
+    if len(live) != n:
+        raise ValueError("one live chance per lane")
+    # 1. Skill targets (gaps ramp in from the gate), minus any tuck-back. Offsets move toward
+    #    them as the race view moves gaps: eased, and no faster than maxGapFeetPerSecond unless
+    #    a horse must hurry to be in place by the line.
     ramp = 1.0
     if cfg["gapRampSeconds"] > 0:
         ramp = min(1.0, t / cfg["gapRampSeconds"])
     fair = 1.0 / n
-    k = min(1.0, dt * cfg["smoothPerSecond"])
+    k = min(1.0, dt * race["viewEasePerSecond"])
+    to_line = st.geo["length"] / st.speed - t
+    allowed = race["maxGapFeetPerSecond"] * dt
+    margin = race["catchUpMarginSeconds"]
     for i in range(n):
         st.skill[i] = st.lead * (live[i] - fair) * ramp
-        target = st.skill[i] - st.tuck[i]
-        st.off[i] = st.off[i] + (target - st.off[i]) * k
+        gap = st.skill[i] - st.tuck[i] - st.off[i]
+        if to_line <= margin:
+            limit = math.inf
+        else:
+            limit = max(allowed, abs(gap) * dt / (to_line - margin))
+        st.off[i] = st.off[i] + min(limit, max(-limit, gap * k))
     # 2. Hold: nobody overlaps the horse ahead in its lane.
     _hold(st, _order(st))
     order = _order(st)
@@ -475,6 +516,11 @@ def tau(trip: Sequence[float], posts: Sequence[int], baseline: Sequence[float], 
     """tau_i = clamp(scale * (trip_i - baseline[post_i] - field mean of the same), floor,
     ceiling). baseline = the per-post row for this course and distance."""
     n = len(trip)
+    if len(posts) != n:
+        raise ValueError("one post per lane")
+    for p in posts:
+        if not isinstance(p, int) or p < 1 or p > len(baseline):
+            raise IndexError(f"post {p!r} out of range 1..{len(baseline)}")
     if not cfg["enabled"]:
         return [0.0] * n
     adj = [trip[i] - baseline[posts[i] - 1] for i in range(n)]
@@ -496,24 +542,3 @@ def trip_stars(t: float, cfg: Dict = CONFIG) -> int:
     if t >= cfg["stars"][1]:
         return 2
     return 1
-
-
-def run_scripted(geo: Dict, posts: Sequence[int], q: Sequence[float], p1: Sequence[float], switch_tick: int,
-                 uniforms: Sequence[float], kinds: Optional[Sequence[str]], intents_by_tick: Dict[int, List[Tuple[int, int]]],
-                 cfg: Dict = CONFIG, race: Dict = RACE, snapshot_every: int = 0):
-    """Plays phase A with live = q before switch_tick and p1 from it (the first checkpoint),
-    and fixed per-tick intents. Returns (state, snapshots: list of (tick, x, off))."""
-    st = new_state(posts, q, uniforms, geo, cfg, kinds, race)
-    dt = 1.0 / cfg["tickHz"]
-    t_lock = lock_time(geo, race)
-    snaps = []
-    tick = 0
-    while tick * dt < t_lock - EPS:
-        t = tick * dt
-        live = q if tick < switch_tick else p1
-        step(st, live, intents_by_tick.get(tick, []), t, dt)
-        if snapshot_every and tick % snapshot_every == 0:
-            snaps.append((tick, list(st.x), list(st.off)))
-        tick += 1
-    lock(st)
-    return st, snaps

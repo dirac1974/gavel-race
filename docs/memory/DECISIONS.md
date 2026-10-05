@@ -505,12 +505,12 @@ Template:
   - **When:** riders change lanes from the gate to the far-turn entry. Three soft bell ticks, then "Lanes locked!"; after that lanes are cosmetic, and the stretch is the slider and the Final Burst only.
   - **How a lane change works:**
     - One press moves one lane, with a 0.6 s glide that starts instantly on the rider's screen; at most one change per 0.6 s, one queued.
-    - **Tuck-in:** a horse alongside blocking a move toward the rail makes yours ease back (up to ~1.5 lengths) and slot in behind it. This is visual only.
+    - **Tuck-in:** a horse alongside blocking a move toward the rail makes yours ease back (up to 3 lengths, `tuckBackMax` 24 ft; ~1.5 before the S0 calibration) and slot in behind it. This is visual only.
     - A blocked move outward cancels after 1 s.
-    - Horses never overlap or bump; the mover gives way; a horse held behind another is drawn there.
+    - Horses never overlap or bump; the mover gives way; a horse held behind another is drawn there. A lane change needs 1 length clear ahead (`clearFeet`) and `holdGap` (10 ft) clear behind in the new lane, so the mover never pushes the horse behind it.
   - **The trip:**
-    - Ground: 0.012 per lane off the rail per 180° of turn. Earlier turns count live; the far turn is booked from the lane held at the bell.
-    - Tucked in: 0.0012 per second while 0.5–3 lengths behind a horse in the same lane, before the lock only, capped at 0.016.
+    - Ground: 0.010 per lane off the rail per 180° of turn (0.012 before the S0 calibration). Earlier turns count live; the far turn is booked from the lane held at the bell.
+    - Tucked in: 0.0010 per second (0.0012 before the S0 calibration) while 0.5–3 lengths behind a horse in the same lane, before the lock only, capped at 0.016.
     - **No boxed-in penalty.**
     - τ_i = clamp(scale × (trip_i − postBaseline[course][distance][post_i] − field mean of the same), −0.02, +0.04); scale = 1.
     - Win chance becomes p ∝ q · exp(κR + c + τ). τ is fixed at the lock and used from then on (checkpoint 2, Final Burst, stretch previews, finish). Before the lock τ = 0, so the trip never depends on luck, and Harville and the locked purses are unchanged.
@@ -528,17 +528,25 @@ Template:
     - Spam is rate-limited; requests after the lock are ignored; disconnects go to Smart Steer.
     - Lane positions go out with the gaps at 10 Hz until the lock.
   - **Bots and posts:**
-    - Bots use Smart Steer with variety (4–12 s lead before turns; 25% ride the rail) drawn after all existing random draws.
+    - Bots use Smart Steer with variety (4–12 s lead before turns; 25% ride the rail, 20% ride one lane wider, added in S0) drawn after all existing random draws.
     - Posts are drawn at random by the server (no longer humans first), never shown as a draw, and corrected by the per-post baseline.
   - **Feedback:** "Saved ground!" at turn exits, "Tucked in!" with wind lines, a gentle tip when wide into a turn (never "lost a place"), and "Good trip ★★☆" on the results (★★★ at τ ≥ +0.015, ★★ at ≥ −0.005, otherwise ★, never zero). "Your trip gained you N places!" appears only when positive.
   - **Replays** record each horse's lane per frame on this screen and add your line as a ribbon with green chevrons, wind lines and the lock marker; no ideal-line ghost.
   - **Python:** `live_chances(..., extra)` and `src/trip.py` mirror `Trip.luau` exactly (D-012).
 - Tuning: in the moderator's prototype a skilled steerer gains +0.011 to +0.023 over Smart Steer, a rider who never steers with Smart Steer off loses 0.014–0.016, and the post baseline cuts post bias from up to ±0.02 to at most 0.003. Without tuck-in most lane changes were refused. All values are in `GameConfig.steering`, and the post baselines are generated into `TripBaseline.luau` by `sims/steering.py`.
-- Calibration (S0, 2026-10-05, model engineer): two tuning changes, so every acceptance target passes on both courses and all distances (docs/research/steering-calibration.md).
-  - **Ground 0.010** per lane per 180° (was 0.012): at 0.012 a rail rider beat Smart Steer by +0.030 in Marathons (three turns count); now +0.017 to +0.028.
-  - **`bots.wideShare = 0.20`** (new): 20% of bots ride one lane wider than Smart Steer, alongside the 25% on the rail. With rail riders only, the average bot out-steered Smart Steer, and a Smart Steer kid among bots averaged τ = −0.007 (dirt Marathon); now −0.0014 to +0.0025.
-  - Tuck-in eases back to the slot behind the whole group alongside, but only if that slot is at most 1.5 lengths back; otherwise the horse waits for room. 77% of inward presses reach their lane within 3 s.
-  - The per-post baseline is calibrated on clamped τ.
+- Calibration (S0, 2026-10-05, model engineer, revised after the PR #37 review): every acceptance target now passes in every course × distance cell (docs/research/steering-calibration.md).
+  - **Ground 0.010** per lane per 180° (was 0.012): at 0.012 a rail rider beat Smart Steer by +0.030 in Marathons (three turns count); now +0.017 to +0.026.
+  - **Draft 0.0010 per second** (was 0.0012): the Sprints were at 40% draft share of the positive trip; now 35% or less in every cell.
+  - **Tuck-in up to 3 lengths** (`tuckBackMax` 24 ft, was ~1.5). The horse eases back to the slot behind the whole group alongside, or waits for room if that slot is further back.
+    - With the race view's 10 ft/s gap limit (D-055), which Trip now copies before the lock, 1.5 lengths left the Miles at 60–74% of inward presses reaching their lane within 3 s. Now 81–98% in every cell.
+  - **The mover never pushes the horse behind:** a lane change needs 1 length clear ahead and 10 ft (`holdGap`) behind in the new lane.
+  - **`bots.wideShare = 0.20`** (new): 20% of bots ride one lane wider than Smart Steer, alongside the 25% on the rail. With rail riders only, the average bot out-steered Smart Steer, and a Smart Steer kid among bots averaged τ = −0.007 (dirt Marathon). Now −0.0009 to +0.0003.
+  - **The per-post baseline is built for Smart Steer kids:** half from a kid at each post among bots, half from all-Smart lobbies, calibrated on clamped τ.
+    - The first baseline came from all-bot fields and left a kid at post 2 up to 0.009 below the field: it leads the lane-2 line without drafting, while a quarter of bots there take the rail.
+    - Post bias is now at most 0.0018 for a kid among bots and 0.0020 in all-Smart lobbies. Bot fields keep up to +0.007 at post 2, which pays nobody.
+  - **Trade-off (provisional):** drafting favours the horses behind a line. In bot fields, the on-screen leader after checkpoint 1 averages τ −0.002 to +0.002 and the last horse +0.001 to +0.005, about 0.3 points of S at most. By tapping alone the gap is under 0.001.
+    - Reversible: `draftPerSecond = 0` makes the trip ground only.
+    - Proposed, not built: a draft baseline by running position.
 - Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
 - Alternatives:
   - cosmetic steering only (kids learn the input does nothing; kept as `scale = 0`);

@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — fix: steering S0 review: post baseline fair for Smart Steer kids (a kid at each post among bots plus all-Smart lobbies, mixed 50/50; per-post checks for both), Trip moves gaps like RaceView (D-055 limiter), mover never pushes the horse behind, tuck-in up to 3 lengths, draftPerSecond 0.0010, every target per course × distance, stored full report asserted by tests, real luck-swap test, geometry checked on CI, index guards, trip.json after-lock presses
 - 2026-10-05 — feat: race steering S0 (D-054): Python trip model `src/trip.py`, `live_chances(..., extra)`, calibration sim and generated per-post baseline (`TripBaseline.luau`), parity fixtures, 491 tests; tuned groundPerLaneTurn 0.010 and bots.wideShare 0.20
 - 2026-10-05 — fix: training rides review — freezes no longer lose Sprint Lane progress (stale samples skipped, jumps clamped, progress snaps to hoops), TrainingRide attribute cleared on errors, guidance to the finish, Walkers collision group, full course speed on a part-pushed stick, timeouts need real riding, off-course samples kept off the floor, horse-call throttle (D-053)
 - 2026-10-05 — feat: training rides (T2): server-scored Sprint Lane and Mud Splash from 10 Hz samples, course picker with Quick train, 3-2-1, glowing next hoop, hoofprints, lap dots, phone Jump button, end card with stars, stat bar and ribbons; TrainingRiders and CourseProps collision groups; Rides.horseOf returns the horse id (D-053)
