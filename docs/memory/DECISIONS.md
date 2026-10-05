@@ -647,8 +647,27 @@ Template:
       - a move needs `holdGap` (10 ft) clear ahead and behind in the new lane, not `clearFeet` (8 ft);
       - a move never goes in front of a horse that is catching up with you.
     - Measured over 960 races each for all bots, 2 riders, 3 riders on Smart Steer off, and the rider's-own-screen runs at 0.1 s and 0.25 s (`overlap_report`): no overlaps anywhere, the order across the line right in every race, and no horse drawn falling back faster than 20 ft/s after the lock. The step happened in 10 to 13 races per 960.
-    - Before the lock, Trip's own holds still hop a horse arriving in a lane back by up to 30 ft/s in bot fields and about 50 ft/s with riders pressing, for one tick. Trip needs `clearFeet` ahead to move but holds at `holdGap`, and that rule is mirrored in `src/trip.py`. Smoothing it means a model change with new fixtures, so it's left for a follow-up.
+    - Before the lock, Trip's own holds still hopped a horse arriving in a lane back by up to 30 ft/s in bot fields and about 50 ft/s with riders pressing, for one tick. Fixed in the follow-up below.
     - Alternatives: release the holds earlier (S2: at 0.5 s one race in 960 crossed in the wrong order, and an earlier release doesn't separate two horses whose finishing gap is under a length), keep holding non-passing pairs (shifts a horse off its place, which can reorder it against another lane's horse), or a minimum finishing gap in the race shape (changes every finish to fix one in hundreds).
+- Pre-lock hop fix (2026-10-05, after S4):
+  - **The cause:** before the lock a lane change needs `clearFeet` (8 ft) ahead, but a hold keeps `holdGap` (10 ft). A horse arriving 8–10 ft behind another, or catching up during its glide, was snapped back to 10 ft in one tick.
+  - **The fix:** `src/trip.py` and `Trip.luau` now settle a held horse back no faster than `holdPullPerSecond` (19 ft/s, new in `trip.CONFIG` and `GameConfig.steering`), counted from where it was at the start of the tick. The view after the lock reads the same value.
+    - Following a horse never needs more (a follower moves back with the horse ahead, at most 10 ft/s), so steady holds are exact as before. Only a fresh arrival is spread over a few ticks.
+    - Lane decisions are unchanged. I picked this over "require the full 10 ft ahead", which would change which moves are allowed and still miss a horse catching up mid-glide.
+  - **Parity and regeneration:** `TripBaseline.luau`, `trip_baseline.json`, `steering_report.json` and the parity fixtures were regenerated; Python and Luau agree on all 200 scripted runs.
+  - **Calibration:** every target still passes in every course × distance, and the numbers moved by at most 0.0001.
+    - Rail rider vs Smart Steer: +0.016 to +0.026.
+    - Never-steer: −0.015 to −0.013.
+    - Within 3 s: 81–98% per cell (90.4% overall).
+    - Draft share: 20–35%.
+    - Post bias: at most 0.0017 for a kid among bots and 0.0020 for all-Smart fields.
+    - Smart Steer kid mean: −0.0009 to +0.0003.
+    - Details in docs/research/steering-calibration.md.
+  - **Spacing:** horses within half a lane stay at least 8.8 ft apart (400 random-press races), and a close arrival is back at 10 ft within 5 ticks.
+  - **On screen** (`overlap_report`, 960 races per row: all bots, 2 riders, 3 riders on Smart Steer off, and the rider's own screen at 0.1 s and 0.25 s):
+    - 0 overlaps on any screen;
+    - no horse falls back faster than 20 ft/s before or after the lock (19.0 ft/s at most on either side; it was 30–52 ft/s before the lock);
+    - the order across the line is right in every race.
 - Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
 - Alternatives:
   - cosmetic steering only (kids learn the input does nothing; kept as `scale = 0`);

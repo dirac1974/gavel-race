@@ -1,6 +1,6 @@
 # Race steering calibration (D-054, stage S0)
 
-By the model engineer, 2026-10-05; revised after the PR #37 review. Python reference `src/trip.py`, calibration `sims/steering.py`, tests `tests/test_trip.py`. Reproduce with `python sims/steering.py --write`, which takes about 30 minutes on 12 cores. It rewrites `tests/fixtures/trip_baseline.json`, `game/src/shared/TripBaseline.luau` and the stored report `tests/fixtures/steering_report.json`, which the tests assert. `python sims/steering.py` reruns the report against the checked-in baseline.
+By the model engineer, 2026-10-05; revised after the PR #37 review. Python reference `src/trip.py`, calibration `sims/steering.py`, tests `tests/test_trip.py`. Reproduce with `python sims/steering.py --write`, which takes about 20 minutes on 12 cores. It rewrites `tests/fixtures/trip_baseline.json`, `game/src/shared/TripBaseline.luau` and the stored report `tests/fixtures/steering_report.json`, which the tests assert. `python sims/steering.py` reruns the report against the checked-in baseline.
 
 **Short answer:** every acceptance target passes in every course × distance cell, including post bias for a Smart Steer kid among bots and in all-Smart lobbies. Changes from the plan:
 - `groundPerLaneTurn` 0.012 → **0.010**
@@ -10,6 +10,7 @@ By the model engineer, 2026-10-05; revised after the PR #37 review. Python refer
 - new `laneBand` and `tuckReleasePerSecond`
 - before the lock, gaps move exactly as `RaceView` moves them (D-055's 10 ft/s limiter)
 - a lane change never pushes the horse behind
+- a hold settles a horse into its place at `holdPullPerSecond` (19 ft/s) instead of snapping it there (the pre-lock hop fix, below; every number in this report is from after it)
 
 `smart.homeLane` (2) and every other plan value are unchanged.
 
@@ -27,6 +28,7 @@ GameConfig.steering = {
 	maxQueued = 1,                 -- 0 or 1; Trip.new rejects anything else
 	clearFeet = 8,                 -- room needed ahead in the new lane...
 	holdGap = 10,                  -- ...and behind it, so the mover never pushes the horse behind
+	holdPullPerSecond = 19,        -- new (hop fix): a hold settles a horse back no faster than this
 	tuckBackMax = 24,              -- plan: 12
 	outwardWaitSeconds = 1.0,
 	tickHz = 10, sendHz = 10,
@@ -65,20 +67,20 @@ Mean τ:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | dirt | Sprint | +0.0002 | +0.0176 | +0.0174 | −0.0145 | −0.0030 | +0.0097 | +0.0000 | 0.0010 | 0.0014 | 35% | 98% |
 | dirt | Mile | −0.0005 | +0.0163 | +0.0168 | −0.0147 | −0.0053 | +0.0065 | −0.0000 | 0.0014 | 0.0017 | 28% | 81% |
-| dirt | Classic | +0.0003 | +0.0193 | +0.0194 | −0.0142 | −0.0001 | +0.0145 | +0.0003 | 0.0018 | 0.0016 | 35% | 94% |
-| dirt | Marathon | −0.0009 | +0.0241 | +0.0252 | −0.0151 | −0.0042 | +0.0112 | +0.0000 | 0.0013 | 0.0017 | 20% | 81% |
-| turf | Sprint | +0.0003 | +0.0170 | +0.0165 | −0.0133 | −0.0025 | +0.0098 | +0.0000 | 0.0011 | 0.0020 | 35% | 98% |
-| turf | Mile | −0.0001 | +0.0193 | +0.0197 | −0.0152 | −0.0039 | +0.0095 | +0.0001 | 0.0012 | 0.0014 | 33% | 85% |
-| turf | Classic | −0.0001 | +0.0195 | +0.0199 | −0.0148 | −0.0012 | +0.0132 | +0.0003 | 0.0016 | 0.0014 | 35% | 92% |
-| turf | Marathon | −0.0001 | +0.0264 | +0.0263 | −0.0151 | +0.0015 | +0.0183 | +0.0006 | 0.0018 | 0.0011 | 24% | 91% |
+| dirt | Classic | +0.0003 | +0.0193 | +0.0194 | −0.0142 | −0.0002 | +0.0145 | +0.0003 | 0.0017 | 0.0016 | 35% | 94% |
+| dirt | Marathon | −0.0009 | +0.0241 | +0.0252 | −0.0151 | −0.0042 | +0.0112 | −0.0000 | 0.0013 | 0.0017 | 20% | 81% |
+| turf | Sprint | +0.0003 | +0.0170 | +0.0164 | −0.0133 | −0.0025 | +0.0098 | +0.0000 | 0.0011 | 0.0020 | 35% | 98% |
+| turf | Mile | −0.0001 | +0.0192 | +0.0197 | −0.0152 | −0.0038 | +0.0095 | +0.0001 | 0.0011 | 0.0014 | 33% | 85% |
+| turf | Classic | −0.0001 | +0.0195 | +0.0199 | −0.0148 | −0.0013 | +0.0131 | +0.0003 | 0.0016 | 0.0014 | 35% | 92% |
+| turf | Marathon | −0.0001 | +0.0264 | +0.0263 | −0.0151 | +0.0015 | +0.0183 | +0.0006 | 0.0017 | 0.0011 | 24% | 91% |
 
 | Target (every cell) | Value | Result |
 | --- | --- | --- |
-| Rail rider vs Smart Steer | +0.01 to +0.03 | +0.017 to +0.026: pass |
+| Rail rider vs Smart Steer | +0.01 to +0.03 | +0.016 to +0.026: pass |
 | Never-steer | −0.02 to −0.01 | −0.015 to −0.013: pass |
 | Inward request reaching its lane within 3 s | ≥ 70% | 81% to 98% (90.4% overall; rail rider 94.3%): pass |
 | Draft share of positive trip | ≤ 40% | 20% to 35% (29.6% overall): pass |
-| Post bias, Smart Steer kid among bots (every post) | < 0.005 | ≤ 0.0018 (absolute mean τ per post ≤ 0.0022): pass |
+| Post bias, Smart Steer kid among bots (every post) | < 0.005 | ≤ 0.0017 (absolute mean τ per post ≤ 0.0022): pass |
 | Post bias, all-Smart lobbies (every post) | < 0.005 | ≤ 0.0020: pass |
 | Smart Steer kid among bots averages | 0 ± 0.003 | −0.0009 to +0.0003: pass |
 | All-Smart field mean | 0 ± 0.003 | −0.0000 to +0.0006: pass |
@@ -87,19 +89,21 @@ Per-post residual: mean τ at each post minus the mean over posts, posts 1 to 8.
 
 | Cell | Smart Steer kid among bots | All-Smart lobbies | Bot fields (for information) |
 | --- | --- | --- | --- |
-| dirt Sprint | −.0002 −.0006 −.0010 −.0005 +.0000 +.0005 +.0008 +.0009 | −.0000 +.0009 +.0008 +.0006 +.0001 −.0005 −.0005 −.0014 | −.0000 +.0023 −.0012 −.0007 −.0005 +.0001 −.0001 +.0001 |
+| dirt Sprint | −.0002 −.0006 −.0010 −.0006 +.0000 +.0005 +.0008 +.0009 | −.0000 +.0009 +.0008 +.0006 +.0001 −.0005 −.0005 −.0014 | −.0000 +.0023 −.0012 −.0007 −.0005 +.0001 −.0001 +.0001 |
 | dirt Mile | +.0003 +.0006 −.0014 −.0005 −.0002 +.0001 +.0005 +.0007 | −.0004 −.0006 +.0017 +.0005 −.0000 −.0002 −.0004 −.0006 | −.0014 +.0073 −.0013 −.0006 −.0015 −.0020 −.0005 −.0001 |
-| dirt Classic | +.0008 −.0014 −.0012 −.0007 −.0001 +.0005 +.0003 +.0018 | −.0007 +.0010 +.0015 +.0013 −.0002 +.0002 −.0015 −.0016 | +.0001 +.0033 −.0021 −.0005 −.0003 −.0005 −.0005 +.0004 |
+| dirt Classic | +.0008 −.0014 −.0012 −.0007 −.0000 +.0006 +.0003 +.0017 | −.0007 +.0011 +.0015 +.0013 −.0003 +.0002 −.0015 −.0016 | +.0001 +.0033 −.0021 −.0004 −.0003 −.0004 −.0005 +.0004 |
 | dirt Marathon | +.0003 +.0007 −.0013 −.0008 −.0001 +.0002 +.0004 +.0006 | −.0003 −.0007 +.0017 +.0005 +.0001 −.0003 −.0004 −.0005 | −.0027 +.0071 −.0006 −.0001 −.0014 −.0005 −.0012 −.0006 |
-| turf Sprint | −.0001 −.0006 −.0009 −.0008 −.0000 +.0005 +.0009 +.0011 | −.0001 +.0008 +.0008 +.0005 +.0002 −.0001 −.0002 −.0020 | +.0001 +.0025 −.0010 −.0013 −.0001 −.0002 −.0001 +.0001 |
-| turf Mile | +.0009 +.0007 −.0012 −.0006 −.0005 +.0001 +.0006 +.0001 | −.0014 −.0006 +.0004 +.0007 +.0001 +.0007 +.0002 −.0001 | −.0003 +.0061 −.0023 −.0014 −.0012 +.0000 −.0008 −.0002 |
-| turf Classic | +.0012 −.0013 −.0016 −.0003 +.0001 −.0001 +.0009 +.0012 | −.0010 +.0009 +.0014 +.0012 +.0005 −.0011 −.0006 −.0013 | +.0001 +.0040 −.0018 −.0010 −.0005 −.0010 −.0001 +.0004 |
-| turf Marathon | +.0009 −.0014 −.0011 −.0011 +.0001 −.0002 +.0011 +.0018 | −.0011 +.0006 +.0010 +.0011 −.0000 −.0007 −.0006 −.0003 | −.0012 +.0029 −.0002 −.0011 +.0004 −.0014 +.0001 +.0005 |
+| turf Sprint | −.0001 −.0006 −.0009 −.0009 −.0001 +.0005 +.0009 +.0011 | −.0001 +.0008 +.0008 +.0005 +.0002 −.0000 −.0002 −.0020 | +.0001 +.0025 −.0010 −.0013 −.0001 −.0002 −.0001 +.0001 |
+| turf Mile | +.0009 +.0007 −.0011 −.0006 −.0005 +.0001 +.0006 −.0000 | −.0014 −.0006 +.0004 +.0007 +.0001 +.0007 +.0002 −.0001 | −.0003 +.0061 −.0023 −.0014 −.0012 +.0001 −.0007 −.0003 |
+| turf Classic | +.0012 −.0013 −.0016 −.0003 +.0001 −.0001 +.0009 +.0011 | −.0010 +.0008 +.0014 +.0012 +.0005 −.0011 −.0006 −.0013 | +.0001 +.0040 −.0018 −.0011 −.0005 −.0010 −.0001 +.0004 |
+| turf Marathon | +.0010 −.0014 −.0011 −.0011 +.0001 −.0003 +.0011 +.0017 | −.0011 +.0006 +.0010 +.0011 −.0001 −.0007 −.0006 −.0003 | −.0012 +.0029 −.0002 −.0011 +.0005 −.0014 +.0001 +.0005 |
 
 Other numbers:
 - **Lane at the lock:** Smart Steer 1.9–2.0, rail rider 1.0, never-steer 4.4–4.6.
 - **Clamp binding:** never-steer sits on the floor in 57–75% of races. The rail rider hits the ceiling in 10% of dirt Marathons, 5% of turf Marathons, and in no races elsewhere.
-- **Spacing:** no two horses sharing a lane were ever closer than `holdGap` (10 ft) at the end of a tick.
+- **Spacing:** the closest two horses sharing a lane came at the end of a tick was 6.96 ft (it was 10.0 before the hop fix). That happens while one is still gliding in, within the 0.9-lane band.
+  - In 400 races with random presses, horses within half a lane of each other were never closer than 8.8 ft (an overlap is under 6 ft of an 8 ft horse).
+  - A close arrival settles back to `holdGap` within 5 ticks.
 
 ### How each number is measured
 
@@ -149,6 +153,25 @@ I did not mix bot fields into the baseline, because that would bring back the ki
 6. **`bots.wideShare = 0.20` (new).** With only "25% ride the rail", the average bot out-steered Smart Steer, and a kid among bots averaged τ −0.005 (dirt Mile) and −0.007 (dirt Marathon). Now 20% of bots ride one lane wider, and a kid among bots averages −0.0009 to +0.0003.
 7. **Every target per cell, not overall.** That includes the within-3-s target, and "a Smart Steer kid among bots averages 0 ± 0.003" was added.
 
+## The pre-lock hop (fixed 2026-10-05)
+
+**What was wrong.** Before the lock, a lane change needs `clearFeet` (8 ft) of room ahead in the new lane, but a hold keeps `holdGap` (10 ft). A horse arriving 8–10 ft behind another, or catching up during its 0.6 s glide, was snapped back to 10 ft in one tick. On screen that was a hop: up to 30 ft/s backwards in bot fields and about 50 ft/s with riders pressing (the S4 overlap report's backward-speed check).
+
+**Fix.** The hold now settles a horse back no faster than `holdPullPerSecond` (19 ft/s), counted from where it was at the start of the tick, in `src/trip.py` and `Trip.luau` alike. The view after the lock uses the same rate.
+- Following a horse never needs more: a follower moves back with the horse ahead, which moves at most 10 ft/s, so steady holds are exact as before.
+- Only a fresh arrival is spread over a few ticks: horses within half a lane stay at least 8.8 ft apart, and a close arrival is back at 10 ft within 5 ticks.
+- Lane decisions don't change.
+
+**Why not the other option:** requiring the full 10 ft ahead before a lane change counts as clear would change which moves are allowed (and the within-3-s numbers), and it still wouldn't cover a horse catching up during its glide.
+
+**Effect on calibration:** every target still passes in every cell, and the numbers moved by at most 0.0001.
+- Overall within 3 s: 90.4%, as before.
+- Draft share: 29.6%, as before.
+- Post bias for a kid among bots: at most 0.0017 (was 0.0018).
+- The per-post baseline moved by at most a few ten-thousandths.
+
+**On screen** (`tests/luau/overlap_report`, 960 races per row): no horse falls back faster than 20 ft/s before or after the lock in any row; see D-054.
+
 ## Draft and tapping skill (trade-off, provisional)
 
 Drafting rewards being behind someone, so the horse in front of a line drafts least. In bot fields, after the first checkpoint:
@@ -160,9 +183,9 @@ Drafting rewards being behind someone, so the horse in front of a line drafts le
 | dirt Classic | −0.0020 | +0.0042 | +0.0012 | +0.0002 |
 | dirt Marathon | +0.0010 | +0.0025 | +0.0025 | +0.0014 |
 | turf Sprint | −0.0013 | +0.0013 | +0.0004 | +0.0001 |
-| turf Mile | −0.0008 | +0.0029 | +0.0016 | +0.0014 |
-| turf Classic | −0.0017 | +0.0039 | +0.0008 | +0.0009 |
-| turf Marathon | −0.0016 | +0.0047 | +0.0018 | +0.0025 |
+| turf Mile | −0.0008 | +0.0030 | +0.0016 | +0.0015 |
+| turf Classic | −0.0016 | +0.0039 | +0.0008 | +0.0009 |
+| turf Marathon | −0.0017 | +0.0047 | +0.0017 | +0.0025 |
 
 **What it means:**
 - The on-screen leader (highest live chance, from rating and taps) averages −0.002 to +0.002, and the last horse +0.001 to +0.005. The gap is at most about 0.006, roughly 0.3 points of S, against the horses in front.
@@ -178,7 +201,7 @@ Drafting rewards being behind someone, so the horse in front of a line drafts le
 1. **Skill target and easing:**
    - Skill target = 320 × (live − 1/n) × min(1, t / 8), minus the lane's tuck-back.
    - Offsets move toward it as RaceView moves gaps. With `gap = target − off`, `k = min(1, 2.5·dt)`, `toLine = length/56 − t` and `limit = max(10·dt, |gap|·dt / (toLine − 0.3))` (no limit inside 0.3 s), the step is `off += clamp(gap·k, −limit, limit)`.
-2. **Hold:** in the order "leader first, then the inside horse, then the lower index", nobody sits closer than 10 ft behind a horse within 0.9 lanes.
+2. **Hold:** in the order "leader first, then the inside horse, then the lower index", nobody sits closer than 10 ft behind a horse within 0.9 lanes. A horse is moved back no further than `holdPullPerSecond` × dt from where it started the tick (19 ft/s), so a close arrival settles over a few ticks.
 3. **Lane changes:**
    - This tick's presses go first, in arrival order (`accept_intent`). Then every other lane, in the same leader-first order, takes its waiting or queued press. Otherwise Smart Steer heads in one lane when the lane is in a turn or within its turn lead of the next one (the far turn at the lock counts), if the horse is wider than its home lane.
    - A move is clear when no horse in, or gliding into, the target lane is less than 8 ft ahead or less than 10 ft behind.

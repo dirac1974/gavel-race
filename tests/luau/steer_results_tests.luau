@@ -207,10 +207,11 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	-- Whole races: the two that jerked before the fix, and a mix, with the step on and off --------
 	local reproBots = simulateRace("dirt", "Sprint", 4212911)
 	local reproRiders = simulateRace("turf", "Marathon", 1963915, nil, { riders = 2 })
-	check(reproBots.jerks == 0 and reproRiders.jerks == 0 and reproBots.backAfter <= 20 and reproRiders.backAfter <= 20
+	check(reproBots.jerks + reproBots.jerksBefore + reproRiders.jerks + reproRiders.jerksBefore == 0
+		and math.max(reproBots.backAfter, reproRiders.backAfter, reproBots.backBefore, reproRiders.backBefore) <= 20
 		and reproBots.before + reproBots.after + reproRiders.before + reproRiders.after == 0,
-		string.format("the review's two races: no jerks after the lock (fastest fall back %.1f and %.1f ft/s), no overlaps",
-			reproBots.backAfter, reproRiders.backAfter))
+		string.format("the review's two races: no jerks (fastest fall back %.1f and %.1f ft/s after the lock, %.1f and %.1f before), no overlaps",
+			reproBots.backAfter, reproRiders.backAfter, reproBots.backBefore, reproRiders.backBefore))
 	local races, jerks, overlaps, sameOrder, rightOrder = 0, 0, 0, true, true
 	for ci, course in { "dirt", "turf" } do
 		for di, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
@@ -221,7 +222,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 			Trip.halfSteps = true
 			local on = simulateRace(course, distance, seed, nil, opts)
 			races += 1
-			jerks += on.jerks
+			jerks += on.jerks + on.jerksBefore
 			overlaps += on.before + on.after
 			if not on.orderOk then rightOrder = false end
 			for p, lane in on.lineOrder do

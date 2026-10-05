@@ -28,7 +28,7 @@ local SteerPredict = require("../../game/src/shared/SteerPredict")
 local SIDE, LENGTH = 0.5, 6 -- overlap: closer than this sideways (lanes) and lengthwise (feet)
 local FRAME = 1 / 60
 local APART = 0.05          -- your own horse drawn this far (lanes) from the shared view counts as apart
-local JERK = 20             -- after the lock, a horse drawn falling back faster than this (ft/s, against the pace) jerks
+local JERK = 20             -- a horse drawn falling back faster than this (ft/s, against the pace) jerks
 
 local function makeRng(seed0: number)
 	local seed = seed0
@@ -51,7 +51,7 @@ export type Own = { overlapsBefore: number, overlapsAfter: number, apartMax: num
 	timeouts: number, longestPrediction: number, presses: number, predicted: number }
 export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean,
 	lineOrder: { number }, result: { number }, answers: { [string]: number }, halfSteps: number,
-	backBefore: number, backAfter: number, jerks: number, own: Own? }
+	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own? }
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local cfgGame = config or GameConfig
@@ -102,12 +102,12 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	local sampleAt, sampleT = 0, 0 -- when the shown sample arrived, and the server tick that made it
 	local stats: Stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {},
-		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, own = nil }
+		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil }
 	-- backBefore / backAfter = the fastest any horse is drawn falling back against the pace (ft/s),
 	-- from 1 s after the gate to the lock and from the lock on (by the server tick that made the
-	-- sample being drawn); jerks = frames after the lock where one
-	-- falls back faster than JERK. (Before the lock Trip's own holds can hop a horse arriving in a lane
-	-- back up to about 2.5 ft in a tick: it needs clearFeet ahead to move, then sits holdGap back.)
+	-- sample being drawn); jerks / jerksBefore = frames after / before the lock where one falls back
+	-- faster than JERK. (Before the hop fix, Trip's own holds snapped a horse arriving in a lane back
+	-- up to 5 ft in a tick; holds now settle at most holdPullPerSecond.)
 	local lastOffset = table.create(n, 0)
 	-- Messages on their way to the client { at, kind, ... } and presses on their way to the server.
 	local inbox, outbox = {}, {}
@@ -190,12 +190,16 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					local back = (lastOffset[i] - offset[i]) / FRAME
 					if afterLock then
 						if back > stats.backAfter then stats.backAfter = back end
-						if back > JERK then jerked = true end
 					elseif back > stats.backBefore then
 						stats.backBefore = back
 					end
+					if back > JERK then jerked = true end
 				end
-				if jerked then stats.jerks += 1 end
+				if jerked and afterLock then
+					stats.jerks += 1
+				elseif jerked then
+					stats.jerksBefore += 1
+				end
 			end
 			for i = 1, n do lastOffset[i] = offset[i] end
 			local glide = FRAME / steer.laneSeconds

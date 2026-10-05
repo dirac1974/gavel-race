@@ -373,14 +373,14 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 					local s = simulateRace(course, distance, cell * 7907 + k * 104729, if k % 2 == 0 then s1 else nil)
 					races += 1
 					overlaps += s.before + s.after
-					jerks += s.jerks
+					jerks += s.jerks + s.jerksBefore
 					if not s.orderOk then wrongOrder += 1 end
 				end
 			end
 		end
 		check(races == 64 and overlaps == 0, `no overlapping horses on screen in {races} races ({overlaps} frames)`)
 		check(wrongOrder == 0, "the order across the line is the result in every race")
-		check(jerks == 0, `no horse drawn jerking back after the lock (over 20 ft/s) in {races} races ({jerks} frames)`)
+		check(jerks == 0, `no horse drawn jerking back (over 20 ft/s), before or after the lock, in {races} races ({jerks} frames)`)
 	end
 	do -- make room: a horse closing on another in its lane moves out
 		local track = TrackLayout.courses.dirt

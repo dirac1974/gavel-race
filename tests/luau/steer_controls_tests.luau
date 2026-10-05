@@ -312,19 +312,21 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(SteerPredict.laneTo(stG, vG, 0.1, true) == 3, "at the lock your horse follows the lanes everyone sees")
 
 	-- Whole races with riders pressing at random: nobody overlaps on screen --------------------
-	local races, overlaps, wrongOrder = 0, 0, 0
+	local races, overlaps, wrongOrder, jerkFrames = 0, 0, 0, 0
 	for ci, course in COURSES do
 		for di, distance in DISTANCES do
 			for k = 1, 2 do
 				local res = simulateRace(course, distance, 7000 + 100 * ci + 10 * di + k, nil, { riders = 2, manual = k == 2 })
 				races += 1
 				overlaps += res.before + res.after
+				jerkFrames += res.jerks + res.jerksBefore
 				if not res.orderOk then wrongOrder += 1 end
 			end
 		end
 	end
 	check(overlaps == 0, `riders pressing ◀ ▶ at random: no overlapping horses in {races} races ({overlaps} frames)`)
 	check(wrongOrder == 0, "...and the order across the line is still the result")
+	check(jerkFrames == 0, `...and nobody is drawn hopping back (over 20 ft/s) before or after the lock ({jerkFrames} frames)`)
 	-- Rider 1 pressing from its own screen (0.1 s each way): singles, doubles, mashes, In-then-Out.
 	local ownRaces, ownOverlaps, sharedOverlaps, timeouts, predicted, longest, apartAtLock = 0, 0, 0, 0, 0, 0, 0
 	for ci, course in COURSES do
