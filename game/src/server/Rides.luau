@@ -16,45 +16,46 @@ local Style = require(Shared:WaitForChild("Style"))
 
 local PATTERN_TEXT = { stars = "⭐ ⭐ ⭐", checks = "🏁", lightning = "⚡", goldtrim = "", plain = "", dots = "• • •", star = "⭐" }
 
--- A saddle cloth in your shop colours, on the horse's back just under the saddle.
-local function addCloth(rig: Model, at: CFrame, height: number, item)
+-- A saddle cloth in your shop colours. It's the horse model's own Cloth piece, cut to fit its
+-- back by tools/meshy/split_legs.py and tinted here; a horse without one shows no cloth (a
+-- plain box stuck out of the horse's sides).
+local function addCloth(rig: Model, item)
 	if not item then return end
-	local root = rig:FindFirstChild("VisualRoot")
-	if not root then return end
-	local cloth = Instance.new("Part")
-	cloth.Name = "SaddleCloth"
-	cloth.Size = Vector3.new(2.9, 1.6, 2.6)
-	cloth.Color = Color3.fromHex(item.color or "FBFBF5")
-	cloth.Material = Enum.Material.Fabric
-	cloth.CanCollide, cloth.CanTouch, cloth.CanQuery, cloth.Massless = false, false, false, true
-	cloth.CFrame = at * CFrame.new(0, height * 0.6 - 0.75, 0.5)
-	cloth.Parent = rig
-	local w = Instance.new("WeldConstraint")
-	w.Part0, w.Part1 = root, cloth
-	w.Parent = cloth
-	if item.pattern == "goldtrim" then cloth.Color = Color3.fromHex(item.color or "7B2D26") end
-	local text = PATTERN_TEXT[item.pattern or "plain"] or ""
-	if item.pattern == "goldtrim" then
-		local trim = Instance.new("SelectionBox")
-		trim.Adornee = cloth
-		trim.Color3 = Color3.fromHex("E3B341")
-		trim.LineThickness = 0.12
-		trim.SurfaceTransparency = 1
-		trim.Parent = cloth
+	local cloth
+	for _, d in rig:GetDescendants() do
+		if d.Name == "Cloth" and d:IsA("MeshPart") then
+			cloth = d
+			break
+		end
 	end
-	if text ~= "" then
-		for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
-			local sg = Instance.new("SurfaceGui")
-			sg.Face = face
-			sg.CanvasSize = Vector2.new(200, 120)
-			sg.Parent = cloth
-			local l = Instance.new("TextLabel")
-			l.Size = UDim2.fromScale(1, 1)
-			l.BackgroundTransparency = 1
-			l.TextScaled = true
-			l.Text = text
-			l.TextColor3 = Color3.new(1, 1, 1)
-			l.Parent = sg
+	if not cloth then return end
+	cloth.TextureID = ""
+	cloth.Material = Enum.Material.Fabric
+	cloth.Color = Color3.fromHex(item.color or "FBFBF5")
+	cloth.Transparency = 0
+	local text = PATTERN_TEXT[item.pattern or "plain"] or ""
+	if text == "" and item.pattern ~= "goldtrim" then return end
+	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = face
+		sg.CanvasSize = Vector2.new(200, 120)
+		sg.LightInfluence = 1
+		sg.Parent = cloth
+		local l = Instance.new("TextLabel")
+		l.AnchorPoint = Vector2.new(0.5, 0.5)
+		l.Position = UDim2.fromScale(0.5, 0.4)
+		l.Size = UDim2.fromScale(0.6, 0.4)
+		l.BackgroundTransparency = 1
+		l.TextScaled = true
+		l.Text = text
+		l.TextColor3 = Color3.new(1, 1, 1)
+		l.Parent = sg
+		if item.pattern == "goldtrim" then
+			local stroke = Instance.new("UIStroke")
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Color = Color3.fromHex("E3B341")
+			stroke.Thickness = 6
+			stroke.Parent = l
 		end
 	end
 end
@@ -306,8 +307,7 @@ function Rides.call(player: Player): (boolean, string?)
 	active[player] = rig
 	local data2 = Profiles.get(player)
 	if data2 then
-		local _, size = rig:GetBoundingBox()
-		addCloth(rig, at, math.min(size.Y, 8), Style.worn(data2, "cloth"))
+		addCloth(rig, Style.worn(data2, "cloth"))
 		putOnHelmet(character, Style.worn(data2, "helmet"))
 	end
 	task.defer(function()
