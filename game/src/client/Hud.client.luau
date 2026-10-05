@@ -46,6 +46,20 @@ dock.Size = UDim2.new(0, 0, 0, 78)
 dock.AutomaticSize = Enum.AutomaticSize.X
 dock.BackgroundTransparency = 1
 dock.Parent = gui
+local dockScale = Instance.new("UIScale")
+dockScale.Parent = dock
+local function fitDock()
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+	local width = math.max(1, dock.AbsoluteSize.X / dockScale.Scale)
+	dockScale.Scale = math.clamp((cam.ViewportSize.X - 24) / width, 0.55, 1)
+end
+dock:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitDock)
+task.spawn(function()
+	while not workspace.CurrentCamera do task.wait(0.1) end
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitDock)
+	fitDock()
+end)
 local layout = Instance.new("UIListLayout")
 layout.FillDirection = Enum.FillDirection.Horizontal
 layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
