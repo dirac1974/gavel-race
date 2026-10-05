@@ -1,12 +1,20 @@
 import json
 import re
+import struct
 from pathlib import Path
-
-from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 ATLAS = ROOT / "assets" / "ui" / "atlas"
 SHARED = ROOT / "game" / "src" / "shared"
+
+
+def png_size(path: Path) -> tuple[int, int]:
+    """Width and height from the PNG header (stdlib only; CI has no Pillow)."""
+    data = path.read_bytes()[:24]
+    assert data[:8] == b"PNG
+
+", path
+    return struct.unpack(">II", data[16:24])
 
 
 def atlas():
@@ -17,7 +25,7 @@ def test_every_rect_fits_its_sheet_and_none_overlap():
     entries = atlas()
     by_sheet = {}
     for name, e in entries.items():
-        w, h = Image.open(ATLAS / f"{e['sheet']}.png").size
+        w, h = png_size(ATLAS / f"{e['sheet']}.png")
         assert w <= 1024 and h <= 1024, f"{e['sheet']} larger than Roblox stores"
         assert 0 <= e["x"] and e["x"] + e["w"] <= w and 0 <= e["y"] and e["y"] + e["h"] <= h, name
         by_sheet.setdefault(e["sheet"], []).append((name, e))
