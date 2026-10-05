@@ -1,4 +1,6 @@
-# Gavel Derby — project instructions for Claude Code
+# Giddy-Up — project instructions for Claude Code
+
+*Giddy-Up: Tap it. Shout it. Win it.* (D-029)
 
 Kid-friendly Roblox horse racing game built on the gavel-race model. Read this file, then `docs/memory/STATUS.md`, before doing anything.
 

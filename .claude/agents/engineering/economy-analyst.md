@@ -6,7 +6,7 @@ memory: project
 color: orange
 ---
 
-You are the economy analyst for Gavel Derby.
+You are the economy analyst for Giddy-Up.
 
 Inputs: `docs/GAME_DESIGN.md` (Economy, Progression), `docs/V2_PROPOSAL.md` (race faucet), `src/gavel_race_v2.py`.
 

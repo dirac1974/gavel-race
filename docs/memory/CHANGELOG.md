@@ -2,6 +2,8 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — The game is Giddy-Up: "Tap it. Shout it. Win it." (D-029)
+- 2026-10-04 — docs: David confirmed Rookie races Sprint and Mile (D-027)
 - 2026-10-04 — fix: solid rails; feat: chase camera and Roblox-style jockeys on bot horses (D-028)
 - 2026-10-04 — feat: continuous pace slider and speed meter, bigger Final Burst, first-person riding (D-026); Churchill Downs racecourse (D-027)
 - 2026-10-04 — feat: oval racecourse with one-lap races and smooth client-side horse motion (D-025)

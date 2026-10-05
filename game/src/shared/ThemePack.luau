@@ -4,7 +4,8 @@
 
 local ThemePack = {
 	id = "horse",
-	gameTitle = "Gavel Derby",
+	gameTitle = "Giddy-Up",
+	tagline = "Tap it. Shout it. Win it.", -- D-029
 	racer = { singular = "Horse", plural = "Horses" },
 	pilot = { singular = "Jockey", plural = "Jockeys" },
 	gavelAction = "Giddy-up", -- D-022: never whip wording

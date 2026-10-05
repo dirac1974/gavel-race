@@ -338,7 +338,7 @@ def ring_panel(x: float, y: float, w: float, h: float, beats_per_s: float, title
 
 def sheet(a: dict[str, tuple[int, int, str]]) -> str:
     width, pad, row_h = 1240, 24, 128
-    out = [caption(width / 2, 44, "Gavel Derby race UI (council-reviewed set)", 26, True)]
+    out = [caption(width / 2, 44, "Giddy-Up race UI (council-reviewed set)", 26, True)]
     y = 70.0
 
     def section(title: str) -> None:

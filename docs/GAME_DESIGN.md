@@ -1,6 +1,6 @@
-# Gavel Derby — game design (condensed)
+# Giddy-Up — game design (condensed)
 
-Working title. Condensed from the planning doc of 2026-10-04 so agents have it in the repo. Race math lives in [V2_PROPOSAL.md](V2_PROPOSAL.md); decisions in [memory/DECISIONS.md](memory/DECISIONS.md).
+**Giddy-Up: Tap it. Shout it. Win it.** Kids shout "Giddy-up!" as they tap to urge their horse on (D-029). Condensed from the planning doc of 2026-10-04 so agents have it in the repo. Race math lives in [V2_PROPOSAL.md](V2_PROPOSAL.md); decisions in [memory/DECISIONS.md](memory/DECISIONS.md).
 
 ## Pitch
 

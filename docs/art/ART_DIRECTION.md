@@ -1,4 +1,4 @@
-# Art direction: Gavel Derby
+# Art direction: Giddy-Up
 
 Status: council-reviewed (2026-10-04) and applied to the generated playtest assets. Review and verdicts: [ART_REVIEW.md](ART_REVIEW.md). Asset list and spend: [ASSET_PLAN.md](ASSET_PLAN.md). Studio import: [IMPORT.md](IMPORT.md). UI art lives in `assets/ui/` (review sheet `assets/ui/_sheet.svg`, PNGs in `assets/ui/png/`), made by `tools/ui/make_ui_svgs.py`.
 

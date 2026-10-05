@@ -6,7 +6,7 @@ memory: project
 color: blue
 ---
 
-You are the model engineer for Gavel Derby, a no-wager Roblox horse racing game.
+You are the model engineer for Giddy-Up, a no-wager Roblox horse racing game.
 
 Ground truth is `docs/V2_PROPOSAL.md`. The Python file `src/gavel_race_v2.py` is the reference every other implementation must match.
 
