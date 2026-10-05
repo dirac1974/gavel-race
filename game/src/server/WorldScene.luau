@@ -2,7 +2,8 @@
 -- WorldScene: builds the world around the racecourse from parts (D-035, WorldLayout):
 -- Fair Street with its fountain, lamps and bunting; the Race Board, Feed & Seed, Vet,
 -- Training Paddock and Market Corral; Barn Lane with 20 fenced stable plots; the Trail loop
--- with the meadow; the Training Ground with its oval and the paddock gymkhana (D-053); trees. Uploaded models (ReplicatedStorage.RaceModels) replace the
+-- with the meadow; the Training Ground with its oval and the paddock gymkhana's layouts (D-053;
+-- clients put this week's in the arena); trees. Uploaded models (ReplicatedStorage.RaceModels) replace the
 -- part-built buildings and props when they've loaded; otherwise the parts stay.
 -- Barns and horses inside each plot are built by StableService.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -682,12 +683,9 @@ local function buildOval(f: Instance)
 	end
 end
 
-local function buildGymkhana(f: Instance)
+-- One Mud Splash layout's props (G = TrainingCourses.courses[key]) into the folder `gy`.
+local function buildGymkhana(gy: Instance, G)
 	local TC = TrainingCourses
-	local G = TC.courses.grit
-	local gy = Instance.new("Folder")
-	gy.Name = "Gymkhana"
-	gy.Parent = f
 	local logH = GameConfig.training.grit.logHeight
 	for _, e in G.elements do
 		local m = Instance.new("Model")
@@ -778,6 +776,29 @@ local function buildGymkhana(f: Instance)
 	end
 end
 
+-- Mud Splash's four layouts (T5, "This week's course"): the props for each are kept in
+-- ReplicatedStorage.Gymkhanas, a folder per course key (grit_w1..grit_w4). Each client copies
+-- this week's layout into the arena (GymkhanaView, from the WeeklyCourse attribute that
+-- TrainingService sets from the server's clock) and keeps the one it's riding until the ride
+-- ends. The server scores from TrainingCourses' geometry, so it needs no props in the arena.
+-- A rebuild (uploaded models arriving) swaps each folder for a new one; clients follow.
+local function buildGymkhanas()
+	local root = ReplicatedStorage:FindFirstChild("Gymkhanas")
+	if not root then
+		root = Instance.new("Folder")
+		root.Name = "Gymkhanas"
+		root.Parent = ReplicatedStorage
+	end
+	for _, key in TrainingCourses.LAYOUTS do
+		local gy = Instance.new("Folder")
+		gy.Name = key
+		buildGymkhana(gy, TrainingCourses.courses[key])
+		local old = root:FindFirstChild(key)
+		if old then old:Destroy() end
+		gy.Parent = root
+	end
+end
+
 local function buildTrainingGround(root: Instance)
 	CollisionGroups.ensure()
 	local f = Instance.new("Folder")
@@ -799,13 +820,13 @@ local function buildTrainingGround(root: Instance)
 		WorldScene.sign(f, Vector3.new(gateX, GROUND_Y + 12.5, z), Vector3.new(0, 0, -1), "Training Ground", "⭐", half * 2 + 2, 3.5, C.woodLight)
 	end
 	buildOval(f)
-	buildGymkhana(f)
+	buildGymkhanas()
 	-- Picture signs (the open courses get a "Ride" prompt from the client).
 	local signs = Instance.new("Folder")
 	signs.Name = "Signs"
 	signs.Parent = f
 	for _, s in TC.signs do
-		local c = TC.courses[s.course]
+		local c = TC.info(s.course)
 		local open = GameConfig.training.courses[s.course] == true
 		local line = if s.pointer then "In the paddock ⬆" elseif open then "Ride!" else "Coming soon"
 		local colour = if open then C.white else Color3.fromHex("EDE4D3")

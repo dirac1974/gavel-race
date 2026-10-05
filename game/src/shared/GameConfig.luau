@@ -202,8 +202,10 @@ GameConfig.training = {
 	-- Mud Splash is ridden at an arena lope (`pace`), and the bending poles at a canter. A log
 	-- counts when the horse is `airborne` studs above its riding height within `logWindow`
 	-- studs of it (logs don't collide, so a horse that doesn't hop just runs through).
+	-- layoutPin (T5): 0 = "This week's course" (four layouts, one a week in turn); 1-4 = always
+	-- that layout (a playtest, or 1 to switch the weekly course off).
 	grit = { mud = 4, logs = 3, poles = 4, logHeight = 2, pace = 28, airborne = 1.5, logWindow = 3,
-		points = { mud = 7.5, log = 12, pole = 8.5 } },
+		points = { mud = 7.5, log = 12, pole = 8.5 }, layoutPin = 0 },
 	ghostHz = 4, ghostMaxPoints = 480, ghostQuantum = 0.5, -- 480 points at 4 Hz = 120 s, a whole ride
 }
 

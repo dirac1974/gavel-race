@@ -151,56 +151,62 @@ local function trainingGroundTests(check: (boolean, string) -> (), close: (numbe
 	local _, sl = TC.ovalProject(s0.x, s0.z)
 	check(close(s0.s, (TCfg.stamina.ringNear + TCfg.stamina.ringFar) / 2, 1e-9) and math.abs(sl) < 1e-6, "Pip starts in the middle of the ring ahead of you")
 
-	-- Mud Splash: every gymkhana piece inside the arena, on the route, logs low and clear of the walkway.
-	local gr = TC.courses.grit
-	local counts = { mud = 0, log = 0, pole = 0 }
-	local points, gymOk = 0, true
-	local function nearRoute(x: number, z: number): number
-		local best = math.huge
-		local pts = gr.route.points
-		for k = 2, #pts do
-			local ax, az, bx, bz = pts[k - 1].x, pts[k - 1].z, pts[k].x, pts[k].z
-			local dx, dz = bx - ax, bz - az
-			local t = math.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1)
-			best = math.min(best, math.sqrt((x - ax - dx * t) ^ 2 + (z - az - dz * t) ^ 2))
+	-- Mud Splash: every gymkhana piece inside the arena, on the route, logs low and clear of the
+	-- walkway. Every layout of "This week's course" (T5) passes the same checks.
+	check(#TC.LAYOUTS == 4 and #TC.GRIT_LAYOUTS == 4, "Mud Splash has four layouts")
+	for _, gkey in TC.LAYOUTS do
+		local gr = TC.courses[gkey]
+		local counts = { mud = 0, log = 0, pole = 0 }
+		local points, gymOk = 0, true
+		local function nearRoute(x: number, z: number): number
+			local best = math.huge
+			local pts = gr.route.points
+			for k = 2, #pts do
+				local ax, az, bx, bz = pts[k - 1].x, pts[k - 1].z, pts[k].x, pts[k].z
+				local dx, dz = bx - ax, bz - az
+				local t = math.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1)
+				best = math.min(best, math.sqrt((x - ax - dx * t) ^ 2 + (z - az - dz * t) ^ 2))
+			end
+			return best
 		end
-		return best
-	end
-	for _, e in gr.elements do
-		counts[e.kind] += 1
-		points += e.points
-		if not inside(paddockR, e.x, e.z, 8) then gymOk = false end
-		if e.rect and not (inside(paddockR, e.rect[1], e.rect[2], 5) and inside(paddockR, e.rect[3], e.rect[4], 5)) then gymOk = false end
-		if e.gate and not (inside(paddockR, e.gate.ax, e.gate.az, 5) and inside(paddockR, e.gate.bx, e.gate.bz, 5)) then gymOk = false end
-		if e.kind == "pole" then
-			if math.abs(nearRoute(e.x, e.z) - TC.POLE_REACH.weave) > 1 then gymOk = false end -- the route weaves round it
-		elseif nearRoute(e.x, e.z) > 0.5 then
-			gymOk = false
+		for _, e in gr.elements do
+			counts[e.kind] += 1
+			points += e.points
+			if not inside(paddockR, e.x, e.z, 8) then gymOk = false end
+			if e.rect and not (inside(paddockR, e.rect[1], e.rect[2], 5) and inside(paddockR, e.rect[3], e.rect[4], 5)) then gymOk = false end
+			if e.gate and not (inside(paddockR, e.gate.ax, e.gate.az, 5) and inside(paddockR, e.gate.bx, e.gate.bz, 5)) then gymOk = false end
+			if e.kind == "pole" then
+				if math.abs(nearRoute(e.x, e.z) - TC.POLE_REACH.weave) > 1 then gymOk = false end -- the route weaves round it
+			elseif nearRoute(e.x, e.z) > 0.5 then
+				gymOk = false
+			end
+			if e.kind == "log" and math.abs(e.x - gateX) < W.PADDOCK_SOUTH_GATE.width / 2 + 5 then gymOk = false end
 		end
-		if e.kind == "log" and math.abs(e.x - gateX) < W.PADDOCK_SOUTH_GATE.width / 2 + 5 then gymOk = false end
+		for _, pt in gr.route.points do
+			if not inside(paddockR, pt.x, pt.z, 3) then gymOk = false end
+		end
+		check(gymOk, gkey .. ": gymkhana pieces inside the arena and on the route; logs clear of the gate-to-gate walkway")
+		check(counts.mud == TCfg.grit.mud and counts.log == TCfg.grit.logs and counts.pole == TCfg.grit.poles and close(points, 100, 1e-9),
+			gkey .. ": 4 puddles, 3 logs, 4 poles worth 100 points")
+		check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, 42 * 42 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
+		check(TCfg.grit.airborne < TC.RIDE_HOP - 1, "a hop clears the log-height test")
+		local slowOk = true
+		local aPole: any, aMud: any = nil, nil
+		for _, e in gr.elements do
+			local inZone = TC.inRect(gr.slowZone, e.x, e.z)
+			if (e.kind == "pole") ~= inZone then slowOk = false end
+			if e.kind == "pole" then aPole = aPole or e elseif e.kind == "mud" then aMud = aMud or e end
+		end
+		check(slowOk and aPole ~= nil and aMud ~= nil and TC.speedAt(gkey, aPole.x, aPole.z) == TCfg.canter
+			and TC.speedAt(gkey, aMud.x, aMud.z) == TCfg.grit.pace
+			and TC.speedAt("speed", 800, -55) == TCfg.gallop, gkey .. ": poles (only) sit in the canter zone")
+		check(TC.onCourse(gkey, gr.start.x, gr.start.z) and TC.onCourse("speed", sp.start.x, sp.start.z)
+			and not TC.onCourse("speed", 800, 0) and TC.inArea("speed", 800, 0) and not TC.inArea("speed", 760, -200),
+			"course bounds: the infield is off the Sprint Lane course but inside its area")
 	end
-	for _, pt in gr.route.points do
-		if not inside(paddockR, pt.x, pt.z, 3) then gymOk = false end
-	end
-	check(gymOk, "gymkhana pieces inside the arena and on the route; logs clear of the gate-to-gate walkway")
-	check(counts.mud == TCfg.grit.mud and counts.log == TCfg.grit.logs and counts.pole == TCfg.grit.poles and close(points, 100, 1e-9),
-		"4 puddles, 3 logs, 4 poles worth 100 points")
-	check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, 42 * 42 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
-	check(TCfg.grit.airborne < TC.RIDE_HOP - 1, "a hop clears the log-height test")
-	local slowOk = true
-	for _, e in gr.elements do
-		local inZone = TC.inRect(gr.slowZone, e.x, e.z)
-		if (e.kind == "pole") ~= inZone then slowOk = false end
-	end
-	check(slowOk and TC.speedAt("grit", gr.elements[5].x, gr.elements[5].z) == TCfg.canter
-		and TC.speedAt("grit", gr.elements[1].x, gr.elements[1].z) == TCfg.grit.pace
-		and TC.speedAt("speed", 800, -55) == TCfg.gallop, "poles (only) sit in the canter zone")
-	check(TC.onCourse("grit", gr.start.x, gr.start.z) and TC.onCourse("speed", sp.start.x, sp.start.z)
-		and not TC.onCourse("speed", 800, 0) and TC.inArea("speed", 800, 0) and not TC.inArea("speed", 760, -200),
-		"course bounds: the infield is off the Sprint Lane course but inside its area")
 
-	-- Ideal times at the configured speeds (35-50 s per D-053).
-	for _, key in TC.ORDER do
+	-- Ideal times at the configured speeds (35-50 s per D-053), every course and layout.
+	for _, key in TC.KEYS do
 		local ideal = TC.idealSeconds(key)
 		check(ideal >= 35 and ideal <= 50, string.format("%s ideal time %.1f s is 35-50 s", key, ideal))
 		check(close(TC.parSeconds(key), ideal * TCfg.parFactor, 1e-9), key .. " par")
@@ -239,7 +245,7 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 	local HZ = CFG.sampleHz
 	local T0 = 20000 * 86400 + 3600
 	local sp = TC.courses.speed
-	local gr = TC.courses.grit
+	local gr = TC.courses.grit_w1
 
 	-- Sprint Lane paths: ride the oval from the start at `speed`, with `latAt(progress)`.
 	local function hoopLateral(p: number): number
@@ -428,7 +434,7 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 		end
 		table.insert(out, { t = 0, x = x, y = yAt(x, z), z = z })
 		while seg <= #pts do
-			local remaining = (o.speed or TC.speedAt("grit", x, z)) / HZ
+			local remaining = (o.speed or TC.speedAt(gr.key, x, z)) / HZ
 			while remaining > 0 and seg <= #pts do
 				local bx, bz = pts[seg].x, pts[seg].z
 				local ddx, ddz = bx - x, bz - z
@@ -445,18 +451,18 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 		return out
 	end
 	local clean = gritRide({ hop = true })
-	local gk, gb = TR.validate(clean, function(x, z) return TC.onCourse("grit", x, z) end, CFG)
-	local graw, gd = TR.scoreGrit(gk, CFG)
+	local gk, gb = TR.validate(clean, function(x, z) return TC.onCourse(gr.key, x, z) end, CFG)
+	local graw, gd = TR.scoreGrit(gk, CFG, gr.key)
 	check(gb == 0 and graw == 100 and gd.mud == 4 and gd.logs == 3 and gd.poles == 4,
 		string.format("perfect Mud Splash scores 100 (%d mud, %d logs, %d poles)", gd.mud, gd.logs, gd.poles))
-	check(gd.finishT ~= nil and close(gd.finishT, TC.idealSeconds("grit"), 1.0), "finishes at about its ideal time")
-	local gtr = TR.tracker("grit")
+	check(gd.finishT ~= nil and close(gd.finishT, TC.idealSeconds(gr.key), 1.0), "finishes at about its ideal time")
+	local gtr = TR.tracker(gr.key)
 	for _, s in clean do TR.feed(gtr, s, CFG) end
 	check(gtr.finished and gtr.next == #gr.elements + 1, "the live tracker passes every piece and finishes")
-	local gres = TR.run("grit", clean, CFG, gtr.finishT)
+	local gres = TR.run(gr.key, clean, CFG, gtr.finishT)
 	check(gres.score == 100 and gres.ribbon == "gold" and gres.stars == 3, "clean gymkhana: gold")
 	local grounded = gritRide({ hop = false })
-	local graw2, gd2 = TR.scoreGrit(TR.validate(grounded, nil, CFG), CFG)
+	local graw2, gd2 = TR.scoreGrit(TR.validate(grounded, nil, CFG), CFG, gr.key)
 	check(gd2.logs == 0 and gd2.mud == 4 and gd2.poles == 4 and close(graw2, 64, 1e-9), "logs ridden through without a hop don't score (no penalty)")
 	-- Wrong side of the poles: mirror the weave.
 	local poleZ = gr.laneZ(4)
@@ -464,14 +470,14 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 		if math.abs(pz - poleZ) < 6 and px > gr.laneX[1] and px < gr.laneX[2] then return 2 * (poleZ - pz) end
 		return 0
 	end })
-	local _, gd3 = TR.scoreGrit(TR.validate(wrong, nil, CFG), CFG)
+	local _, gd3 = TR.scoreGrit(TR.validate(wrong, nil, CFG), CFG, gr.key)
 	check(gd3.poles == 0 and gd3.mud == 4 and gd3.logs == 3, "poles passed on the wrong side don't count")
 	-- Wide of a puddle: lane 1 ridden 8 studs north misses Mud1 only.
 	local wide = gritRide({ hop = true, shift = function(px: number, pz: number): number
 		if math.abs(pz - gr.laneZ(1)) < 0.01 and px > gr.laneX[1] then return -8 end
 		return 0
 	end })
-	local _, gd4 = TR.scoreGrit(TR.validate(wide, nil, CFG), CFG)
+	local _, gd4 = TR.scoreGrit(TR.validate(wide, nil, CFG), CFG, gr.key)
 	check(gd4.mud == 3 and not gd4.got.Mud1 and gd4.got.Mud2, "a puddle ridden round doesn't count; the rest do")
 	-- Individual cases: a hop seen only between samples still counts; a pole through its middle doesn't.
 	local log = gr.elements[2]
@@ -499,13 +505,13 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 		"a pole counts only when passed on its side, not through it")
 	local mud = gr.elements[1]
 	local splash = { { t = 0, x = mud.x - 9, y = 0, z = mud.z + 5 }, { t = 0.1, x = mud.x - 6.5, y = 0, z = mud.z + 5 } }
-	local _, sd = TR.scoreGrit(splash, CFG)
+	local _, sd = TR.scoreGrit(splash, CFG, gr.key)
 	check(sd.mud == 1 and sd.got.Mud1, "one sample inside a puddle splashes it")
 	-- The finish only counts after a fair part of the course.
 	local f = gr.finish
 	local rush = { { t = 1, x = f.ax + 3, y = 0, z = (f.az + f.bz) / 2 }, { t = 1.1, x = f.ax - 1, y = 0, z = (f.az + f.bz) / 2 } }
-	local _, rd = TR.scoreGrit(rush, CFG)
-	local rtr = TR.tracker("grit")
+	local _, rd = TR.scoreGrit(rush, CFG, gr.key)
+	local rtr = TR.tracker(gr.key)
 	for _, s in rush do TR.feed(rtr, s, CFG) end
 	check(rd.finishT == nil and not rtr.finished, "crossing the finish early doesn't end the ride")
 
@@ -732,10 +738,10 @@ local function trainingJitterTests(check: (boolean, string) -> (), close: (numbe
 	for _, s in outside do TR.feed(oTr, s, CFG) end
 	local oRes = TR.run("speed", outside, CFG, 120)
 	check(oRes.scored == 0 and not TR.timeoutCounts(oRes, oTr), "a little riding with nothing scored doesn't count")
-	local gTr = TR.tracker("grit")
+	local gTr = TR.tracker("grit_w1")
 	gTr.next = 4
-	check(TR.timeoutCounts({ scored = 0 }, gTr) and not TR.timeoutCounts({ scored = 0 }, TR.tracker("grit"))
-		and TR.timeoutCounts({ scored = 1 }, TR.tracker("grit")), "Mud Splash timeouts: past three pieces or one scored")
+	check(TR.timeoutCounts({ scored = 0 }, gTr) and not TR.timeoutCounts({ scored = 0 }, TR.tracker("grit_w1"))
+		and TR.timeoutCounts({ scored = 1 }, TR.tracker("grit_w1")), "Mud Splash timeouts: past three pieces or one scored")
 end
 
 -- Training rides T3: Gate Break, Hill Climb, Easy Rein (D-053).
@@ -1004,7 +1010,7 @@ local function trainingT3Tests(check: (boolean, string) -> (), close: (number, n
 	local ox, oz = TC.ovalCarrot(800, -55, 14, 3)
 	local od, ol = TC.ovalProject(ox, oz)
 	check(close(TC.wrap(od - TC.ovalProject(800, -55)), 14, 1e-6) and close(ol, 3, 1e-6), "oval aim: 14 studs on, at the lateral asked")
-	local gr = TC.courses.grit
+	local gr = TC.courses.grit_w1
 	local lane2 = gr.laneZ(2)
 	local cx, cz, hint = TC.routeCarrot(gr.route, gr.laneX[1] + 40, gr.laneZ(1), 1, 12)
 	check(math.abs(cz - gr.laneZ(1)) < 0.5 and cx > gr.laneX[1] + 40 and hint >= 1, "route aim stays in your lane, ahead of you")
@@ -1420,13 +1426,301 @@ local function trainingT4Tests(check: (boolean, string) -> (), close: (number, n
 		and string.find(paddock, 'WaitForChild("QuickStop"):FireServer()', 1, true) ~= nil,
 		"a closed Quick train game ends with no gain; no gain without a tap or during a race; a ride and a game never overlap")
 	local stable = fs.readFile("game/src/server/StableService.server.luau")
-	check(string.find(stable, 'h.ribbons[course] == "gold"', 1, true) ~= nil and string.find(stable, '"rosette_ribbon"', 1, true) ~= nil,
+	check(string.find(stable, "local golds = Profile.rosettes(h)", 1, true) ~= nil and string.find(stable, '"rosette_ribbon"', 1, true) ~= nil,
 		"a rosette on the stall for each gold ribbon")
 	local P = Profile.new(20000 * 86400)
 	local on = Profile.migrate({ settings = { visits = "Friends", shareGhost = true } }, 20000 * 86400)
 	local junk = Profile.migrate({ settings = { visits = "Friends", shareGhost = 1 } }, 20000 * 86400)
 	check(P.settings.shareGhost == false and on.settings.shareGhost == true and junk.settings.shareGhost == false,
 		"sharing your ghost is off by default and repaired to a yes/no")
+end
+
+-- Training rides T5: "This week's course", four Mud Splash layouts (D-053).
+local function trainingT5Tests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local TR = require("../../game/src/shared/TrainingRide")
+	local Training = require("../../game/src/shared/Training")
+	local Ghost = require("../../game/src/shared/Ghost")
+	local QT = require("../../game/src/shared/QuickTrain")
+	local fs = require("@lune/fs")
+	local CFG = GameConfig.training
+	local HZ = CFG.sampleHz
+	local DAY = 86400
+	local OCT5 = 1791158400 -- 2026-10-05 00:00 UTC, a Monday: week 2962
+
+	-- Geometry: no piece overlaps another, the start line or the finish arch; each has room to
+	-- ride in its lane (8 studs clear along it) and sits off the turns. --------------------------
+	local function footprint(e): { number }
+		if e.kind == "mud" then return e.rect end
+		if e.kind == "log" then return { e.x - 1.5, e.z - TC.LOG_HALF - 2.1, e.x + 1.5, e.z + TC.LOG_HALF + 2.1 } end -- log and wings
+		return { e.x - 1.1, e.z - 1.1, e.x + 1.1, e.z + 1.1 } -- pole and its base
+	end
+	local function overlap(a: { number }, b: { number }, m: number): boolean
+		return a[1] - m < b[3] and b[1] - m < a[3] and a[2] - m < b[4] and b[2] - m < a[4]
+	end
+	for _, key in TC.LAYOUTS do
+		local gr = TC.courses[key]
+		local x0, x1 = gr.laneX[1], gr.laneX[2]
+		local fin = gr.finish
+		local finZ = (fin.az + fin.bz) / 2
+		local fixed = {
+			{ x0 - 0.4, gr.laneZ(1) - (gr.laneGap - 4) / 2, x0 + 0.4, gr.laneZ(1) + (gr.laneGap - 4) / 2 }, -- start line
+			{ fin.ax - 0.4, finZ - (gr.laneGap / 2 - 2.4) - 0.4, fin.ax + 0.4, finZ + (gr.laneGap / 2 - 2.4) + 0.4 }, -- finish posts
+		}
+		local clearOk, roomOk, turnsOk, finishOk = true, true, true, true
+		for i, e in gr.elements do
+			local fa = footprint(e)
+			for j = i + 1, #gr.elements do
+				local o = gr.elements[j]
+				if overlap(fa, footprint(o), 2) then clearOk = false end
+				if o.lane == e.lane and math.abs(o.x - e.x) - (fa[3] - fa[1]) / 2 - (footprint(o)[3] - footprint(o)[1]) / 2 < 8 then roomOk = false end
+			end
+			for _, f in fixed do
+				if overlap(fa, f, 2) then clearOk = false end
+			end
+			if fa[1] < x0 + 18 or fa[3] > x1 - 18 then turnsOk = false end
+			if e.lane == gr.lanes and (e.x - fin.ax) * e.dir > -(8 + (fa[3] - fa[1]) / 2) then finishOk = false end -- before the arch
+		end
+		check(clearOk and roomOk, key .. ": no piece overlaps another, the start line or the finish; 8 studs to ride between pieces in a lane")
+		check(turnsOk and finishOk, key .. ": every piece on a straight (18+ studs from the turns) and before the finish arch")
+		check(gr.poleLane >= 2 and gr.poleLane <= gr.lanes - 1, key .. ": the canter lane is neither the start nor the finish lane")
+		-- Riding order: pieces come in the order the route reaches them (the glow moves on in it).
+		local lastS, orderOk = -1, true
+		local rp = gr.route.points
+		for _, e in gr.elements do
+			-- how far along the route its nearest point is
+			local px, pz = e.x, e.weaveZ or e.z
+			local best, bestD, walked = 0, math.huge, 0
+			for k = 2, #rp do
+				local ax, az, bx, bz = rp[k - 1].x, rp[k - 1].z, rp[k].x, rp[k].z
+				local dx, dz = bx - ax, bz - az
+				local l2 = dx * dx + dz * dz
+				local f = if l2 > 0 then math.clamp(((px - ax) * dx + (pz - az) * dz) / l2, 0, 1) else 0
+				local d = (ax + dx * f - px) ^ 2 + (az + dz * f - pz) ^ 2
+				if d < bestD then best, bestD = walked + f * math.sqrt(l2), d end
+				walked += math.sqrt(l2)
+			end
+			if best <= lastS then orderOk = false end
+			lastS = best
+		end
+		check(orderOk, key .. ": pieces listed in riding order")
+		check(gr.start.x == TC.courses.grit_w1.start.x and gr.start.z == TC.courses.grit_w1.start.z, key .. ": every layout starts at the same line")
+	end
+	local differ = 0
+	for n = 2, #TC.LAYOUTS do
+		local a, b = TC.courses[TC.LAYOUTS[1]], TC.courses[TC.LAYOUTS[n]]
+		local same = a.poleLane == b.poleLane
+		for i, e in a.elements do
+			if b.elements[i].x ~= e.x or b.elements[i].z ~= e.z or b.elements[i].kind ~= e.kind then same = false end
+		end
+		if not same then differ += 1 end
+	end
+	check(differ == 3, "the four layouts are all different")
+
+	-- All reachable: a perfect ride round each layout (lope, canter in its pole lane, a hop at
+	-- every log) scores 100, passes every piece in order and finishes at about its ideal time.
+	local function perfectRide(gr)
+		local pts = table.clone(gr.route.points)
+		local last, prev = pts[#pts], pts[#pts - 1]
+		local dx, dz = last.x - prev.x, last.z - prev.z
+		local len = math.sqrt(dx * dx + dz * dz)
+		table.insert(pts, { x = last.x + dx / len * 6, z = last.z + dz / len * 6 })
+		local out = {}
+		local x, z = pts[1].x, pts[1].z
+		local seg, t = 2, 0
+		local function yAt(px: number, pz: number): number
+			for _, e in gr.elements do
+				if e.kind == "log" and math.abs(pz - e.z) < 3 and math.abs(px - e.x) < 6.5 then
+					return TC.RIDE_HOP * (1 - ((px - e.x) / 6.5) ^ 2)
+				end
+			end
+			return 0
+		end
+		table.insert(out, { t = 0, x = x, y = 0, z = z })
+		while seg <= #pts do
+			local remaining = TC.speedAt(gr.key, x, z) / HZ
+			while remaining > 0 and seg <= #pts do
+				local bx, bz = pts[seg].x, pts[seg].z
+				local l = math.sqrt((bx - x) ^ 2 + (bz - z) ^ 2)
+				if l <= remaining then
+					x, z, remaining, seg = bx, bz, remaining - l, seg + 1
+				else
+					x, z, remaining = x + (bx - x) / l * remaining, z + (bz - z) / l * remaining, 0
+				end
+			end
+			t += 1 / HZ
+			table.insert(out, { t = t, x = x, y = yAt(x, z), z = z })
+		end
+		return out
+	end
+	local rides = {}
+	for _, key in TC.LAYOUTS do
+		local gr = TC.courses[key]
+		local ride = perfectRide(gr)
+		rides[key] = ride
+		local kept, bad = TR.validate(ride, function(x, z) return TC.onCourse(key, x, z) end, CFG)
+		local raw, d = TR.scoreGrit(kept, CFG, key)
+		check(bad == 0 and #kept == #ride and raw == 100 and d.mud == 4 and d.logs == 3 and d.poles == 4,
+			string.format("%s: a perfect ride scores 100 (%d mud, %d logs, %d poles)", key, d.mud, d.logs, d.poles))
+		local tr = TR.tracker(key)
+		for _, s in ride do TR.feed(tr, s, CFG) end
+		check(tr.finished and tr.next == #gr.elements + 1 and close(tr.finishT :: number, TC.idealSeconds(key), 1.0),
+			key .. ": the live tracker passes every piece and finishes at about the ideal time")
+		local res = TR.run(key, ride, CFG, tr.finishT)
+		check(res.score == 100 and res.ribbon == "gold" and res.stars == 3 and res.course == key and res.scored == 11, key .. ": clean ride, gold")
+		-- Riding another layout's route on this layout's props scores less (the layouts really differ).
+		local other = TC.LAYOUTS[(gr.layout % #TC.LAYOUTS) + 1]
+		local wrongRaw = TR.scoreGrit((TR.validate(rides[other] or perfectRide(TC.courses[other]), nil, CFG)), CFG, key)
+		check(wrongRaw < 100, string.format("%s: %s's route scores %.0f on it", key, other, wrongRaw))
+	end
+
+	-- This week's course: Training.week(now) % 4, stable within a week, from the server's clock.
+	check(TC.layoutFor(0) == 1 and TC.layoutFor(1) == 2 and TC.layoutFor(2) == 3 and TC.layoutFor(3) == 4 and TC.layoutFor(4) == 1
+		and TC.layoutFor(2962) == 3, "layout = week % 4 + 1")
+	check(Training.week(OCT5) == 2962 and Training.week(OCT5 - 1) == 2961, "weeks start on Monday 00:00 UTC (as the training cap)")
+	check(TC.weekCourse(OCT5) == "grit_w3" and TC.weekCourse(OCT5 - 1) == "grit_w2" and TC.weekCourse(OCT5 + 7 * DAY) == "grit_w4"
+		and TC.weekCourse(OCT5 + 14 * DAY) == "grit_w1", "the week of 2026-10-05 rides layout 3, then 4, then 1")
+	local stableOk, cycleOk = true, true
+	for w = 0, 11 do
+		local monday = OCT5 + w * 7 * DAY
+		local key = TC.weekCourse(monday)
+		for _, dt in { 1, 3600, DAY + 5, 3 * DAY, 6 * DAY + 86399 } do
+			if TC.weekCourse(monday + dt) ~= key then stableOk = false end
+		end
+		if TC.weekCourse(monday + 7 * DAY) == key or TC.weekCourse(monday + 28 * DAY) ~= key then cycleOk = false end
+	end
+	check(stableOk, "the layout stays the same all week, Monday to Sunday")
+	check(cycleOk, "each week the next layout; every layout comes back after four weeks")
+	CFG.grit.layoutPin = 2
+	local pinned = TC.weekCourse(OCT5) == "grit_w2" and TC.weekCourse(OCT5 + 7 * DAY) == "grit_w2"
+	CFG.grit.layoutPin = 9
+	local badPin = TC.weekCourse(OCT5) == "grit_w3"
+	CFG.grit.layoutPin = 0
+	check(pinned and badPin and TC.weekCourse(OCT5) == "grit_w3", "layoutPin 1-4 holds one layout; 0 (or anything else) follows the week")
+	-- The server picks the layout from its own clock, whatever the client asked for.
+	local t3 = OCT5 + 2 * DAY
+	check(TC.resolve("grit", t3) == "grit_w3" and TC.resolve("grit_w1", t3) == "grit_w3" and TC.resolve("grit_w4", t3 + 7 * DAY) == "grit_w4"
+		and TC.resolve("grit", t3 + 7 * DAY) == "grit_w4", "Mud Splash resolves to this week's layout by the server's time")
+	check(TC.resolve("speed", t3) == "speed" and TC.resolve("accel", t3) == "accel" and TC.resolve("stamina", t3) == "stamina"
+		and TC.resolve("nope", t3) == nil and TC.resolve(nil, t3) == nil and TC.resolve(42, t3) == nil, "other courses resolve to themselves; junk to nothing")
+	check(TC.statOf("grit_w2") == "grit" and TC.statOf("grit") == "grit" and TC.statOf("speed") == "speed" and TC.statOf("x") == nil
+		and TC.info("grit").name == "Mud Splash" and TC.info("grit_w4").emoji == "💦" and TC.info("nope") == nil, "stat and name for picker and course keys")
+	local service = fs.readFile("game/src/server/TrainingService.server.luau")
+	local _, resolves = string.gsub(service, "TrainingCourses%.resolve%(", "")
+	check(string.find(service, "local course = o.course or TrainingCourses.resolve(requested, os.time())", 1, true) ~= nil
+		and string.find(service, "local course = TrainingCourses.resolve(requested, os.time()) -- one Mud Splash layout for both (T5)", 1, true) ~= nil
+		and resolves == 2, "the server resolves the layout from os.time() only when a ride (or a group) starts")
+	check(string.find(service, 'local key = TrainingCourses.weekCourse(os.time())', 1, true) ~= nil
+		and string.find(service, 'ReplicatedStorage:SetAttribute("WeeklyCourse", key)', 1, true) ~= nil,
+		"the server publishes this week's layout from its clock")
+	check(string.find(service, "for _, key in TrainingCourses.LAYOUTS do GHOST_COURSES[key] = true end", 1, true) ~= nil,
+		"every layout has its own ghost")
+	-- A ride keeps its layout to the end: the client pins it, the server keeps s.course.
+	local client = fs.readFile("game/src/client/TrainingRideClient.client.luau")
+	local view = fs.readFile("game/src/client/GymkhanaView.luau")
+	local scene = fs.readFile("game/src/server/WorldScene.luau")
+	check(string.find(client, "GymkhanaView.pin(course)", 1, true) ~= nil and string.find(client, "GymkhanaView.unpin()", 1, true) ~= nil
+		and string.find(view, 'GetAttributeChangedSignal("WeeklyCourse"):Connect(refresh)', 1, true) ~= nil
+		and string.find(view, "if pinned then return pinned end", 1, true) ~= nil,
+		"clients rebuild the arena when the week changes, but never during their own ride")
+	check(string.find(scene, "for _, key in TrainingCourses.LAYOUTS do", 1, true) ~= nil and string.find(scene, "buildGymkhana(gy, TrainingCourses.courses[key])", 1, true) ~= nil,
+		"the server builds props for every layout")
+
+	-- Profiles: ribbons and best runs per layout; T2-T4's "grit" moves to layout 1. -------------
+	local keys = {}
+	for _, k in TC.KEYS do keys[k] = true end
+	local same = #Profile.COURSES == #TC.KEYS
+	for _, k in Profile.COURSES do
+		if not keys[k] or Profile.COURSE_STAT[k] ~= TC.courses[k].stat then same = false end
+	end
+	check(same and Profile.LEGACY_COURSES.grit == TC.LAYOUTS[1], "Profile's course list matches TrainingCourses; old grit = layout 1")
+	local T0 = OCT5 + 3600
+	local function horseWith(ribbons: any, best: any)
+		local h = Horse.starter("h1", "Pip", "grey", makeRng(5), T0)
+		h.ribbons, h.trainingBest = ribbons, best
+		return h
+	end
+	local function loadOne(h)
+		local p = Profile.new(T0)
+		Profile.addHorse(p, h)
+		return Profile.migrate(p, T0).horses[1]
+	end
+	local m1 = loadOne(horseWith({ grit = "silver", speed = "gold" }, { grit = { score = 80, seconds = 41 } }))
+	check(m1.ribbons.grit_w1 == "silver" and m1.ribbons.grit == nil and m1.ribbons.speed == "gold" and m1.trainingBest.grit_w1.score == 80
+		and m1.trainingBest.grit == nil, "an old Mud Splash ribbon and best run move to layout 1")
+	local m2 = loadOne(horseWith({ grit = "gold", grit_w1 = "bronze", grit_w3 = "silver", grit_w2 = "platinum" },
+		{ grit = { score = 80, seconds = 40 }, grit_w1 = { score = 80, seconds = 42 }, grit_w4 = "junk" }))
+	check(m2.ribbons.grit_w1 == "gold" and m2.ribbons.grit_w3 == "silver" and m2.ribbons.grit_w2 == nil and m2.trainingBest.grit_w1.seconds == 40
+		and m2.trainingBest.grit_w4 == nil, "the better of old and new is kept; other layouts stay; junk is dropped")
+	local m3 = loadOne(horseWith({ grit = "bronze", grit_w1 = "gold" }, { grit = { score = 50, seconds = 30 }, grit_w1 = { score = 90, seconds = 44 } }))
+	check(m3.ribbons.grit_w1 == "gold" and m3.trainingBest.grit_w1.score == 90, "a worse old ribbon or run never replaces a better new one")
+	local again = loadOne(m2)
+	check(again.ribbons.grit_w1 == "gold" and again.ribbons.grit_w3 == "silver" and again.trainingBest.grit_w1.seconds == 40,
+		"repair is the same on every load")
+
+	-- Ribbons are saved under the layout ridden: the server's key for that week.
+	local rh = Horse.starter("h2", "Maple", "bay", makeRng(6), T0)
+	local key3 = TC.resolve("grit", t3)
+	local tr3 = TR.tracker(key3)
+	for _, s in rides[key3] do TR.feed(tr3, s, CFG) end
+	local res3 = TR.run(key3, rides[key3], CFG, tr3.finishT)
+	local new3 = TR.record(rh, key3, res3)
+	check(key3 == "grit_w3" and new3 and rh.ribbons.grit_w3 == "gold" and rh.ribbons.grit_w1 == nil and rh.ribbons.grit == nil
+		and rh.trainingBest.grit_w3 ~= nil, "a ride this week saves its ribbon and best run under grit_w3 only")
+	local key4 = TC.resolve("grit", t3 + 7 * DAY)
+	local res4 = TR.run(key4, rides[key4], CFG, nil)
+	local new4 = TR.record(rh, key4, res4)
+	check(key4 == "grit_w4" and new4 and rh.ribbons.grit_w4 ~= nil and rh.ribbons.grit_w3 == "gold", "next week's layout earns its own ribbon; this week's stays")
+	local back = loadOne(rh)
+	check(back.ribbons.grit_w3 == "gold" and back.ribbons.grit_w4 == rh.ribbons.grit_w4 and Horse.view(back, T0, GameConfig.energy).ribbons.grit_w3 == "gold",
+		"layout ribbons survive a save and show in the owner's view")
+	-- One Mud Splash rosette for a gold on any layout.
+	local rz = Horse.starter("h3", "Comet", "grey", makeRng(7), T0)
+	rz.ribbons = { grit_w1 = "gold", grit_w3 = "gold", speed = "gold", accel = "silver" }
+	local ros = Profile.rosettes(rz)
+	check(#ros == 2 and ros[1] == "speed" and ros[2] == "grit" and #Profile.rosettes({ ribbons = { grit_w2 = "silver" } }) == 0
+		and #Profile.rosettes({}) == 0, "one rosette per stat: golds on two layouts make one Mud Splash rosette")
+
+	-- Ghosts per layout; the old "grit" ghost loads as layout 1; saving passes old and new keys through.
+	local pts = {}
+	for k = 0, 20 do table.insert(pts, { t = k / 10, x = 700 + k, y = 0, z = -282 }) end
+	local function run(score: number)
+		local g = Ghost.encode(Ghost.fromSamples(pts))
+		g.score, g.seconds = score, 40
+		return g
+	end
+	local courses = {}
+	for _, k in Profile.COURSES do courses[k] = true end
+	local legacy, r2, r1 = run(90), run(80), run(70)
+	local loaded = Ghost.loadRuns({ grit = legacy, grit_w2 = r2, weekly_9 = run(99), speed = { score = 1 } }, courses, Profile.LEGACY_COURSES)
+	check(loaded.grit_w1 == legacy and loaded.grit_w2 == r2 and loaded.weekly_9 == nil and loaded.speed == nil and loaded.grit == nil,
+		"an old Mud Splash ghost loads as layout 1; unknown keys and bad runs aren't loaded")
+	local both = Ghost.loadRuns({ grit = legacy, grit_w1 = r1 }, courses, Profile.LEGACY_COURSES)
+	local both2 = Ghost.loadRuns({ grit = r1, grit_w1 = legacy }, courses, Profile.LEGACY_COURSES)
+	check(both.grit_w1 == legacy and both2.grit_w1 == legacy, "with both, the better ghost is layout 1's")
+	local future = { v = 3, score = 5, seconds = 9, d = "future", n = 1, hz = 8, q = 0.25 }
+	local stored = { runs = { grit = legacy, grit_w2 = future, weekly_9 = { v = 1 } }, extra = 1 }
+	local merged = Ghost.mergeStore(stored, { grit_w1 = r1, grit_w3 = r2, grit_w2 = r2 })
+	check(merged.runs.grit == legacy and merged.runs.weekly_9 == stored.runs.weekly_9 and merged.runs.grit_w2 == future
+		and merged.runs.grit_w1 == r1 and merged.runs.grit_w3 == r2 and merged.extra == 1,
+		"a save writes each layout's ghost and passes the old key, unknown keys and newer runs through")
+	check(string.find(fs.readFile("game/src/server/Ghosts.luau"), "Ghost.loadRuns(runs, COURSES, Profile.LEGACY_COURSES)", 1, true) ~= nil,
+		"the ghost store loads through loadRuns")
+
+	-- Kid safety: no countdown, "last chance" or dates anywhere near it; Quick train unaffected.
+	local paddock = fs.readFile("game/src/client/PaddockClient.client.luau")
+	local calm = true
+	for _, src in { paddock, client, view, service } do
+		local low = string.lower(src)
+		for _, bad in { "last chance", "days left", "time left", "ends in", "ends soon", "hurry", "expires", "until monday", "leaving soon", "next week" } do
+			if string.find(low, bad, 1, true) then calm = false end
+		end
+	end
+	check(calm and string.find(paddock, "This week's course", 1, true) ~= nil and string.find(paddock, "layoutRibbons(b, h, 92)", 1, true) ~= nil,
+		"the picker says \"This week's course\" with four ribbon icons and no countdown or last-chance text")
+	check(Training.GAMES.grit ~= nil and Training.GAMES.grit_w1 == nil and #QT.STATS == 4 and QT.STATS[4] == "grit"
+		and string.find(service, "if typeof(stat) ~= \"string\" or not Training.GAMES[stat] then return end", 1, true) ~= nil,
+		"Quick train is unaffected (its four games, keyed by stat)")
 end
 
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
@@ -2108,5 +2402,6 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	trainingT3Tests(check, close)
 	trainingT3ReviewTests(check, close)
 	trainingT4Tests(check, close)
+	trainingT5Tests(check, close)
 
 end

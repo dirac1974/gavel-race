@@ -4,7 +4,8 @@
 -- time a ride needs it) with pcall and retries, never blocking the profile. Saving merges with
 -- what's stored (the better run per course wins), so two servers can't overwrite a better
 -- ghost and a failed load never wipes anything; anything this version doesn't understand (a
--- newer encoding, a new course, new keys) is passed through untouched.
+-- newer encoding, a new course, new keys) is passed through untouched. Each Mud Splash layout
+-- is its own course (T5: grit_w1..grit_w4); T2-T4's "grit" ghost loads as grit_w1.
 --   Ghosts.ensure(player)            start loading if needed; returns the entry
 --   Ghosts.ready(player)             loaded (or given up on)?
 --   Ghosts.run(player, course)       the best run kept in memory, or nil
@@ -42,17 +43,10 @@ end
 local COURSES = {}
 for _, c in Profile.COURSES do COURSES[c] = true end
 
--- Only well-formed runs on real courses survive a load.
+-- Only well-formed runs on real courses survive a load; T2-T4's "grit" ghost counts as Mud
+-- Splash layout 1 (T5: each layout has its own ghost).
 local function clean(runs: any): { [string]: any }
-	local out = {}
-	if typeof(runs) ~= "table" then return out end
-	for course, run in runs do
-		if COURSES[course] and typeof(run) == "table" and typeof(run.score) == "number" and typeof(run.seconds) == "number"
-			and Ghost.decode(run) ~= nil then
-			out[course] = run
-		end
-	end
-	return out
+	return Ghost.loadRuns(runs, COURSES, Profile.LEGACY_COURSES)
 end
 
 local function merge(into: { [string]: any }, from: { [string]: any })

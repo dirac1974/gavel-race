@@ -4,7 +4,8 @@
 -- at their gate, and handles Map fast-travel. Plots stay fenced; the owner's visit setting
 -- (default Friends) is published on the plot so each client can close the gate locally for
 -- players who aren't allowed in (WorldClient). Visitors never change anything. Each stall shows
--- a gold rosette for every training course its horse has a gold ribbon on (D-053).
+-- a gold rosette for every training course its horse has a gold ribbon on (D-053); Mud Splash
+-- has one rosette for a gold on any of its four layouts (T5, Profile.rosettes).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -126,13 +127,11 @@ local YARD_SPOTS = {
 }
 
 -- Training rides (D-053): a gold rosette on the stall for each course this horse has a gold
--- ribbon on, in a row under its name plate (the uploaded rosette_ribbon, or a part one).
+-- ribbon on, in a row under its name plate (the uploaded rosette_ribbon, or a part one). One
+-- per stat: a gold on any Mud Splash layout makes the Mud Splash rosette (T5).
 local GOLD = Color3.fromHex("FFD23F")
 local function rosettes(barn: Instance, bay: CFrame, h)
-	local golds = {}
-	for _, course in Profile.COURSES do
-		if typeof(h.ribbons) == "table" and h.ribbons[course] == "gold" then table.insert(golds, course) end
-	end
+	local golds = Profile.rosettes(h)
 	for k, course in golds do
 		local x = (k - (#golds + 1) / 2) * 1.9
 		local cf = bay * CFrame.new(x, GROUND_Y + BARN_H - 4.6, 0.45)
@@ -469,10 +468,7 @@ local function signature(data): string
 	table.insert(parts, tostring(Style.hasSet(data, "star")))
 	for _, it in Style.yard(data) do table.insert(parts, it.id) end
 	for _, h in data.horses do
-		local golds = ""
-		for _, course in Profile.COURSES do
-			if typeof(h.ribbons) == "table" and h.ribbons[course] == "gold" then golds ..= string.sub(course, 1, 2) end
-		end
+		local golds = table.concat(Profile.rosettes(h), ",")
 		table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name .. ":" .. golds) -- gold rosettes (D-053)
 	end
 	return table.concat(parts, "|")

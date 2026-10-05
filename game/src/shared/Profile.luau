@@ -72,8 +72,30 @@ end
 -- Training rides (D-053): per horse, the best ribbon and the best run on each course.
 --   h.ribbons[course] = "bronze" | "silver" | "gold"
 --   h.trainingBest[course] = { score = 0..100, seconds = ride time }
-Profile.COURSES = { "speed", "accel", "stamina", "grit" }
+-- Each Mud Splash layout is its own course (T5, "This week's course"): grit_w1..grit_w4
+-- (TrainingCourses.LAYOUTS; a world test keeps these lists the same). The single Mud Splash of
+-- T2-T4 was saved as "grit"; it is layout 1, so a load moves it to grit_w1 (the better ribbon
+-- and run of the two stay) and drops the old key.
+Profile.COURSES = { "speed", "accel", "stamina", "grit_w1", "grit_w2", "grit_w3", "grit_w4" }
+Profile.COURSE_STAT = { speed = "speed", accel = "accel", stamina = "stamina", grit_w1 = "grit", grit_w2 = "grit", grit_w3 = "grit", grit_w4 = "grit" }
+Profile.LEGACY_COURSES = { grit = "grit_w1" }
 Profile.RIBBONS = { bronze = true, silver = true, gold = true }
+local RIBBON_RANK = { bronze = 1, silver = 2, gold = 3 }
+
+local function cleanBest(b: any): { score: number, seconds: number }?
+	local score = typeof(b) == "table" and tonumber(b.score)
+	local seconds = typeof(b) == "table" and tonumber(b.seconds)
+	if score and seconds and score == score and seconds == seconds then
+		return { score = math.clamp(score, 0, 100), seconds = math.clamp(seconds, 0, 3600) }
+	end
+	return nil
+end
+
+local function betterBest(a: any, b: any?): boolean
+	if not b then return true end
+	if a.score ~= b.score then return a.score > b.score end
+	return a.seconds < b.seconds
+end
 
 function Profile.repairTraining(h: any)
 	local ribbons = {}
@@ -81,20 +103,39 @@ function Profile.repairTraining(h: any)
 		for _, c in Profile.COURSES do
 			if Profile.RIBBONS[h.ribbons[c]] then ribbons[c] = h.ribbons[c] end
 		end
+		for old, new in Profile.LEGACY_COURSES do
+			local r = h.ribbons[old]
+			if Profile.RIBBONS[r] and RIBBON_RANK[r] > (RIBBON_RANK[ribbons[new]] or 0) then ribbons[new] = r end
+		end
 	end
 	h.ribbons = ribbons
 	local best = {}
 	if typeof(h.trainingBest) == "table" then
 		for _, c in Profile.COURSES do
-			local b = h.trainingBest[c]
-			local score = typeof(b) == "table" and tonumber(b.score)
-			local seconds = typeof(b) == "table" and tonumber(b.seconds)
-			if score and seconds and score == score and seconds == seconds then
-				best[c] = { score = math.clamp(score, 0, 100), seconds = math.clamp(seconds, 0, 3600) }
-			end
+			best[c] = cleanBest(h.trainingBest[c])
+		end
+		for old, new in Profile.LEGACY_COURSES do
+			local b = cleanBest(h.trainingBest[old])
+			if b and betterBest(b, best[new]) then best[new] = b end
 		end
 	end
 	h.trainingBest = best
+end
+
+-- The stall's gold rosettes (D-053): one per stat whose course has a gold ribbon, in stat
+-- order. Mud Splash has one rosette for a gold on any of its layouts (T5).
+function Profile.rosettes(h: any): { string }
+	local golds = {}
+	if typeof(h.ribbons) == "table" then
+		for course, stat in Profile.COURSE_STAT do
+			if h.ribbons[course] == "gold" then golds[stat] = true end
+		end
+	end
+	local out = {}
+	for _, stat in Horse.STATS do
+		if golds[stat] then table.insert(out, stat) end
+	end
+	return out
 end
 
 -- Load whatever was saved (nil for a new player) and bring it to the current version,

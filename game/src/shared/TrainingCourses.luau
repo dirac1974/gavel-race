@@ -13,7 +13,10 @@
 --              round the gate loop and back in, three times.
 --     stamina  Hill Climb: follow Pip the lead pony for 2 laps over the hill.
 --     grit     Mud Splash: a gymkhana in the paddock arena, six lanes joined by turns, with 4
---              puddles, 3 low logs and 4 bending poles in a canter zone.
+--              puddles, 3 low logs and 4 bending poles in a canter zone. It has four layouts
+--              (T5, "This week's course"): course keys grit_w1..grit_w4, one a week in turn
+--              (weekCourse). The picker and signs say "grit"; the server turns that into this
+--              week's layout from its own clock (resolve). grit_w1 is the Mud Splash of T2-T4.
 --   A gate is a segment (a -> b) with a unit forward normal (nx, nz): riding across it along
 --   the normal is a forward crossing. Rects are { x0, z0, x1, z1 }.
 
@@ -261,26 +264,89 @@ end
 -- goes past it: side = +1 means the horse passes on the pole's left as the rider sees it (the
 -- pole is on the rider's right), side = -1 the other way. The route weaves accordingly, so the
 -- sides alternate down the lane.
-local GRIT_LAYOUT = {
-	{ kind = "mud", lane = 1, dx = 0 },
-	{ kind = "log", lane = 2, dx = -45 },
-	{ kind = "mud", lane = 3, dx = -30 },
-	{ kind = "log", lane = 3, dx = 45 },
-	{ kind = "pole", lane = 4, dx = 45, side = 1 },
-	{ kind = "pole", lane = 4, dx = 20, side = -1 },
-	{ kind = "pole", lane = 4, dx = -5, side = 1 },
-	{ kind = "pole", lane = 4, dx = -30, side = -1 },
-	{ kind = "mud", lane = 5, dx = -35 },
-	{ kind = "log", lane = 5, dx = 40 },
-	{ kind = "mud", lane = 6, dx = 30 },
+-- Four layouts (T5), one a week in turn. Every one starts at the same line (lane 1, west end),
+-- runs the same six lanes and has 4 puddles, 3 logs and 4 poles worth 100; what changes is
+-- which lane holds the poles (the canter lane), where the puddles and logs sit and where the
+-- finish arch stands. Pieces are listed in riding order (odd lanes run east, even lanes west):
+-- the glow moves on in this order. The world tests check every layout like the first.
+local GRIT_LAYOUTS = {
+	{ -- 1: the Mud Splash of T2-T4 (its ribbons, best runs and ghosts carry over as grit_w1)
+		poleLane = 4, finishDX = -48,
+		pieces = {
+			{ kind = "mud", lane = 1, dx = 0 },
+			{ kind = "log", lane = 2, dx = -45 },
+			{ kind = "mud", lane = 3, dx = -30 },
+			{ kind = "log", lane = 3, dx = 45 },
+			{ kind = "pole", lane = 4, dx = 45, side = 1 },
+			{ kind = "pole", lane = 4, dx = 20, side = -1 },
+			{ kind = "pole", lane = 4, dx = -5, side = 1 },
+			{ kind = "pole", lane = 4, dx = -30, side = -1 },
+			{ kind = "mud", lane = 5, dx = -35 },
+			{ kind = "log", lane = 5, dx = 40 },
+			{ kind = "mud", lane = 6, dx = 30 },
+		},
+	},
+	{ -- 2: poles early, a splash and a hop to start
+		poleLane = 2, finishDX = -40,
+		pieces = {
+			{ kind = "mud", lane = 1, dx = -30 },
+			{ kind = "log", lane = 1, dx = 35 },
+			{ kind = "pole", lane = 2, dx = 40, side = 1 },
+			{ kind = "pole", lane = 2, dx = 15, side = -1 },
+			{ kind = "pole", lane = 2, dx = -10, side = 1 },
+			{ kind = "pole", lane = 2, dx = -35, side = -1 },
+			{ kind = "mud", lane = 3, dx = -20 },
+			{ kind = "log", lane = 3, dx = 40 },
+			{ kind = "mud", lane = 4, dx = 30 },
+			{ kind = "log", lane = 4, dx = -30 },
+			{ kind = "mud", lane = 5, dx = 0 },
+		},
+	},
+	{ -- 3: two splashes, two hops in a row, poles late
+		poleLane = 5, finishDX = -44,
+		pieces = {
+			{ kind = "mud", lane = 1, dx = -25 },
+			{ kind = "mud", lane = 1, dx = 30 },
+			{ kind = "log", lane = 2, dx = 40 },
+			{ kind = "log", lane = 2, dx = -25 },
+			{ kind = "mud", lane = 3, dx = 5 },
+			{ kind = "log", lane = 4, dx = 25 },
+			{ kind = "pole", lane = 5, dx = -40, side = 1 },
+			{ kind = "pole", lane = 5, dx = -15, side = -1 },
+			{ kind = "pole", lane = 5, dx = 10, side = 1 },
+			{ kind = "pole", lane = 5, dx = 35, side = -1 },
+			{ kind = "mud", lane = 6, dx = 15 },
+		},
+	},
+	{ -- 4: poles in the middle lane, a hop and a splash on each side
+		poleLane = 3, finishDX = -52,
+		pieces = {
+			{ kind = "mud", lane = 1, dx = 30 },
+			{ kind = "log", lane = 2, dx = 35 },
+			{ kind = "mud", lane = 2, dx = -25 },
+			{ kind = "pole", lane = 3, dx = -45, side = 1 },
+			{ kind = "pole", lane = 3, dx = -20, side = -1 },
+			{ kind = "pole", lane = 3, dx = 5, side = 1 },
+			{ kind = "pole", lane = 3, dx = 30, side = -1 },
+			{ kind = "mud", lane = 4, dx = 40 },
+			{ kind = "log", lane = 4, dx = -20 },
+			{ kind = "log", lane = 5, dx = -35 },
+			{ kind = "mud", lane = 5, dx = 25 },
+		},
+	},
 }
-local GRIT_LANES, POLE_LANE, FINISH_DX = 6, 4, -48
+local GRIT_LANES = 6
+TC.GRIT_LAYOUTS = GRIT_LAYOUTS
+TC.LAYOUTS = {} :: { string } -- course keys, layout n = "grit_w" .. n
+for n in GRIT_LAYOUTS do TC.LAYOUTS[n] = "grit_w" .. n end
 TC.MUD_HALF = { along = 7, across = 6 }
 TC.LOG_HALF = 6
 TC.POLE_REACH = { inner = 1.5, outer = 10, weave = 5 }
 
-local function buildGrit()
+local function buildGrit(n: number)
 	local g = CFG.grit
+	local layout = GRIT_LAYOUTS[n]
+	local POLE_LANE, FINISH_DX = layout.poleLane, layout.finishDX
 	local pr = WorldLayout.placeRect("paddock") :: Rect
 	local cx = (pr[1] + pr[3]) / 2
 	local x0, x1 = pr[1] + 17, pr[3] - 17
@@ -290,7 +356,7 @@ local function buildGrit()
 	local laneDir = function(k: number): number return if k % 2 == 1 then 1 else -1 end
 	local elements = {}
 	local counts = { mud = 0, log = 0, pole = 0 }
-	for i, e in GRIT_LAYOUT do
+	for i, e in layout.pieces do
 		local x, z, dir = cx + e.dx, laneZ(e.lane), laneDir(e.lane)
 		counts[e.kind] += 1
 		local el: { [string]: any } = { index = i, kind = e.kind, n = counts[e.kind], lane = e.lane, x = x, z = z, dir = dir,
@@ -341,9 +407,9 @@ local function buildGrit()
 	end
 	local poleZ = laneZ(POLE_LANE)
 	return {
-		key = "grit", kind = "arena", start = start, elements = elements, route = polyline(pts),
+		key = TC.LAYOUTS[n], stat = "grit", layout = n, kind = "arena", start = start, elements = elements, route = polyline(pts),
 		finish = gate(cx + FINISH_DX, laneZ(GRIT_LANES), 0, 1, gap / 2 - 0.4, laneDir(GRIT_LANES), 0),
-		slowZone = { x0, poleZ - gap / 2, x1, poleZ + gap / 2 },
+		slowZone = { x0, poleZ - gap / 2, x1, poleZ + gap / 2 }, poleLane = POLE_LANE,
 		arena = pr, lanes = GRIT_LANES, laneGap = gap, laneZ = laneZ, laneX = { x0, x1 },
 	}
 end
@@ -352,12 +418,59 @@ TC.courses = {
 	speed = buildSpeed(),
 	accel = buildAccel(),
 	stamina = buildStamina(),
-	grit = buildGrit(),
 } :: { [string]: any }
+for n, key in TC.LAYOUTS do TC.courses[key] = buildGrit(n) end
+-- The picker and the picture signs, by stat ("grit" is Mud Splash: this week's layout).
 TC.ORDER = { "speed", "accel", "stamina", "grit" }
+-- Every course key (each layout is its own course: ribbons, best runs and ghosts are per key).
+TC.KEYS = { "speed", "accel", "stamina" }
+for _, key in TC.LAYOUTS do table.insert(TC.KEYS, key) end
 for key, c in TC.courses do
-	local info = Training.GAMES[key]
-	c.stat, c.name, c.label, c.emoji = key, info.name, info.label, info.emoji
+	local stat = c.stat or key
+	local info = Training.GAMES[stat]
+	c.stat, c.name, c.label, c.emoji = stat, info.name, info.label, info.emoji
+end
+
+-- This week's course (T5) -----------------------------------------------------------------------
+-- Layout n of Mud Splash for a week (Training.week: weeks start Monday 00:00 UTC, as the
+-- training cap does): week % 4, so each layout comes back every four weeks. No countdown is
+-- ever shown; a layout's ribbons can be earned whenever it comes back.
+function TC.layoutFor(week: number): number
+	return week % #TC.LAYOUTS + 1
+end
+
+-- The Mud Splash course key for the server's time `now` (GameConfig.training.grit.layoutPin
+-- 1-4 pins one layout, e.g. for a playtest; 0 follows the week).
+function TC.weekCourse(now: number): string
+	local pin = CFG.grit.layoutPin
+	if typeof(pin) == "number" and TC.LAYOUTS[pin] then return TC.LAYOUTS[pin] end
+	return TC.LAYOUTS[TC.layoutFor(Training.week(now))]
+end
+
+-- The course a ride request means, on the server at `now`: Mud Splash ("grit" or any of its
+-- layouts) is always this week's layout, whatever the client asked for; other keys as they are.
+-- nil for anything that isn't a course.
+function TC.resolve(key: any, now: number): string?
+	if typeof(key) ~= "string" then return nil end
+	local c = TC.courses[key]
+	if key == "grit" or (c and c.stat == "grit") then return TC.weekCourse(now) end
+	return if c then key else nil
+end
+
+-- The stat a course or picker key trains ("grit_w3" -> "grit"); nil if it's neither.
+function TC.statOf(key: any): string?
+	if typeof(key) ~= "string" then return nil end
+	local c = TC.courses[key]
+	if c then return c.stat end
+	return if Training.GAMES[key] then key else nil
+end
+
+-- Name, label and emoji for a course or picker key (the picker and signs use stats).
+function TC.info(key: any): any?
+	local stat = TC.statOf(key)
+	local g = stat and Training.GAMES[stat]
+	if not g then return nil end
+	return { stat = stat, name = g.name, label = g.label, emoji = g.emoji }
 end
 
 -- Where a course is ridden: samples outside are discarded (bounds) and a rider outside the
@@ -415,13 +528,13 @@ function TC.idealSeconds(key: string, seed: number?): number
 		end
 		return hi
 	end
-	if key == "grit" then
+	if c and c.kind == "arena" then
 		local total = 0
 		local pts = c.route.points
 		for k = 2, #pts do
 			local a, b = pts[k - 1], pts[k]
 			local len = math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2)
-			total += len / TC.speedAt("grit", (a.x + b.x) / 2, (a.z + b.z) / 2)
+			total += len / TC.speedAt(key, (a.x + b.x) / 2, (a.z + b.z) / 2)
 		end
 		return total
 	end

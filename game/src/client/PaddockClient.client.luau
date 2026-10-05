@@ -11,6 +11,9 @@
 --   and shows the server's score at the end.
 --   Ride together (T4): "👫 Ride together" lists friends nearby who can be invited; pick one and
 --   a course and an invite goes out (the friend must accept). No text travels with it.
+--   This week's course (T5): the Mud Splash tile says "This week's course" and shows four small
+--   ribbon icons, one per layout (the ribbon you have on it, or an empty one), this week's
+--   ringed in orange. No dates or timers: a layout's ribbons can be earned whenever it's back.
 --     Sprint Lane (Speed): tap as the runner crosses each glowing zone.
 --     Gate Break (Acceleration): wait for green, then tap fast.
 --     Hill Climb (Stamina): hold to keep the marker in the moving green band.
@@ -507,6 +510,37 @@ end
 
 -- The course picker (D-053): four picture tiles and Quick train.
 local RIBBON_EMOJI = { bronze = "🥉", silver = "🥈", gold = "🥇" }
+
+-- Mud Splash's four layouts (T5): a small ribbon icon for each, this week's ringed.
+local function layoutRibbons(parent: Instance, h, y: number)
+	local row = Instance.new("Frame")
+	row.Name = "LayoutRibbons"
+	row.BackgroundTransparency = 1
+	row.Position = UDim2.new(0, 0, 0, y)
+	row.Size = UDim2.new(1, 0, 0, 28)
+	row.Parent = parent
+	local l = Instance.new("UIListLayout")
+	l.FillDirection = Enum.FillDirection.Horizontal
+	l.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	l.Padding = UDim.new(0, 8)
+	l.Parent = row
+	local week = ReplicatedStorage:GetAttribute("WeeklyCourse")
+	for n, key in TrainingCourses.LAYOUTS do
+		local got = h.ribbons and RIBBON_EMOJI[h.ribbons[key]]
+		local cell = Instance.new("Frame")
+		cell.LayoutOrder = n
+		cell.Size = UDim2.fromOffset(28, 28)
+		cell.BackgroundColor3 = if got then C.paper else C.white
+		cell.BackgroundTransparency = if got then 0 else 0.3
+		Ui.corner(cell, 8)
+		Ui.stroke(cell, if key == week then 3 else 1.5, if key == week then C.orange else C.shade)
+		cell.Parent = row
+		local t = Ui.text(cell, got or "🎀", 18, { Size = UDim2.fromScale(1, 1) })
+		if not got then t.TextTransparency = 0.65 end
+	end
+	return row
+end
+
 local function coursePicker()
 	local h = PlayerState.activeHorse()
 	if not h or not h.stalled then
@@ -530,16 +564,22 @@ local function coursePicker()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = grid
 	for i, key in TrainingCourses.ORDER do
-		local c = TrainingCourses.courses[key]
+		local c = TrainingCourses.info(key)
 		local ready = GameConfig.training.courses[key] == true
+		-- Mud Splash (T5): this week's layout; its ribbons show per layout below
+		local weekly = ready and key == "grit"
 		local ribbon = h.ribbons and RIBBON_EMOJI[h.ribbons[key]] or ""
-		local line = if ready then c.label .. (if ribbon ~= "" then "  " .. ribbon else "") else "Coming soon"
+		local line = if weekly then "This week's course"
+			elseif ready then c.label .. (if ribbon ~= "" then "  " .. ribbon else "")
+			else "Coming soon"
 		local b = Ui.button(grid, "", UDim2.new(), UDim2.new(), if ready then C.cream else C.white, 20)
 		b.LayoutOrder = i
-		Ui.text(b, c.emoji, 44, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 50) })
-		Ui.text(b, c.name, 24, { Position = UDim2.new(0, 0, 0, 60), Size = UDim2.new(1, 0, 0, 30) })
-		local l = Ui.text(b, line, 18, { Position = UDim2.new(0, 0, 0, 92), Size = UDim2.new(1, 0, 0, 24) })
+		local top = if weekly then -4 else 8
+		Ui.text(b, c.emoji, if weekly then 36 else 44, { Position = UDim2.new(0, 0, 0, top), Size = UDim2.new(1, 0, 0, 44) })
+		Ui.text(b, c.name, 24, { Position = UDim2.new(0, 0, 0, top + (if weekly then 40 else 52)), Size = UDim2.new(1, 0, 0, 30) })
+		local l = Ui.text(b, line, 18, { Position = UDim2.new(0, 0, 0, if weekly then 66 else 92), Size = UDim2.new(1, 0, 0, 24) })
 		l.TextColor3 = if ready then C.plum else C.shade
+		if weekly then layoutRibbons(b, h, 92) end
 		b.Activated:Connect(function()
 			if not ready then
 				Ui.toast(c.name .. " is coming soon!", "stat_" .. key, c.emoji)
@@ -574,7 +614,7 @@ local function inviteCourse(friend)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = grid
 	for i, key in TrainingCourses.ORDER do
-		local c = TrainingCourses.courses[key]
+		local c = TrainingCourses.info(key)
 		if GameConfig.training.courses[key] then
 			local b = Ui.button(grid, "", UDim2.new(), UDim2.new(), C.cream, 20)
 			b.LayoutOrder = i
@@ -682,7 +722,7 @@ promptAt("TrainPrompt", pad.x, pad.z + 6, "Train", "Training Paddock", trainingM
 -- "Ride" on the picture signs of the courses that are open (D-053).
 if GameConfig.training.mode == "rides" then
 	for _, sign in TrainingCourses.signs do
-		local c = TrainingCourses.courses[sign.course]
+		local c = TrainingCourses.info(sign.course)
 		if not sign.pointer and GameConfig.training.courses[sign.course] then
 			-- in front of the sign, a little toward the path through the middle
 			local gateX = WorldLayout.PADDOCK_SOUTH_GATE.x
