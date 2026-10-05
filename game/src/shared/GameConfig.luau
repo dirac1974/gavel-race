@@ -78,6 +78,10 @@ GameConfig.leaguePoints = { 10, 6, 4, 2 }        -- 1st..4th; everyone else gets
 GameConfig.finishPoints = 1
 -- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py)
 GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 1400, Gold = 3000 }
+-- League ceilings (D-046): a horse whose best base Rating passes this has its Cup opened and
+-- its league's regular races closed. The Cup winner gets cupPurseB × B (D-048).
+GameConfig.leagueCeiling = { Rookie = 58, Bronze = 68, Silver = 78, Gold = 88 }
+GameConfig.cupPurseB = 3
 GameConfig.maxTapRewindSeconds = 0.3             -- cap on the per-player latency allowance (D-021)
 GameConfig.tapJitterMarginSeconds = 0.05         -- added to measured one-way latency (D-021)
 GameConfig.missedTapScore = 0

@@ -272,7 +272,7 @@ end)
 
 local function open()
 	if not PlayerState.data or #PlayerState.data.horses == 0 then return end
-	mode, moving = "horses", nil
+	mode, moving, retiring, renameState = "horses", nil, nil, nil
 	gui.Enabled = true
 	panel.Position = UDim2.fromScale(0.5, 0.55)
 	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()

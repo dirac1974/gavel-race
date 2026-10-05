@@ -116,31 +116,37 @@ for _, p in Players:GetPlayers() do setupPlayer(p) end
 
 -- A card is open (league nil) until its first rider joins: their horse's league and the race
 -- kind they picked (regular, Cup or Practice) set it (D-046).
-local function pickDistance(c, leagueName: string): string
+local function pickDistance(slot: number, leagueName: string): string
 	local league = GameConfig.leagues[leagueName] or GameConfig.leagues[DEFAULT_LEAGUE]
 	local distances = league.distances or DISTANCES
-	return distances[((c.nextDistance - 1) % #distances) + 1]
+	return distances[((slot - 1) % #distances) + 1]
 end
 
 local function newCard(c)
-	c.card = { league = nil, cup = false, practice = false, distance = pickDistance(c, DEFAULT_LEAGUE),
-		surface = c.surface, weather = WEATHERS[math.random(1, #WEATHERS)] }
+	local slot = c.nextDistance
 	c.nextDistance += 1
+	c.card = { league = nil, cup = false, practice = false, slot = slot, distance = pickDistance(slot, DEFAULT_LEAGUE),
+		surface = c.surface, weather = WEATHERS[math.random(1, #WEATHERS)] }
 end
 
 local function claimCard(c, leagueName: string, kind: string)
 	c.card.league = leagueName
 	c.card.cup = kind == "cup"
 	c.card.practice = kind == "practice"
-	c.card.distance = pickDistance(c, leagueName)
+	c.card.distance = pickDistance(c.card.slot, leagueName) -- same slot, so Rookie's Sprint stays a Sprint
+end
+
+local function openCard(c)
+	if c.card then c.card.league, c.card.cup, c.card.practice = nil, false, false end
 end
 
 -- A horse's strength for the league ceiling: its best base Rating over every condition,
 -- without care or bond (so caring for a horse never closes races to it).
 local function bestRating(h): number
 	local best = 0
-	for d in RaceRating.DISTANCE_WEIGHTS do
-		for s in RaceRating.SURFACE_SHIFT do
+	local league = GameConfig.leagues[h.league] or GameConfig.leagues[DEFAULT_LEAGUE]
+	for _, d in league.distances or DISTANCES do
+		for _, s in { "Dirt", "Turf" } do
 			for w in RaceRating.WEATHER_SHIFT do
 				best = math.max(best, RaceRating.rating(h.stats, { distance = d, surface = s, weather = w }, 0, 0, nil, 0))
 			end
@@ -205,13 +211,12 @@ local function leaveLine(player: Player)
 	local c = inLine[player]
 	if not c then return end
 	inLine[player] = nil
+	player:SetAttribute("InLine", nil)
 	local i = table.find(c.queue, player)
 	if i then table.remove(c.queue, i) end
 	if #c.queue == 0 then
 		c.fillDeadline = nil
-		if not c.current and c.card then -- nobody waiting: the card is open again
-			c.card.league, c.card.cup, c.card.practice = nil, false, false
-		end
+		openCard(c) -- nobody waiting for the next race: its card is open again
 	end
 	QueueStatus:FireClient(player, false, #c.queue, nil, c.id)
 	queueStatus(c)
@@ -333,7 +338,8 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 	kind = if kind == "cup" or kind == "practice" then kind else "race"
 	-- An open card takes this rider's league and kind; a claimed card must match.
 	local wanted = c.card
-	local claiming = c.card.league == nil and #c.queue == 0 and not c.current
+	local alone = #c.queue == 0 or (#c.queue == 1 and c.queue[1] == player)
+	local claiming = alone and (c.card.league == nil or inLine[player] == c)
 	if claiming then
 		local data = Profiles.get(player)
 		local pick = data and ((typeof(horseId) == "string" and Profile.isStalled(data, horseId) and Profile.horse(data, horseId)) or Profile.activeHorse(data))
@@ -348,7 +354,11 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 		return
 	end
 	if inLine[player] == c then
-		chosen[player] = h.id -- just changing horse
+		chosen[player] = h.id -- changing horse (and, alone in line, the kind)
+		if claiming then
+			claimCard(c, wanted.league, kind)
+			publishCards()
+		end
 		return
 	end
 	if #c.queue >= GameConfig.lanes then
@@ -359,6 +369,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 	if claiming then claimCard(c, wanted.league, kind) end
 	table.insert(c.queue, player)
 	inLine[player] = c
+	player:SetAttribute("InLine", true)
 	chosen[player] = h.id
 	if not c.fillDeadline and not c.current then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
 	queueStatus(c)
@@ -435,7 +446,12 @@ end
 local function runRace(c, players: { Player })
 	local rng = Random.new()
 	local card = table.clone(c.card)
-	local leagueName = card.league or DEFAULT_LEAGUE
+	if not card.league then -- shouldn't happen (the first rider claims the card); take theirs
+		local data = players[1] and Profiles.get(players[1])
+		local h0 = data and (Profile.horse(data, chosen[players[1]] or "") or Profile.activeHorse(data))
+		card.league = if h0 then h0.league else DEFAULT_LEAGUE
+	end
+	local leagueName = card.league
 	local league = GameConfig.leagues[leagueName]
 	local cond = { distance = card.distance, surface = card.surface, weather = card.weather }
 	local humans = {}
@@ -444,6 +460,7 @@ local function runRace(c, players: { Player })
 	local riders = {}
 	for _, p in players do
 		local h = rideable(p, chosen[p], card)
+		if h and h.league ~= leagueName then h = nil end -- cash fields never mix leagues
 		local cost = if h then costOf(card, h) else 0
 		local data = Profiles.get(p)
 		if h and data and not riding[p] and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
@@ -459,7 +476,10 @@ local function runRace(c, players: { Player })
 		end
 	end
 	players = riders
-	if #players == 0 then return end
+	if #players == 0 then
+		if #c.queue == 0 then openCard(c) end
+		return
+	end
 	newCard(c) -- the board shows the next race on this course while this one runs
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
 	local coats = {}
@@ -471,6 +491,13 @@ local function runRace(c, players: { Player })
 		lanes = lanes,
 		rng = rng,
 	})
+	for i in session.purses do
+		if card.practice then
+			session.purses[i] = 0
+		elseif card.cup then
+			session.purses[i] = Leagues.CUP_PURSE * league.B
+		end
+	end
 	applyIntegrity(session, players)
 
 	-- Timeline (D-026, D-027, D-031): gate -> pace (2 checkpoints) -> into the homestretch:
@@ -624,16 +651,16 @@ local function runRace(c, players: { Player })
 		-- Practice pays nothing and earns no points; a Cup win pays 3B (D-046).
 		local cash, points = prize.cash, prize.leaguePoints
 		if card.practice then
-			cash, points = 0, 0
-		elseif card.cup and prize.place == 1 and not prize.isBot then
-			cash = Leagues.CUP_PURSE * league.B
+			cash, points = 0, 0 -- the Cup winner's purse is already the locked session purse
 		end
 		table.insert(summary, { name = lane.name, place = prize.place, cash = cash, isBot = prize.isBot, id = prize.id, lane = laneIdx })
 		if not prize.isBot then
 			local player = Players:GetPlayerByUserId(tonumber(prize.id))
 			local data = player and Profiles.get(player)
 			if data and horseOf[player.UserId] then
-				Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+				if not card.practice then
+					Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+				end
 				if card.cup and prize.place == 1 then
 					local h = Profile.horse(data, horseOf[player.UserId])
 					local nxt = h and Leagues.promote(h)
@@ -698,6 +725,7 @@ local function courseLoop(c)
 		while #c.queue > 0 and #racers < GameConfig.lanes do
 			local p = table.remove(c.queue, 1)
 			inLine[p] = nil
+			p:SetAttribute("InLine", nil)
 			table.insert(racers, p)
 		end
 		c.fillDeadline = nil
@@ -719,6 +747,7 @@ local function courseLoop(c)
 					end
 				end
 				table.clear(c.charged)
+				if #c.queue == 0 then openCard(c) end
 				for _, p in racers do
 					p:SetAttribute("Racing", nil)
 					if riding[p] == c then riding[p] = nil end
