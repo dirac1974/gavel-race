@@ -43,6 +43,12 @@ Last updated: 2026-10-04
 - Clients follow one race (`RaceState.consider/isFocus`: yours, else the newest); `RaceView` animates every race; Minimap and Replay course-aware.
 - `RacePicker`: race cards, horse choice with "suits today" from Rating (never win chance), Join.
 
+**Stage 7 — Spectators** (branch `claude/stage7-fans`, stacked on Stage 4):
+- `Fans` (pure, tested): Fan XP from the cheered horse's checkpoint and burst results (+2 for a win, 11 a race, 100 a day), Clap Along scoring (±80 ms, extras count against), steadiness flag (spread < 12 ms over 48+ beats), crowd = best fan + 0.15 + 0.10 assists, boost 0.03 × crowd, drifting beats, Top Fans and ranks.
+- `RaceSession:setCrowd` / `tilts`: the boost joins the live tilt as κR + c; riding gain keeps the crowd fixed.
+- `FanService`: cheers lock at the first checkpoint, claps via TapTime, crowd before each segment closes, Fan XP and strikes (2nd private note, 3rd fan play off 30 days, expire after 90) saved in the profile, Top Fans to all and your rank to you; cheer jobs.
+- `FanClient`: cheer bar, CLAP! button with beat ring and per-clap labels, Top Fans panel with Fan XP.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.

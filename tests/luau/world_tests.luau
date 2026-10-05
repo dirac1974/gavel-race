@@ -409,4 +409,43 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	end
 	check(okLen, "turf races run about their distance in every lane")
 	check(TrackLayout.courses.dirt == dirtCfg and TrackLayout.courses.turf == turfCfg, "course table")
+
+	-- Spectators (Stage 7) -------------------------------------------------------------
+	local Fans = require("../../game/src/shared/Fans")
+	check(Fans.raceXp({ 100, 100, 100, 100 }, true, 0) == Fans.XP_PER_RACE, "fan XP capped per race")
+	check(Fans.raceXp({ 85, 62, 10 }, false, 0) == 3, "Great 2 + Good 1")
+	check(Fans.raceXp({ 100, 100 }, true, 95) == 5, "daily cap")
+	check(Fans.level(0) == 1 and Fans.level(250) == 3, "fan levels every 100 XP")
+	local beats = {}
+	for k = 1, 60 do beats[k] = k * 0.55 end
+	local perfect = table.clone(beats)
+	check(close(Fans.clapScore(beats, perfect), 100, 1e-9), "perfect claps score 100")
+	local mash = {}
+	for k = 1, 400 do mash[k] = k * 0.08 end
+	check(Fans.clapScore(beats, mash) == 0, "mashing scores 0")
+	local human = {}
+	local hr = makeRng(5)
+	for k, b in beats do human[k] = b + (hr:NextNumber() - 0.5) * 0.08 end
+	local hs = Fans.clapScore(beats, human)
+	check(hs > 40 and hs < 90 and not Fans.flagged(beats, human), "a human fan scores well and isn't flagged")
+	check(Fans.flagged(beats, perfect), "perfectly steady claps are flagged")
+	check(close(Fans.crowd({ 100 }), 1, 1e-9) and close(Fans.crowd({ 50, 50, 50 }), 0.625, 1e-9) and close(Fans.crowd({}), 0, 1e-9),
+		"crowd: best fan full, assists small")
+	check(Fans.crowd({ 60, 40 }) >= Fans.crowd({ 60 }) and Fans.crowd({ 60, 40, 30, 90 }) == Fans.crowd({ 90, 60, 40 }),
+		"another fan never lowers the crowd; the fourth adds nothing")
+	check(close(Fans.boost(1), 0.03, 1e-12), "full crowd boost")
+	local fb = Fans.beats(makeRng(9), 10, 30, 0.55, 0.03)
+	local okBeats = #fb > 30
+	for k = 2, #fb do
+		local g = fb[k] - fb[k - 1]
+		if g < 0.55 * 0.85 - 1e-9 or g > 0.55 * 1.15 + 1e-9 then okBeats = false end
+	end
+	check(okBeats, "clap beats drift within ±15%")
+	local entries = {
+		{ id = "a", name = "A", score = 80, flagged = false }, { id = "b", name = "B", score = 95, flagged = true },
+		{ id = "c", name = "C", score = 60, flagged = false }, { id = "d", name = "D", score = 0, flagged = false },
+	}
+	local top = Fans.topFans(entries)
+	check(#top == 2 and top[1].id == "a" and Fans.rankOf(entries, "c") == 2 and Fans.rankOf(entries, "d") == nil
+		and Fans.rankOf(entries, "b") == 1, "top fans skip flagged and zero; flagged fans still see their own rank")
 end

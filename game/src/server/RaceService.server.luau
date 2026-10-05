@@ -33,6 +33,7 @@ local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
+local FanService = require(script.Parent:WaitForChild("FanService"))
 
 local LEAGUE = "Rookie" -- every horse is Rookie until leagues arrive (Stage 9)
 local COUNTDOWN = 3
@@ -417,6 +418,7 @@ local function runRace(c, players: { Player })
 	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
 	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
 	PaceSchedule:FireAllClients(passes, c.id)
+	FanService.start(c.id, session, players, tStart, tFinish) -- cheers and Clap Along (D-019, D-020)
 	task.delay(math.max(0, tStart - now()), function() c.scene:openGate() end) -- and they're off
 	local isBot = {}
 	for i, lane in session.lanes do -- racing players ride their own horse as the jockey
@@ -522,6 +524,7 @@ local function runRace(c, players: { Player })
 			end
 			if #great > 0 then BurstSparkle:FireAllClients(great, c.id) end
 		end
+		FanService.beforeClose(c.id, seg) -- the crowd's tiny boost joins this segment's close
 		shownLive = session:closeSegment(seg)
 		LiveChances:FireAllClients(seg, shownLive, c.id)
 	end
@@ -544,6 +547,7 @@ local function runRace(c, players: { Player })
 		end
 	end
 	RaceFinished:FireAllClients(summary, c.id)
+	FanService.finish(c.id, result.order[1])
 	table.clear(c.charged) -- the race counted
 	-- Your ride: stars from your score, and places your riding gained versus riding at the race
 	-- average (same luck, everything else the same). Only gains are shown to the rider.
@@ -602,6 +606,7 @@ local function courseLoop(c)
 				warn(string.format("Race on %s failed: %s", c.id, tostring(err)))
 				c.current = nil
 				c.scene:dismountAll()
+				FanService.abort(c.id)
 				RaceAborted:FireAllClients(c.id)
 				for p, horseId in c.charged do -- give back the Energy for a race that didn't count
 					local data = Profiles.get(p)

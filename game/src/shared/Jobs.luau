@@ -30,6 +30,7 @@ Jobs.DAILY = {
 	{ id = "d_treat", event = "treat", target = 2, text = "Give 2 treats", icon = "carrot", go = "stable", reward = { cash = 3, items = { apple = 1 } } },
 	{ id = "d_ride", event = "ride", target = 1, text = "Go for a ride on your horse", icon = "hoofprint", go = "stable", reward = { cash = 3, items = { carrot = 1 } } },
 	{ id = "d_trail", event = "visit_trail", target = 1, text = "Visit the flower meadow on the Trail", icon = "map_trail", go = "trailGate", reward = { cash = 4, items = { apple = 1 } } },
+	{ id = "d_cheer", event = "cheer", target = 1, text = "Cheer for a horse in a race", icon = "job_cheer", go = "track", reward = { cash = 3, items = { carrot = 2 } } },
 	{ id = "d_train", event = "train", target = 1, text = "Do a training session", icon = "stat_speed", go = "paddock", reward = { cash = 4, items = { grain = 1 } } },
 	{ id = "d_vet", event = "checkup", target = 1, text = "Take a horse for a check-up", icon = "stethoscope", go = "vet", reward = { cash = 3, items = { treat = 1 } } },
 } :: { Def }
@@ -53,6 +54,7 @@ Jobs.MONTHLY = {
 	{ id = "m_harvest20", event = "harvest", target = 20, text = "Pick 20 crops", icon = "carrot", go = "stable", reward = { stamps = 1, items = { seed_apple = 4 } } },
 	{ id = "m_bond", event = "pet", target = 20, text = "Pet your horses 20 times", icon = "heart", go = "stable", reward = { stamps = 1, items = { treat = 4 } } },
 	{ id = "m_days10", event = "day", target = 10, text = "Visit your stable on 10 days", icon = "map_stable", go = "stable", reward = { stamps = 2, items = { hay = 20 } } },
+	{ id = "m_cheer10", event = "cheer", target = 10, text = "Cheer in 10 races", icon = "job_cheer", go = "track", reward = { stamps = 1, items = { treat = 3 } } },
 	{ id = "m_trail5", event = "visit_trail", target = 5, text = "Visit the flower meadow 5 times", icon = "map_trail", go = "trailGate", reward = { stamps = 1, items = { apple = 5 } } },
 } :: { Def }
 
