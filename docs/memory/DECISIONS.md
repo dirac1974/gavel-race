@@ -403,3 +403,13 @@ Template:
 - Decision: From Bronze, Green Cash fees only; foal Potential 0.7 × parents' average + 0.3 × breed average ± 5; foals start at 35% of Potential; coats separate from stats; a sim must show bloodlines level off before building.
 - Alternatives: Diamond breeding boosts (paid random items), full inheritance (runaway bloodlines).
 - Links: docs/WORLD_DESIGN.md
+
+## D-048 — League promotion races are called Cups
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team (moderator call, small)
+- Decision: in the game the Stakes race of each league (D-013, D-046) is called the **Cup**: "Rookie Cup", "Bronze Cup", and so on ("Win the Rookie Cup to move up!"). Rules are unchanged: League Points or the league ceiling open it, the winner gets 3B and moves up a league.
+- Why: "stake(s)" is on the policy guard's wagering list (hard rule 1), and for kids it reads like betting ("high stakes"); "Cup" is a familiar sports word with a trophy to match.
+- Alternatives: "Stakes race" (allowed by the guard as a phrase but still betting-flavoured for kids), "Championship" (too long for buttons), "Final".
+- Links: game/src/shared/Leagues.luau, game/src/server/RaceService.server.luau, game/src/client/RacePicker.client.luau
+

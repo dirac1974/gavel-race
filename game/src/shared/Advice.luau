@@ -39,6 +39,8 @@ function Advice.forHorse(h: any, profile: any, now: number): Tip
 		return { emoji = "🌾", fact = fact, next = "Next: a meal of hay", go = "stable" }
 	elseif not h.groomed then
 		return { emoji = "🪮", fact = fact, next = "Next: a good brushing", go = "stable" }
+	elseif h.cupOpen and not h.resting then
+		return { emoji = "🏆", fact = fact, next = "Next: win the " .. (h.league or "Rookie") .. " Cup to move up!", go = "raceBoard" }
 	elseif h.trainingReady then
 		local stat = Advice.trainNext(h)
 		return { emoji = "⭐", fact = fact, next = if stat then "Next: train " .. STAT_LABEL[stat] else "Next: a training session", go = "paddock" }

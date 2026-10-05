@@ -78,6 +78,10 @@ GameConfig.leaguePoints = { 10, 6, 4, 2 }        -- 1st..4th; everyone else gets
 GameConfig.finishPoints = 1
 -- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py)
 GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 1400, Gold = 3000 }
+-- League ceilings (D-046): a horse whose best base Rating passes this has its Cup opened and
+-- its league's regular races closed. The Cup winner gets cupPurseB × B (D-048).
+GameConfig.leagueCeiling = { Rookie = 58, Bronze = 68, Silver = 78, Gold = 88 }
+GameConfig.cupPurseB = 3
 GameConfig.maxTapRewindSeconds = 0.3             -- cap on the per-player latency allowance (D-021)
 GameConfig.tapJitterMarginSeconds = 0.05         -- added to measured one-way latency (D-021)
 GameConfig.missedTapScore = 0
@@ -130,6 +134,7 @@ GameConfig.leagues = {
 		distances = { "Sprint", "Mile" }, -- shorter races for new players (D-027)
 		strideIntervalLo = 0.60, strideIntervalHi = 0.60, strideDrift = 0, leadChange = false },
 	Bronze = { name = "Bronze", T = 18, B = 50, sweepSeconds = 2.0, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
+		distances = { "Sprint", "Mile", "Classic" }, -- Bronze adds the Classic; Silver and up run every distance (D-046)
 		strideIntervalLo = 0.55, strideIntervalHi = 0.60, strideDrift = 0.02, leadChange = false },
 	Silver = { name = "Silver", T = 18, B = 120, sweepSeconds = 1.6, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
 		strideIntervalLo = 0.50, strideIntervalHi = 0.56, strideDrift = 0.03, leadChange = false },

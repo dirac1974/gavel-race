@@ -47,6 +47,7 @@ end)
 local title = Ui.text(panel, "🐴 My Horses", 30, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 36) })
 local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
 local stallBtn = Ui.button(panel, "", UDim2.fromOffset(220, 40), UDim2.new(0, 16, 0, 14), C.sky, 17)
+local hallBtn = Ui.button(panel, "🏅 Hall of Fame", UDim2.fromOffset(170, 40), UDim2.new(1, -236, 0, 14), C.cream, 16)
 local list = Instance.new("ScrollingFrame")
 list.BackgroundTransparency = 1
 list.Size = UDim2.new(1, -32, 1, -76)
@@ -62,6 +63,7 @@ grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = list
 
 local moving: string? = nil -- a pasture horse picked to swap into a stall
+local retiring: string? = nil -- asked once; a second tap retires
 local renameState = nil       -- { id, first, second, picked } kept while renaming
 local mode = "horses"       -- or "rename:<id>"
 
@@ -106,7 +108,8 @@ local function horseCard(h, order: number)
 	dot.Parent = card
 	local name = Ui.text(card, (if active then "⭐ " else "") .. h.name, 20, { Position = UDim2.new(0, 58, 0, 6), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	Ui.text(card, string.format("%s · %s · %s", if h.stalled then "In a stall" else "In the pasture", STYLE_LABEL[h.style] or "", h.league or "Rookie"), 13,
+	local leagueLine = (h.league or "Rookie") .. (if h.cupOpen then " · 🏆 Cup open!" elseif h.pointsToCup then string.format(" · %d pts to the Cup", h.pointsToCup) else "")
+	Ui.text(card, string.format("%s · %s · %s", if h.stalled then "Stall" else "Pasture", STYLE_LABEL[h.style] or "", leagueLine), 13,
 		{ Position = UDim2.new(0, 58, 0, 30), Size = UDim2.new(1, -66, 0, 16), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
 	for k, key in { "speed", "accel", "stamina", "grit" } do
 		statBar(card, 54 + (k - 1) * 20, key, h.stats[key], h.potential and h.potential[key])
@@ -123,7 +126,7 @@ local function horseCard(h, order: number)
 	rl.Padding = UDim.new(0, 6)
 	rl.Parent = row
 	local function btn(text: string, color: Color3, fn)
-		local b = Ui.button(row, text, UDim2.fromOffset(110, 38), UDim2.new(), color, 15)
+		local b = Ui.button(row, text, UDim2.fromOffset(82, 38), UDim2.new(), color, 13)
 		b.Activated:Connect(fn)
 	end
 	if h.stalled and not active then
@@ -144,6 +147,36 @@ local function horseCard(h, order: number)
 		mode = "rename:" .. h.id
 		render()
 	end)
+	if #d.horses > 1 then
+		btn(if retiring == h.id then "Sure? Retire" else "🏅 Retire", if retiring == h.id then C.red else C.cream, function()
+			if retiring == h.id then
+				gameRemotes:WaitForChild("RetireHorse"):FireServer(h.id)
+				retiring = nil
+			else
+				retiring = h.id
+				render()
+			end
+		end)
+	end
+end
+
+local function hallView()
+	local d = PlayerState.data
+	title.Text = "🏅 Hall of Fame"
+	local plaques = d.hallOfFame or {}
+	if #plaques == 0 then
+		local empty = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
+		Ui.text(empty, "No legends yet. Retire a horse when you choose, and its record lives here.", 18,
+			{ Position = UDim2.new(0, 12, 0, 40), Size = UDim2.new(1, -24, 0, 80) })
+	end
+	for k, pl in plaques do
+		local c = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
+		c.LayoutOrder = k
+		Ui.text(c, "🏅 " .. pl.name, 22, { Position = UDim2.new(0, 12, 0, 12), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
+		Ui.text(c, string.format("%s · %s", pl.coat:gsub("_", " "), pl.league), 15, { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+		Ui.text(c, string.format("🏁 %d races · 🥇 %d wins · 🎀 %d top three · 💵 %d", pl.races, pl.wins, pl.places, pl.cash), 16,
+			{ Position = UDim2.new(0, 12, 0, 74), Size = UDim2.new(1, -24, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	end
 end
 
 local function renameView(id: string)
@@ -207,6 +240,13 @@ render = function()
 	for _, ch in list:GetChildren() do if not ch:IsA("UIGridLayout") then ch:Destroy() end end
 	local d = PlayerState.data
 	if not d then return end
+	if mode == "hall" then
+		grid.CellSize = UDim2.new(0.5, -8, 0, 120)
+		stallBtn.Visible = false
+		hallBtn.Text = "◀ My Horses"
+		return hallView()
+	end
+	hallBtn.Text = "🏅 Hall of Fame"
 	if string.sub(mode, 1, 7) == "rename:" then
 		grid.CellSize = UDim2.new(1, 0, 0, 300)
 		stallBtn.Visible = false
@@ -220,6 +260,11 @@ render = function()
 	for i, h in d.horses do horseCard(h, i) end
 end
 
+hallBtn.Activated:Connect(function()
+	mode = if mode == "hall" then "horses" else "hall"
+	render()
+end)
+
 stallBtn.Activated:Connect(function()
 	local d = PlayerState.data
 	if d and d.market and d.market.nextStallPrice then gameRemotes:WaitForChild("BuyStall"):FireServer() end
@@ -227,7 +272,7 @@ end)
 
 local function open()
 	if not PlayerState.data or #PlayerState.data.horses == 0 then return end
-	mode, moving = "horses", nil
+	mode, moving, retiring, renameState = "horses", nil, nil, nil
 	gui.Enabled = true
 	panel.Position = UDim2.fromScale(0.5, 0.55)
 	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
