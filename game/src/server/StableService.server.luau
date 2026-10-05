@@ -402,7 +402,8 @@ local function applyAway(i: number, player: Player, data)
 					if d:GetAttribute("BaseT") == nil then d:SetAttribute("BaseT", d.Transparency) end
 					d.Transparency = if away then 1 else d:GetAttribute("BaseT")
 				elseif d:IsA("ParticleEmitter") then
-					d.Enabled = not away
+					if d:GetAttribute("BaseOn") == nil then d:SetAttribute("BaseOn", d.Enabled) end
+					d.Enabled = not away and d:GetAttribute("BaseOn")
 				end
 			end
 		end
@@ -518,12 +519,16 @@ Profiles.Changed.Event:Connect(function(player: Player)
 	refresh(player)
 end)
 
-Players.PlayerAdded:Connect(function(player: Player)
-	player.CharacterAdded:Connect(function() onCharacter(player) end)
-	-- The horse is back in its stall the moment you get off or its race ends.
+-- The horse is back in its stall the moment you get off or its race ends.
+local function watchAway(player: Player)
 	for _, name in { "RidingHorse", "RacingHorse" } do
 		player:GetAttributeChangedSignal(name):Connect(function() refresh(player) end)
 	end
+end
+for _, player in Players:GetPlayers() do watchAway(player) end
+Players.PlayerAdded:Connect(function(player: Player)
+	player.CharacterAdded:Connect(function() onCharacter(player) end)
+	watchAway(player)
 end)
 Players.PlayerRemoving:Connect(function(player: Player)
 	local i = plotOf[player]

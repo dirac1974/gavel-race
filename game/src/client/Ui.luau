@@ -62,6 +62,26 @@ function Ui.pad(obj: GuiObject, px: number)
 	return p
 end
 
+-- Touch layout (D-056): a touch screen whose last input was a touch (a tablet with a keyboard
+-- switches to the PC layout while the keyboard is used). Ui.TouchChanged fires when it flips.
+local UserInputService = game:GetService("UserInputService")
+function Ui.touchLayout(): boolean
+	if not UserInputService.TouchEnabled then return false end
+	local last = UserInputService:GetLastInputType()
+	return last == Enum.UserInputType.Touch or not UserInputService.KeyboardEnabled
+end
+Ui.TouchChanged = Instance.new("BindableEvent")
+do
+	local was = Ui.touchLayout()
+	UserInputService.LastInputTypeChanged:Connect(function()
+		local now = Ui.touchLayout()
+		if now ~= was then
+			was = now
+			Ui.TouchChanged:Fire(now)
+		end
+	end)
+end
+
 function Ui.screen(name: string, order: number?): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name

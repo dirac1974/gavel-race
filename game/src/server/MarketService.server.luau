@@ -121,9 +121,9 @@ Tame.OnServerEvent:Connect(function(player: Player, index: any, score: any, star
 	end
 	-- The wild horse is where every client drew it when the game began (it stands still on the
 	-- tamer's screen while they play, D-056): the tamer must be next to that spot. A start time
-	-- more than 60 s old (or in the future) is clamped, so it can't be used to reach far-off horses.
+	-- more than 30 s old (or in the future) is clamped, so it can't be used to reach far-off horses.
 	local now = workspace:GetServerTimeNow()
-	local at = if typeof(startedAt) == "number" and startedAt == startedAt then math.clamp(startedAt, now - 60, now) else now
+	local at = if typeof(startedAt) == "number" and startedAt == startedAt then math.clamp(startedAt, now - 30, now) else now
 	local x, z = Market.wildPosition(WorldLayout.meadow, index, at)
 	if not near(player, x, z, 30) then
 		Profiles.notify(player, "Get a little closer to the wild horse, then try again", "heart")

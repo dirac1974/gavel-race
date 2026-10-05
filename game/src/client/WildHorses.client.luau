@@ -81,7 +81,7 @@ end)
 local lastPos = setmetatable({}, { __mode = "k" })
 local LEGS_RANGE = 150 -- studs from the camera; farther horses glide (nobody can see their feet)
 local TURN_RATE = 3     -- the heading eases toward the next spot (no spinning on the spot, D-056)
-local RETURN_SECONDS = 1.2 -- after a taming game the horse walks back into its wander
+local RETURN_SPEED = 12   -- studs/s: after a taming game the horse walks back into its wander...
 local function yawOf(dx: number, dz: number): number
 	return math.atan2(-dx, -dz) -- CFrame.Angles(0, yaw, 0) looks along (-sin yaw, 0, -cos yaw)
 end
@@ -98,10 +98,13 @@ RunService.Heartbeat:Connect(function(dt)
 			h.yaw = h.yaw or want
 			h.yaw += ((want - h.yaw + math.pi) % (2 * math.pi) - math.pi) * math.min(1, dt * TURN_RATE)
 			if h.returnFrom then -- ease from where the taming game left it back to its wander
-				local a = math.clamp((os.clock() - h.returnFrom.t0) / RETURN_SECONDS, 0, 1)
+				local a = math.clamp((os.clock() - h.returnFrom.t0) / h.returnFrom.seconds, 0, 1)
 				a = a * a * (3 - 2 * a)
 				pos = h.returnFrom.pos:Lerp(pos, a)
-				if a >= 1 then h.returnFrom = nil end
+				if a >= 1 then
+					h.returnFrom = nil
+					h.prompt.Enabled = true -- back in its wander: you can make friends again (start() guards a game in progress)
+				end
 			end
 			local bob = if walk > 0 and walk < 1 then 0.12 * math.abs(math.sin(t * 6 + i)) else 0
 			h.model:PivotTo(CFrame.new(pos + Vector3.new(0, bob, 0)) * CFrame.Angles(0, h.yaw, 0))
@@ -169,13 +172,18 @@ end
 task.spawn(function() gameRemotes:WaitForChild("TameResult").OnClientEvent:Connect(answer) end)
 
 local function setPrompts(on: boolean)
-	for _, h in horses do h.prompt.Enabled = on end
+	for _, h in horses do h.prompt.Enabled = on and not h.returnFrom end -- not while walking back
 end
 
 -- The horse walks back into its wander from where it stood still.
 local function release(h)
 	h.still = false
-	h.returnFrom = { pos = Vector3.new(h.model:GetPivot().Position.X, GROUND_Y, h.model:GetPivot().Position.Z), t0 = os.clock() }
+	local from = Vector3.new(h.model:GetPivot().Position.X, GROUND_Y, h.model:GetPivot().Position.Z)
+	local x, z = Market.wildPosition(WorldLayout.meadow, h.index, workspace:GetServerTimeNow())
+	local dist = (Vector3.new(x, GROUND_Y, z) - from).Magnitude
+	-- ...at a walk, never a bolt (at least 1.2 s; it may have wandered on while you played).
+	h.returnFrom = { pos = from, t0 = os.clock(), seconds = math.max(1.2, dist / RETURN_SPEED) }
+	h.prompt.Enabled = false
 end
 
 local function finish(score: number)
@@ -187,11 +195,11 @@ local function finish(score: number)
 	for _, c in s.conns do c:Disconnect() end
 	-- The server decides (it checks you were next to the horse when the game began): a win waits
 	-- for its answer before celebrating (D-056); a lost game just closes.
-	gameRemotes:WaitForChild("Tame"):FireServer(s.horse.index, score, s.startedAt)
-	if score <= 0 then
+	if score <= 0 then -- it trotted off: nothing for the server to check
 		task.delay(0.8, function() if not session then gui.Enabled = false end end)
 		return
 	end
+	gameRemotes:WaitForChild("Tame"):FireServer(s.horse.index, score, s.startedAt)
 	waiting += 1
 	local mine = waiting
 	title.Text = "Getting to know you…"
@@ -232,7 +240,7 @@ closeBtn.Activated:Connect(function()
 end)
 
 local function start(h)
-	if session then return end
+	if session or h.returnFrom then return end
 	local d = PlayerState.data
 	if d and d.market and not d.market.canTame then
 		Ui.toast("You made a new friend today, or need a treat (carrot, apple or sugar cube).", "heart", "🥕")
