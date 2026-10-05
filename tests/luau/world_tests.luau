@@ -817,7 +817,7 @@ local function trainingT3Tests(check: (boolean, string) -> (), close: (number, n
 				for i = feedFrom, #samples do feed(i) end
 				feedFrom = #samples + 1
 				for _, e in tr.events do
-					if e.kind == "armed" then armedAt = e.bellT end
+					if e.kind == "armed" then armedAt = tr.bellT end
 				end
 				table.clear(tr.events)
 			end
@@ -860,8 +860,10 @@ local function trainingT3Tests(check: (boolean, string) -> (), close: (number, n
 	local raw, detail = TR.scoreAccel(TR.validate(samples, function(x, z) return TC.onCourse("accel", x, z) end, CFG), SEED, 0, CFG)
 	check(tr.finished and detail.scored == 3 and raw == 100 and detail.quick == 3, string.format("three quick starts score 100 (%.1f)", raw))
 	check(detail.finishT ~= nil and detail.finishT > 30 and detail.finishT < TC.parSeconds("accel"), string.format("Gate Break under par (%.1f s)", detail.finishT or -1))
-	local res = TR.run("accel", samples, CFG, tr.finishT, { seed = SEED, allowance = 0 })
+	local res = TR.run("accel", samples, CFG, tr.finishT, { bellSeed = SEED, allowance = 0 })
 	check(res.score == 100 and res.ribbon == "gold" and res.stars == 3 and res.scored == 3, "a quick Gate Break: gold")
+	check(close(res.par, TR.accelIdeal(res.detail.breaks, CFG) * CFG.parFactor, 1e-9)
+		and math.abs(res.par - TC.parSeconds("accel")) > 0.01, "Gate Break par uses this ride's bell waits")
 	local slowS = gateRide({ 1.25, 1.25, 3 })
 	local slowRaw, slowD = TR.scoreAccel(TR.validate(slowS, nil, CFG), SEED, 0, CFG)
 	-- (a scripted start lands on the 0.1 s sample grid, so a reaction reads within 0.1 s of it)
@@ -955,7 +957,7 @@ local function trainingT3Tests(check: (boolean, string) -> (), close: (number, n
 	local perfectH = follow(16)
 	local hraw, hd = TR.scoreStamina(TR.validate(perfectH, nil, CFG), SEED, 0, CFG)
 	check(hraw == 100 and hd.samples > 300, "staying in the middle of Pip's ring scores 100")
-	local hres = TR.run("stamina", perfectH, CFG, endT, { seed = SEED, allowance = 0 })
+	local hres = TR.run("stamina", perfectH, CFG, endT, { seed = SEED, lag = 0 })
 	check(hres.score == 100 and hres.ribbon == "gold" and hres.badShare == 0, "a perfect Hill Climb: gold")
 	local lagRaw = TR.scoreStamina(TR.validate(follow(30), nil, CFG), SEED, 0, CFG)
 	check(lagRaw == 0, "lagging 30 studs behind Pip is outside the ring")
@@ -1035,6 +1037,144 @@ local function trainingT3Tests(check: (boolean, string) -> (), close: (number, n
 	local old = Profile.migrate({ settings = { visits = "Friends" } }, 20000 * 86400)
 	check(junk.settings.easyRein == false and on.settings.easyRein == true and old.settings.easyRein == false, "Easy Rein repaired on load")
 	check(Profile.view(on, 20000 * 86400, GameConfig.energy).settings.easyRein == true, "the owner sees Easy Rein")
+end
+
+-- Training rides T3 review (PR #39): off-course time, Pip's clock, standing-start freezes,
+-- the secret bell and par per ride.
+local function trainingT3ReviewTests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local TR = require("../../game/src/shared/TrainingRide")
+	local CFG = GameConfig.training
+	local HZ = CFG.sampleHz
+	local ST = CFG.stamina
+	local SEED = 777
+	local endT = TC.idealSeconds("stamina", SEED)
+	local mid = (ST.ringNear + ST.ringFar) / 2
+
+	-- B1: time off the track is time out of Pip's ring.
+	local function ride(where: (number) -> (number, number))
+		local out = {}
+		local k = 0
+		while k / HZ <= endT + 0.5 do
+			local x, z = where(k / HZ)
+			table.insert(out, { t = k / HZ, x = x, y = 0, z = z })
+			k += 1
+		end
+		return out
+	end
+	local inRingAt = function(t: number): (number, number)
+		local pony = TC.ponyAt(SEED, t)
+		local x, z = TC.ovalPoint(pony.d - mid, pony.lateral)
+		return x, z
+	end
+	local camper = ride(function(t: number): (number, number)
+		if t >= 10 and t < 12 then return inRingAt(t) end
+		return TC.courses.stamina.start.x, 0 -- standing in the middle of the infield
+	end)
+	local camp = TR.run("stamina", camper, CFG, endT, { seed = SEED, lag = 0 })
+	check(camp.score < 15 and camp.ribbon == "bronze", string.format("camping in the infield scores low (%.0f), not gold", camp.score))
+	-- An honest kid who gets lost in the infield for ten seconds scores the share they rode with Pip.
+	local lostFrom, lostTo = 15, 25
+	local lost = ride(function(t: number): (number, number)
+		if t >= lostFrom and t < lostTo then
+			local pony = TC.ponyAt(SEED, t)
+			return TC.ovalPoint(pony.d - mid, -30) -- well inside the inner rail
+		end
+		return inRingAt(t)
+	end)
+	local lostRes = TR.run("stamina", lost, CFG, endT, { seed = SEED, lag = 0 })
+	local expect = 100 * (1 - (lostTo - lostFrom) / (endT - ST.grace))
+	check(math.abs(lostRes.score - expect) < 4, string.format("lost in the infield: %.0f, about the share ridden with Pip (%.0f)", lostRes.score, expect))
+	check(lostRes.badShare <= 2 / 300, "riding in and out of the infield isn't cheating")
+
+	-- B2: the rider's screen runs Pip on the server's clock (anchored on the server's go time),
+	-- and the server sees the rider one trip late. With the one-way allowance an honest
+	-- follower stays in the ring for any ping up to the cap.
+	local function followSeen(oneWay: number, clientLate: number)
+		return ride(function(t: number): (number, number)
+			-- what the server sees at t: the rider at t - oneWay, following the Pip on their screen
+			local tc = TR.rideClock(t - oneWay, clientLate)
+			return inRingAt(tc)
+		end)
+	end
+	local anchoredOk = true
+	for _, oneWay in { 0.03, 0.08, 0.15, 0.25 } do
+		local seen = followSeen(oneWay, 0)
+		local r = TR.run("stamina", seen, CFG, endT, { seed = SEED, lag = TR.lagAllowance(2 * oneWay) })
+		if r.score < 99 then anchoredOk = false end
+	end
+	check(anchoredOk, "Pip on the server's clock + the one-way allowance: an honest follower stays in the ring")
+	check(close(TR.lagAllowance(0.2), 0.1 + GameConfig.tapJitterMarginSeconds, 1e-9) and TR.lagAllowance(5) == GameConfig.maxTapRewindSeconds,
+		"Hill Climb allowance: one way + margin, capped")
+	check(close(TR.bellAllowance(0.2), 0.2 + GameConfig.tapJitterMarginSeconds, 1e-9), "Gate Break allowance: the whole round trip + margin")
+	-- (Why the anchor matters: a screen whose clock started at the end of its own countdown runs
+	-- late by one way plus the countdown's overshoot, and the follower drifts out of the ring.)
+	local late = followSeen(0.1, 0.1 + 0.3)
+	local lateRes = TR.run("stamina", late, CFG, endT, { seed = SEED, lag = TR.lagAllowance(0.2) })
+	check(lateRes.score < 50, string.format("a late local clock would fall out of the ring (%.0f)", lateRes.score))
+	check(TR.rideClock(105.25, 100) == 5.25, "ride clock = server time - the server's go time")
+
+	-- S3: a freeze at a standing start doesn't make the start look slow.
+	local ac = TC.courses.accel
+	local gz = ac.start.z
+	local function standingStart(freeze: number, react: number): number?
+		local sc = TR.screener(nil)
+		local tr = TR.tracker("accel", { seed = SEED })
+		local t = 0
+		local goTrue: number? = nil
+		local function at(time: number): (number, number)
+			if not goTrue or time < goTrue then return ac.start.x, gz end
+			return ac.start.x + CFG.gallop * (time - goTrue), gz
+		end
+		local reaction: number? = nil
+		for _ = 1, 200 do
+			local x, z = at(t)
+			if goTrue and t >= goTrue and t < goTrue + freeze then x, z = ac.start.x, gz end -- the replica froze
+			local kind, k = TR.screen(sc, { t = t, x = x, y = 0, z = z }, CFG)
+			if kind == "ok" then TR.feed(tr, k, CFG) end
+			for _, e in tr.events do
+				if e.kind == "armed" then goTrue = (tr.bellT :: number) + react end
+				if e.kind == "go" then reaction = e.reaction end
+			end
+			table.clear(tr.events)
+			if reaction then break end
+			t = math.floor((t + 1 / HZ) * 1000 + 0.5) / 1000
+		end
+		return reaction
+	end
+	local freezeOk = true
+	local worst = 0
+	for _, freeze in { 0, 0.2, 0.3, 0.4 } do
+		local r = standingStart(freeze, 0.26)
+		if not r or math.abs(r - 0.26) > 0.01 then freezeOk = false end
+		worst = math.max(worst, if r then math.abs(r - 0.26) else 99)
+	end
+	check(freezeOk, string.format("a 0.26 s start reads 0.26 s through 0.2-0.4 s freezes (worst off by %.3f)", worst))
+
+	-- S1: events never carry the bell time, and the bell comes from the server's own seed.
+	local tr1 = TR.tracker("accel", { seed = 11 })
+	local tr2 = TR.tracker("accel", { seed = 12 })
+	for k = 0, 10 do
+		local s = { t = k / HZ, x = ac.start.x, y = 0, z = gz }
+		TR.feed(tr1, s, CFG)
+		TR.feed(tr2, s, CFG)
+	end
+	local leaked = false
+	for _, e in tr1.events do
+		for key in e do
+			if key == "bellT" or key == "bell" or key == "delay" then leaked = true end
+		end
+	end
+	check(#tr1.events == 1 and tr1.events[1].kind == "armed" and not leaked, "the Ready event doesn't say when the bell rings")
+	check(tr1.bellT ~= tr2.bellT, "the bell time follows the tracker's (server-only) seed")
+
+	-- Par per ride: the bell waits it really had.
+	local mean = (CFG.accel.bellMin + CFG.accel.bellMax) / 2
+	local quickBells = { { wait = CFG.accel.bellMin }, { wait = CFG.accel.bellMin }, { wait = CFG.accel.bellMin } }
+	local slowBells = { { wait = CFG.accel.bellMax }, { wait = CFG.accel.bellMax }, { wait = CFG.accel.bellMax } }
+	check(close(TR.accelIdeal(quickBells, CFG), TC.idealSeconds("accel") - 3 * (mean - CFG.accel.bellMin), 1e-9)
+		and close(TR.accelIdeal(slowBells, CFG), TC.idealSeconds("accel") + 3 * (CFG.accel.bellMax - mean), 1e-9)
+		and close(TR.accelIdeal({}, CFG), TC.idealSeconds("accel"), 1e-9), "Gate Break par follows the ride's own bell waits")
 end
 
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
@@ -1714,5 +1854,6 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	trainingRideTests(check, close)
 	trainingJitterTests(check, close)
 	trainingT3Tests(check, close)
+	trainingT3ReviewTests(check, close)
 
 end

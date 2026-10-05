@@ -21,6 +21,7 @@
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 local TrainingCourses = if script then require(script.Parent.TrainingCourses) :: any else require("./TrainingCourses")
 local Training = if script then require(script.Parent.Training) :: any else require("./Training")
+local TapTime = if script then require(script.Parent.TapTime) :: any else require("./TapTime")
 
 export type Sample = { t: number, x: number, y: number, z: number, gap: boolean? }
 export type Crossing = { i: number, f: number, t: number, dir: number, x: number, y: number, z: number }
@@ -200,17 +201,37 @@ local function ovalStep(st: any, prev: Sample?, s: Sample, cfg: any)
 	end
 end
 
+-- Latency allowances (capped like race taps, D-021). `ping` is Player:GetNetworkPing(), a
+-- round trip. Gate Break: the bell goes out and the go comes back, so the whole round trip.
+-- Hill Climb: the rider's screen runs Pip on the server's clock, and the server sees the rider
+-- one trip late, so one way.
+function TR.bellAllowance(ping: number): number
+	return TapTime.rewindAllowance(2 * ping, GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+end
+
+function TR.lagAllowance(ping: number): number
+	return TapTime.rewindAllowance(ping, GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+end
+
+-- Seconds into the ride on any machine: the server's clock (workspace:GetServerTimeNow()) minus
+-- the server's go time from TrainBegin. The rider's screen runs Pip and the countdown on this,
+-- so a slow countdown loop or a late message never makes Pip late.
+function TR.rideClock(serverNow: number, goAtServer: number): number
+	return serverNow - goAtServer
+end
+
 -- Live tracker ------------------------------------------------------------------------------
--- opts (Gate Break): { seed, allowance } (the bell times come from the seed; the allowance is
--- the player's latency, taken off each reaction).
+-- opts (Gate Break): { seed, allowance, allowances }. The seed is the server's own bell seed,
+-- never sent to the client. allowances[n] (set by the server when the n-th bell rings, from
+-- the ping then) wins over the single `allowance`.
 function TR.tracker(key: string, opts: any?)
 	local c = TC.courses[key]
 	local o = opts or {}
 	return { key = key, progress = 0, lastD = c.startD or 0, last = nil :: Sample?, next = 1, finished = false, hit = {},
 		finishT = nil :: number?, minFinish = if c.kind == "arena" then TR.MIN_FINISH_SHARE * TC.idealSeconds(key) else 0,
 		-- Gate Break
-		seed = o.seed or 1, allowance = o.allowance or 0, phase = "settle", breakNo = 1, attempt = 1, arms = 0,
-		settleSince = nil :: number?, bellT = nil :: number?, results = {}, events = {} }
+		seed = o.seed or 1, allowance = o.allowance or 0, allowances = o.allowances or {}, phase = "settle", breakNo = 1,
+		attempt = 1, arms = 0, armT = nil :: number?, settleSince = nil :: number?, bellT = nil :: number?, results = {}, events = {} }
 end
 
 -- Gate Break --------------------------------------------------------------------------------
@@ -218,9 +239,12 @@ end
 -- flag 120 studs on. Moving goStuds or leaving the stall before the bell is an early go: the
 -- break runs once more ("Wait for the bell!"), and an early go on the rerun scores breakFloor.
 -- A go counts from inside the stall only, because only a horse settled in the stall is armed.
--- Reaction = when the horse started (from how far it moved by the first sample that shows it
--- going) - the bell - the latency allowance. The tracker queues events for the server to send:
--- { kind = "armed" | "early" | "go" | "flag", ... }.
+-- Reaction = when the horse started - the bell - the latency allowance. The start is worked
+-- back from how far the horse is from where it was readied, at a gallop, and can't be before
+-- the break was readied (a frozen replica at a standing start looks like standing still, so
+-- the previous sample is no bound; a teleport only makes the start look earlier, i.e. early). The tracker queues events for the
+-- server to send: { kind = "armed" | "early" | "go" | "flag", ... }; the bell time is never in
+-- them.
 TR.DASH_SETTLE = 1.5 -- after a go, standing in the stall this long also ends the break
 
 function TR.breakScore(reaction: number, cfg: any): number
@@ -257,13 +281,13 @@ local function feedAccel(tr: any, prev: Sample?, s: Sample, cfg: any)
 		dt = s.t - prev.t
 	end
 	local slow = dt <= 0 or moved / dt < 3
-	-- when the horse set off: back from this sample by the time a gallop takes to cover `moved`
+	-- how far from where the break was readied, and when the horse set off from there
+	local away = if tr.spot then math.sqrt((s.x - tr.spot.x) ^ 2 + (s.z - tr.spot.z) ^ 2) else moved
 	local function goTime(): number
-		if not prev then return s.t end
-		return math.clamp(s.t - moved / cfg.gallop, prev.t, s.t)
+		return math.clamp(s.t - away / cfg.gallop, tr.armT or s.t, s.t)
 	end
 	local function gone(): boolean
-		return moved >= ac.goStuds or not inBox
+		return away >= ac.goStuds or not inBox
 	end
 	if tr.phase == "settle" or tr.phase == "dash" then
 		if tr.phase == "dash" and prev and not s.gap then
@@ -280,9 +304,10 @@ local function feedAccel(tr: any, prev: Sample?, s: Sample, cfg: any)
 					tr.settleSince = s.t - ac.settleSeconds -- already settled
 				end
 				tr.arms += 1
+				tr.armT, tr.spot = s.t, { x = s.x, z = s.z }
 				tr.bellT = s.t + TC.bellDelay(tr.seed, tr.arms)
 				tr.phase = "armed"
-				event(tr, "armed", { attempt = tr.attempt, bellT = tr.bellT })
+				event(tr, "armed", { attempt = tr.attempt })
 			end
 		else
 			tr.settleSince = nil
@@ -295,14 +320,15 @@ local function feedAccel(tr: any, prev: Sample?, s: Sample, cfg: any)
 					event(tr, "early", { rerun = true })
 					tr.attempt, tr.phase, tr.bellT, tr.settleSince = 2, "settle", nil, nil
 				else
-					tr.results[tr.breakNo] = { score = ac.breakFloor, early = true }
+					tr.results[tr.breakNo] = { score = ac.breakFloor, early = true, wait = (tr.bellT :: number) - (tr.armT :: number) }
 					event(tr, "early", { rerun = false, score = ac.breakFloor })
 					tr.phase = "dash"
 				end
 			else
-				local reaction = math.max(0, goT - (tr.bellT :: number) - tr.allowance)
+				local allowance = tr.allowances[tr.arms] or tr.allowance
+				local reaction = math.max(0, goT - (tr.bellT :: number) - allowance)
 				local score = TR.breakScore(reaction, cfg)
-				tr.results[tr.breakNo] = { score = score, reaction = reaction }
+				tr.results[tr.breakNo] = { score = score, reaction = reaction, wait = (tr.bellT :: number) - (tr.armT :: number) }
 				event(tr, "go", { score = score, reaction = reaction })
 				tr.phase, tr.settleSince = "dash", nil
 			end
@@ -462,8 +488,10 @@ function TR.finalize(raw: number, badShare: number, seconds: number?, ideal: num
 end
 
 -- Gate Break from a ride's kept samples (the server's live tracker sees the same ones).
-function TR.scoreAccel(kept: { Sample }, seed: number, allowance: number, cfg: any): (number, any)
-	local tr = TR.tracker("accel", { seed = seed, allowance = allowance })
+-- `allowance` is one number or a table by bell (the n-th bell's allowance at [n]).
+function TR.scoreAccel(kept: { Sample }, seed: number, allowance: any, cfg: any): (number, any)
+	local tr = TR.tracker("accel", { seed = seed, allowance = if typeof(allowance) == "number" then allowance else 0,
+		allowances = if typeof(allowance) == "table" then allowance else nil })
 	for _, s in kept do TR.feed(tr, s, cfg) end
 	local total, scored, quick = 0, 0, 0
 	for b = 1, cfg.accel.breaks do
@@ -477,6 +505,19 @@ function TR.scoreAccel(kept: { Sample }, seed: number, allowance: number, cfg: a
 	return total / cfg.accel.breaks, { breaks = tr.results, scored = scored, quick = quick, finishT = tr.finishT }
 end
 
+-- Gate Break's ideal time for this ride: the bell waits it really had (the average for a break
+-- that didn't happen), so gold never depends on bell luck.
+function TR.accelIdeal(results: any, cfg: any): number
+	local ac = cfg.accel
+	local base = TC.idealSeconds("accel")
+	local mean = (ac.bellMin + ac.bellMax) / 2
+	for b = 1, ac.breaks do
+		local r = results[b]
+		if r and r.wait then base += r.wait - mean end
+	end
+	return base
+end
+
 -- Hill Climb: is the horse in Pip's ring at t? The ring runs ringNear..ringFar studs behind
 -- Pip round the oval, ringHalfWidth either side of Pip's line. `lag` (the player's latency,
 -- capped) is how far behind the server's clock the rider's screen shows Pip.
@@ -488,6 +529,8 @@ function TR.inRing(seed: number, t: number, x: number, z: number, lag: number, c
 	return behind >= st.ringNear and behind <= st.ringFar and math.abs(lat - pony.lateral) <= st.ringHalfWidth, behind
 end
 
+-- `kept` must include off-course samples (TR.run validates Hill Climb without a course
+-- check): time away from the track is time out of the ring, not time that doesn't count.
 function TR.scoreStamina(kept: { Sample }, seed: number, lag: number, cfg: any): (number, any)
 	local endT = TC.idealSeconds("stamina", seed)
 	local n, inside = 0, 0
@@ -503,24 +546,27 @@ end
 
 -- Validate, score and finalize a whole ride. `seconds` is the ride time the server measured
 -- (its tracker's finish, or the time when the ride ran out).
--- opts: { seed, allowance } for Gate Break and Hill Climb.
+-- opts: Gate Break { bellSeed, allowance (or allowances by bell) }, Hill Climb { seed, lag }.
 function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?, opts: any?)
 	local o = opts or {}
-	local kept, bad, counts = TR.validate(samples, function(x: number, z: number): boolean return TC.onCourse(key, x, z) end, cfg)
+	-- Hill Climb keeps off-course samples: they count as out of Pip's ring
+	local onCourse = if key == "stamina" then nil else function(x: number, z: number): boolean return TC.onCourse(key, x, z) end
+	local kept, bad, counts = TR.validate(samples, onCourse, cfg)
 	local raw, detail
 	if key == "speed" then
 		raw, detail = TR.scoreSpeed(kept, cfg)
 	elseif key == "grit" then
 		raw, detail = TR.scoreGrit(kept, cfg)
 	elseif key == "accel" then
-		raw, detail = TR.scoreAccel(kept, o.seed or 1, o.allowance or 0, cfg)
+		raw, detail = TR.scoreAccel(kept, o.bellSeed or 1, o.allowances or o.allowance or 0, cfg)
 	elseif key == "stamina" then
-		raw, detail = TR.scoreStamina(kept, o.seed or 1, o.allowance or 0, cfg)
+		raw, detail = TR.scoreStamina(kept, o.seed or 1, o.lag or 0, cfg)
 	else
 		return nil
 	end
 	local secs = seconds or detail.finishT or (if #samples > 0 then samples[#samples].t else 0)
-	local res = TR.finalize(raw, bad, secs, TC.idealSeconds(key), cfg)
+	local ideal = if key == "accel" then TR.accelIdeal(detail.breaks, cfg) else TC.idealSeconds(key)
+	local res = TR.finalize(raw, bad, secs, ideal, cfg)
 	res.detail, res.course, res.kept, res.counts = detail, key, #kept, counts
 	res.scored = if key == "speed" then detail.hoops
 		elseif key == "grit" then detail.mud + detail.logs + detail.poles

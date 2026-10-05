@@ -11,7 +11,11 @@
 --   TrainAbort -> a gentle note and everything goes away.
 --   Gate Break (T3): the practice gate's doors on this screen; TrainCue moments from the server:
 --   "Ready…", the bell (doors swing open, "GO!"), "Wait for the bell!", "Great start!", then back
---   round the loop to the gate (the horse stops by itself in the stall).
+--   round the loop to the gate (the horse stops by itself in the middle of the stall). A stick
+--   still pushed from riding in must be let go once before the horse can leave the stall, so
+--   nobody is launched into an early go.
+--   The countdown and Pip run on the server's clock (TrainBegin's go time and
+--   workspace:GetServerTimeNow()), so Pip on this screen is the server's Pip.
 --   Hill Climb (T3): Pip the lead pony (a palomino at 0.85 scale in a teal lead-pony cloth) runs
 --   ponyAt(seed, t) on this screen only; a glowing ring behind him; inside it your horse keeps
 --   Pip's pace by itself. "Stay with Pip!" is the only nudge.
@@ -476,17 +480,23 @@ local function sampleNow(s): any?
 	local hh = (rig :: Model):FindFirstChildOfClass("Humanoid")
 	local y = pos.Y - (s.baseY or pos.Y) - TC.groundHeight(pos.X, pos.Z)
 	if hh and hh.FloorMaterial ~= Enum.Material.Air then y = math.min(y, 0.5) end -- on the ground, whatever the baseline says
-	return { t = os.clock() - (s.goAt or os.clock()), x = pos.X, z = pos.Z, y = y }
+	return { t = TrainingRide.rideClock(workspace:GetServerTimeNow(), s.goAtServer), x = pos.X, z = pos.Z, y = y }
 end
 
 local function onGo(s)
-	s.goAt = os.clock()
 	table.sort(s.base)
 	s.baseY = if #s.base > 0 then s.base[(#s.base + 1) // 2] else nil
 	s.tracker = TrainingRide.tracker(s.course)
 	s.prev = sampleNow(s)
 	TrainingState.phase = "ride"
-	if s.course == "accel" then s.gate = "settle" end
+	if s.course == "accel" then
+		-- Gate Break starts on the bell, not here: no "Go!", and nothing hides "Ready…" later
+		if s.gate == "countdown" then
+			s.gate = "settle"
+			countdown.Visible = false
+		end
+		return
+	end
 	countdown.Text = "Go!"
 	Ui.pop(countdown)
 	play("vo_giddyup", 0.8)
@@ -495,12 +505,13 @@ local function onGo(s)
 	end)
 end
 
-local function beginSession(course: string, n: number, seed: number)
+local function beginSession(course: string, n: number, seed: number, goAtServer: number)
 	stopVisuals()
 	local c = TC.courses[course]
 	if not c then return end
-	local s = { course = course, c = c, seed = seed, base = {}, got = {}, target = nil, recent = {}, hops = {}, hoopsHit = 0,
-		hint = 1, breaksDone = 0, gate = "countdown", outSince = nil, nudgedAt = -math.huge }
+	local s = { course = course, c = c, seed = seed, goAtServer = goAtServer, base = {}, got = {}, target = nil, recent = {},
+		hops = {}, hoopsHit = 0, hint = 1, breaksDone = 0, gate = "countdown", outSince = nil, nudgedAt = -math.huge,
+		released = false }
 	session = s
 	TrainingState.active, TrainingState.course, TrainingState.phase = true, course, "countdown"
 	courseLabel.Text = c.emoji .. " " .. c.name
@@ -519,18 +530,21 @@ local function beginSession(course: string, n: number, seed: number)
 	jumpBtn.Visible = UserInputService.TouchEnabled
 	countdown.Visible = true
 	task.spawn(function()
-		for k = math.max(1, math.floor(n + 0.5)), 1, -1 do
-			if session ~= s then return end
-			countdown.Text = tostring(k)
-			Ui.pop(countdown)
-			play("ui_pop")
-			-- the horse's riding height, while it stands at the start
-			local t0 = os.clock()
-			while os.clock() - t0 < 1 do
-				local rig = myRide()
-				if rig and rig.PrimaryPart then table.insert(s.base, rig.PrimaryPart.Position.Y) end
-				task.wait(0.1)
+		-- 3-2-1 on the server's clock: GO is the server's go time, however late we got here
+		local shown = nil
+		while session == s do
+			local left = goAtServer - workspace:GetServerTimeNow()
+			if left <= 0 then break end
+			local k = math.max(1, math.ceil(left))
+			if k ~= shown then
+				shown = k
+				countdown.Text = tostring(k)
+				Ui.pop(countdown)
+				play("ui_pop")
 			end
+			local rig = myRide() -- the horse's riding height, while it stands at the start
+			if rig and rig.PrimaryPart then table.insert(s.base, rig.PrimaryPart.Position.Y) end
+			task.wait(math.min(0.1, math.max(0, left)))
 		end
 		if session == s then onGo(s) end
 	end)
@@ -589,19 +603,34 @@ local function cheerFor(s, prev, cur)
 end
 
 -- Gate Break: pace, aim, glow and prints for where you are in a break.
+--   settle / back: canter; stop by itself in the middle of the stall
+--   ready / bell:  standing in the stall; the stick must be let go once after coming in, then
+--                  any push is a go (early before the bell)
+--   dash:          gallop to the flag
+local STICK_DEADZONE = 0.2
 local function gateFrame(s, cur)
 	local ac = TC.courses.accel
 	local gz = ac.start.z
-	local inner = { ac.stall[1] + 1, ac.stall[2] + 1, ac.stall[3] - 1, ac.stall[4] - 1 }
+	-- where the horse stops: the middle of the stall (doorX - 8 .. doorX)
+	local hold = { ac.doorX - 5.5, gz - 3, ac.doorX - 1.5, gz + 3 }
 	setDots(CFG.accel.breaks, s.breaksDone, true)
-	if s.gate == "go" or s.gate == "ready" then
+	if not TC.inRect(ac.stall, cur.x, cur.z) then
+		s.released = false
+	elseif (TrainingState.stick or 0) < STICK_DEADZONE then
+		s.released = true
+	end
+	if s.gate == "ready" or s.gate == "bell" then
+		TrainingState.speed = if s.released then nil else 0
+		TrainingState.aim = { x = ac.flag.ax + 10, z = gz }
+		return
+	elseif s.gate == "dash" then
 		TrainingState.speed = nil -- a gallop
 		TrainingState.aim = { x = ac.flag.ax + 10, z = gz }
 		return
 	end
-	-- settling or heading back: canter, and stop by itself inside the stall (for up to 3 s,
-	-- so a horse the server hasn't readied yet can still move)
-	if TC.inRect(inner, cur.x, cur.z) then
+	-- settling or heading back: canter, and stop by itself in the stall (for up to 3 s, so a
+	-- horse the server hasn't readied yet can still move)
+	if TC.inRect(hold, cur.x, cur.z) then
 		s.holdSince = s.holdSince or os.clock()
 		TrainingState.speed = if os.clock() - s.holdSince < 3 then 0 else 8
 	else
@@ -625,14 +654,16 @@ local function pipFrame(s, cur, dt: number)
 	if s.pip then s.pipPos = placePip(s.pip, pony, dt, s.pipPos) end
 	local rd = pony.d - (st.ringNear + st.ringFar) / 2
 	local rx, rz = TC.ovalPoint(rd, pony.lateral)
-	local inside, behind = TrainingRide.inRing(s.seed, t, cur.x, cur.z, 0, CFG)
+	local inside = TrainingRide.inRing(s.seed, t, cur.x, cur.z, 0, CFG)
 	if s.ring then
 		s.ring.CFrame = CFrame.new(rx, GROUND_Y + TC.groundHeight(rx, rz) + 0.3, rz) * CFrame.Angles(0, 0, math.pi / 2)
 		s.ring.Color = if inside then C.gold else C.white
 		s.ring.Transparency = if inside then 0.45 else 0.65
 	end
-	-- inside the ring your horse keeps Pip's pace; behind it, a gallop catches up
-	TrainingState.speed = if inside then pony.speed elseif behind > st.ringFar then CFG.gallop else pony.speed * 0.7
+	-- inside the ring your horse keeps Pip's pace; behind it (by any amount, even more than half
+	-- a lap) a gallop catches up; ahead of it, ease off
+	local behindAll = pony.s - s.tracker.progress
+	TrainingState.speed = if inside then pony.speed elseif behindAll > st.ringFar then CFG.gallop else pony.speed * 0.7
 	TrainingState.aim = (function()
 		local ax, az = TC.ovalCarrot(cur.x, cur.z, 12, pony.lateral)
 		return { x = ax, z = az }
@@ -662,6 +693,7 @@ RunService.RenderStepped:Connect(function(dt)
 		gateFrame(s, cur)
 		return
 	elseif s.course == "stamina" then
+		TrainingRide.feed(s.tracker, cur, CFG) -- your progress round the oval, to know how far behind Pip
 		s.prev = cur
 		pipFrame(s, cur, dt)
 		return
@@ -884,9 +916,10 @@ local function showCard(r)
 end
 
 -- Remotes -----------------------------------------------------------------------------------------
-TrainBegin.OnClientEvent:Connect(function(course, seed, n)
+TrainBegin.OnClientEvent:Connect(function(course, seed, n, goAtServer)
 	closeCard(false)
-	beginSession(course, tonumber(n) or CFG.countdownSeconds, tonumber(seed) or 1)
+	local count = tonumber(n) or CFG.countdownSeconds
+	beginSession(course, count, tonumber(seed) or 1, tonumber(goAtServer) or (workspace:GetServerTimeNow() + count))
 end)
 
 -- Gate Break moments.
@@ -894,6 +927,8 @@ TrainCue.OnClientEvent:Connect(function(kind, data)
 	local s = session
 	if not s or s.course ~= "accel" or typeof(data) ~= "table" then return end
 	local ac = TC.courses.accel
+	-- each moment starts a fresh leg: the route aim from the start of the loop, a fresh stall stop
+	s.hint, s.holdSince = 1, nil
 	if kind == "armed" then
 		s.gate = "ready"
 		setDoors(false, false)
@@ -903,7 +938,7 @@ TrainCue.OnClientEvent:Connect(function(kind, data)
 		countdown.Visible = true
 		Ui.pop(countdown)
 	elseif kind == "bell" then
-		s.gate = "go"
+		s.gate = "bell"
 		setDoors(true, false)
 		play("gate_bell", 0.8)
 		countdown.Text = "GO!"
@@ -917,14 +952,24 @@ TrainCue.OnClientEvent:Connect(function(kind, data)
 			if session == s and s.gate ~= "ready" then countdown.Visible = false end
 		end)
 	elseif kind == "early" then
-		s.gate = if data.rerun then "back" else "go"
 		countdown.Visible = false
-		say("Wait for the bell!", C.white)
 		if data.rerun then
+			s.gate, s.released = "back", false
+			say("Wait for the bell!", C.white)
 			setDoors(true, true)
 			s.backPrintsAt = 0
+		else
+			-- early again: this break counts as an easy start; off to the flag (no bell to wait for)
+			s.gate = "dash"
+			say("Off you go! Ride to the flag!", C.gold)
+			setDoors(true, false)
+			glowParts(flagParts())
+			local rig = myRide()
+			local root = rig and rig.PrimaryPart
+			if root then printsAlong({ { x = root.Position.X, z = root.Position.Z }, { x = ac.flag.ax, z = ac.start.z } }, 7, 18) end
 		end
 	elseif kind == "go" then
+		s.gate = "dash"
 		local score = tonumber(data.score) or 0
 		say(if score >= 90 then "Great start!" elseif score >= 60 then "Good start!" else "Off you go!", C.gold)
 		play("tap_good", 0.7)
@@ -934,7 +979,7 @@ TrainCue.OnClientEvent:Connect(function(kind, data)
 		clearGlow()
 		clearPrints()
 		if not data.last then
-			s.gate = "back"
+			s.gate, s.released = "back", false
 			s.backPrintsAt = 0
 			setDoors(true, true)
 			say("Back to the gate!", C.white)

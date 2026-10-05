@@ -13,6 +13,7 @@ local TrainingState = {
 	speed = nil :: number?,       -- the course's pace right now, if it isn't the usual one
 	aim = nil,                    -- { x, z }: where Easy Rein steers
 	easyRein = false,             -- the player's Easy Rein setting
+	stick = 0,                    -- how far the move stick is pushed (RideClient writes it)
 }
 
 -- PaddockClient's picker asks to start a course through this (so both scripts share one path).

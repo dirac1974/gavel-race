@@ -211,6 +211,7 @@ RunService.RenderStepped:Connect(function()
 	if TrainingState.active and TrainingState.phase == "ride" and root and TrainingState.course then
 		-- Courses ride at their own speed: a part-pushed stick still rides at full course speed
 		-- (only the direction counts), with a small deadzone so a resting thumb doesn't steer.
+		TrainingState.stick = move.Magnitude -- Gate Break waits for a let-go stick in the stall
 		local dir = if move.Magnitude > COURSE_DEADZONE then move.Unit else Vector3.zero
 		-- TrainingState.speed: the course's own pace this moment (Pip's speed in his ring, a
 		-- canter back to the practice gate, a stop inside it).
@@ -220,7 +221,11 @@ RunService.RenderStepped:Connect(function()
 		if TrainingState.easyRein and aim and steer.Magnitude > 0 then
 			-- Easy Rein (D-053): a strong pull toward the next hoop, ring, flag or piece
 			local to = Vector3.new(aim.x - root.Position.X, 0, aim.z - root.Position.Z)
-			if to.Magnitude > 1 then steer = (steer.Unit * 0.25 + to.Unit * 0.75).Unit end
+			if to.Magnitude > 1 then
+				-- pulling well away from the aim (more than 90°) still turns you round
+				local w = if steer.Unit:Dot(to.Unit) >= 0 then 0.75 else 0.15
+				steer = (steer.Unit * (1 - w) + to.Unit * w).Unit
+			end
 		end
 		hh:Move(magnet(steer, root.Position), false)
 		return

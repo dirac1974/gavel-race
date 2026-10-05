@@ -11,8 +11,12 @@
 --                                   "bell", "early", "go", "flag")
 --   Gate Break runs a live tracker on screened samples (the same screening a replay uses), so
 --   the bell the rider hears is the one the score uses; bell times come from the session seed.
---   Hill Climb ends when Pip finishes his two laps. Both take the player's latency allowance
---   (round trip + margin, capped at 0.3 s): off each reaction, and as Pip's clock lag.
+--   The bells come from a server-only seed (never sent); the shared seed is Pip's. TrainBegin
+--   carries the go time on the server's clock, so the rider's screen runs the countdown and Pip
+--   on workspace:GetServerTimeNow(). Hill Climb ends when Pip finishes his two laps.
+--   Latency allowances (capped at 0.3 s): Gate Break takes the round trip + margin off each
+--   reaction, measured when that bell rings; Hill Climb lags Pip's clock by one way + margin
+--   (the server sees the rider one trip late), from the ride's median ping.
 --   The client sends no score. The server checks the horse is yours, stalled and the one you
 --   ride, that you're at the paddock or the Training Ground and not racing, and the session
 --   limits; puts you at the start; then samples the ride rig's root at 10 Hz on its own clock
@@ -39,7 +43,6 @@ local TrainingRide = require(Shared:WaitForChild("TrainingRide"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
-local TapTime = require(Shared:WaitForChild("TapTime"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
@@ -55,6 +58,15 @@ local TrainAbort = Profiles.remote("TrainAbort")   -- both ways: reason / stop
 local TrainCue = Profiles.remote("TrainCue")       -- server -> client: Gate Break moments
 local SESSION_GAP = CFG.sessionGapSeconds          -- seconds between sessions (each game takes longer)
 local CARD_SECONDS = 90                            -- safety net: TrainingRide clears this long after the end card opens
+
+local rng = Random.new()
+
+local function median(list: { number }): number
+	if #list == 0 then return 0 end
+	local c = table.clone(list)
+	table.sort(c)
+	return c[(#c + 1) // 2]
+end
 
 local lastTrain: { [Player]: number } = {}
 local lastVet: { [Player]: number } = {}
@@ -154,7 +166,10 @@ end
 
 local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 	if not endSession(player, s) then return end
-	local result = TrainingRide.run(s.course, s.samples, CFG, seconds, { seed = s.seed, allowance = s.allowance })
+	local result = TrainingRide.run(s.course, s.samples, CFG, seconds, {
+		seed = s.seed, lag = TrainingRide.lagAllowance(median(s.pings)),
+		bellSeed = s.bellSeed, allowances = s.tracker.allowances, allowance = s.allowance,
+	})
 	local data = Profiles.get(player)
 	local h = data and Profile.horse(data, s.horseId)
 	if not result or not h then
@@ -189,7 +204,7 @@ local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 			elseif s.course == "accel" then { breaks = result.detail.scored, quick = result.detail.quick }
 			elseif s.course == "stamina" then { share = result.detail.share }
 			else { mud = result.detail.mud, logs = result.detail.logs, poles = result.detail.poles },
-		finished = seconds ~= nil and s.tracker.finished,
+		finished = seconds ~= nil and (s.tracker.finished or s.course == "stamina"), -- Hill Climb ends when Pip finishes
 	})
 end
 
@@ -253,13 +268,16 @@ local function startCourse(player: Player, horseId: any, course: any)
 	if rig.PrimaryPart then rig.PrimaryPart.AssemblyLinearVelocity = Vector3.zero end
 	table.insert(history[player], os.clock())
 	local now = os.clock()
-	local seed = math.random(1, 2 ^ 30)
+	local seed = rng:NextInteger(1, 2 ^ 30)      -- shared: Pip's path
+	local bellSeed = rng:NextInteger(1, 2 ^ 30)  -- server only: the bells
 	-- the bell goes out and the go comes back: the whole round trip, plus a margin, capped
-	local allowance = TapTime.rewindAllowance(2 * player:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	-- (measured again when each bell rings)
+	local allowance = TrainingRide.bellAllowance(player:GetNetworkPing())
 	local s = {
-		course = course, horseId = horseId, rig = rig, seed = seed, allowance = allowance,
-		goAt = now + CFG.countdownSeconds, lastSample = now, samples = {}, base = {}, baseY = nil,
-		outside = 0, tracker = TrainingRide.tracker(course, { seed = seed, allowance = allowance }),
+		course = course, horseId = horseId, rig = rig, seed = seed, bellSeed = bellSeed, allowance = allowance,
+		goAt = now + CFG.countdownSeconds, goAtServer = workspace:GetServerTimeNow() + CFG.countdownSeconds,
+		lastSample = now, samples = {}, base = {}, baseY = nil, pings = { player:GetNetworkPing() },
+		outside = 0, tracker = TrainingRide.tracker(course, { seed = bellSeed, allowance = allowance }),
 		screen = TrainingRide.screener(function(x: number, z: number): boolean return TrainingCourses.onCourse(course, x, z) end),
 		endT = if course == "stamina" then TrainingCourses.idealSeconds("stamina", seed) else nil,
 		bellSent = 0,
@@ -269,7 +287,7 @@ local function startCourse(player: Player, horseId: any, course: any)
 	cards[player] = nil
 	setTrainingRide(player, true)
 	Rides.setTraining(player, true)
-	TrainBegin:FireClient(player, course, s.seed, CFG.countdownSeconds)
+	TrainBegin:FireClient(player, course, s.seed, CFG.countdownSeconds, s.goAtServer)
 end
 
 TrainStart.OnServerEvent:Connect(function(player: Player, horseId: any, course: any)
@@ -328,10 +346,14 @@ local function sample(player: Player, s, now: number)
 		-- Gate Break: screened samples drive the live tracker; its moments go to the client
 		local kind, kept = TrainingRide.screen(s.screen, smp, CFG)
 		if kind == "ok" then TrainingRide.feed(s.tracker, kept, CFG) end
-		for _, e in s.tracker.events do TrainCue:FireClient(player, e.kind, e) end
+		for _, e in s.tracker.events do
+			-- only what the screen needs (never a bell time)
+			TrainCue:FireClient(player, e.kind, { breakNo = e.breakNo, attempt = e.attempt, rerun = e.rerun, score = e.score, last = e.last })
+		end
 		table.clear(s.tracker.events)
 		if s.tracker.finished then return finish(player, s, s.tracker.finishT or t) end
 	elseif s.course == "stamina" then
+		if #s.samples % CFG.sampleHz == 0 then table.insert(s.pings, player:GetNetworkPing()) end
 		if t >= s.endT then return finish(player, s, s.endT) end -- Pip has finished his two laps
 	elseif TrainingRide.feed(s.tracker, smp, CFG) then
 		return finish(player, s, s.tracker.finishT or t)
@@ -344,6 +366,7 @@ local function ringBell(player: Player, s, now: number)
 	local tr = s.tracker
 	if (tr.phase == "armed" or tr.phase == "go") and tr.bellT and s.bellSent ~= tr.arms and now - s.goAt >= tr.bellT then
 		s.bellSent = tr.arms
+		tr.allowances[tr.arms] = TrainingRide.bellAllowance(player:GetNetworkPing()) -- this bell's latency
 		TrainCue:FireClient(player, "bell", { breakNo = tr.breakNo })
 	end
 end
