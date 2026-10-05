@@ -539,4 +539,19 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(plaque and plaque.wins == 9 and #rp.horses == 1 and rp.activeHorse == r2.id and rp.hallOfFame[1].name == "Old Timer",
 		"retiring keeps a Hall of Fame plaque")
 	check(Leagues.retire(rp, "nope", T0) == nil, "only your horses retire")
+
+	-- First ten minutes (Stage 10) -------------------------------------------------------
+	local Tour = require("../../game/src/shared/Tour")
+	local flags = {}
+	check(Tour.current(flags) == 1 and Tour.STEPS[1].event == "race", "tour starts with a race")
+	local _, moved = Tour.advance(flags, "feed")
+	check(not moved and Tour.current(flags) == 1, "doing something else doesn't skip the current step")
+	Tour.advance(flags, "race")
+	check(Tour.current(flags) == 3, "a step done early (feeding before racing) is skipped later")
+	for _, step in Tour.STEPS do Tour.advance(flags, step.event) end
+	check(Tour.current(flags) == nil and flags.tourDone, "doing each step finishes the tour")
+	local f2 = {}
+	Tour.skip(f2)
+	check(Tour.current(f2) == nil, "the tour can be skipped")
+	check(Tour.text(Tour.STEPS[2], "Comet") == "Great ride! Head to your barn and give Comet some hay.", "horse name in the text")
 end

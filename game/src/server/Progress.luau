@@ -14,6 +14,7 @@ local Progress = {}
 function Progress.record(player: Player, event: string, n: number?)
 	local data = Profiles.get(player)
 	if not data or (n or 1) <= 0 then return end
+	if Progress.onRecord then Progress.onRecord(player, event) end -- the first-ten-minutes tour (SettingsService)
 	local finished = Jobs.record(data, player.UserId, event, n or 1, os.time())
 	for _, d in finished do
 		Profiles.notify(player, "Job done: " .. d.text .. "! Claim it on your Stable Board", "clipboard")
