@@ -341,4 +341,36 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(PaceMeter.countAtLeast(passes, { 0.5, 1.5 }, 80) == 2, "two centred taps are Great")
 	check(PaceMeter.countAtLeast(passes, { 0.5, 0.51, 1.5 }, 80) == 1, "a doubled pass doesn't count")
 	check(PaceMeter.countAtLeast(passes, { 0.05 }, 80) == 0, "an edge tap isn't Great")
+
+	-- Training and the vet (Stage 6) ------------------------------------------------------
+	local Training = require("../../game/src/shared/Training")
+	local th = Horse.starter("h7", "Clover", "bay", rng, T0)
+	th.potential.speed = 85
+	local okT, g1, msgT = Training.train(th, "speed", 100, T0)
+	-- never trained = rested: 0.12 × 40 × 1.0 × 1.5 = 7.2, capped at 6 for the week
+	check(okT and close(g1, 6, 1e-9) and close(th.stats.speed, 51, 1e-9) and string.find(msgT, "Rested") ~= nil, "first session: rested bonus, weekly cap")
+	check(not Training.train(th, "accel", 100, T0 + 60), "weekly cap stops more training")
+	check(not Training.ready(th, T0 + 60) and Training.ready(th, T0 + 8 * 86400), "cap resets next week")
+	local th2 = Horse.starter("h8", "Daisy", "grey", rng, T0)
+	th2.potential.stamina = 75
+	local _, ga = Training.train(th2, "stamina", 0, T0)                    -- rested, poor score: 0.12 × 30 × 0.5 × 1.5 = 2.7
+	local _, gb = Training.train(th2, "stamina", 100, T0 + 600)            -- not rested: 0.12 × 27.3 × 1.0 = 3.276 → capped at 3.3 (6 − 2.7)
+	check(close(ga, 2.7, 1e-9) and close(gb, 3.3, 1e-9), "gain follows room left, score and rest; cap total")
+	local th3 = Horse.starter("h9", "Pebble", "black", rng, T0)
+	th3.potential.grit = th3.stats.grit
+	check(not Training.train(th3, "grit", 100, T0), "no training past Potential")
+	check(not Training.train(th3, "luck", 100, T0) and not Training.train(th3, "speed", 0 / 0, T0), "only real stats and scores")
+	-- gains slow near Potential
+	local near = Horse.starter("h10", "Sunny", "palomino", rng, T0)
+	near.potential.accel, near.stats.accel = 80, 78
+	local _, gn = Training.train(near, "accel", 100, T0)
+	check(gn <= 2 and near.stats.accel <= 80, "never above Potential")
+	-- vet
+	local vh = Horse.starter("h11", "Biscuit", "bay", rng, T0)
+	local okV, msgV, stamp = Training.checkup(vh, 80, T0)
+	check(okV and stamp == "checkup" and vh.bond == 1 and string.find(msgV, "stamp") ~= nil, "first check-up: stamp and bond")
+	local _, _, stamp2 = Training.checkup(vh, 80, T0 + 60)
+	check(stamp2 == nil and vh.bond == 1, "one check-up a day counts")
+	local _, _, stamp3 = Training.checkup(vh, 20, T0 + 86400)
+	check(stamp3 == "potential" and vh.stamps.potential and Horse.view(vh, T0 + 86400, E).potential ~= nil, "second visit reveals Potential")
 end
