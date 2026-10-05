@@ -1,10 +1,11 @@
 --!strict
--- Training and the vet (D-039, D-040). Pure rules on horse records, tested under Lune.
--- Training: one mini-game per stat at the Training Paddock. A session gains in proportion
--- to the room left below the horse's Potential, so a stat slows down as it nears its cap:
+-- Training and the vet (D-039, D-040, D-053). Pure rules on horse records, tested under Lune.
+-- Training: a ride-through course per stat (TrainingRide scores it on the server) or a Quick
+-- train game. A session gains in proportion to the room left below the horse's Potential, so
+-- a stat slows down as it nears its cap:
 --   gain = K × (Potential − stat) × (0.5 + 0.5 × score / 100), × 1.5 if the horse is rested
 -- (no session for RESTED_SECONDS, offline counts), never more than the weekly cap per horse.
--- The cap is the real limit (scores come from the client), reachable in about 3 sessions.
+-- The cap is the real limit, reachable in about 3 sessions.
 -- "Training moves you up leagues; riding wins races."
 -- Vet (wellness clinic): a heartbeat check-up gives +1 bond once a day and the next Health
 -- Passport stamp on a new day. Nothing makes a horse ill and nothing is for sale.

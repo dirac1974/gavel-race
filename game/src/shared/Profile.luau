@@ -68,6 +68,34 @@ function Profile.new(now: number): Profile
 	}
 end
 
+-- Training rides (D-053): per horse, the best ribbon and the best run on each course.
+--   h.ribbons[course] = "bronze" | "silver" | "gold"
+--   h.trainingBest[course] = { score = 0..100, seconds = ride time }
+Profile.COURSES = { "speed", "accel", "stamina", "grit" }
+Profile.RIBBONS = { bronze = true, silver = true, gold = true }
+
+function Profile.repairTraining(h: any)
+	local ribbons = {}
+	if typeof(h.ribbons) == "table" then
+		for _, c in Profile.COURSES do
+			if Profile.RIBBONS[h.ribbons[c]] then ribbons[c] = h.ribbons[c] end
+		end
+	end
+	h.ribbons = ribbons
+	local best = {}
+	if typeof(h.trainingBest) == "table" then
+		for _, c in Profile.COURSES do
+			local b = h.trainingBest[c]
+			local score = typeof(b) == "table" and tonumber(b.score)
+			local seconds = typeof(b) == "table" and tonumber(b.seconds)
+			if score and seconds and score == score and seconds == seconds then
+				best[c] = { score = math.clamp(score, 0, 100), seconds = math.clamp(seconds, 0, 3600) }
+			end
+		end
+	end
+	h.trainingBest = best
+end
+
 -- Load whatever was saved (nil for a new player) and bring it to the current version,
 -- repairing anything missing or out of range.
 function Profile.migrate(data: any, now: number): Profile
@@ -88,7 +116,11 @@ function Profile.migrate(data: any, now: number): Profile
 	local horses = {}
 	if typeof(p.horses) == "table" then
 		for _, h in p.horses do
-			if typeof(h) == "table" and typeof(h.id) == "string" then table.insert(horses, Horse.repair(h, now)) end
+			if typeof(h) == "table" and typeof(h.id) == "string" then
+				local fixed = Horse.repair(h, now)
+				Profile.repairTraining(fixed)
+				table.insert(horses, fixed)
+			end
 		end
 	end
 	p.horses = horses

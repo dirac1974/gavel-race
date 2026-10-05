@@ -1,7 +1,13 @@
 --!nonstrict
--- PaddockClient (D-039, D-040): training games at the Training Paddock and the heartbeat
--- check-up at the Vet.
---   Train: pick a horse and a stat, play a 10-second game, the server adds the gain.
+-- PaddockClient (D-039, D-040, D-053): the training picker at the Training Paddock and the
+-- heartbeat check-up at the Vet.
+--   Train (D-053): four picture tiles for the ride-through courses on your active horse
+--     (Sprint Lane and Mud Splash now; Gate Break and Hill Climb "Coming soon"), plus "Quick
+--     train" for the old games. Picking a course (here or at its picture sign's "Ride" prompt)
+--     asks TrainingRideClient to start it. GameConfig.training.mode = "meters" shows only the
+--     games, as before D-053.
+--   Quick train: pick a horse and a stat, play a 10-second game, the server adds the gain
+--   (still client-scored until T4; the server caps its quality).
 --     Sprint Lane (Speed): tap as the runner crosses each glowing zone.
 --     Gate Break (Acceleration): wait for green, then tap fast.
 --     Hill Climb (Stamina): hold to keep the marker in the moving green band.
@@ -22,6 +28,9 @@ if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
+local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
 
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local C = Ui.colors
@@ -472,14 +481,68 @@ local function chooseStat(h)
 	end
 end
 
-local function trainingMenu()
-	open("⭐ Training Paddock", "Pick a horse to train")
+local function quickTrainMenu()
+	open(if GameConfig.training.mode == "rides" then "⚡ Quick train" else "⭐ Training Paddock", "Pick a horse to train")
 	if #stalledHorses() == 0 then
 		Ui.text(body, "Pick your first horse to start training!", 22, { Size = UDim2.new(1, 0, 0, 40) })
 		return
 	end
 	horseRow(chooseStat)
 	Ui.text(body, "Training moves you up leagues. Riding wins races!", 18, { Position = UDim2.new(0, 0, 0, 110), Size = UDim2.new(1, 0, 0, 26) }).TextColor3 = C.plum
+end
+
+-- The course picker (D-053): four picture tiles and Quick train.
+local RIBBON_EMOJI = { bronze = "🥉", silver = "🥈", gold = "🥇" }
+local function coursePicker()
+	local h = PlayerState.activeHorse()
+	if not h or not h.stalled then
+		open("⭐ Training", "Ride your horse round a course!")
+		local msg = if h then h.name .. " is out in the pasture. Pick a horse from a stall in My Horses to train!"
+			else "Pick your first horse to start training!"
+		Ui.text(body, msg, 22, { Size = UDim2.new(1, 0, 0, 60) })
+		return
+	end
+	local sub = if h.trainingReady == false then string.format("%s's training is full this week. Ride for stars!", h.name)
+		else string.format("Ride %s round a course · this week %.1f of %d points%s", h.name, h.trainedWeek or 0, Training.WEEKLY_CAP,
+			if h.rested then " · Rested ✨" else "")
+	open("⭐ Training", sub)
+	local grid = Instance.new("Frame")
+	grid.BackgroundTransparency = 1
+	grid.Size = UDim2.new(1, 0, 0, 276)
+	grid.Parent = body
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.new(0.5, -8, 0, 130)
+	layout.CellPadding = UDim2.fromOffset(12, 12)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = grid
+	for i, key in TrainingCourses.ORDER do
+		local c = TrainingCourses.courses[key]
+		local ready = GameConfig.training.courses[key] == true
+		local ribbon = h.ribbons and RIBBON_EMOJI[h.ribbons[key]] or ""
+		local line = if ready then c.label .. (if ribbon ~= "" then "  " .. ribbon else "") else "Coming soon"
+		local b = Ui.button(grid, "", UDim2.new(), UDim2.new(), if ready then C.cream else C.white, 20)
+		b.LayoutOrder = i
+		Ui.text(b, c.emoji, 44, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 50) })
+		Ui.text(b, c.name, 24, { Position = UDim2.new(0, 0, 0, 60), Size = UDim2.new(1, 0, 0, 30) })
+		local l = Ui.text(b, line, 18, { Position = UDim2.new(0, 0, 0, 92), Size = UDim2.new(1, 0, 0, 24) })
+		l.TextColor3 = if ready then C.plum else C.shade
+		b.Activated:Connect(function()
+			if not ready then
+				Ui.toast(c.name .. " is coming soon!", "stat_" .. key, c.emoji)
+				return
+			end
+			close()
+			TrainingState.StartRequested:Fire(key)
+		end)
+	end
+	if GameConfig.training.quickTrain then
+		local quick = Ui.button(body, "⚡ Quick train", UDim2.new(0.5, 0, 0, 52), UDim2.new(0.25, 0, 0, 290), C.gold, 22)
+		quick.Activated:Connect(quickTrainMenu)
+	end
+end
+
+local function trainingMenu()
+	if GameConfig.training.mode == "rides" then coursePicker() else quickTrainMenu() end
 end
 
 local function passport(h)
@@ -525,7 +588,7 @@ local function vetMenu()
 end
 
 -- Prompts at the paddock gate and the vet's door -----------------------------------------
-local function promptAt(name: string, x: number, z: number, action: string, object: string, fn)
+local function promptAt(name: string, x: number, z: number, action: string, object: string, fn, reach: number?)
 	local anchor = Instance.new("Part")
 	anchor.Name = name
 	anchor.Anchored, anchor.CanCollide, anchor.CanQuery, anchor.Transparency = true, false, false, 1
@@ -534,7 +597,7 @@ local function promptAt(name: string, x: number, z: number, action: string, obje
 	anchor.Parent = workspace
 	local p = Instance.new("ProximityPrompt")
 	p.ActionText, p.ObjectText = action, object
-	p.MaxActivationDistance = 14
+	p.MaxActivationDistance = reach or 14
 	p.RequiresLineOfSight = false
 	p.Parent = anchor
 	p.Triggered:Connect(fn)
@@ -542,6 +605,21 @@ end
 
 local pad = WorldLayout.places.paddock
 promptAt("TrainPrompt", pad.x, pad.z + 6, "Train", "Training Paddock", trainingMenu)
+-- "Ride" on the picture signs of the courses that are open (D-053).
+if GameConfig.training.mode == "rides" then
+	for _, sign in TrainingCourses.signs do
+		local c = TrainingCourses.courses[sign.course]
+		if not sign.pointer and GameConfig.training.courses[sign.course] then
+			-- in front of the sign, a little toward the path through the middle
+			local gateX = WorldLayout.PADDOCK_SOUTH_GATE.x
+			local ax = sign.x + sign.lookX * 3 + math.clamp(gateX - sign.x, -6, 6)
+			promptAt("Ride_" .. sign.course, ax, sign.z + sign.lookZ * 3, "Ride", c.name, function()
+				if gui.Enabled then close() end
+				TrainingState.StartRequested:Fire(sign.course)
+			end, 18)
+		end
+	end
+end
 local vet = WorldLayout.places.vet
 promptAt("VetPrompt", vet.x, vet.z + 6, "Check-up", "Vet", vetMenu)
 

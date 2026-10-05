@@ -5,6 +5,10 @@
 --   this client owns; Space or the jump button makes the horse hop.
 --   Every ride horse (yours and other players') shows its standing model when slow and its
 --   galloping model when fast, with a little bob in step, computed on each screen.
+--   Course mode (training rides, D-053; TrainingState): held still for the 3-2-1, then the
+--   horse rides at the course's own speed by itself (a gallop on the oval, an arena lope in the
+--   gymkhana, a canter through the poles) and is pulled gently toward the next hoop within
+--   magnetStuds of its edge. Gamepad R2 gallops too (L3 kept; ButtonX stays the prompt key).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -17,6 +21,9 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local HorseLegs = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("HorseLegs"))
+local TrainingCourses = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrainingCourses"))
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 
@@ -94,10 +101,10 @@ ContextActionService:BindAction("GiddyUpGallop", function(_, state)
 	if not riding then return Enum.ContextActionResult.Pass end
 	if state == Enum.UserInputState.Begin then setGallop(true) elseif state == Enum.UserInputState.End then setGallop(false) end
 	return Enum.ContextActionResult.Sink
-end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
+end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3, Enum.KeyCode.ButtonR2)
 
 UserInputService.JumpRequest:Connect(function()
-	if not riding then return end
+	if not riding or TrainingState.phase == "countdown" then return end
 	local hh = riding:FindFirstChildOfClass("Humanoid")
 	if hh and hh.FloorMaterial ~= Enum.Material.Air then hh.Jump = true end
 end)
@@ -108,6 +115,36 @@ local function setCharacterJump(enabled: boolean)
 end
 
 -- Steering ----------------------------------------------------------------------------
+-- The move vector as a world direction (what Humanoid:Move(v, true) does with the camera).
+local function worldMove(move: Vector3): Vector3
+	local cam = workspace.CurrentCamera
+	if not cam or move.Magnitude < 1e-3 then return Vector3.zero end
+	local look = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z)
+	if look.Magnitude < 1e-3 then look = Vector3.new(cam.CFrame.UpVector.X, 0, cam.CFrame.UpVector.Z) end
+	if look.Magnitude < 1e-3 then return Vector3.zero end
+	look = look.Unit
+	local right = Vector3.new(-look.Z, 0, look.X)
+	return right * move.X - look * move.Z
+end
+
+-- A soft pull toward the next hoop when the horse is heading for it and within magnetStuds of
+-- its edge (D-053). It never steers on its own: no stick, no pull.
+local MAGNET = GameConfig.training.magnetStuds
+local COURSE_DEADZONE = 0.2
+local function magnet(dir: Vector3, pos: Vector3): Vector3
+	local t = TrainingState.target
+	if not t or dir.Magnitude < 1e-3 then return dir end
+	local toX, toZ = t.x - pos.X, t.z - pos.Z
+	local ahead = toX * t.nx + toZ * t.nz
+	if ahead < 2 or ahead > 30 then return dir end
+	local sideX, sideZ = toX - t.nx * ahead, toZ - t.nz * ahead
+	local side = math.sqrt(sideX * sideX + sideZ * sideZ)
+	if side < 0.5 or side > t.half + MAGNET then return dir end
+	if dir.X * t.nx + dir.Z * t.nz <= 0 then return dir end
+	local pull = Vector3.new(toX, 0, toZ).Unit
+	return (dir.Unit * 0.7 + pull * 0.3).Unit * dir.Magnitude
+end
+
 local function steadyHorse(rig: Model)
 	-- State changes only work on the machine that simulates the humanoid: this one.
 	local hh = rig:FindFirstChildOfClass("Humanoid")
@@ -128,16 +165,33 @@ RunService.RenderStepped:Connect(function()
 		if not racing then setCharacterJump(ride == nil) end
 		rideBtn.Text = if ride then "👋 Get off" else "🐴 Ride"
 		rideBtn.BackgroundColor3 = if ride then C.white else C.gold
-		gallopBtn.Visible = ride ~= nil and UserInputService.TouchEnabled
 		if not ride then setGallop(false) end
 	end
+	-- Courses gallop by themselves, so the Gallop button steps aside (the training ride's own
+	-- Jump button takes that corner).
+	local showGallop = riding ~= nil and UserInputService.TouchEnabled and not TrainingState.active
+	if gallopBtn.Visible ~= showGallop then gallopBtn.Visible = showGallop end
 	-- Hide the ride button while racing or with no horse yet.
 	rideSlot.Visible = not racing and PlayerState.data ~= nil and #PlayerState.data.horses > 0
 	if not riding then return end
 	local hh = riding:FindFirstChildOfClass("Humanoid")
 	if not hh then return end
-	hh.WalkSpeed = if galloping then GALLOP else WALK
 	local move = if controls then controls:GetMoveVector() else Vector3.zero
+	if TrainingState.active and TrainingState.phase == "countdown" then
+		hh.WalkSpeed = 0
+		hh:Move(Vector3.zero, false)
+		return
+	end
+	local root = riding.PrimaryPart
+	if TrainingState.active and TrainingState.phase == "ride" and root and TrainingState.course then
+		-- Courses ride at their own speed: a part-pushed stick still rides at full course speed
+		-- (only the direction counts), with a small deadzone so a resting thumb doesn't steer.
+		local dir = if move.Magnitude > COURSE_DEADZONE then move.Unit else Vector3.zero
+		hh.WalkSpeed = TrainingCourses.speedAt(TrainingState.course, root.Position.X, root.Position.Z)
+		hh:Move(magnet(worldMove(dir), root.Position), false)
+		return
+	end
+	hh.WalkSpeed = if galloping then GALLOP else WALK
 	hh:Move(move, true)
 end)
 

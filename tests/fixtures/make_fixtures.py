@@ -107,9 +107,15 @@ def main() -> None:
         taps += [rng.uniform(start, start + duration) for _ in range(rng.choice([0, 2, 6]))]
         taps.sort()
         mean, errs, single = pm.score(passes, taps)
+        # Finger bounces (D-055): some taps get a second touch 20-200 ms later (own generator, so
+        # the other cases' numbers don't move).
+        brng = random.Random(len(pace_cases) * 7919 + 17)
+        btaps = sorted(taps + [t + brng.uniform(0.02, 0.2) for t in taps if brng.random() < 0.3])
+        bmean, berrs, bsingle = pm.score(passes, btaps, 0.15)
         pace_cases.append({"spec": spec, "start": start, "duration": duration, "uniforms": uniforms,
                            "passes": [p._asdict() for p in passes], "taps": taps, "score": mean, "errors": errs,
-                           "single": single})
+                           "single": single, "bounceTaps": btaps, "bounceScore": bmean, "bounceErrors": berrs,
+                           "bounceSingle": bsingle})
     out = ROOT / "tests" / "fixtures" / "race_math.json"
     out.write_text(json.dumps({"cases": cases, "windows": windows, "ratings": ratings_cases, "stride": stride_cases,
                                "pace": pace_cases, "extraCases": extra_cases()}))

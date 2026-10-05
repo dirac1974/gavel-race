@@ -3,6 +3,12 @@
 Newest first. One line per commit.
 
 - 2026-10-05 — feat: race steering S0 (D-054): Python trip model `src/trip.py`, `live_chances(..., extra)`, calibration sim and generated per-post baseline (`TripBaseline.luau`), parity fixtures, 491 tests; tuned groundPerLaneTurn 0.010 and bots.wideShare 0.20
+- 2026-10-05 — fix: training rides review — freezes no longer lose Sprint Lane progress (stale samples skipped, jumps clamped, progress snaps to hoops), TrainingRide attribute cleared on errors, guidance to the finish, Walkers collision group, full course speed on a part-pushed stick, timeouts need real riding, off-course samples kept off the floor, horse-call throttle (D-053)
+- 2026-10-05 — feat: training rides (T2): server-scored Sprint Lane and Mud Splash from 10 Hz samples, course picker with Quick train, 3-2-1, glowing next hoop, hoofprints, lap dots, phone Jump button, end card with stars, stat bar and ribbons; TrainingRiders and CourseProps collision groups; Rides.horseOf returns the horse id (D-053)
+- 2026-10-05 — feat: Training Ground (T1): training oval with a hill, Sprint Lane hoops, practice gate, paddock south gate and path, Mud Splash gymkhana, picture signs; TrainingCourses geometry (D-053)
+- 2026-10-05 — feat: race feel (D-055): finger bounces ignored, 3-2-1 countdown, Early/Late instead of Miss, riders' board off in-race and no win % anywhere, Space/Enter/click/touch/A/R2 tap, spectating only near the course and never while busy; cheer strip at the top and CLAP left of the movement buttons (D-056); debate 011
+- 2026-10-05 — fix: race review: a turned-down race clears a stale focus, replay buttons after the next race, spectator burst text, stick clicks
+- 2026-10-05 — fix: race on screen matches the result (every lane timed on lane 1), smooth gaps, eased gate, replay hand-off, finger-down taps, phone HUD, camera back on dismount, first race waits for horse models
 - 2026-10-05 — docs: debates 009 (training rides) and 010 (race steering); D-053 and D-054
 - 2026-10-05 — fix: running legs review: legs never drift, gait cross-fade, rest at race end, fitted saddle cloth (lane numbers in races), smooth normals, fallbacks
 - 2026-10-05 — feat: running legs: standing horses split into body and legs, walk/trot/gallop cycles on races, rides and wild horses (D-051)

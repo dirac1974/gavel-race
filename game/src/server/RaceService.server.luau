@@ -37,7 +37,7 @@ local Leagues = require(Shared:WaitForChild("Leagues"))
 local Style = require(Shared:WaitForChild("Style"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
-local COUNTDOWN = 3
+local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
 local LATENCY_GRACE = 0.35 -- wait after a segment closes for late packets
 local COURSE_ORDER = { "dirt", "turf" }
 local SURFACE = { dirt = "Dirt", turf = "Turf" }
@@ -252,7 +252,7 @@ PaceTap.OnServerEvent:Connect(function(player: Player, claimed: any)
 		list = {}
 		cur.taps[player.UserId] = list
 	end
-	if #list < cur.maxTaps then table.insert(list, t) end -- extra taps would score 0 anyway
+	if #list < cur.maxTaps then table.insert(list, t) end -- room for a bounce per pass (D-055); more would score 0 anyway
 end)
 
 BurstTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
@@ -554,7 +554,7 @@ local function runRace(c, players: { Player })
 	end
 	local cur = {
 		session = session, seg = 1, kind = "pace", open = tStart, close = preLast,
-		taps = {}, allowances = snapshotAllowances(players), maxTaps = #passes * 2 + 10,
+		taps = {}, allowances = snapshotAllowances(players), maxTaps = #passes * 3 + 10,
 	}
 	c.current = cur
 	publishCards()
@@ -579,7 +579,7 @@ local function runRace(c, players: { Player })
 		local partial = {}
 		for i, lane in session.lanes do
 			if not lane.isBot then
-				partial[i] = (PaceMeter.score(done, cur.taps[tonumber(lane.id)] or {}))
+				partial[i] = (PaceMeter.score(done, cur.taps[tonumber(lane.id)] or {}, GameConfig.pace.bounceSeconds))
 			end
 		end
 		shownLive = session:previewLive(seg, partial)
@@ -610,7 +610,7 @@ local function runRace(c, players: { Player })
 			for _, p in players do
 				local res = session:scorePace(tostring(p.UserId), seg, cur.taps[p.UserId] or {})
 				if res then
-					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, cur.taps[p.UserId] or {}, 80)
+					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, cur.taps[p.UserId] or {}, 80, GameConfig.pace.bounceSeconds)
 					local list = errors[p.UserId] or {}
 					for _, e in res.errors do table.insert(list, e) end
 					errors[p.UserId] = list
@@ -723,6 +723,13 @@ local function courseLoop(c)
 			for _, p in c.queue do LobbyStatus:FireClient(p, math.ceil((c.fillDeadline or 0) - os.clock()), c.id) end
 			queueStatus(c)
 			task.wait(1)
+		end
+		-- The first race after a server start waits (up to 10 s more) for the horse models to
+		-- load, so no horse runs without its running legs (D-055). Riders stay in line meanwhile.
+		local models = ReplicatedStorage:FindFirstChild("RaceModels")
+		local waited = 0
+		while models and not models:GetAttribute("Loaded") and waited < 10 do
+			waited += task.wait(0.25)
 		end
 		local racers = {}
 		while #c.queue > 0 and #racers < GameConfig.lanes do

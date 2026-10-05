@@ -33,6 +33,7 @@ The key has no `user_read` permission, so `GET /v1/user/subscription` returns 40
 | gallop_loop | P0 | hoofbeats on dirt, seamless loop (`loop: true`) | 2.0 s | 80 | | | not made |
 | crowd_cheer | P0 | friendly fair crowd cheer | 3.0 s | 120 | | | not made |
 | gate_bell | P0 | starting bell and gate clang | 1.5 s | 60 | | | not made |
+| count_tick | P1 | soft drum tick for "3, 2, 1" (a drum, not a bell: D-054's lane lock uses bell ticks; D-055) | 0.5 s | 20 | | | not made |
 | burst_whoosh | P0 | sparkly whoosh for the Final Burst | 1.5 s | 60 | | | not made |
 | tap_good | P0 | soft bright tick (Great / Perfect tap) | 0.5 s | 20 | | | not made |
 | finish_fanfare | P0 | short cheerful brass flourish | 2.5 s | 100 | | | not made |
@@ -60,6 +61,7 @@ Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_
 
 | Moment | Sound | Code |
 | --- | --- | --- |
+| Countdown | count_tick on "3", "2" and "1" (D-055) | `RaceController` (RaceStarted) |
 | Gate opens | gate_bell, then vo_off 0.25 s later so they don't stack | `RaceController` (RaceStarted, cued at the start time) |
 | Your race runs | gallop_loop (riders only, while in the saddle; stops when the race ends, you leave the saddle or respawn) | `RaceController` |
 | Field enters the final far turn | vo_far_turn (skipped if under 4 s after the start) | `RaceController` (same sum as RaceService's `tFar`) |

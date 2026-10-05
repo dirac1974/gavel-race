@@ -33,6 +33,7 @@ GameConfig.pace = {
 	shiftMax = 3,
 	centerRange = 0.6,
 	speedFillPasses = 5,       -- the speed meter shows the mean of the last few passes
+	bounceSeconds = 0.15,      -- a tap this soon after the last counted tap is a finger bounce: ignored (D-055; 0 = D-026)
 }
 -- Race length (D-027): distance on the Churchill-style track at a gallop. Real times:
 -- Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~1:57, Marathon ~2:21.
@@ -55,6 +56,40 @@ GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own scr
 GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
+-- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
+-- clock), so the order on screen is the race order in every lane.
+GameConfig.raceView = {
+	maxGapFeetPerSecond = 10, -- a horse gains or loses ground on the pace at most this fast...
+	catchUpMarginSeconds = 0.3, -- ...unless it must go faster to reach its place by the line
+	gateEaseSeconds = 0.6,    -- horses reach full gallop out of the gate over about this long
+	nudgeRiseSeconds = 0.15,  -- a good tap's nudge on your own horse eases in...
+	nudgeFallSeconds = 0.6,   -- ...and back out
+	settleSeconds = 0.6,      -- after the line, legs ease to standing before the race ends
+}
+GameConfig.gateCountdownSeconds = 3 -- "3, 2, 1" over the gate, then "GO!" with the bell (D-055)
+-- Race screen (D-055).
+GameConfig.hud = {
+	missedPassLabel = "",        -- a pass with no tap shows no word ("Miss" = before D-055)
+	earlyLateBelow = 30,         -- a tap scoring under this says "Early" or "Late"
+	riderBoardInRace = false,    -- riders see the running-order board in the race (true = D-030)
+	boardShowsChance = false,    -- win % and purse on the board, and the rider's live win chance line
+	spectatorBoardRowsPhone = 4, -- spectators on phones: the top 3 plus their cheered rider
+}
+-- Watching a race you're not in (D-055): the race HUD, cheer strip and results card appear only
+-- within rangeStuds of the course's outer edge (the same range as race sound, D-052), stay until
+-- keepStuds, and never over a training ride, a care or training game, or a full-screen panel.
+GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }
+-- Cheering on screen (D-056): CLAP one column left of the movement buttons (Gallop, Hop); the
+-- cheer strip sits at the top centre under the status line, never mid-screen.
+GameConfig.fans = {
+	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
+	clapSizeOnFoot = { 170, 90 },
+	clapSizeRiding = { 120, 70 },
+	cheerStripTop = true,
+}
+-- The only keys and buttons that tap the slider and the Final Burst (D-055), besides a click or
+-- touch. Steering, camera, clap, prompt and menu keys are not taps.
+GameConfig.tapKeys = { "Space", "Return", "KeypadEnter", "ButtonA", "ButtonR2" }
 GameConfig.stride = {
 	beats = 8,                 -- per stretch, ~2 taps a second
 	halfWindowSeconds = 0.08,  -- a tap scores if within this of its beat
@@ -116,6 +151,42 @@ GameConfig.energy = {
 	careTopUps = { feed = 1, groom = 1 },
 	careCooldownSeconds = 2 * 60 * 60,
 	freeLeagues = { Rookie = true }, -- Rookie races cost no Energy
+}
+
+-- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
+-- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in
+-- TrainingCourses.luau; scoring in TrainingRide.luau.
+GameConfig.training = {
+	mode = "rides",                 -- "rides" | "meters" (paddock games only, as before D-053)
+	-- Courses that can be ridden now; the others show "Coming soon" on the picker (T3).
+	courses = { speed = true, grit = true, accel = false, stamina = false },
+	quickTrain = true,              -- show the 10-second games as "Quick train"
+	quickQualityCap = 0.85,         -- Quick train gains at most this quality (score 70)
+	sampleHz = 10,
+	maxSpeed = 53,                  -- studs/s horizontal: gallop 46 + 15%
+	maxStep = 12,                   -- studs between samples (teleport)
+	maxBadShare = 0.10,             -- more discarded than this: score at the floor
+	enforceFloor = false,           -- log-only for the first two weeks
+	sessionGapSeconds = 4,
+	maxSessionsPerHour = 40,
+	maxSessionSeconds = 120,        -- a ride still going after this ends and counts what it has
+	leaveSeconds = 2,               -- outside the course area this long ends the session (no gain)
+	countdownSeconds = 3,
+	stars = { 60, 90 },             -- 2 and 3 stars
+	ribbons = { silver = 75, gold = 90 },
+	parFactor = 1.15,               -- par = ideal time × this; gold needs under par
+	magnetStuds = 4,
+	gallop = 46, canter = 20,
+	oval = { cx = 800, cz = 0, straight = 160, radius = 55, width = 24 },
+	speed = { laps = 3, hoopsPerLap = 6, hoopWidth = 10 },
+	accel = { breaks = 3, bellMin = 1.5, bellMax = 3.5, dash = 120, fullReact = 0.5, zeroReact = 2.0, breakFloor = 40, goSpeed = 20 },
+	stamina = { laps = 2, ringNear = 8, ringFar = 24, ringHalfWidth = 6, ponyMin = 30, ponyMax = 42, grace = 3, hill = 6 },
+	-- Mud Splash is ridden at an arena lope (`pace`), and the bending poles at a canter. A log
+	-- counts when the horse is `airborne` studs above its riding height within `logWindow`
+	-- studs of it (logs don't collide, so a horse that doesn't hop just runs through).
+	grit = { mud = 4, logs = 3, poles = 4, logHeight = 2, pace = 28, airborne = 1.5, logWindow = 3,
+		points = { mud = 7.5, log = 12, pole = 8.5 } },
+	ghostHz = 4, ghostMaxPoints = 300, ghostQuantum = 0.5,
 }
 
 -- Prize ribbons for the UI (D-016). Never use racing-wager terms in UI text. -- policy-ok

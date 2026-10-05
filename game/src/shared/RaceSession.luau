@@ -201,7 +201,7 @@ function RaceSession:scorePace(id: string, seg: number, taps: { number }): PaceR
 	if not i or self.finished or seg ~= self.closed + 1 or self:kind(seg) ~= "pace" or self.passes == nil then return nil end
 	local lane = self.lanes[i]
 	if lane.isBot or lane.scores[seg] ~= nil then return nil end
-	local s, errors, matched = self.deps.PaceMeter.score(self:pacePasses(seg), taps)
+	local s, errors, matched = self.deps.PaceMeter.score(self:pacePasses(seg), taps, self.config.pace and self.config.pace.bounceSeconds)
 	lane.scores[seg] = s
 	return { score = s, errors = errors, matched = matched }
 end

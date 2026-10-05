@@ -97,3 +97,19 @@ def test_skill_beats_mashing_random_and_fixed_interval_macros():
     assert statistics.mean(good) > 88
     assert statistics.mean(mash) < 2
     assert statistics.mean(macro) < statistics.mean(kid) - 10  # a synced macro does worse than an average kid
+
+
+def test_finger_bounces_are_ignored_but_mashing_still_fails():
+    # D-055: a tap within 0.15 s of the last counted tap is ignored; the first tap counts.
+    passes = race(random.Random(8))
+    perfect = [pm.ideal_time(p) for p in passes]
+    bounced = sorted(perfect + [t + 0.08 for t in perfect])
+    assert pm.score(passes, bounced)[0] == 0  # the D-026 rule: two taps zero the pass
+    assert pm.score(passes, bounced, 0.15)[0] == pytest.approx(100)
+    late_bounce = sorted(perfect + [t + 0.2 for t in perfect if t + 0.2 < passes[-1].t1])
+    assert pm.score(passes, late_bounce, 0.15)[0] < 10  # a real second tap still zeroes the pass
+    for hz in (7, 8, 10, 12):
+        mash = [k / hz for k in range(36 * hz)]
+        assert pm.score(passes, mash, 0.15)[0] < 5
+    kept, ignored = pm.debounce([1.0, 1.1, 1.2, 1.4], 0.15)
+    assert kept == [1.0, 1.2, 1.4] and ignored == 1  # measured from the last counted tap
