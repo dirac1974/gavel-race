@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local Rides = {}
 
@@ -240,7 +241,11 @@ function Rides.start()
 		if os.clock() - (lastCall[player] or 0) < 1.5 then return end
 		lastCall[player] = os.clock()
 		local ok, why = Rides.call(player)
-		if not ok and why then Profiles.notify(player, why, "heart") end
+		if ok then
+			Progress.record(player, "ride", 1)
+		elseif why then
+			Profiles.notify(player, why, "heart")
+		end
 	end)
 	GetOff.OnServerEvent:Connect(function(player: Player)
 		if active[player] then

@@ -328,16 +328,22 @@ local function attachBarn(barn: Instance)
 	-- is where a kid stands (the horse itself is too far into the barn to reach).
 	local d = PlayerState.data
 	for _, m in barn:GetChildren() do
-		if m:IsA("BasePart") and string.sub(m.Name, 1, 5) == "Stall" then
+		if m:IsA("BasePart") and m.Name == "Noticeboard" then
+			if not m:FindFirstChild("CarePrompt") then
+				prompt(m, "Read", "Stable Board", Enum.KeyCode.E).Triggered:Connect(function()
+					ReplicatedStorage:WaitForChild("HudEvents"):WaitForChild("OpenBoard"):Fire()
+				end)
+			end
+		elseif m:IsA("BasePart") and string.sub(m.Name, 1, 5) == "Stall" then
 			local stall = tonumber(string.sub(m.Name, 6))
-			if stall and not m:FindFirstChild("CarePrompt") then
-				local h = d and d.horses[stall]
-				if h then
-					local id = h.id
-					local p = prompt(m, "Care", h.name)
-					p.UIOffset = Vector2.new(0, 40)
-					p.Triggered:Connect(function() horseCard(id) end)
-				end
+			local h = stall and d and d.horses[stall]
+			if h and not m:FindFirstChild("CarePrompt") then
+				local id = h.id
+				local p = prompt(m, "Care", h.name)
+				p.UIOffset = Vector2.new(0, 40)
+				p.Triggered:Connect(function() horseCard(id) end)
+			end
+			if stall and not m:FindFirstChild("ChorePrompt") then
 				local chore = prompt(m, "Muck out", "Stall", Enum.KeyCode.F, 1.2)
 				chore.Name = "ChorePrompt"
 				chore.Triggered:Connect(function()
@@ -408,6 +414,9 @@ task.spawn(function()
 		end
 	end)
 	player:GetAttributeChangedSignal("PlotIndex"):Connect(scan)
+	PlayerState.Changed.Event:Connect(function(_, before)
+		if before == nil then scan() end -- first profile view: add the Care prompts
+	end)
 	scan()
 	-- The shop counter on Fair Street.
 	local places = world:WaitForChild("Places", 60)

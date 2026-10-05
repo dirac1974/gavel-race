@@ -33,6 +33,7 @@ local Horse = require(Shared:WaitForChild("Horse"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local LEAGUE = "Rookie" -- prototype: one league
 local COUNTDOWN = 3
@@ -381,6 +382,8 @@ local function runRace(players: { Player })
 
 	local errors: { [number]: { number } } = {}
 	local matched: { [number]: number } = {}
+	local greatTaps: { [number]: number } = {}  -- Great or Perfect pace taps, for Stable Board jobs
+	local greatBurst: { [number]: boolean } = {} -- tapped a Great or Perfect Final Burst
 	for seg, kind in GameConfig.segments do
 		current.seg = seg
 		if kind == "pace" then
@@ -401,6 +404,7 @@ local function runRace(players: { Player })
 			for _, p in players do
 				local res = session:scorePace(tostring(p.UserId), seg, current.taps[p.UserId] or {})
 				if res then
+					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, current.taps[p.UserId] or {}, 80)
 					local list = errors[p.UserId] or {}
 					for _, e in res.errors do table.insert(list, e) end
 					errors[p.UserId] = list
@@ -420,7 +424,10 @@ local function runRace(players: { Player })
 			for _, p in players do
 				local i = session:laneIndex(tostring(p.UserId))
 				local s = i and session.lanes[i].scores[seg]
-				if s and s >= 80 then table.insert(great, tostring(p.UserId)) end
+				if s and s >= 80 then
+					table.insert(great, tostring(p.UserId))
+					greatBurst[p.UserId] = true
+				end
 			end
 			if #great > 0 then BurstSparkle:FireAllClients(great) end
 		end
@@ -460,6 +467,12 @@ local function runRace(players: { Player })
 		end
 	end
 	recordIntegrity(players, errors, matched)
+	-- Stable Board jobs count effort, never wins (D-043).
+	for _, p in players do
+		Progress.record(p, "race", 1)
+		Progress.record(p, "great_tap", greatTaps[p.UserId] or 0)
+		if greatBurst[p.UserId] then Progress.record(p, "burst_great", 1) end
+	end
 	-- Riders stay on their horse for the results and replay; they press Done to get off.
 	task.delay(GameConfig.dismountTimeoutSeconds, TrackScene.dismountAll)
 	for _, p in players do p:SetAttribute("Racing", nil) end

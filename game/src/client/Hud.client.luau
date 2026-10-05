@@ -36,6 +36,7 @@ local function localEvent(name: string): BindableEvent
 end
 local OpenStarter = localEvent("OpenStarter")
 local OpenMap = localEvent("OpenMap")
+local OpenBoard = localEvent("OpenBoard")
 
 -- Dock --------------------------------------------------------------------------
 local dock = Instance.new("Frame")
@@ -118,13 +119,19 @@ local restLabel = Ui.text(hoofRow, "", 16, { Size = UDim2.new(0, 70, 1, 0), Layo
 restLabel.TextColor3 = C.plum
 
 -- Map (D-035)
-local mapSlot = slot(70, 3)
+local mapSlot = slot(70, 4)
 local mapBtn = Ui.button(mapSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.sky, 20)
 Ui.icon(mapBtn, "map", "🗺️", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
 mapBtn.Activated:Connect(function() OpenMap:Fire() end)
 
+-- Stable Board (D-043): no badge, no bell.
+local boardSlot = slot(70, 3)
+local boardBtn = Ui.button(boardSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream, 20)
+Ui.icon(boardBtn, "clipboard", "📋", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
+boardBtn.Activated:Connect(function() OpenBoard:Fire() end)
+
 -- Race button
-local raceSlot = slot(170, 4)
+local raceSlot = slot(170, 5)
 local raceBtn = Ui.button(raceSlot, "🏁 RACE!", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.orange, 30)
 local leaveBtn = Ui.button(raceSlot, "✕", UDim2.fromOffset(34, 34), UDim2.new(1, -20, 1, -88), C.white, 18)
 leaveBtn.Visible = false

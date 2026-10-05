@@ -17,6 +17,7 @@ Care.FEEDS = { hay = { bond = 0 }, grain = { bond = 1 } }
 Care.TREATS = { carrot = 2, apple = 2, oats = 2, treat = 3 } -- bond per treat
 Care.TREATS_PER_DAY = 3
 Care.PET_BOND = 1
+Care.PETS_COUNTED = 2 -- pets per horse per day that count toward Stable Board jobs
 Care.SEEDS = {
 	seed_carrot = { crop = "carrot", seconds = 60 * 60, yield = 3, label = "Carrots" },
 	seed_apple = { crop = "apple", seconds = 4 * 60 * 60, yield = 4, label = "Apples" },
@@ -69,7 +70,8 @@ end
 
 local function rollDaily(h: any, now: number)
 	local d = today(now)
-	if h.daily == nil or h.daily.day ~= d then h.daily = { day = d, treats = 0, petted = false } end
+	if h.daily == nil or h.daily.day ~= d then h.daily = { day = d, treats = 0, petted = false, pets = 0 } end
+	h.daily.pets = h.daily.pets or 0
 end
 
 function Care.treat(p: any, h: any, item: string, now: number): (boolean, string)
@@ -83,12 +85,16 @@ function Care.treat(p: any, h: any, item: string, now: number): (boolean, string
 	return true, h.name .. " loved that! +" .. bond .. " bond"
 end
 
-function Care.pet(p: any, h: any, now: number): (boolean, string)
+-- Always allowed and always nice. Bond once a day; the third return says whether this pet
+-- counts toward jobs (the first PETS_COUNTED a day per horse), so tapping can't farm jobs.
+function Care.pet(p: any, h: any, now: number): (boolean, string, boolean)
 	rollDaily(h, now)
-	if h.daily.petted then return true, h.name .. " nuzzles you" end -- always nice, bond once a day
+	h.daily.pets += 1
+	local counted = h.daily.pets <= Care.PETS_COUNTED
+	if h.daily.petted then return true, h.name .. " nuzzles you", counted end
 	h.daily.petted = true
 	Horse.addBond(h, Care.PET_BOND)
-	return true, h.name .. " nuzzles you! +1 bond"
+	return true, h.name .. " nuzzles you! +1 bond", counted
 end
 
 -- Garden --------------------------------------------------------------------------
