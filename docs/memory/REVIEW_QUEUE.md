@@ -32,3 +32,4 @@ Provisional decisions made by the team under D-009, newest last. For each: keep,
 | D-045 | For grown-ups: A button explaining races (no gambling, nothing buys speed), Diamonds, the visit setting and weekly play time, with a pointer to Roblox parental controls and an optional break reminder. | See docs/WORLD_DESIGN.md; values in `GameConfig` once built |
 | D-046 | Leagues and careers: Stakes unlock by League Points and a win promotes | See docs/WORLD_DESIGN.md; values in `GameConfig` once built |
 | D-047 | Breeding (later): From Bronze, Green Cash fees only | See docs/WORLD_DESIGN.md; values in `GameConfig` once built |
+| D-048 | Promotion (Stakes) races are called Cups in the game: "Rookie Cup"; same rules | Rename the UI strings in `RacePicker`, `HorsesClient`, `Advice`, `RaceService` |

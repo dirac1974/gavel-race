@@ -107,7 +107,7 @@ local function horseCard(h, order: number)
 	dot.Parent = card
 	local name = Ui.text(card, (if active then "⭐ " else "") .. h.name, 20, { Position = UDim2.new(0, 58, 0, 6), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	local leagueLine = (h.league or "Rookie") .. (if h.stakesOpen then " · 🏆 Stakes open!" elseif h.pointsToStakes then string.format(" · %d pts to Stakes", h.pointsToStakes) else "")
+	local leagueLine = (h.league or "Rookie") .. (if h.cupOpen then " · 🏆 Cup open!" elseif h.pointsToCup then string.format(" · %d pts to the Cup", h.pointsToCup) else "")
 	Ui.text(card, string.format("%s · %s · %s", if h.stalled then "Stall" else "Pasture", STYLE_LABEL[h.style] or "", leagueLine), 13,
 		{ Position = UDim2.new(0, 58, 0, 30), Size = UDim2.new(1, -66, 0, 16), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
 	for k, key in { "speed", "accel", "stamina", "grit" } do
