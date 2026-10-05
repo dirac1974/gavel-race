@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: Stage 6 training games and vet check-ups with the Health Passport (D-039, D-040)
 - 2026-10-04 — feat: Stage 5 Stable Board: daily, weekly and monthly jobs, horse tips, GO hoofprints, pinned job (D-043)
 - 2026-10-04 — feat: Stage 3 care and food: feeding, brushing game, treats, petting, garden, chores, Feed & Seed (D-038)
 - 2026-10-04 — feat: Stage 2 the world: Fair Street, Barn Lane plots with barns, Map travel, riding your horse, privacy walls, hoofprint guide (D-035, D-042)

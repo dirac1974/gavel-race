@@ -104,6 +104,17 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] No bell, no red badge, no timers anywhere; no job asks you to win, spend or invite.
 - [ ] Next day (or change the clock): finished but unclaimed jobs pay out with a "Welcome back" toast; the visit counts once per day.
 
+## Training and the vet (Stage 6, D-039, D-040)
+
+- [ ] Training Paddock: the "Train" prompt at the gate → pick a horse → four stat buttons showing value, Potential (or "?" until the vet reveals it) and room to grow; "This week: x of 6 points", "Rested ✨" when 3 h have passed since the last session.
+- [ ] Sprint Lane (Speed): tap as the runner crosses the glowing zone, 5 rounds getting faster.
+- [ ] Gate Break (Acceleration): wait for green, tap; tapping on red says "Too soon!".
+- [ ] Hill Climb (Stamina): hold to climb, let go to slide, stay in the moving green band for 8 s.
+- [ ] Mud Splash (Grit): tap as each puddle reaches the hoof, 8 puddles.
+- [ ] After a game: a label and score, then a toast like "+3.2 Speed! Rested bonus ✨"; the weekly cap stops training at 6 points with a kind message.
+- [ ] Vet: the "Check-up" prompt → pick a horse → Health Passport with five stamp slots → tap with the heartbeat (the heart pulses); first visit stamps "First check-up", the next day's visit reveals Potential.
+- [ ] Stable Board: horse cards suggest "Next: train <stat>" when training is ready; daily and weekly jobs for training and check-ups appear in the mix.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

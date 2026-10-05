@@ -30,6 +30,8 @@ Jobs.DAILY = {
 	{ id = "d_treat", event = "treat", target = 2, text = "Give 2 treats", icon = "carrot", go = "stable", reward = { cash = 3, items = { apple = 1 } } },
 	{ id = "d_ride", event = "ride", target = 1, text = "Go for a ride on your horse", icon = "hoofprint", go = "stable", reward = { cash = 3, items = { carrot = 1 } } },
 	{ id = "d_trail", event = "visit_trail", target = 1, text = "Visit the flower meadow on the Trail", icon = "map_trail", go = "trailGate", reward = { cash = 4, items = { apple = 1 } } },
+	{ id = "d_train", event = "train", target = 1, text = "Do a training session", icon = "stat_speed", go = "paddock", reward = { cash = 4, items = { grain = 1 } } },
+	{ id = "d_vet", event = "checkup", target = 1, text = "Take a horse for a check-up", icon = "stethoscope", go = "vet", reward = { cash = 3, items = { treat = 1 } } },
 } :: { Def }
 
 Jobs.WEEKLY = {
@@ -41,6 +43,8 @@ Jobs.WEEKLY = {
 	{ id = "w_chore6", event = "chore", target = 6, text = "Muck out 6 stalls", icon = "hay", go = "stable", reward = { cash = 15, items = { hay = 10 } } },
 	{ id = "w_burst3", event = "burst_great", target = 3, text = "Hit 3 Great Final Bursts", icon = "care_star", go = "raceBoard", reward = { cash = 25, items = { treat = 2 } } },
 	{ id = "w_days3", event = "day", target = 3, text = "Visit your stable on 3 days", icon = "map_stable", go = "stable", reward = { cash = 20, items = { apple = 3 } } },
+	{ id = "w_train4", event = "train", target = 4, text = "Do 4 training sessions", icon = "stat_stamina", go = "paddock", reward = { cash = 25, items = { grain = 3 } } },
+	{ id = "w_vet3", event = "checkup", target = 3, text = "Collect 3 vet check-ups", icon = "stethoscope", go = "vet", reward = { cash = 15, items = { treat = 2 } } },
 } :: { Def }
 
 Jobs.MONTHLY = {

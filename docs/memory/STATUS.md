@@ -32,6 +32,11 @@ Last updated: 2026-10-04
 - `JobService`: rollover, claim, swap, adds jobs and garden readiness to the profile view.
 - `StableBoard` (client): board with horse cards, job cards with GO hoofprints and Claim, ribbons, "All done today!", pinned job; 📋 dock button and barn noticeboard.
 
+**Stage 6 — Training and the vet** (branch `claude/stage6-training`, stacked on Stage 5):
+- `Training` (pure, tested): gain = 0.12 × (Potential − stat) × (0.5 + 0.5 × score/100), ×1.5 when rested (3 h since the last session), weekly cap 6 points per horse, never past Potential; vet check-up +1 bond a day and the next of five Health Passport stamps (the second reveals Potential).
+- `TrainingService`: horse is yours and stalled, you're at the paddock or the vet, rate limits; jobs count `train` and `checkup`.
+- `PaddockClient`: four training games (Sprint Lane, Gate Break, Hill Climb, Mud Splash) and the heartbeat check-up with the Health Passport.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.
