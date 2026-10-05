@@ -24,7 +24,7 @@ Don't use `horse_gallop/` (smeared saddle patch), the plain `*.glb` of any coat 
 - Each GLB is one mesh with one colour texture (2048 × 2048, no PBR maps) and an identity node transform.
 - Units are glTF metres, normalised so the longest side is about 1.9.
 - **The origin is at the bounding-box centre, not the bottom**, even though the request asked for `origin_at: bottom`.
-- Front is +Z. Roblox's forward (`LookVector`) is −Z, so rotate 180° about Y after import.
+- After import into Roblox the horses already face −Z (Roblox's forward). Playtest on 2026-10-04 showed the earlier "rotate 180°" note was wrong; `AssetService` now applies no turn (`YAW` table).
 
 | Slot | Triangles | Raw size X × Y × Z | Front | Target size in studs (X × Y × Z) | Uniform scale |
 | --- | --- | --- | --- | --- | --- |

@@ -24,6 +24,7 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ThemePack = require(Shared:WaitForChild("ThemePack"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
+local RaceState = require(script.Parent:WaitForChild("RaceState"))
 
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
@@ -224,6 +225,24 @@ speedGradient.Parent = speedFill
 local speedLabel = label(speed, UDim2.new(0, 70, 1, 0), UDim2.new(0, -78, 0, 0), "SPEED", 16)
 speedLabel.TextXAlignment = Enum.TextXAlignment.Right
 
+-- Your place in the race (D-030): big, top right under the minimap.
+local placeBadge = Instance.new("Frame")
+placeBadge.AnchorPoint = Vector2.new(1, 0)
+placeBadge.Position = UDim2.new(1, -16, 0, 200)
+placeBadge.Size = UDim2.fromOffset(150, 70)
+placeBadge.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
+placeBadge.BackgroundTransparency = 0.2
+placeBadge.ZIndex = 6
+placeBadge.Visible = false
+placeBadge.Parent = gui
+round(placeBadge, UDim.new(0, 14))
+local placeText = label(placeBadge, UDim2.new(1, 0, 0.72, 0), UDim2.fromScale(0, 0), "", 46)
+placeText.Font = Enum.Font.GothamBlack
+placeText.TextColor3 = Color3.fromHex("FFD34D")
+placeText.ZIndex = 7
+local placeOf = label(placeBadge, UDim2.new(1, 0, 0.3, 0), UDim2.fromScale(0, 0.68), "", 16)
+placeOf.ZIndex = 7
+
 -- Tap-result shapes above the feedback text (Perfect is a star, a miss is a flat dash).
 local feedbackIcon = Instance.new("ImageLabel")
 feedbackIcon.AnchorPoint = Vector2.new(0.5, 1)
@@ -288,25 +307,33 @@ local lanes = {}
 local chances = {}
 local sparkleUntil = {}
 local riding = false
+local myLaneIndex = nil
+local youMarkerPlace: TextLabel? = nil
+local lastHud = 0
 -- pace = { passes, tapsByPass = {}, done = 0, recent = {} } for the race
 local paceState = nil
 -- active burst = { seg, open, close, spec, tapped }
 local burstState = nil
 
+-- During a race the rows follow the running order (D-030): place, lane badge, name,
+-- win chance and purse. Before the race they're in lane order.
 local function renderBoard()
 	local t = os.clock()
-	for i, row in rows do
-		local lane = lanes[i]
+	local racing = RaceState.active and #RaceState.order > 0
+	for r, row in rows do
+		local i = if racing then RaceState.order[r] else r
+		local lane = i and lanes[i]
 		if lane then
 			local you = lane.id == myId and "  ◀ YOU" or ""
 			local sparkle = (sparkleUntil[lane.id] or 0) > t and " ✦" or ""
-			row.Text = string.format("%d  %s%s%s  %d%%  %s %d", i, lane.name, sparkle, you,
+			local lead = if racing then RaceState.ordinal(r) else tostring(i)
+			row.Text = string.format("%s  %s%s%s  %d%%  %s %d", lead, lane.name, sparkle, you,
 				math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
 			row.TextColor3 = lane.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
-			UiArt.set(rowBadges[i], if sparkle ~= "" then `lane_{i}_sparkle` else `lane_{i}`)
+			UiArt.set(rowBadges[r], if sparkle ~= "" then `lane_{i}_sparkle` else `lane_{i}`)
 		else
 			row.Text = ""
-			rowBadges[i].Visible = false
+			rowBadges[r].Visible = false
 		end
 	end
 end
@@ -389,6 +416,17 @@ end
 
 RunService.RenderStepped:Connect(function()
 	local t = serverNow()
+	if RaceState.active and os.clock() - lastHud > 0.2 then
+		lastHud = os.clock()
+		renderBoard()
+		local myPlace = myLaneIndex and RaceState.place[myLaneIndex]
+		placeBadge.Visible = myPlace ~= nil
+		if myPlace then
+			placeText.Text = RaceState.ordinal(myPlace)
+			placeOf.Text = string.format("of %d", RaceState.lanes)
+			if youMarkerPlace then youMarkerPlace.Text = RaceState.ordinal(myPlace) end
+		end
+	end
 	if paceState and riding then
 		local passes = paceState.passes
 		local k = PaceMeter.passIndex(passes, t)
@@ -447,9 +485,14 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	chances = {}
 	sparkleUntil = {}
 	riding = false
+	myLaneIndex = nil
+	youMarkerPlace = nil
 	for i, lane in laneList do
 		chances[i] = lane.chance
-		if lane.id == myId then riding = true end
+		if lane.id == myId then
+			riding = true
+			myLaneIndex = i
+		end
 	end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
 	status.Text = string.format("%s race: %s", league, conditions)
@@ -475,13 +518,25 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		if not horse or horse:FindFirstChild("YouMarker") then return end
 		local bb = Instance.new("BillboardGui")
 		bb.Name = "YouMarker"
-		bb.Size = UDim2.fromOffset(90, 90)
+		bb.Size = UDim2.fromOffset(90, 120)
 		bb.StudsOffsetWorldSpace = Vector3.new(0, 12, 0)
 		bb.AlwaysOnTop = true
 		local img = Instance.new("ImageLabel")
-		img.Size = UDim2.fromScale(1, 1)
+		img.Size = UDim2.fromScale(1, 0.75)
 		img.BackgroundTransparency = 1
 		img.Parent = bb
+		local youPlace = Instance.new("TextLabel")
+		youPlace.Name = "Place"
+		youPlace.Size = UDim2.fromScale(1, 0.28)
+		youPlace.Position = UDim2.fromScale(0, 0.72)
+		youPlace.BackgroundTransparency = 1
+		youPlace.Font = Enum.Font.GothamBlack
+		youPlace.TextScaled = true
+		youPlace.TextColor3 = Color3.fromHex("FFD34D")
+		youPlace.TextStrokeTransparency = 0
+		youPlace.Text = ""
+		youPlace.Parent = bb
+		youMarkerPlace = youPlace
 		if not UiArt.set(img, "you_marker") then
 			local txt = Instance.new("TextLabel")
 			txt.Size = UDim2.fromScale(1, 0.5)
@@ -571,6 +626,7 @@ local function showResults(summary)
 		end
 	end
 	results.Visible = true
+	placeBadge.Visible = false
 	status.Text = "Results"
 	feedback.Text, hint.Text = "", ""
 	showResultIcon(nil)

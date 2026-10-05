@@ -21,9 +21,13 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 
 ## Riding and the race
 - [ ] When the race starts you're seated on your horse and the camera is a close chase view from just behind and above, wide enough to see the nearby horses; it turns with your horse round the bends. Scrolling (or pinching) zooms in to first person or further out.
+- [ ] Every horse faces the way it's running (heads forward, not backwards).
 - [ ] Every bot horse has a Roblox-style jockey in its lane's colours (shirt and helmet) with white breeches, sitting in the saddle, not standing.
 - [ ] Your rider sits on the horse's back (not floating or sunk in). If not, note roughly how far off; `SADDLE_HEIGHT` and `SADDLE_BACK` in `TrackScene.luau` tune it.
 - [ ] Space, clicks and taps never throw you off the horse.
+- [ ] A big place badge ("3rd of 8") sits at the top right and changes as horses pass each other; the YOU marker over your horse shows the same place.
+- [ ] The board on the left re-sorts by running order, each row starting with its place (1st, 2nd, ...).
+- [ ] A minimap of the oval in the top-right corner shows every horse as a numbered dot in its lane colour (yours larger with a white ring) moving round; the white tick is the finish line, and the homestretch is along the bottom.
 - [ ] The gate clears and the horses gallop (with a bob) round the course without stopping; the likelier winners edge ahead after each checkpoint.
 - [ ] The race lasts about as long as its distance says (Sprint ~70 s, Mile ~95 s on Rookie).
 
