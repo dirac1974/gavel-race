@@ -177,3 +177,12 @@ Template:
 - Fairness: riders with friends watching get a small edge over riders without, and bots never have fans; this is a mild path around D-006 (party members never share a cash race), accepted because the cap (+0.3 points) is about 1/60 of the collusion gain D-006 prevents (+20.8 points, 12.5% → 33.3%).
 - Alternatives: count-weighted crowds (large groups always win); mean of all fans (weak cheerers hurt their friend); boost 0.15 or 0.10 (David asked for smaller); friendly races only (David chose cash races too).
 - Links: docs/V2_PROPOSAL.md step 5, D-019, STATUS backlog items 4 and 6
+
+## D-021 — Tap time allowance follows measured latency
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: team (engineering, security fix; amends D-010)
+- Context: D-010 scored a tap at the client-claimed time if it was up to 0.3 s before arrival. A modified client could wait until the marker passed the center and claim that moment, scoring 100 on every window (worth up to 2.7x win chance).
+- Decision: the allowance is the player's measured one-way latency (`GetNetworkPing() / 2`, snapshotted when each window opens) plus a 0.05 s jitter margin, capped at 0.3 s. Claims older than that are scored at arrival time. A 30 ms ping gives a 65 ms band, so the old exploit now scores where the marker actually is (58 instead of 100 in the Rookie test case).
+- Residual: the meter is deterministic, so a script that taps at the computed center time still scores well. That is timing skill done by a program, handled by the statistical flags in STATUS backlog item 4 (sustained S > 95), not by tap-time rules. Ping can be inflated with a lag switch, but the cap still bounds the band at 0.3 s.
+- Links: game/src/shared/GavelMeter.luau (rewindAllowance, resolveTapTime), game/src/server/RaceService.server.luau, tests/luau/game_tests.luau

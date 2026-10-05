@@ -42,18 +42,26 @@ function GavelMeter.score(t: number, spec: Spec): number
 	return 100 * (1 - math.clamp(d, 0, 1))
 end
 
--- Decide which time a tap is scored at (D-010): the client's claimed server
--- time if it is plausible, otherwise the arrival time. Returns nil if the tap
--- falls outside the window.
+-- How far before arrival a claimed tap time may be (D-021): the player's
+-- measured one-way latency plus a jitter margin, capped. A flat allowance let
+-- a modified client wait until the marker passed the center and claim that
+-- moment; tying it to measured latency leaves only a narrow band to pick from.
+function GavelMeter.rewindAllowance(roundTripSeconds: number, margin: number, cap: number): number
+	return math.clamp(math.max(roundTripSeconds, 0) / 2 + margin, 0, cap)
+end
+
+-- Decide which time a tap is scored at (D-010, D-021): the client's claimed
+-- server time if it lies within `allowance` before arrival, otherwise the
+-- arrival time. Returns nil if the tap falls outside the window.
 function GavelMeter.resolveTapTime(
 	claimed: number,
 	arrival: number,
 	windowStart: number,
 	windowEnd: number,
-	maxRewind: number
+	allowance: number
 ): number?
 	local t = arrival
-	if claimed <= arrival and arrival - claimed <= maxRewind then
+	if claimed <= arrival and arrival - claimed <= allowance then
 		t = claimed
 	end
 	if t < windowStart or t > windowEnd then

@@ -80,7 +80,10 @@ Tap.OnServerEvent:Connect(function(player: Player, window: any, claimed: any)
 	if window ~= current.activeWindow then return end
 	local w = current.windows[window]
 	local arrival = now()
-	local t = GavelMeter.resolveTapTime(claimed, arrival, w.open, w.close, GameConfig.maxTapRewindSeconds)
+	-- Latency is snapshotted when the window opens so a lag spike mid-window can't widen it.
+	local allowance = (w.allowances and w.allowances[player.UserId])
+		or GavelMeter.rewindAllowance(player:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	local t = GavelMeter.resolveTapTime(claimed, arrival, w.open, w.close, allowance)
 	if not t then return end
 	local score = current.session:submitTap(tostring(player.UserId), window, t - w.open)
 	if score then
@@ -136,6 +139,11 @@ local function runRace(players: { Player })
 
 	for w = 1, GameConfig.windowsPerRace do
 		task.wait(math.max(0, windows[w].open - now()))
+		windows[w].allowances = {}
+		for _, p in Players:GetPlayers() do
+			windows[w].allowances[p.UserId] = GavelMeter.rewindAllowance(
+				p:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+		end
 		current.activeWindow = w
 		WindowOpened:FireAllClients(w, windows[w].open, windows[w].close, session:meterSpec(w), ThemePack.windows[w])
 		task.wait(math.max(0, windows[w].close + LATENCY_GRACE - now()))
