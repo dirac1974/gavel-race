@@ -40,6 +40,13 @@
 --   lapsing after 20 s (TrainInviteGone), rate-limited (RideTogether). On "Ride together" both
 --   start the course on one countdown and one Pip, each scored alone; TrainTogether shares
 --   stars and ribbons only.
+--   This week's course (T5): Mud Splash has four layouts, one a week in turn. The server picks
+--   the layout from its own clock (TrainingCourses.resolve: whatever the client asked for) when
+--   a ride starts, and the ride keeps it to the end, so a week turning over never changes a ride
+--   under anyone; the next ride takes the new one. ReplicatedStorage's WeeklyCourse attribute
+--   names this week's layout for the clients (the arena's props and the picker). Ribbons, best
+--   runs and ghosts are kept per layout (its course key), so a layout's ribbons can be earned
+--   whenever it comes back; no countdown anywhere.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -107,7 +114,16 @@ local invites = RideTogether.book()
 local lastAsk: { [Player]: number } = {}
 local GROUP_LEAD = 2.5                             -- a group's countdown starts this much later (horses being called)
 local nextGroupId = 1
-local GHOST_COURSES = { speed = true, grit = true } -- courses with ghosts (see finish)
+local GHOST_COURSES = { speed = true } -- courses with ghosts: Sprint Lane and every Mud Splash layout (see finish)
+for _, key in TrainingCourses.LAYOUTS do GHOST_COURSES[key] = true end
+
+-- This week's Mud Splash layout (T5) for the clients, from the server's clock.
+local function publishWeek(): string
+	local key = TrainingCourses.weekCourse(os.time())
+	if ReplicatedStorage:GetAttribute("WeeklyCourse") ~= key then ReplicatedStorage:SetAttribute("WeeklyCourse", key) end
+	return key
+end
+publishWeek()
 
 local function setTrainingRide(player: Player, on: boolean)
 	if player.Parent then player:SetAttribute("TrainingRide", if on then true else nil) end
@@ -405,13 +421,18 @@ local function sendGhosts(player: Player, s)
 	if #list > 0 then TrainGhosts:FireClient(player, s.course, list) end
 end
 
--- opts (Ride together): { seed, goAtServer, group, side } so riders share one countdown and Pip.
-local function startCourse(player: Player, horseId: any, course: any, opts: any?)
+-- opts (Ride together): { seed, goAtServer, group, side, course } so riders share one countdown,
+-- one Pip and one Mud Splash layout (the group's course key, resolved once).
+local function startCourse(player: Player, horseId: any, requested: any, opts: any?)
 	local o = opts or {}
-	if typeof(course) ~= "string" or not TrainingCourses.courses[course] then return end
 	if CFG.mode ~= "rides" then return end
-	if not CFG.courses[course] then
-		Profiles.notify(player, TrainingCourses.courses[course].name .. " is coming soon!", "stat_" .. course)
+	publishWeek()
+	-- Mud Splash: this week's layout by the server's clock, whatever the client asked for (T5)
+	local course = o.course or TrainingCourses.resolve(requested, os.time())
+	if not course then return end
+	local stat = TrainingCourses.courses[course].stat
+	if not CFG.courses[stat] then
+		Profiles.notify(player, TrainingCourses.courses[course].name .. " is coming soon!", "stat_" .. stat)
 		return
 	end
 	if racing(player) then
@@ -567,7 +588,10 @@ TrainInvite.OnServerEvent:Connect(function(player: Player, toId: any, course: an
 	Profiles.notify(player, "Invite sent to " .. to.DisplayName .. "!", "stat_" .. course)
 end)
 
-local function startGroup(a: Player, b: Player, course: string)
+local function startGroup(a: Player, b: Player, requested: string)
+	publishWeek()
+	local course = TrainingCourses.resolve(requested, os.time()) -- one Mud Splash layout for both (T5)
+	if not course then return end
 	local group = { id = nextGroupId, members = { a, b }, course = course, results = {} }
 	nextGroupId += 1
 	local seed = rng:NextInteger(1, 2 ^ 30)
@@ -580,7 +604,8 @@ local function startGroup(a: Player, b: Player, course: string)
 				return
 			end
 			pending[p] = true
-			local ok, err = pcall(startCourse, p, data.activeHorse, course, { seed = seed, goAtServer = goAtServer, group = group, side = if i == 1 then -1 else 1 })
+			local ok, err = pcall(startCourse, p, data.activeHorse, course, { seed = seed, goAtServer = goAtServer, group = group,
+				side = if i == 1 then -1 else 1, course = course })
 			pending[p] = nil
 			if not ok then
 				warn("[Training] group start failed: " .. tostring(err))
@@ -703,6 +728,7 @@ RunService.Heartbeat:Connect(function()
 		nextSlowTick = now + 0.2
 		tickQuick(workspace:GetServerTimeNow())
 		tickInvites()
+		publishWeek()
 	end
 	for player, card in cards do
 		if now > card.untilT or not player.Parent then closeCard(player) end -- the card's Done normally clears it

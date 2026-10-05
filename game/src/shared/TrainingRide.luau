@@ -9,8 +9,8 @@
 --   crossings       where a path crosses a gate, with direction (+1 forward, -1 backward).
 --   tracker / feed  live progress: laps on the oval, the next gymkhana piece, the finish.
 --   scoreSpeed      Sprint Lane: 100 × hoops ridden through, in order and forward, / 18.
---   scoreGrit       Mud Splash: puddles splashed (7.5), logs hopped (12, clean = airborne),
---                   poles passed on the right side (8.5).
+--   scoreGrit       Mud Splash (any of its layouts): puddles splashed (7.5), logs hopped (12,
+--                   clean = airborne), poles passed on the right side (8.5).
 --   scoreAccel      Gate Break: three breaks from the practice gate; each scores by reaction
 --                   to the bell (100 within fullReact, down to breakFloor at zeroReact).
 --   scoreStamina    Hill Climb: 100 × the share of time in Pip's ring after the grace.
@@ -427,8 +427,8 @@ function TR.cleared(kept: { Sample }, x: Crossing, e: any, g: any): boolean
 	return false
 end
 
-function TR.scoreGrit(kept: { Sample }, cfg: any): (number, any)
-	local c = TC.courses.grit
+function TR.scoreGrit(kept: { Sample }, cfg: any, key: string): (number, any)
+	local c = TC.courses[key]
 	local g = cfg.grit
 	local counts = { mud = 0, log = 0, pole = 0 }
 	local got = {}
@@ -455,7 +455,7 @@ function TR.scoreGrit(kept: { Sample }, cfg: any): (number, any)
 		end
 	end
 	local finishT: number? = nil
-	local minT = TR.MIN_FINISH_SHARE * TC.idealSeconds("grit")
+	local minT = TR.MIN_FINISH_SHARE * TC.idealSeconds(key)
 	for _, x in TR.crossings(kept, c.finish) do
 		if x.dir > 0 and x.t >= minT then
 			finishT = x.t
@@ -558,11 +558,12 @@ function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?, op
 	-- Hill Climb keeps off-course samples: they count as out of Pip's ring
 	local onCourse = if key == "stamina" then nil else function(x: number, z: number): boolean return TC.onCourse(key, x, z) end
 	local kept, bad, counts = TR.validate(samples, onCourse, cfg)
+	local c = TC.courses[key]
 	local raw, detail
 	if key == "speed" then
 		raw, detail = TR.scoreSpeed(kept, cfg)
-	elseif key == "grit" then
-		raw, detail = TR.scoreGrit(kept, cfg)
+	elseif c and c.kind == "arena" then
+		raw, detail = TR.scoreGrit(kept, cfg, key)
 	elseif key == "accel" then
 		raw, detail = TR.scoreAccel(kept, o.bellSeed or 1, o.allowances or o.allowance or 0, cfg)
 	elseif key == "stamina" then
@@ -575,7 +576,7 @@ function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?, op
 	local res = TR.finalize(raw, bad, secs, ideal, cfg)
 	res.detail, res.course, res.kept, res.counts = detail, key, #kept, counts
 	res.scored = if key == "speed" then detail.hoops
-		elseif key == "grit" then detail.mud + detail.logs + detail.poles
+		elseif c.kind == "arena" then detail.mud + detail.logs + detail.poles
 		elseif key == "accel" then detail.scored
 		else detail.inRing
 	return res
