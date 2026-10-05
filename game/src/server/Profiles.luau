@@ -293,7 +293,7 @@ end
 function Profiles.saveNow(player: Player): boolean
 	local e = entries[player]
 	if not e then return false end
-	if e.temporary then return true end
+	if e.temporary then return RunService:IsStudio() end -- a live server with no DataStore can't keep a purchase
 	return save(player, e, false)
 end
 

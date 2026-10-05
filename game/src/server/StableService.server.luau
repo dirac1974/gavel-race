@@ -119,8 +119,8 @@ end
 -- Fixed spots in the front yard for decor from the Tack & Paint shop (D-050), in plot space
 -- (inward from the lane, across to the right looking in), each facing out to the lane.
 local YARD_SPOTS = {
-	yard_bench = { 22, 18 }, yard_lanterns = { 2, 20 }, yard_saddlerack = { 60, 30 },
-	yard_picnic = { 40, 16 }, yard_haycart = { 70, -14 }, yard_bridge = { 12, -28 },
+	yard_bench = { 22, 18 }, yard_lanterns = { 2, 20 }, yard_saddlerack = { 16, 32 },
+	yard_picnic = { 36, -16 }, yard_haycart = { 70, -14 }, yard_bridge = { 12, -28 },
 }
 
 local function buildBarn(i: number, owner: Player, data)
@@ -182,7 +182,7 @@ local function buildBarn(i: number, owner: Player, data)
 			end
 			hm.Parent = barn
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
-				bay.LookVector, h.name, if h.id == data.activeHorse or starSet then "⭐" else nil, stallW - 3, 2.2, plateC)
+				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)
 			nameLabel.Name = "HorseName"
 		end
 	end

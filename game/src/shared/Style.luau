@@ -116,6 +116,8 @@ function Style.buy(p: any, id: string, now: number): (boolean, string)
 	p.style.owned[id] = true
 	p.style.boughtAt = p.style.boughtAt or {}
 	p.style.boughtAt[id] = now
+	p.style.paid = p.style.paid or {}
+	p.style.paid[id] = it.price
 	Style.equip(p, id)
 	return true, it.name .. " is yours! (You can return it within a day.)"
 end
@@ -131,11 +133,13 @@ end
 function Style.giveBack(p: any, id: string, now: number): (boolean, string)
 	if not Style.canReturn(p, id, now) then return false, "That can't be returned now" end
 	local it = byId[id] :: Item
+	local paid = (p.style.paid and p.style.paid[id]) or it.price
 	Style.unequip(p, id)
 	p.style.owned[id] = nil
 	p.style.boughtAt[id] = nil
-	p.diamonds += it.price
-	return true, string.format("Returned %s: +%d 💎", it.name, it.price)
+	if p.style.paid then p.style.paid[id] = nil end
+	p.diamonds += paid
+	return true, string.format("Returned %s: +%d 💎", it.name, paid)
 end
 
 -- Wear an owned item (yard pieces: place it). Returns (ok, message).
@@ -197,7 +201,7 @@ end
 -- Free Diamonds from milestones only (D-050): never for logging in, streaks or race places.
 Style.EARN_PROMOTION = 25      -- a horse moves up a league
 Style.EARN_MONTHLY_RIBBON = 25 -- every monthly job claimed
-Style.EARN_FAN_LEVEL = 10      -- each new Fan level
+-- (Never for Fan levels: Fan XP includes backing the winner, so it must stay cosmetic, hard rule 1.)
 
 function Style.earn(p: any, amount: number)
 	ensure(p)

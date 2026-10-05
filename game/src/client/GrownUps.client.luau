@@ -134,7 +134,7 @@ local function grownUpsTab()
 	local shop = d and d.shop
 	para("💎 Diamonds cost real money through Robux, 1 Diamond = 1 Robux in every pack (no bigger-pack bonus). They buy looks only: saddle cloths and helmets for riding around, barn paint, name plates and yard decor.", 16, 4)
 	para("Never for sale: horses, coats, stats, speed, Green Cash, food, Energy, race entries, fan gear, trophies, rosettes or anything random.", 16, 41)
-	para(string.format("Our own limits: at most %d Robux of Diamonds a day and %d a month. Diamonds bought this month: %d Robux. No buying in line, during a race, on the results screen or for two minutes after. Any look can be returned within a day for all its Diamonds; Robux refunds go through Roblox Support.",
+	para(string.format("Our own limits: the game won't offer more than %d Robux of Diamonds in 24 hours or %d in 30 days. Diamonds bought in the last 30 days: %d Robux. No buying in line, during a race, on the results screen or for two minutes after. Any look can be returned within a day for all its Diamonds; Robux refunds go through Roblox Support.",
 		shop and shop.caps and shop.caps.dayRobux or 250, shop and shop.caps and shop.caps.monthRobux or 1000, shop and shop.monthRobux or 0), 16, 42)
 	para("🐴 Horses never get sick, run away or come to harm if your child takes a break. There are no streaks to lose and no countdowns.", 16, 5)
 	para("💬 Chat uses Roblox's own filtered chat and age settings. Horse names are built from a word list, so nothing can be typed.", 16, 6)

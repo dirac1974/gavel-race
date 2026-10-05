@@ -34,23 +34,43 @@ local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 local scale = Instance.new("UIScale")
 scale.Parent = panel
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	local function rescale()
-		local v = workspace.CurrentCamera.ViewportSize
+local compact = false
+local render -- defined below; a screen-size change redraws
+local function layout()
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+	local v = cam.ViewportSize
+	-- Phones: fill the screen at full size with one column (big, tappable), rather than
+	-- shrinking the desktop layout.
+	compact = v.Y < 600 or v.X < 820
+	if compact then
+		scale.Scale = 1
+		panel.Size = UDim2.fromOffset(math.min(W, v.X - 16), v.Y - 16)
+	else
+		panel.Size = UDim2.fromOffset(W, H)
 		scale.Scale = math.min(1, (v.X - 20) / W, (v.Y - 20) / H)
 	end
-	rescale()
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+end
+task.spawn(function()
+	while not workspace.CurrentCamera do task.wait(0.1) end
+	layout()
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+		layout()
+		if render then render() end
+	end)
 end)
 Ui.text(panel, "🎨 Tack & Paint", 30, { Position = UDim2.new(0, 0, 0, 10), Size = UDim2.new(1, 0, 0, 36) })
 local balance = Ui.text(panel, "", 22, { Position = UDim2.new(0, 18, 0, 14), Size = UDim2.new(0, 200, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
 balance.TextColor3 = Color3.fromHex("2E5AAC")
 local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 8), C.white, 22)
-local tabs = Instance.new("Frame")
+local tabs = Instance.new("ScrollingFrame")
 tabs.BackgroundTransparency = 1
-tabs.Size = UDim2.new(1, -32, 0, 42)
+tabs.Size = UDim2.new(1, -32, 0, 46)
 tabs.Position = UDim2.new(0, 16, 0, 54)
+tabs.ScrollingDirection = Enum.ScrollingDirection.X
+tabs.AutomaticCanvasSize = Enum.AutomaticSize.X
+tabs.CanvasSize = UDim2.new()
+tabs.ScrollBarThickness = 4
 tabs.Parent = panel
 local tl = Instance.new("UIListLayout")
 tl.FillDirection = Enum.FillDirection.Horizontal
@@ -72,7 +92,6 @@ grid.Parent = list
 
 local tab = "tack"
 local confirming: string? = nil
-local render
 
 local function diamonds(): number
 	return (PlayerState.data and PlayerState.data.diamonds) or 0
@@ -136,7 +155,7 @@ local function itemCard(it, order: number)
 	rl.Padding = UDim.new(0, 6)
 	rl.Parent = row
 	local function btn(text: string, color: Color3, fn)
-		local b = Ui.button(row, text, UDim2.fromOffset(112, 38), UDim2.new(), color, 15)
+		local b = Ui.button(row, text, UDim2.fromOffset(124, 44), UDim2.new(), color, 16)
 		b.Activated:Connect(fn)
 	end
 	if own then
@@ -165,6 +184,7 @@ local function itemCard(it, order: number)
 				btn("Yes, buy", C.green, function()
 					confirming = nil
 					gameRemotes:WaitForChild("StyleBuy"):FireServer(it.id)
+					render()
 				end)
 				btn("No", C.white, function()
 					confirming = nil
@@ -212,14 +232,15 @@ render = function()
 	balance.Text = "💎 " .. diamonds()
 	for _, ch in tabs:GetChildren() do if ch:IsA("TextButton") then ch:Destroy() end end
 	for _, ch in list:GetChildren() do if not ch:IsA("UIGridLayout") then ch:Destroy() end end
+	grid.CellSize = if compact then UDim2.new(1, -8, 0, 132) else UDim2.new(0.5, -8, 0, 132)
 	for _, cat in Style.CATEGORIES do
-		local b = Ui.button(tabs, cat.label, UDim2.fromOffset(136, 40), UDim2.new(), if tab == cat.id then C.gold else C.white, 14)
+		local b = Ui.button(tabs, cat.label, UDim2.fromOffset(112, 44), UDim2.new(), if tab == cat.id then C.gold else C.white, 15)
 		b.Activated:Connect(function()
 			tab, confirming = cat.id, nil
 			render()
 		end)
 	end
-	local db = Ui.button(tabs, "💎 Diamonds", UDim2.fromOffset(110, 40), UDim2.new(), if tab == "diamonds" then C.gold else C.sky, 14)
+	local db = Ui.button(tabs, "💎 Diamonds", UDim2.fromOffset(112, 44), UDim2.new(), if tab == "diamonds" then C.gold else C.sky, 15)
 	db.Activated:Connect(function()
 		tab, confirming = "diamonds", nil
 		render()

@@ -151,10 +151,6 @@ function FanService.finish(courseId: string, winnerLane: number)
 			local levelBefore = Fans.level(f.xp)
 			f.xp += xp
 			f.dayXp += xp
-			local _, profile = fanData(e.player)
-			for _ = levelBefore + 1, Fans.level(f.xp) do
-				Style.earn(profile, Style.EARN_FAN_LEVEL) -- a milestone gift per Fan level (D-050)
-			end
 			if e.flagged then -- one strike per race at most
 				local last = f.strikes[#f.strikes]
 				if last and t - last >= STRIKE_EXPIRY then table.clear(f.strikes) end -- 90 days without a flag

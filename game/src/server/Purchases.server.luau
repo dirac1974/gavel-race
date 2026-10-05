@@ -1,9 +1,11 @@
 --!nonstrict
 -- Purchases (D-050): Robux → Diamonds through developer products, nothing else.
 -- Roblox calls ProcessReceipt until we answer PurchaseGranted, possibly more than once and
--- possibly in another server, so each purchase id is recorded in the player's profile and the
--- profile is saved before we say PurchaseGranted (a repeat of a recorded id is just granted
--- again without adding Diamonds). If the save fails, the grant is undone and Roblox retries.
+-- possibly in another server, so each purchase id is recorded in the player's profile together
+-- with its Diamonds, and we say PurchaseGranted only once that profile is saved. If the save
+-- fails we keep both in memory and answer NotProcessedYet: the next save writes them together,
+-- a retry here finds the receipt and only needs the save, and if the server stops first neither
+-- was saved, so the retry elsewhere grants them once.
 -- Product ids live in DiamondProducts (created in the Creator Dashboard); 0 = not set up yet.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -40,7 +42,9 @@ MarketplaceService.ProcessReceipt = function(info)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	local id = tostring(info.PurchaseId)
-	if hasReceipt(data, id) then return Enum.ProductPurchaseDecision.PurchaseGranted end
+	if hasReceipt(data, id) then
+		return if Profiles.saveNow(player) then Enum.ProductPurchaseDecision.PurchaseGranted else Enum.ProductPurchaseDecision.NotProcessedYet
+	end
 	data.diamonds += pack.diamonds
 	table.insert(data.receipts, id)
 	while #data.receipts > MAX_RECEIPTS do table.remove(data.receipts, 1) end
@@ -49,17 +53,8 @@ MarketplaceService.ProcessReceipt = function(info)
 	data.purchaseLog = if typeof(data.purchaseLog) == "table" then data.purchaseLog else {}
 	table.insert(data.purchaseLog, { t = os.time(), robux = pack.robux }) -- for the daily and monthly caps
 	while #data.purchaseLog > 100 do table.remove(data.purchaseLog, 1) end
-	if not Profiles.saveNow(player) then
-		-- Undo and let Roblox retry later, so a failed save can never lose or double a purchase.
-		data.diamonds -= pack.diamonds
-		data.diamondsBought -= pack.diamonds
-		data.robuxSpent -= (tonumber(info.CurrencySpent) or 0)
-		table.remove(data.purchaseLog)
-		local i = table.find(data.receipts, id)
-		if i then table.remove(data.receipts, i) end
-		return Enum.ProductPurchaseDecision.NotProcessedYet
-	end
-	Profiles.notify(player, string.format("+%d 💎 Diamonds. Thank you!", pack.diamonds), "diamond")
 	Profiles.changed(player)
+	if not Profiles.saveNow(player) then return Enum.ProductPurchaseDecision.NotProcessedYet end
+	Profiles.notify(player, string.format("+%d 💎 Diamonds. Thank you!", pack.diamonds), "diamond")
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end

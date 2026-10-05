@@ -33,28 +33,31 @@ local function busy(player: Player): boolean
 	return false
 end
 
--- Robux spent through Diamond packs today and this month (from saved purchase records).
+-- Robux spent through Diamond packs in the last 24 hours and the last 30 days (rolling, so a
+-- date line in any time zone can't double the limit).
 local function spent(data, now: number): (number, number)
 	local day, month = 0, 0
-	local today = now // 86400
-	local t = os.date("!*t", now)
 	for _, rec in data.purchaseLog or {} do
-		if rec.t // 86400 == today then day += rec.robux end
-		local rt = os.date("!*t", rec.t)
-		if rt.year == t.year and rt.month == t.month then month += rec.robux end
+		if now - rec.t < 86400 then day += rec.robux end
+		if now - rec.t < 30 * 86400 then month += rec.robux end
 	end
 	return day, month
 end
 
 -- Why buying Diamonds isn't possible right now (nil = it is).
 local function blocked(player: Player, data, pack): string?
+	if not policyOk[player] then
+		local ok, info = pcall(function() return PolicyService:GetPolicyInfoForPlayerAsync(player) end)
+		policyOk[player] = ok and info ~= nil
+	end
 	if not policyOk[player] then return "Buying Diamonds isn't available right now." end
+	if Profiles.isTemporary(player) and not game:GetService("RunService"):IsStudio() then return "Buying Diamonds isn't available right now." end
 	if player:GetAttribute("Racing") or player:GetAttribute("InLine") then return "You can visit the shop after your race." end
 	local raceEnd = player:GetAttribute("LastRaceEnd")
 	if raceEnd and os.time() - raceEnd < DiamondProducts.afterRaceSeconds then return "You can visit the shop a little after your race." end
 	local day, month = spent(data, os.time())
-	if day + pack.robux > DiamondProducts.caps.dayRobux then return "That's the most Diamonds for today. Come back tomorrow!" end
-	if month + pack.robux > DiamondProducts.caps.monthRobux then return "That's the most Diamonds for this month." end
+	if day + pack.robux > DiamondProducts.caps.dayRobux then return "That's all the Diamonds for today." end
+	if month + pack.robux > DiamondProducts.caps.monthRobux then return "That's all the Diamonds for this month." end
 	return nil
 end
 
