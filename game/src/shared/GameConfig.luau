@@ -72,6 +72,7 @@ GameConfig.steering = {
 	maxQueued = 1,                 -- 0 or 1: one press can wait behind the one in progress
 	clearFeet = 8,                 -- a lane change needs this much room ahead in the new lane...
 	holdGap = 10,                  -- ...and this much behind; a held horse sits this far back
+	holdPullPerSecond = 19,        -- a hold settles a horse back no faster than this (no hop on screen)
 	tuckBackMax = 24,              -- ease back up to 3 lengths to slot in behind horses
 	outwardWaitSeconds = 1.0,      -- a blocked move outward cancels after this long
 	tickHz = 10, sendHz = 10,

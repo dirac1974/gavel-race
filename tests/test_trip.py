@@ -313,7 +313,8 @@ def test_tuck_in_eases_back_and_slots_in_behind():
     for tick in range(101, 131):
         play(st, 1, even(2), start=tick)
         lowest = min(lowest, st.off[1])
-        assert min(in_band_gaps(st) or [99]) >= CFG["holdGap"] - 1e-9
+        # it moves in once clearFeet behind, then settles back to holdGap (no hop)
+        assert min(in_band_gaps(st) or [99]) >= CFG["clearFeet"] - 1e-9
     assert st.x[1] == 2.0  # in within 3 s
     assert before - lowest <= CFG["tuckBackMax"] + 1e-9
     assert st.off[0] - st.off[1] == pytest.approx(CFG["holdGap"], abs=1e-6)  # tucked in behind
@@ -347,19 +348,63 @@ def test_no_tuck_past_a_long_line_of_horses():
     assert st.off[4] == pytest.approx(start, abs=1e-6)  # the slot is past tuckBackMax: no ease-back
 
 
-def test_horses_never_overlap():
-    for seed in range(6):
+def test_horses_never_overlap_and_never_hop_back():
+    """Random presses among Smart Steer, manual and bot horses. Horses sharing a lane never
+    overlap (never closer than 6 ft of an 8 ft horse). A horse arriving a little close (a lane
+    change needs clearFeet ahead; the hold keeps holdGap) settles into its place within 8 ticks
+    instead of snapping (400 such races: closest 8.8 ft within half a lane, settled within 5).
+    Nobody moves back faster than holdPullPerSecond (no hop on screen)."""
+    for seed in range(12):
         rng = random.Random(seed)
         course, distance = steering.cells()[seed % 8]
         geo = trip.phase_a(course, distance)
         setup = steering.race_setup(steering.race_seed(7, seed, 0), distance)
         st = trip.new_state(list(range(1, 9)), setup["q"], setup["uniforms"], geo, CFG,
                             ["smart", "manual", "bot", "bot", "smart", "bot", "manual", "bot"])
+        close_for = {}
         for tick in range(phase_a_ticks(geo)):
             intents = [(i, rng.choice((-1, 1))) for i in (0, 1, 4, 6) if rng.random() < 0.08]
+            before = list(st.off)
             trip.step(st, setup["q"] if tick < 200 else setup["p1"], intents, tick * DT, DT)
-            assert min(in_band_gaps(st) or [99]) >= CFG["holdGap"] - 1e-9
             assert all(1.0 <= x <= 8.0 for x in st.x)
+            assert all(before[i] - st.off[i] <= CFG["holdPullPerSecond"] * DT + 1e-9 for i in range(st.n))
+            for i in range(st.n):
+                for j in range(i + 1, st.n):
+                    dx, gap = abs(st.x[i] - st.x[j]), abs(st.off[i] - st.off[j])
+                    if dx < CFG["laneBand"]:
+                        assert gap >= 6.0
+                        close_for[(i, j)] = close_for.get((i, j), 0) + 1 if gap < CFG["holdGap"] - 1e-9 else 0
+                        assert close_for[(i, j)] <= 8
+
+
+def test_a_hold_settles_a_close_arrival_instead_of_snapping():
+    """Horse A sits 9 ft behind B, one lane out, and is catching up (its skill target is ahead
+    of B's) when it moves into B's lane: it arrives inside holdGap. With an instant hold
+    (the rule before the hop fix) it hops back several feet in one tick; now it eases back at
+    no more than holdPullPerSecond and settles at holdGap."""
+    geo = trip.phase_a("dirt", "Classic")
+
+    def ride(cfg):
+        live = [0.5 - 9 / 640, 0.5 + 9 / 640]  # A (lane 3) settles 9 ft behind B (lane 2)
+        st = trip.new_state([3, 2], live, [0.5] * 4, geo, cfg, ["manual", "manual"])
+        play(st, 200, live)
+        chase = [0.5 + 20 / 640, 0.5 - 20 / 640]  # now A's place is 20 ft ahead of B's
+        play(st, 1, chase, intents={200: [(0, -1)]}, start=200)
+        worst, gaps = 0.0, []
+        for tick in range(201, 240):
+            before = st.off[0]
+            play(st, 1, chase, start=tick)
+            worst = max(worst, before - st.off[0])
+            if abs(st.x[0] - st.x[1]) < CFG["laneBand"]:
+                gaps.append(st.off[1] - st.off[0])
+        return st, worst, gaps
+
+    _, old_worst, _ = ride(cfg_with(holdPullPerSecond=1e9))
+    st, worst, gaps = ride(CFG)
+    assert old_worst > 20 * DT  # the hop: over 20 ft/s backwards on screen
+    assert st.x[0] == 2.0
+    assert worst <= CFG["holdPullPerSecond"] * DT + 1e-9  # no hop now
+    assert min(gaps) >= CFG["clearFeet"] - 1e-9 and gaps[-1] == pytest.approx(CFG["holdGap"], abs=1e-6)  # settled behind B
 
 
 # ---------------------------------------------------------------- Smart Steer
@@ -440,9 +485,13 @@ def test_draft_is_capped_and_stops_at_the_lock():
     short = dict(geo, lockS=RACE["speed"] * 5.05)
     st = trip.new_state([1, 1], even(2), [0.5] * 4, short, CFG, ["manual", "manual"])
     play(st, phase_a_ticks(short), even(2))
-    assert st.draft[1] == pytest.approx(CFG["draftPerSecond"] * 5.05, abs=1e-12)  # the last tick is clipped
+    # The two start level; the second settles back into its hold at holdPullPerSecond and is
+    # tucked in (draftNear or more behind) from tick `first` on. The last tick is clipped.
+    first = next(k for k in range(20) if (k + 1) * CFG["holdPullPerSecond"] * DT >= CFG["draftNear"])
+    drafted = CFG["draftPerSecond"] * (5.05 - first * DT)
+    assert first == 2 and st.draft[1] == pytest.approx(drafted, abs=1e-12)
     play(st, 20, even(2), start=phase_a_ticks(short))  # stepping past the lock adds nothing
-    assert st.draft[1] == pytest.approx(CFG["draftPerSecond"] * 5.05, abs=1e-12)
+    assert st.draft[1] == pytest.approx(drafted, abs=1e-12)
 
 
 def test_nothing_changes_after_the_lock():

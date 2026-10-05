@@ -49,6 +49,7 @@ CONFIG: Dict = {
     "maxQueued": 1,               # 0 or 1: one press can wait behind the one in progress
     "clearFeet": 8.0,             # a lane change needs this much room ahead in the new lane...
     "holdGap": 10.0,              # ...and this much behind; a held horse sits this far back
+    "holdPullPerSecond": 19.0,    # a hold settles a horse back no faster than this (no hop on screen)
     "tuckBackMax": 24.0,          # ease back at most this far to slot in behind horses (plan: 12)
     "outwardWaitSeconds": 1.0,    # a blocked move outward cancels after this long
     "tickHz": 10,
@@ -310,16 +311,22 @@ def _order(st: TripState) -> List[int]:
     return sorted(range(st.n), key=lambda i: (-off[i], x[i], i))
 
 
-def _hold(st: TripState, order: List[int]) -> None:
-    """A horse may not sit closer than holdGap behind a horse sharing its lane."""
+def _hold(st: TripState, order: List[int], prev: Sequence[float], dt: float) -> None:
+    """A horse may not sit closer than holdGap behind a horse sharing its lane. It settles back
+    no faster than holdPullPerSecond, counted from where it was at the start of the tick (prev):
+    a horse arriving in a lane a little close (a lane change needs clearFeet ahead, a hold keeps
+    holdGap) eases into its place over a few ticks instead of hopping back on screen. Following
+    a horse never needs more: a follower moves back with the horse ahead, at most
+    maxGapFeetPerSecond."""
     band, gap = st.cfg["laneBand"], st.cfg["holdGap"]
+    pull = st.cfg["holdPullPerSecond"] * dt
     off, x = st.off, st.x
     for a in range(st.n):
         i = order[a]
         for b in range(a):
             j = order[b]
             if abs(x[i] - x[j]) < band and off[j] - off[i] < gap:
-                off[i] = off[j] - gap
+                off[i] = max(off[j] - gap, min(off[i], prev[i] - pull))
 
 
 def _try_move(st: TripState, i: int, d: int, t: float, tucking: List[bool], manual: bool) -> bool:
@@ -386,6 +393,7 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
     n = st.n
     if len(live) != n:
         raise ValueError("one live chance per lane")
+    prev = list(st.off)  # where every horse was at the start of the tick (holds settle from here)
     # 1. Skill targets (gaps ramp in from the gate), minus any tuck-back. Offsets move toward
     #    them as the race view moves gaps: eased, and no faster than maxGapFeetPerSecond unless
     #    a horse must hurry to be in place by the line.
@@ -406,7 +414,7 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
             limit = max(allowed, abs(gap) * dt / (to_line - margin))
         st.off[i] = st.off[i] + min(limit, max(-limit, gap * k))
     # 2. Hold: nobody overlaps the horse ahead in its lane.
-    _hold(st, _order(st))
+    _hold(st, _order(st), prev, dt)
     order = _order(st)
     # 3. Lane changes: this tick's requests in arrival order, then everyone else leader
     #    first, then the inside horse.
@@ -449,7 +457,7 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
                 st.x[i] = st.x[i] + glide
             else:
                 st.x[i] = st.x[i] - glide
-    _hold(st, order)
+    _hold(st, order, prev, dt)
     release = cfg["tuckReleasePerSecond"] * dt
     for i in range(n):
         if not tucking[i] and st.tuck[i] > 0:

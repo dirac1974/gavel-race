@@ -176,16 +176,21 @@ local function order(st: any): { number }
 	return out
 end
 
--- A horse may not sit closer than holdGap behind a horse sharing its lane.
-local function hold(st: any, ord: { number })
+-- A horse may not sit closer than holdGap behind a horse sharing its lane. It settles back no
+-- faster than holdPullPerSecond, counted from where it was at the start of the tick (prev): a horse
+-- arriving in a lane a little close (a lane change needs clearFeet ahead, a hold keeps holdGap)
+-- eases into its place over a few ticks instead of hopping back on screen. Following a horse never
+-- needs more: a follower moves back with the horse ahead, at most maxGapFeetPerSecond.
+local function hold(st: any, ord: { number }, prev: { number }, dt: number)
 	local band, gap = st.cfg.laneBand, st.cfg.holdGap
+	local pull = st.cfg.holdPullPerSecond * dt
 	local off, x = st.off, st.x
 	for a = 1, st.n do
 		local i = ord[a]
 		for b = 1, a - 1 do
 			local j = ord[b]
 			if math.abs(x[i] - x[j]) < band and off[j] - off[i] < gap then
-				off[i] = off[j] - gap
+				off[i] = math.max(off[j] - gap, math.min(off[i], prev[i] - pull))
 			end
 		end
 	end
@@ -257,6 +262,7 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	local cfg, race = st.cfg, st.race
 	local n = st.n
 	if #live ~= n then error("one live chance per lane", 2) end
+	local prev = table.clone(st.off) -- where every horse was at the start of the tick (holds settle from here)
 	-- 1. Skill targets (gaps ramp in from the gate), minus any tuck-back; offsets move toward
 	--    them as the race view moves gaps (eased, capped unless catching up by the line).
 	local ramp = 1
@@ -278,7 +284,7 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 		st.off[i] = st.off[i] + math.min(limit, math.max(-limit, gap * k))
 	end
 	-- 2. Hold: nobody overlaps the horse ahead in its lane.
-	hold(st, order(st))
+	hold(st, order(st), prev, dt)
 	local ord = order(st)
 	-- 3. Lane changes: this tick's requests in arrival order, then everyone else leader first,
 	--    then the inside horse.
@@ -329,7 +335,7 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 			end
 		end
 	end
-	hold(st, ord)
+	hold(st, ord, prev, dt)
 	local release = cfg.tuckReleasePerSecond * dt
 	for i = 1, n do
 		if not tucking[i] and st.tuck[i] > 0 then
@@ -590,14 +596,14 @@ Trip.halfSteps = true          -- the S4 half-lane step at the finish (tests com
 -- the make-room lanes let it out (as Trip holds before the lock). A horse taking a half-lane step
 -- (S4) is in neither lane once it is more than 0.45 lanes from the other horse: holding it (or its
 -- new neighbour) back then would jerk one of them backwards on screen. And a hold never pulls a
--- horse back faster than HOLD_PULL_FRACTION of twice the gap limit (S4 review): following a horse
--- needs no more than that, so only a sudden snap (two horses meeting in a lane closer than holdGap)
--- is spread over a few frames instead of a jerk. before = offsets at the start of this substep of h s.
-local HOLD_PULL_FRACTION = 0.95
+-- horse back faster than holdPullPerSecond, as Trip's own holds (S4 review, pre-lock hop fix):
+-- following a horse needs no more than that, so only a sudden snap (two horses meeting in a lane
+-- closer than holdGap) is spread over a few frames instead of a jerk. before = offsets at the start
+-- of this substep of h s.
 local function holdView(st: any, before: { number }, h: number)
 	local band, gap = st.cfg.laneBand, st.cfg.holdGap
 	local view, x, tgt = st.view, st.shown, st.shownTgt
-	local pull = HOLD_PULL_FRACTION * 2 * st.race.maxGapFeetPerSecond * h
+	local pull = st.cfg.holdPullPerSecond * h
 	local ord = table.create(st.n)
 	for i = 1, st.n do ord[i] = i end
 	table.sort(ord, function(a: number, b: number): boolean
