@@ -6,7 +6,7 @@ Last updated: 2026-10-05
 
 - **Race model v2**: Python reference and Luau module agree exactly (300 fixture races, purses and finish orders included).
 - **Roblox prototype (Phase 1)**: Rojo project in `game/` with three Giddy-up stretches and a Final Burst (D-022). Pure modules (GameConfig, ThemePack, Stride, BurstMeter, TapTime, Integrity, RaceRating, RaceSession) are tested under Lune; stride scoring has a Python mirror with parity tests. Server loop and client UI are written and compile, but **have not been run in Roblox Studio** (see `game/PLAYTEST.md`).
-- **Tests**: 1,109 Python tests; 17,600+ Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
+- **Tests**: 1,632 Python tests; 76,000+ Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
 - **Art**: playtest art (D-023) is uploaded and wired in; the place must be published to the LlamaWorks group to load it.
 - **Race shape (D-033)**: secret luck at the gate gives the same Harville odds as an exponential race; luck shows from the far turn, so comebacks happen on screen while taps still count. Replays of the finish or the whole race (D-034).
 - **Design**: debate 007 replaced the gavel meter with Giddy-up stretches and the Final Burst (D-022). Provisional decisions listed in REVIEW_QUEUE.md.
@@ -20,7 +20,7 @@ Last updated: 2026-10-05
 1. **Studio playtest of the world** (David): `game/PLAYTEST.md`, every section; enable API access in Game Settings → Security to test saving. Fix what breaks.
 2. **Sound effects**: generate and upload the 15 effects once the ElevenLabs key has Sound Effects access (docs/audio/AUDIO_PLAN.md); the code already plays them when their ids arrive. Then listen in Studio and tune `LEVEL` in `Sound.luau`.
 3. **Training rides** (D-053): ~~Training Ground and oval (T1)~~ done, ~~server-scored Sprint Lane + Mud Splash (T2)~~ done (PR, not yet run in Studio); ~~Gate Break + Hill Climb + Easy Rein (T3)~~ done (PR, not yet run in Studio); next ghosts / rosettes / Ride together / server Quick Train (T4). Plan: docs/debates/009. David asked for this 2026-10-05 ("You should run around with the horse").
-4. **Race steering** (D-054): Python trip model + calibration (S0), rail coordinates + random posts (S1), Smart Steer on the server (S2), rider controls (S3), replays and results (S4). Plan: docs/debates/010. David asked for this 2026-10-05.
+4. **Race steering** (D-054): ~~Python trip model + calibration (S0)~~ done 2026-10-05 (`src/trip.py`, `sims/steering.py`, docs/research/steering-calibration.md); next rail coordinates + random posts (S1), Smart Steer on the server (S2, mirror `src/trip.py` and `tests/fixtures/trip.json`), rider controls (S3), replays and results (S4). Plan: docs/debates/010. David asked for this 2026-10-05.
 5. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
 6. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
 7. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
@@ -33,6 +33,7 @@ Last updated: 2026-10-05
 14. **Performance pass**: StreamingEnabled check, model counts on phones (58 models in ReplicatedStorage), trees and fences.
 ## Done
 
+- 2026-10-05: race steering S0 (D-054): Python trip model (lanes, holds, tuck-in, Smart Steer, ground and draft, τ), `live_chances(..., extra)`, calibration sim with the generated per-post baseline (2,000 bot-mix races per course × distance), Luau parity fixtures (`trip.json`, `race_math.json` extraCases). After review: post baseline built for Smart Steer kids (per-post bias ≤ 0.002 among bots and in all-Smart lobbies), gaps move like RaceView (D-055), the mover never pushes the horse behind; every target met per course × distance with `groundPerLaneTurn` 0.010, `draftPerSecond` 0.0010, `tuckBackMax` 24 and `bots.wideShare` 0.20; the full report is stored and asserted by tests.
 - 2026-10-05: training rides T3 (D-053): Gate Break (practice gate, bell from the seed, early go reruns once, latency allowance) and Hill Climb (Pip the lead pony, ring scoring) scored by the server; all four courses open; Easy Rein in Settings.
 - 2026-10-05: training rides T1 + T2 (D-053): the Training Ground (oval with a hill, hoops, practice gate, path from the paddock's new south gate), the Mud Splash gymkhana in the paddock arena, server-scored Sprint Lane and Mud Splash, the course picker with Quick train, end card with stars and ribbons. Gate Break and Hill Climb show "Coming soon" until T3.
 - 2026-10-05: play-test quirks (debate 011): QA audits of the race and the riding world (Lune sims); race fixes and race feel (D-055) merged: the order across the line is the result, no lurches, countdown, bounce-proof taps, phone HUD, spectating only near the course. Riding and world fixes (D-056) follow in the riding-feel PR after the training PR.

@@ -147,6 +147,32 @@ do
 	for i = 1, 8 do check(close(p[i], q[i], 1e-12), "equal scores return base chances") end
 end
 
+-- Steering geometry (D-054): src/trip.py's gate and phase A match TrackLayout -------------
+do
+	local TrackLayout = require("../../game/src/shared/TrackLayout")
+	local tripData = serde.decode("json", fs.readFile("tests/fixtures/trip.json"))
+	for course, cfg in TrackLayout.courses do
+		for name, distance in TrackLayout.distances do
+			local g = tripData.geometry[course][name]
+			local plan = TrackLayout.plan(cfg, distance)
+			local r1 = TrackLayout.laneRadius(cfg, 1)
+			check(close(tripData.distances[name], distance, 0), `trip geometry {course} {name}: distance`)
+			check(plan.gateStraight == g.gate.straight and plan.laps == g.gate.laps, `trip geometry {course} {name}: gate straight`)
+			check(close(plan.gateOffset, g.gate.offset, 1e-9), `trip geometry {course} {name}: gate offset`)
+			check(close(plan.lengths[1], g.length, 1e-9), `trip geometry {course} {name}: length {plan.lengths[1]} vs {g.length}`)
+			check(r1 == g.r1 and close(math.pi * r1, g.turnLength, 1e-9), `trip geometry {course} {name}: lane-1 radius`)
+			check(close(plan.lengths[1] - cfg.finishFromTop - math.pi * r1, g.lockS, 1e-9), `trip geometry {course} {name}: lock`)
+			check(cfg.finishFromTop == tripData.finishFromTop[course], `trip geometry {course}: finish`)
+			local s = 0
+			for _, seg in g.segments do
+				check(close(seg.start, s, 1e-6), `trip geometry {course} {name}: segment start`)
+				s += seg.length
+			end
+			check(close(s, g.lockS, 1e-6), `trip geometry {course} {name}: segments reach the lock`)
+		end
+	end
+end
+
 -- Game modules ---------------------------------------------------------------
 require("./game_tests")(check, close)
 require("./world_tests")(check, close)

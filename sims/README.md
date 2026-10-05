@@ -1,5 +1,15 @@
 # Simulations
 
+## steering.py — race steering baseline and calibration (D-054)
+
+```bash
+python sims/steering.py                  # acceptance report against the checked-in baseline (~3 min, all cores)
+python sims/steering.py --write          # regenerate tests/fixtures/trip_baseline.json and game/src/shared/TripBaseline.luau first
+python sims/steering.py --set groundPerLaneTurn=0.011 --races 500 --report-races 300   # try a tuning change (nothing written)
+```
+
+Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the mirror of `GameConfig.steering`) or the course geometry; `tests/test_trip.py` fails while the baseline is stale. Results and tuning history: `docs/research/steering-calibration.md`.
+
 ## economy.py — progression pace and Green Cash per hour
 
 ```bash

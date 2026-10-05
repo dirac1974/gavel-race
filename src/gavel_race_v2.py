@@ -6,7 +6,8 @@ Six steps per race:
   2. Locked win purse in whole cash: round(B / q). Every horse expects B (within 0.5 q / B).
   3. Gavel window score: 100 * (1 - d), constant-speed meter.
   4. Skill vs. this race's average: R = clamp((S - mean S) / 50, rFloor, 1).
-  5. Live win chance by exponential tilt: p' ∝ q * exp(kappa * R).
+  5. Live win chance by exponential tilt: p' ∝ q * exp(kappa * R + c + tau)
+     (c: crowd boost, D-020; tau: steering trip from the far-turn lock, D-054, src/trip.py).
   6. Finish order by sequential draw from p' (Harville).
 
 See docs/V2_PROPOSAL.md for the rationale. v1 (src/gavel_race.py) is kept
@@ -20,7 +21,7 @@ import math
 import random
 import sys
 from dataclasses import dataclass
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 
 @dataclass
@@ -69,8 +70,14 @@ def skills(scores: Sequence[float], cfg: Config) -> List[float]:
 
 
 # Step 5
-def live_chances(q: Sequence[float], R: Sequence[float], cfg: Config) -> List[float]:
-    return normalize([qi * math.exp(cfg.kappa * ri) for qi, ri in zip(q, R)])
+def live_chances(q: Sequence[float], R: Sequence[float], cfg: Config,
+                 extra: Optional[Sequence[float]] = None) -> List[float]:
+    """Exponent kappa * R_i + extra_i: extra = crowd boost c (D-020) plus the steering trip
+    tau (D-054, fixed at the far-turn lock). extra=None takes the original path, so results
+    are bit-identical to before."""
+    if extra is None:
+        return normalize([qi * math.exp(cfg.kappa * ri) for qi, ri in zip(q, R)])
+    return normalize([qi * math.exp(cfg.kappa * ri + ei) for qi, ri, ei in zip(q, R, extra)])
 
 
 # Step 6
