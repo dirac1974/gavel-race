@@ -61,9 +61,9 @@
       "rig": false,
       "retexture_of": "horse_gallop",
       "target_polycount": 8000,
-      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dapple grey coat: light silver-grey body with soft round darker grey dapples, darker grey lower legs, silver-white mane and tail, dark grey muzzle, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
-      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos, no blue or purple tint",
-      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS (note): reads light grey, near white; dapples faint; dark lower legs and hooves."
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dapple grey coat: medium steel-grey body covered in clearly visible round charcoal-grey dapples on the shoulders, barrel and hindquarters, dark charcoal lower legs, light silver mane and tail, dark grey muzzle, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos, no blue or purple tint, no near-white body, no washed-out coat",
+      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS (note): reads light grey, near white; dapples faint; dark lower legs and hooves. RE-ROLL requested by David 2026-10-04: darker dapple grey (10 cr)."
     },
     {
       "slot_id": "horse_gallop_black",

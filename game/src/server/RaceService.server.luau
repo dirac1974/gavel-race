@@ -21,6 +21,7 @@ local TapTime = require(Shared:WaitForChild("TapTime"))
 local Integrity = require(Shared:WaitForChild("Integrity"))
 local RaceSession = require(Shared:WaitForChild("RaceSession"))
 local RaceRating = require(Shared:WaitForChild("RaceRating"))
+local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
 
 local LEAGUE = "Rookie" -- prototype: one league
 local COUNTDOWN = 3
@@ -210,6 +211,7 @@ local function runRace(players: { Player })
 		rng = rng,
 	})
 	applyIntegrity(session, players)
+	TrackScene.build() -- rebuilt each race so models appear as soon as moderation clears them
 	local league = GameConfig.leagues[LEAGUE]
 	local strideCfg = GameConfig.stride
 	current = { session = session, seg = nil, kind = nil, taps = {}, allowances = {} }
@@ -254,13 +256,16 @@ local function runRace(players: { Player })
 			end
 			if #great > 0 then BurstSparkle:FireAllClients(great) end
 		end
-		LiveChances:FireAllClients(seg, session:closeSegment(seg))
+		local live = session:closeSegment(seg)
+		LiveChances:FireAllClients(seg, live)
+		TrackScene.afterSegment(seg, #GameConfig.segments, live, GameConfig.windowGapSeconds - 0.5)
 		t = current.close + LATENCY_GRACE
 	end
 	current.seg = nil
 
-	task.wait(2) -- run to the line
 	local result = session:finish()
+	TrackScene.finish(result.order, 2)
+	task.wait(2) -- run to the line
 	local summary = {}
 	for _, prize in result.prizes do
 		local lane = session.lanes[session:laneIndex(prize.id)]
@@ -278,6 +283,8 @@ local function runRace(players: { Player })
 	recordIntegrity(players, gaps, matched)
 	current = nil
 end
+
+task.delay(3, TrackScene.build) -- a scene to look at in the lobby
 
 while true do
 	while #Players:GetPlayers() == 0 do task.wait(1) end

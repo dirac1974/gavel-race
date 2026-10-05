@@ -7,7 +7,7 @@
 -- Final Burst: one tap on the sweeping meter, which starts at a random point. The
 -- celebration plays on your own screen after it's scored; others see a sparkle.
 -- Drawn from the shared server clock; all scoring happens on the server.
--- Placeholder shapes until the playtest art is imported.
+-- Placeholder shapes show until the uploaded atlas art arrives (UiArt), then hide.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -24,6 +24,7 @@ local Stride = require(Shared:WaitForChild("Stride"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ThemePack = require(Shared:WaitForChild("ThemePack"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
+local UiArt = require(script.Parent:WaitForChild("UiArt"))
 
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
@@ -86,11 +87,19 @@ board.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
 board.BackgroundTransparency = 0.3
 board.ZIndex = 4
 board.Parent = gui
-local rows = {}
+local rows, rowBadges = {}, {}
 for i = 1, 8 do
-	local row = label(board, UDim2.new(1, -12, 0, 24), UDim2.new(0, 6, 0, 5 + (i - 1) * 26), "", 16)
+	local row = label(board, UDim2.new(1, -40, 0, 24), UDim2.new(0, 34, 0, 5 + (i - 1) * 26), "", 16)
 	row.TextXAlignment = Enum.TextXAlignment.Left
 	rows[i] = row
+	local b = Instance.new("ImageLabel")
+	b.Size = UDim2.fromOffset(24, 24)
+	b.Position = UDim2.new(0, 6, 0, 5 + (i - 1) * 26)
+	b.BackgroundTransparency = 1
+	b.ZIndex = 5
+	b.Visible = false
+	b.Parent = board
+	rowBadges[i] = b
 end
 
 local segmentName = label(gui, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0.30, 0), "", 24)
@@ -108,6 +117,7 @@ hoof.ZIndex = 3
 hoof.Visible = false
 hoof.Parent = gui
 round(hoof)
+local hoofArt = UiArt.attach(hoof, "hoof", 4, function() hoof.BackgroundTransparency = 1 end)
 
 local rings = {}
 for i = 1, 4 do
@@ -123,7 +133,8 @@ for i = 1, 4 do
 	stroke.Thickness = 6
 	stroke.Color = Color3.fromRGB(255, 225, 90)
 	stroke.Parent = r
-	rings[i] = { frame = r, stroke = stroke }
+	local art = UiArt.attach(r, "hoof_ring", 4, function() stroke.Enabled = false end)
+	rings[i] = { frame = r, stroke = stroke, art = art }
 end
 
 -- The pulsing pad: kids look for a button, but any tap anywhere counts.
@@ -139,6 +150,10 @@ pad.Parent = gui
 round(pad, UDim.new(0, 24))
 local padText = label(pad, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), ThemePack.words.giddyUp, 40)
 padText.Font = Enum.Font.GothamBlack
+local padArt = UiArt.attach(pad, "giddyup_pad", 3, function()
+	pad.BackgroundTransparency = 1
+	padText.Visible = false
+end)
 
 -- Final Burst meter.
 local meter = Instance.new("Frame")
@@ -160,6 +175,10 @@ local function zone()
 	return z
 end
 local zoneA, zoneB = zone(), zone()
+UiArt.attach(meter, "burst_bar", 3, function() meter.BackgroundTransparency = 1 end)
+for _, z in { zoneA, zoneB } do
+	UiArt.attach(z, "burst_glow", 3, function() z.BackgroundTransparency = 1 end)
+end
 
 local marker = Instance.new("Frame")
 marker.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -168,12 +187,70 @@ marker.Position = UDim2.new(0, 0, 0.5, 0)
 marker.BackgroundColor3 = Color3.new(1, 1, 1)
 marker.ZIndex = 4
 marker.Parent = meter
+UiArt.attach(marker, "burst_marker", 5, function()
+	marker.BackgroundTransparency = 1
+	marker.Size = UDim2.new(0, 26, 1.8, 0)
+end)
+
+-- Tap-result shapes above the feedback text (Perfect is a star, a miss is a flat dash).
+local feedbackIcon = Instance.new("ImageLabel")
+feedbackIcon.AnchorPoint = Vector2.new(0.5, 1)
+feedbackIcon.Position = UDim2.new(0.5, 0, 0.66, -2)
+feedbackIcon.Size = UDim2.fromOffset(56, 56)
+feedbackIcon.BackgroundTransparency = 1
+feedbackIcon.ZIndex = 5
+feedbackIcon.Visible = false
+feedbackIcon.Parent = gui
+local RESULT_ART = {
+	Perfect = "label_perfect", ["Perfect stretch"] = "label_perfect", Great = "label_great", Good = "label_good",
+	Okay = "label_okay", ["Keep the beat"] = "label_steady", ["Off beat"] = "label_miss", Miss = "label_miss",
+	["Broke stride"] = "label_steady",
+}
+local function showResultIcon(labelText: string?)
+	local name = labelText and RESULT_ART[labelText]
+	if name then UiArt.set(feedbackIcon, name) else feedbackIcon.Visible = false end
+end
 
 -- Burst celebration (own screen only, after scoring).
 local burstBanner = label(gui, UDim2.new(1, 0, 0, 80), UDim2.new(0, 0, 0.36, 0), "", 64)
 burstBanner.Font = Enum.Font.GothamBlack
 burstBanner.TextColor3 = Color3.fromRGB(255, 225, 90)
 burstBanner.Visible = false
+local rays = Instance.new("ImageLabel")
+rays.AnchorPoint = Vector2.new(0.5, 0.5)
+rays.Position = UDim2.new(0.5, 0, 0.36, 40)
+rays.Size = UDim2.fromOffset(340, 340)
+rays.BackgroundTransparency = 1
+rays.ZIndex = 4
+rays.Visible = false
+rays.Parent = gui
+
+-- Results panel with ribbons for 1st-4th (D-016 ribbons: Blue, Red, Yellow, White).
+local RIBBONS = { "ribbon_blue", "ribbon_red", "ribbon_yellow", "ribbon_white" }
+local results = Instance.new("Frame")
+results.AnchorPoint = Vector2.new(0.5, 0)
+results.Position = UDim2.new(0.5, 0, 0.42, 0)
+results.Size = UDim2.fromOffset(360, 5 * 40 + 12)
+results.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
+results.BackgroundTransparency = 0.25
+results.ZIndex = 6
+results.Visible = false
+results.Parent = gui
+round(results, UDim.new(0, 16))
+local resultRows = {}
+for i = 1, 5 do
+	local icon = Instance.new("ImageLabel")
+	icon.Size = UDim2.fromOffset(28, 34)
+	icon.Position = UDim2.new(0, 12, 0, 8 + (i - 1) * 40)
+	icon.BackgroundTransparency = 1
+	icon.ZIndex = 7
+	icon.Visible = false
+	icon.Parent = results
+	local text = label(results, UDim2.new(1, -60, 0, 34), UDim2.new(0, 50, 0, 8 + (i - 1) * 40), "", 22)
+	text.ZIndex = 7
+	text.TextXAlignment = Enum.TextXAlignment.Left
+	resultRows[i] = { icon = icon, text = text }
+end
 
 -- State ---------------------------------------------------------------------
 local lanes = {}
@@ -193,8 +270,10 @@ local function renderBoard()
 			row.Text = string.format("%d  %s%s%s  %d%%  %s %d", i, lane.name, sparkle, you,
 				math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
 			row.TextColor3 = lane.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
+			UiArt.set(rowBadges[i], if sparkle ~= "" then `lane_{i}_sparkle` else `lane_{i}`)
 		else
 			row.Text = ""
+			rowBadges[i].Visible = false
 		end
 	end
 end
@@ -226,6 +305,10 @@ local function celebrate(score: number, labelText: string)
 	burstBanner.Text = string.format("%s! %d", labelText, math.round(score))
 	burstBanner.Visible = true
 	burstBanner.TextTransparency = 0
+	if score >= 80 and UiArt.set(rays, "burst_rays") then
+		rays.ImageTransparency = 0.2
+		TweenService:Create(rays, TweenInfo.new(1.8), { ImageTransparency = 1 }):Play()
+	end
 	burstBanner.TextSize = 40
 	TweenService:Create(burstBanner, TweenInfo.new(0.25, Enum.EasingStyle.Back), { TextSize = 64 }):Play()
 	if score >= 80 and not reducedMotion() then
@@ -255,9 +338,15 @@ local function tap()
 		end
 		if active.tapsThisBeat > 1 then
 			feedback.Text = "Broke stride!"
+			showResultIcon("Broke stride")
 			hint.Text = ThemePack.words.tooFast
 		else
-			feedback.Text = Stride.tapLabel(err, active.half, GameConfig.strideLabels)
+			local tapLabel = Stride.tapLabel(err, active.half, GameConfig.strideLabels)
+			feedback.Text = tapLabel
+			showResultIcon(tapLabel)
+			if padArt.Visible and UiArt.set(padArt, "giddyup_pad_pressed") then
+				task.delay(0.08, function() UiArt.set(padArt, "giddyup_pad") end)
+			end
 			hint.Text = ""
 		end
 	elseif active.kind == "burst" and not active.tapped then
@@ -293,7 +382,9 @@ RunService.RenderStepped:Connect(function()
 				local r = rings[used]
 				local size = HOOF * (1 + 1.6 * math.max(ahead, 0) / RING_LEAD)
 				r.frame.Size = UDim2.fromOffset(size, size)
-				r.stroke.Transparency = if ahead > RING_LEAD * 0.8 then (ahead - RING_LEAD * 0.8) / (RING_LEAD * 0.2) else 0
+				local fade = if ahead > RING_LEAD * 0.8 then (ahead - RING_LEAD * 0.8) / (RING_LEAD * 0.2) else 0
+				r.stroke.Transparency = fade
+				r.art.ImageTransparency = fade
 				r.frame.Visible = true
 			end
 			if math.abs(ahead) < 0.06 and lastBeatBuzzed ~= k then
@@ -306,11 +397,18 @@ RunService.RenderStepped:Connect(function()
 		for _, b in beats do
 			if math.abs(t - b) < 0.06 then onBeat = true break end
 		end
-		hoof.BackgroundColor3 = if onBeat then Color3.fromRGB(255, 225, 90) else Color3.fromRGB(60, 40, 30)
+		if hoofArt.Visible then
+			hoofArt.ImageColor3 = if onBeat then Color3.fromRGB(255, 225, 90) else Color3.new(1, 1, 1)
+		else
+			hoof.BackgroundColor3 = if onBeat then Color3.fromRGB(255, 225, 90) else Color3.fromRGB(60, 40, 30)
+		end
 		-- Pulse only before the first ring; hold steady while rings are on screen so the
 		-- pad never competes with the beat (art review).
 		if t < beats[1] - RING_LEAD then
-			pad.BackgroundTransparency = 0.35 + 0.2 * math.abs(math.sin(t * math.pi * 2))
+			local pulse = 0.2 * math.abs(math.sin(t * math.pi * 2))
+			if padArt.Visible then padArt.ImageTransparency = pulse else pad.BackgroundTransparency = 0.35 + pulse end
+		elseif padArt.Visible then
+			padArt.ImageTransparency = 0
 		else
 			pad.BackgroundTransparency = 0.35
 		end
@@ -358,6 +456,40 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, _start, con
 	status.Text = string.format("%s race: %s", league, conditions)
 	feedback.Text, hint.Text = "", ""
 	burstBanner.Visible = false
+	results.Visible = false
+	showResultIcon(nil)
+	task.spawn(function()
+		-- YOU marker over your own horse on the track (TrackScene builds it just before this event).
+		local myLane = nil
+		for i, lane in laneList do
+			if lane.id == myId then myLane = i end
+		end
+		local track = workspace:WaitForChild("RaceTrack", 5)
+		local horseFolder = track and track:WaitForChild("Horses", 5)
+		local horse = myLane and horseFolder and horseFolder:WaitForChild("Lane" .. myLane, 5)
+		if not horse or horse:FindFirstChild("YouMarker") then return end
+		local bb = Instance.new("BillboardGui")
+		bb.Name = "YouMarker"
+		bb.Size = UDim2.fromOffset(90, 90)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 12, 0)
+		bb.AlwaysOnTop = true
+		local img = Instance.new("ImageLabel")
+		img.Size = UDim2.fromScale(1, 1)
+		img.BackgroundTransparency = 1
+		img.Parent = bb
+		if not UiArt.set(img, "you_marker") then
+			local txt = Instance.new("TextLabel")
+			txt.Size = UDim2.fromScale(1, 0.5)
+			txt.BackgroundTransparency = 1
+			txt.Text = "YOU"
+			txt.Font = Enum.Font.GothamBlack
+			txt.TextScaled = true
+			txt.TextColor3 = Color3.fromRGB(255, 220, 80)
+			txt.TextStrokeTransparency = 0
+			txt.Parent = bb
+		end
+		bb.Parent = horse
+	end)
 	renderBoard()
 end)
 
@@ -371,6 +503,7 @@ end)
 
 remotes.StretchResult.OnClientEvent:Connect(function(_seg, score, labelText)
 	feedback.Text = string.format("%s! %d", labelText, math.round(score))
+	showResultIcon(labelText)
 	hint.Text = ""
 end)
 
@@ -385,6 +518,7 @@ end)
 
 remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText)
 	feedback.Text = ""
+	showResultIcon(labelText)
 	hint.Text = ""
 	celebrate(score, labelText) -- the burst is scored on arrival; the window may still be open for others
 end)
@@ -417,15 +551,32 @@ remotes.IntegrityNote.OnClientEvent:Connect(function(text)
 end)
 
 remotes.RaceFinished.OnClientEvent:Connect(function(summary)
-	local lines = {}
+	-- Top four with ribbons, plus your own place if you finished lower.
+	local shown = {}
 	for _, row in summary do
-		if row.place <= 4 or row.id == myId then
+		if row.place <= 4 then table.insert(shown, row) end
+	end
+	for _, row in summary do
+		if row.id == myId and row.place > 4 then table.insert(shown, row) end
+	end
+	table.sort(shown, function(a, b) return a.place < b.place end)
+	for i, r in resultRows do
+		local row = shown[i]
+		if row then
 			local cash = row.cash > 0 and string.format("  +%d", row.cash) or ""
-			table.insert(lines, string.format("%d. %s%s", row.place, row.name, cash))
+			local you = row.id == myId and "  ◀ YOU" or ""
+			r.text.Text = string.format("%d. %s%s%s", row.place, row.name, cash, you)
+			r.text.TextColor3 = row.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
+			if not (RIBBONS[row.place] and UiArt.set(r.icon, RIBBONS[row.place])) then r.icon.Visible = false end
+		else
+			r.text.Text = ""
+			r.icon.Visible = false
 		end
 	end
+	results.Visible = true
 	status.Text = "Results"
-	feedback.Text = table.concat(lines, "   ")
+	feedback.Text = ""
+	showResultIcon(nil)
 	segmentName.Text, hint.Text = "", ""
 	hideAll()
 	active = nil

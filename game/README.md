@@ -14,7 +14,7 @@ Phase 1 prototype: one Rookie race loop with bots, three Giddy-up stretches and 
 | --- | --- | --- |
 | `src/shared/` | ReplicatedStorage.Shared | Pure modules: GameConfig, ThemePack, Stride (Giddy-up beats and scoring), BurstMeter (Final Burst), TapTime (latency rules), Integrity (macro detection), RaceRating, RaceSession |
 | `../src/RaceMath.luau` | ReplicatedStorage.Shared.RaceMath | Race math (mirrors the Python reference) |
-| `src/server/` | ServerScriptService.Server | RaceService: lobby, segment schedule, tap validation, prizes, integrity logging |
-| `src/client/` | StarterPlayerScripts.Client | RaceController: hoof-beat ring, burst meter, tap anywhere, board |
+| `src/server/` | ServerScriptService.Server | RaceService (lobby, segments, tap validation, prizes, integrity logging), AssetService (loads uploaded art), TrackScene (track, stalls, moving horses) |
+| `src/client/` | StarterPlayerScripts.Client | RaceController (hoof-beat ring, burst meter, tap anywhere, board, results), UiArt (atlas art with placeholder fallback) |
 
 Pure modules take their dependencies as arguments and never touch Roblox services, so they are tested under Lune (`lune run tests/luau/run_all`). The server and client scripts were written without Studio access and still need a Studio playtest.

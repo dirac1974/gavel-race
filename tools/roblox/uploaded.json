@@ -1,0 +1,65 @@
+{
+ "finish_post": {
+  "assetId": 88806289427928,
+  "file": "Models/generated/finish_post/finish_post.glb",
+  "kind": "Model",
+  "sha256": "61f90eaa623426fc707161bf09674ea4498c79c94cad3068767fa361710e6da5",
+  "uploadedAt": "2026-10-05T03:45:10Z"
+ },
+ "gate_stall": {
+  "assetId": 90161128848656,
+  "file": "Models/generated/gate_stall/gate_stall.glb",
+  "kind": "Model",
+  "sha256": "b45aee76d9c3295440be86499d112d26469b717843835801e6cd803e48dde46a",
+  "uploadedAt": "2026-10-05T03:45:30Z"
+ },
+ "horse_bay": {
+  "assetId": 98817538977109,
+  "file": "Models/generated/horse_gallop_bay/horse_gallop_bay_hoofed.glb",
+  "kind": "Model",
+  "sha256": "7d15bdc1db4939ca3d61ef1c69a9b05ad89902c1b7bd1765abaeb4f926185331",
+  "uploadedAt": "2026-10-05T03:43:41Z"
+ },
+ "horse_black": {
+  "assetId": 129978818778220,
+  "file": "Models/generated/horse_gallop_black/horse_gallop_black_hoofed.glb",
+  "kind": "Model",
+  "sha256": "3eea06c55bbc410e9b4c97783b31fdbce081edce2344c6f49aa3e1e18ac9b923",
+  "uploadedAt": "2026-10-05T03:44:38Z"
+ },
+ "horse_chestnut": {
+  "assetId": 109537148454752,
+  "file": "Models/generated/horse_gallop_chestnut/horse_gallop_chestnut_hoofed.glb",
+  "kind": "Model",
+  "sha256": "69964bdcc14a0016f412cdd0bfe7d8328dc6f97043b945cfc8cfd45ec65e2a27",
+  "uploadedAt": "2026-10-05T03:44:04Z"
+ },
+ "horse_grey": {
+  "assetId": 78983375774009,
+  "file": "Models/generated/horse_gallop_grey/horse_gallop_grey_hoofed.glb",
+  "kind": "Model",
+  "sha256": "63096080384b97bb748215b50f7e7e8206bc4d90c667d4d06dc353aadfd08534",
+  "uploadedAt": "2026-10-05T03:44:18Z"
+ },
+ "horse_palomino": {
+  "assetId": 87460359921029,
+  "file": "Models/generated/horse_gallop_palomino/horse_gallop_palomino_hoofed.glb",
+  "kind": "Model",
+  "sha256": "f5822d37e79af98ec25f45b94e98917da1deaed549a9472664b6128ab3a04092",
+  "uploadedAt": "2026-10-05T03:44:56Z"
+ },
+ "ui_atlas_1": {
+  "assetId": 138919800817033,
+  "file": "assets/ui/atlas/ui_atlas_1.png",
+  "kind": "Decal",
+  "sha256": "529a6deb20578d2985b11dfdce1fef5133b2f226db74758cd081d8c27a6d5d36",
+  "uploadedAt": "2026-10-05T03:45:33Z"
+ },
+ "ui_atlas_2": {
+  "assetId": 94337225467876,
+  "file": "assets/ui/atlas/ui_atlas_2.png",
+  "kind": "Decal",
+  "sha256": "009513b2d9daf1bdf193dd29bffd05f2b9ccfb40d6e4e08ecd6080c204e42240",
+  "uploadedAt": "2026-10-05T03:45:37Z"
+ }
+}

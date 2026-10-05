@@ -273,3 +273,9 @@ then: poll GET https://api.meshy.ai/openapi/v1/retexture/<task_id>, download mod
 ```
 
 </details>
+
+## Follow-up (2026-10-04)
+
+- Grey re-rolled as a darker dapple grey at David's request (10 credits; total 180 of 200). The pale version is kept locally as `Models/generated/horse_gallop_grey_light/`.
+- Finish post kept with its plaid disc (David: reevaluate later).
+- Uploaded to Roblox under the LlamaWorks group; see `docs/art/IMPORT.md`.

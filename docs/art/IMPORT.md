@@ -1,6 +1,10 @@
 # Importing the generated models into Studio by hand
 
-Nothing has been uploaded to Roblox. Uploading needs David's approval. This page covers bringing the files into a place by hand.
+**Uploaded 2026-10-04** with David's approval, under the LlamaWorks group (`ROBLOX_CREATOR_GROUP_ID`), by `tools/roblox/upload_assets.py`: five horse coats, the finish post, the gate stall, and the two UI atlas sheets (`tools/ui/build_atlas.py`). Ids are in `tools/roblox/uploaded.json`, `game/src/shared/MeshAssets.luau` and `game/src/shared/UiImages.luau`. At server start `AssetService` loads and sizes the models into `ReplicatedStorage.RaceModels` (as below) and publishes the UI sheets' image ids; `TrackScene` and the client use them, with placeholders until then.
+
+**The place must belong to the LlamaWorks group**, because Roblox only lets a place load assets owned by its own creator. In Studio: File → Publish to Roblox As → LlamaWorks. New assets also wait for moderation (minutes to hours).
+
+The rest of this page covers bringing the files into a place by hand, if ever needed.
 
 ## Where the files are
 

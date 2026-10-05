@@ -1,0 +1,275 @@
+{
+ "burst_bar": {
+  "h": 128,
+  "sheet": "ui_atlas_1",
+  "w": 1024,
+  "x": 0,
+  "y": 776
+ },
+ "burst_glow": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 256,
+  "x": 0,
+  "y": 0
+ },
+ "burst_marker": {
+  "h": 160,
+  "sheet": "ui_atlas_1",
+  "w": 64,
+  "x": 130,
+  "y": 614
+ },
+ "burst_rays": {
+  "h": 256,
+  "sheet": "ui_atlas_1",
+  "w": 256,
+  "x": 0,
+  "y": 0
+ },
+ "chance_down": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 258,
+  "y": 0
+ },
+ "chance_up": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 388,
+  "y": 0
+ },
+ "finish_checker": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 518,
+  "y": 0
+ },
+ "giddyup_pad": {
+  "h": 176,
+  "sheet": "ui_atlas_1",
+  "w": 512,
+  "x": 0,
+  "y": 258
+ },
+ "giddyup_pad_pressed": {
+  "h": 176,
+  "sheet": "ui_atlas_1",
+  "w": 512,
+  "x": 0,
+  "y": 436
+ },
+ "hoof": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 648,
+  "y": 0
+ },
+ "hoof_ring": {
+  "h": 256,
+  "sheet": "ui_atlas_1",
+  "w": 256,
+  "x": 258,
+  "y": 0
+ },
+ "label_good": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 778,
+  "y": 0
+ },
+ "label_great": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 0,
+  "y": 130
+ },
+ "label_miss": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 130,
+  "y": 130
+ },
+ "label_okay": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 260,
+  "y": 130
+ },
+ "label_perfect": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 390,
+  "y": 130
+ },
+ "label_steady": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 520,
+  "y": 130
+ },
+ "lane_1": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 650,
+  "y": 130
+ },
+ "lane_1_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 780,
+  "y": 130
+ },
+ "lane_2": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 0,
+  "y": 260
+ },
+ "lane_2_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 130,
+  "y": 260
+ },
+ "lane_3": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 260,
+  "y": 260
+ },
+ "lane_3_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 390,
+  "y": 260
+ },
+ "lane_4": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 520,
+  "y": 260
+ },
+ "lane_4_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 650,
+  "y": 260
+ },
+ "lane_5": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 780,
+  "y": 260
+ },
+ "lane_5_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 0,
+  "y": 390
+ },
+ "lane_6": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 130,
+  "y": 390
+ },
+ "lane_6_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 260,
+  "y": 390
+ },
+ "lane_7": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 390,
+  "y": 390
+ },
+ "lane_7_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 520,
+  "y": 390
+ },
+ "lane_8": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 650,
+  "y": 390
+ },
+ "lane_8_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 780,
+  "y": 390
+ },
+ "lane_sparkle": {
+  "h": 128,
+  "sheet": "ui_atlas_2",
+  "w": 128,
+  "x": 0,
+  "y": 520
+ },
+ "ribbon_blue": {
+  "h": 160,
+  "sheet": "ui_atlas_1",
+  "w": 128,
+  "x": 514,
+  "y": 436
+ },
+ "ribbon_red": {
+  "h": 160,
+  "sheet": "ui_atlas_1",
+  "w": 128,
+  "x": 644,
+  "y": 436
+ },
+ "ribbon_white": {
+  "h": 160,
+  "sheet": "ui_atlas_1",
+  "w": 128,
+  "x": 774,
+  "y": 436
+ },
+ "ribbon_yellow": {
+  "h": 160,
+  "sheet": "ui_atlas_1",
+  "w": 128,
+  "x": 0,
+  "y": 614
+ },
+ "you_marker": {
+  "h": 256,
+  "sheet": "ui_atlas_1",
+  "w": 256,
+  "x": 516,
+  "y": 0
+ }
+}
