@@ -3,7 +3,8 @@
 -- barn with one stall per stall slot and their stalled horses standing in them, spawns them
 -- at their gate, and handles Map fast-travel. Plots stay fenced; the owner's visit setting
 -- (default Friends) is published on the plot so each client can close the gate locally for
--- players who aren't allowed in (WorldClient). Visitors never change anything.
+-- players who aren't allowed in (WorldClient). Visitors never change anything. Each stall shows
+-- a gold rosette for every training course its horse has a gold ribbon on (D-053).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -124,6 +125,36 @@ local YARD_SPOTS = {
 	yard_picnic = { 36, -16 }, yard_haycart = { 70, -14 }, yard_bridge = { 12, -28 },
 }
 
+-- Training rides (D-053): a gold rosette on the stall for each course this horse has a gold
+-- ribbon on, in a row under its name plate (the uploaded rosette_ribbon, or a part one).
+local GOLD = Color3.fromHex("FFD23F")
+local function rosettes(barn: Instance, bay: CFrame, h)
+	local golds = {}
+	for _, course in Profile.COURSES do
+		if typeof(h.ribbons) == "table" and h.ribbons[course] == "gold" then table.insert(golds, course) end
+	end
+	for k, course in golds do
+		local x = (k - (#golds + 1) / 2) * 1.9
+		local cf = bay * CFrame.new(x, GROUND_Y + BARN_H - 4.6, 0.45)
+		local m = WorldScene.model("rosette_ribbon")
+		if m then
+			m:PivotTo(cf * CFrame.new(0, -1.2, 0))
+			for _, d in m:GetDescendants() do
+				if d:IsA("BasePart") then d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch = true, false, false, false end
+			end
+			m.Name = "Rosette_" .. course
+			m.Parent = barn
+		else
+			part({ Name = "Rosette_" .. course, Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, 1.4, 1.4), Color = GOLD,
+				CanCollide = false, CFrame = cf * CFrame.Angles(0, math.pi / 2, 0) }, barn)
+			for _, sd in { -1, 1 } do
+				part({ Name = "RosetteTail", Size = Vector3.new(0.35, 1.1, 0.1), Color = GOLD, CanCollide = false,
+					CFrame = cf * CFrame.new(sd * 0.25, -1, 0.05) * CFrame.Angles(0, 0, sd * 0.25) }, barn)
+			end
+		end
+	end
+end
+
 local function buildBarn(i: number, owner: Player, data)
 	-- Your look from the Tack & Paint shop (free classic red until you choose).
 	local paint = Style.worn(data, "paint")
@@ -185,6 +216,7 @@ local function buildBarn(i: number, owner: Player, data)
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
 				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)
 			nameLabel.Name = "HorseName"
+			rosettes(barn, bay, h)
 		end
 	end
 	-- Props: hay and a water trough in front of the barn, inside the plot whatever the barn's size.
@@ -436,7 +468,13 @@ local function signature(data): string
 	end
 	table.insert(parts, tostring(Style.hasSet(data, "star")))
 	for _, it in Style.yard(data) do table.insert(parts, it.id) end
-	for _, h in data.horses do table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name) end
+	for _, h in data.horses do
+		local golds = ""
+		for _, course in Profile.COURSES do
+			if typeof(h.ribbons) == "table" and h.ribbons[course] == "gold" then golds ..= string.sub(course, 1, 2) end
+		end
+		table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name .. ":" .. golds) -- gold rosettes (D-053)
+	end
 	return table.concat(parts, "|")
 end
 

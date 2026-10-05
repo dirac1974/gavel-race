@@ -1177,6 +1177,199 @@ local function trainingT3ReviewTests(check: (boolean, string) -> (), close: (num
 		and close(TR.accelIdeal({}, CFG), TC.idealSeconds("accel"), 1e-9), "Gate Break par follows the ride's own bell waits")
 end
 
+-- Training rides T4: ghosts, Ride together, Quick train on the server (D-053).
+local function trainingT4Tests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local Ghost = require("../../game/src/shared/Ghost")
+	local RT = require("../../game/src/shared/RideTogether")
+	local QT = require("../../game/src/shared/QuickTrain")
+	local TapTime = require("../../game/src/shared/TapTime")
+	local CFG = GameConfig.training
+
+	-- Ghosts: resampled at 4 Hz, quantised to 0.5 studs, at most 300 points, small. ------------
+	local samples = {}
+	for k = 0, 1200 do -- a 120 s ride at 10 Hz, galloping round the oval with hops
+		local t = k / 10
+		local x, z = TC.ovalPoint(30 + CFG.gallop * t, 4 * math.sin(t))
+		table.insert(samples, { t = t, x = x, y = if k % 37 < 4 then 3.3 else 0, z = z })
+	end
+	local pts = Ghost.fromSamples(samples)
+	check(#pts == Ghost.MAX and Ghost.HZ == CFG.ghostHz and Ghost.Q == CFG.ghostQuantum and Ghost.MAX == CFG.ghostMaxPoints,
+		"a long ride keeps at most 300 points at 4 Hz (config values)")
+	local g = Ghost.encode(pts)
+	local back = Ghost.decode(g)
+	local exact = back ~= nil and #back == #pts
+	local worst = 0
+	for i, p in pts do
+		local b = back and back[i]
+		if not b then exact = false break end
+		worst = math.max(worst, math.abs(b.x - p.x), math.abs(b.y - p.y), math.abs(b.z - p.z))
+	end
+	check(exact and worst <= Ghost.Q / 2 + 1e-9, string.format("ghost round trip within half a quantum (worst %.3f)", worst))
+	check(#g.d <= Ghost.MAX * 5 and #g.d >= Ghost.MAX * 3, string.format("a full ghost is about 5 characters a point (%d for %d)", #g.d, g.n))
+	local again = Ghost.encode(back :: any)
+	check(again.d == g.d, "decoding and encoding again gives the same string")
+	check(Ghost.decode({ v = 1, hz = 4, q = 0.5, n = 3, d = "AB" }) == nil and Ghost.decode({ d = "!!", n = 1, q = 0.5 }) == nil
+		and Ghost.decode("junk") == nil and Ghost.decode({ v = 1, hz = 4, q = 0.5, n = 999, d = "" }) == nil, "bad ghost data is refused")
+	local gx, _, gz, fx = Ghost.at(back :: any, 4, 0.125)
+	check(gx ~= nil and close(gx :: number, ((back :: any)[1].x + (back :: any)[2].x) / 2, 1e-9) and fx ~= nil
+		and Ghost.at(back :: any, 4, 1000) == nil and gz ~= nil, "ghost position between points; nothing after the end")
+	check(Ghost.better({ score = 90, seconds = 50 }, { score = 80, seconds = 40 }) and Ghost.better({ score = 90, seconds = 40 }, { score = 90, seconds = 41 })
+		and not Ghost.better({ score = 70, seconds = 30 }, { score = 90, seconds = 60 }) and Ghost.better({ score = 1, seconds = 1 }, nil),
+		"the best run: score, then time")
+	check(#Ghost.fromSamples({}) == 0 and #Ghost.fromSamples({ samples[1] }) == 1, "tiny rides still make a ghost")
+
+	-- Ride together: friends only, privacy respected, accept-only invites that lapse. ---------
+	local base: RT.Ctx = { friends = true, fromVisits = "Friends", toVisits = "Friends", toNear = true, toBusy = false }
+	local function with(k: string, v: any): RT.Ctx
+		local c = table.clone(base) :: any
+		c[k] = v
+		return c
+	end
+	check(RT.canInvite(base), "a free friend nearby can be invited")
+	check(select(2, RT.canInvite(with("friends", false))) == "friends", "only Roblox friends")
+	check(select(2, RT.canInvite(with("toVisits", "Nobody"))) == "private" and select(2, RT.canInvite(with("fromVisits", "Nobody"))) == "private",
+		"visits set to Nobody (either side) means no invites")
+	check(select(2, RT.canInvite(with("toNear", false))) == "far" and select(2, RT.canInvite(with("toBusy", true))) == "busy"
+		and select(2, RT.canInvite(with("same", true))) == "self", "far away, busy or yourself: no")
+	local book = RT.book()
+	local id1 = RT.invite(book, 1, 2, "speed", 100)
+	check(id1 ~= nil, "an invite goes out")
+	local none, why = RT.invite(book, 1, 3, "speed", 103)
+	check(none == nil and why == "gap", "invites are spaced out")
+	local none2, why2 = RT.invite(book, 4, 2, "grit", 103)
+	check(none2 == nil and why2 == "pending", "a friend with an invite waiting can't get another")
+	local wrong, whyW = RT.reply(book, id1, 3, 105)
+	check(wrong == nil and whyW == "notyou", "only the invited friend can answer")
+	local ok1 = RT.reply(book, id1, 2, 105)
+	check(ok1 ~= nil and ok1.from == 1 and ok1.course == "speed" and RT.reply(book, id1, 2, 106) == nil, "an answer closes the invite")
+	local id2 = RT.invite(book, 1, 2, "grit", 120)
+	local lapsed = RT.sweep(book, 120 + RT.INVITE_SECONDS)
+	check(id2 ~= nil and #lapsed == 1 and lapsed[1].id == id2 and RT.reply(book, id2, 2, 141) == nil, "invites lapse after 20 s")
+	local count = 0
+	for k = 0, 9 do
+		local id = RT.invite(book, 7, 100 + k, "speed", 1000 + k * RT.GAP)
+		if id then
+			count += 1
+			RT.reply(book, id, 100 + k, 1000 + k * RT.GAP + 1)
+		end
+	end
+	check(count == RT.PER_WINDOW, string.format("at most %d invites in five minutes (%d)", RT.PER_WINDOW, count))
+	check(RT.invite(book, 7, 200, "speed", 1000 + RT.WINDOW + 1) ~= nil, "the window moves on")
+	RT.forget(book, 7)
+	check(RT.pendingFor(book, 200) == nil, "leaving clears your invites")
+
+	-- Quick train on the server: seeded games, scored from tap times. ------------------------
+	local SEED = 31337
+	-- Sprint Lane: tap each round when the runner is on the zone's centre.
+	local function speedPerfect(seed: number): { any }
+		local ev = {}
+		local t = 0
+		for _ = 1, QT.SPEED.rounds do
+			local hit = nil
+			for k = 1, 6000 do
+				local tt = t + k * 0.001
+				local x, c = QT.speedView(seed, ev, tt)
+				if math.abs(x - c) < 0.003 then
+					hit = tt
+					break
+				end
+			end
+			if not hit then break end
+			table.insert(ev, { t = hit, kind = "tap" })
+			t = hit + QT.SPEED.lock
+		end
+		return ev
+	end
+	local sev = speedPerfect(SEED)
+	local sres = QT.play("speed", SEED, sev, 60)
+	check(#sev == 5 and sres.done and sres.score >= 99, string.format("Sprint Lane: five taps on the zone score %.1f", sres.score))
+	check(QT.speedCenter(SEED, 1) ~= QT.speedCenter(SEED + 1, 1) and QT.speedCenter(SEED, 1) == QT.speedCenter(SEED, 1), "the server's seed sets the zones")
+	local double = { sev[1], { t = sev[1].t + 0.1, kind = "tap" } }
+	local dres = QT.play("speed", SEED, double, sev[1].t + 0.2)
+	check(dres.taps[1] ~= nil and dres.taps[2] == nil, "a second tap right after a hit doesn't count (as before)")
+	local idle = QT.play("speed", SEED, {}, 5 * QT.SPEED.roundMax + 0.1)
+	check(idle.done and idle.score == 0 and not QT.play("speed", SEED, {}, 3).done, "no taps: the rounds pass by themselves")
+	-- Gate Break.
+	local aev = {}
+	local at = 0
+	for r = 1, QT.ACCEL.rounds do
+		local green = at + QT.accelDelay(SEED, r)
+		table.insert(aev, { t = green + 0.2, kind = "tap" })
+		at = green + 0.2 + QT.ACCEL.nextPause
+	end
+	local ares = QT.play("accel", SEED, aev, 60)
+	check(ares.done and ares.score == 100, "Gate Break: quick taps after green score 100")
+	local early = { { t = 0.3, kind = "tap" } }
+	local eres = QT.play("accel", SEED, early, 0.5)
+	check(eres.taps[1] == 0 and not eres.done, "tapping on red counts 0 for that round")
+	-- Mud Splash.
+	local gev = {}
+	for _, p in QT.puddles(SEED) do table.insert(gev, { t = p, kind = "tap" }) end
+	local gres = QT.play("grit", SEED, gev, 60)
+	check(gres.done and gres.score == 100, "Mud Splash: a tap on every puddle scores 100")
+	-- Hill Climb: deterministic from the hold and release times.
+	local hev = { { t = 0.5, kind = "down" }, { t = 1.4, kind = "up" }, { t = 2.6, kind = "down" }, { t = 3.1, kind = "up" } }
+	local h1, h2 = QT.play("stamina", SEED, hev, 9), QT.play("stamina", SEED, hev, 9)
+	check(h1.done and h1.score == h2.score and h1.score > 0 and h1.score <= 100, "Hill Climb scores the same for the same holds")
+
+	-- The server resolves each tap's claimed time (TapTime.resolve, D-021); the screen's preview
+	-- uses the claimed times. Within the allowance they agree exactly.
+	local function serverEvents(ev: { any }, oneWay: number, startAt: number)
+		local out = {}
+		local allowance = TapTime.rewindAllowance(2 * oneWay, GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+		for _, e in ev do
+			local claimed = startAt + e.t
+			local resolved = TapTime.resolve(claimed, claimed + oneWay, startAt, startAt + QT.MAX_GAME, allowance)
+			if resolved then QT.addEvent(out, resolved - startAt, e.kind) end
+		end
+		return out
+	end
+	local matchOk = true
+	for _, game in { { "speed", sev }, { "accel", aev }, { "grit", gev }, { "stamina", hev } } do
+		local preview = QT.play(game[1], SEED, game[2], 60)
+		local server = QT.play(game[1], SEED, serverEvents(game[2], 0.12, 5000), 60)
+		-- (the same to rounding: server times are counted from its start time)
+		if not close(preview.score, server.score, 1e-6) then matchOk = false end
+		for i in game[2] do
+			local a, b = preview.taps[i], server.taps[i]
+			if (a == nil) ~= (b == nil) or (a and b and QT.label(a) ~= QT.label(b)) then matchOk = false end
+		end
+	end
+	check(matchOk, "the server's score and each tap's label match the screen's preview")
+	-- A claimed time from too far back is scored when it arrived.
+	local cheat = {}
+	local allowance = TapTime.rewindAllowance(0.1, GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	for _, e in gev do
+		local claimed = 5000 + e.t
+		local resolved = TapTime.resolve(claimed, claimed + 1.2, 5000, 5000 + QT.MAX_GAME, allowance)
+		QT.addEvent(cheat, (resolved :: number) - 5000, e.kind)
+	end
+	check(QT.play("grit", SEED, cheat, 60).score < 50, "a tap claimed from too far back counts when it arrived")
+	-- Quick train quality stays capped at 0.85.
+	local TR = require("../../game/src/shared/TrainingRide")
+	check(TR.quickScore(gres.score, CFG) == 70, "Quick train's server score is capped (quality 0.85)")
+	local many = {}
+	for k = 1, 200 do QT.addEvent(many, k * 0.01, "tap") end
+	check(#many == QT.MAX_EVENTS, "a flood of taps is cut off")
+	check(QT.play("speed", SEED, {}, QT.MAX_GAME).done, "a game never runs past 40 s")
+
+	-- No client score anywhere any more; rosettes for gold ribbons; the ghost-sharing setting.
+	local fs = require("@lune/fs")
+	local service = fs.readFile("game/src/server/TrainingService.server.luau")
+	local paddock = fs.readFile("game/src/client/PaddockClient.client.luau")
+	check(string.find(service, 'remote("Train")', 1, true) == nil and string.find(paddock, 'WaitForChild("Train")', 1, true) == nil
+		and string.find(service, "TapTime.resolve", 1, true) ~= nil, "Quick train sends tap times only; the old score remote is gone")
+	local stable = fs.readFile("game/src/server/StableService.server.luau")
+	check(string.find(stable, 'h.ribbons[course] == "gold"', 1, true) ~= nil and string.find(stable, '"rosette_ribbon"', 1, true) ~= nil,
+		"a rosette on the stall for each gold ribbon")
+	local P = Profile.new(20000 * 86400)
+	local on = Profile.migrate({ settings = { visits = "Friends", shareGhost = true } }, 20000 * 86400)
+	local junk = Profile.migrate({ settings = { visits = "Friends", shareGhost = 1 } }, 20000 * 86400)
+	check(P.settings.shareGhost == false and on.settings.shareGhost == true and junk.settings.shareGhost == false,
+		"sharing your ghost is off by default and repaired to a yes/no")
+end
+
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
 	local E = GameConfig.energy
 	local T0 = 20000 * 86400 + 3600 -- a fixed day, 01:00 UTC
@@ -1855,5 +2048,6 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	trainingJitterTests(check, close)
 	trainingT3Tests(check, close)
 	trainingT3ReviewTests(check, close)
+	trainingT4Tests(check, close)
 
 end

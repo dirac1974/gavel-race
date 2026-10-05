@@ -152,6 +152,16 @@ Gate Break, Hill Climb and Easy Rein (T3):
 - [ ] During a ride and its end card, Explorer shows the attribute TrainingRide = true on your Player; it stays while the card is up and clears on Done, Stop or an early end (or after 90 s as a safety net).
 - [ ] Output: lines like `[Training] <id> speed: 12% of 430 samples too fast or teleported (3 stale, 0 off course) (log only)` are expected only now and then; note how often they appear on a phone and the stale count (freezes) (the floor stays log-only, `enforceFloor = false`).
 
+Ghosts, Ride together, rosettes and Quick train (T4):
+- [ ] Ride a course, then ride it again: a see-through horse (your best ride, "👻 Your best", in the coat you rode it on) runs the course beside you in time with your ride, legs moving, and disappears when its ride ends. It only changes when you beat your best (more stars, or as good and quicker). Rejoin later: it's still there (needs API access in Studio; without it ghosts last until you leave).
+- [ ] Settings → "Share my ghost with friends" (off at first). With it on, a Roblox friend in the same server who rides that course alone sees your ghost labelled with your name; with it off they never do.
+- [ ] Course picker → "👫 Ride together": lists Roblox friends at the paddock, path or Training Ground who aren't racing or riding; strangers never show. Pick a friend and a course: "Invite sent!".
+- [ ] The friend sees a card: "🐴 <name> would like to ride <course> with you!" with "👫 Ride together" and "Not now"; no countdown on it. "Not now" (or 20 s with no answer) closes it; the inviter gets a kind note. A second invite straight away says to wait; more than five in five minutes are refused.
+- [ ] "Ride together": both of you are put at the start side by side (both in the practice gate for Gate Break), one shared 3-2-1, the same Pip in Hill Climb; you ride through each other. Each end card shows your own stars, gain and ribbon, plus a line for your friend with their stars and ribbon only ("still riding…" until they finish); never times or who was first.
+- [ ] Settings → visits "Nobody" (either of you): no Ride together list or invites ("Ride together is off").
+- [ ] A gold ribbon puts a gold rosette on that horse's stall under its name plate, one per course; four golds, four rosettes.
+- [ ] Quick train: the four games look and feel as before (the reaction time and the hold game's countdown are no longer shown: no timers on screen); "Get ready…" for a second, then play; the score shown at the end is the server's, and a perfect game still gains like a score of 70.
+
 ## Race Board and two courses (Stage 4, D-036)
 
 - [ ] RACE! (or the Race Board prompt) opens the picker: two cards, Dirt course and Turf course, each with league, distance, surface, weather, eight lane dots and "Open / Filling / Starts in Ns / Racing now".

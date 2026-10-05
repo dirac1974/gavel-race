@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: training rides T4: ghosts of your best ride (own DataStore key, share with friends toggle), Ride together with friends (accept-only invites, shared countdown and Pip, stars and ribbons only), gold rosettes on the stall, Quick train scored by the server from tap times (D-053)
 - 2026-10-05 — fix: training T3 review — Hill Climb counts time off the track as out of the ring, Pip and the countdown on the server's clock with a one-way allowance, no launch from the gate with a held stick, early twice rides on to the flag, secret bell seed, standing-start freezes read true, per-ride par, Easy Rein can turn round (D-053)
 - 2026-10-05 — feat: training rides T3: server-scored Gate Break (practice gate, bell from the seed, early go reruns, latency allowance) and Hill Climb (Pip the lead pony, ring scoring), Easy Rein steering help in Settings (D-053)
 - 2026-10-05 — feat: riding feel (D-056): phone Hop button, riding trots with a leg-driven bob, shins collider, get off where the horse stood, room check when calling, stall plaque while out, 💎 pill and shop doors shut around races, taming fixed, wild horses turn smoothly, bridge and Race Board fixed

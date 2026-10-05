@@ -74,6 +74,8 @@ SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
 		data.settings.sound = value -- client Sound module; nil = on
 	elseif key == "easyRein" and typeof(value) == "boolean" then
 		data.settings.easyRein = value -- steering help on training courses (D-053); no score change
+	elseif key == "shareGhost" and typeof(value) == "boolean" then
+		data.settings.shareGhost = value -- friends here may see your training ghosts (D-053); off by default
 	elseif key == "tour" and value == "restart" then
 		data.flags.tourStep, data.flags.tourDone, data.flags.tourDid = 1, nil, nil
 	else

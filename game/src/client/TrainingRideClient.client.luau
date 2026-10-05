@@ -20,6 +20,11 @@
 --   ponyAt(seed, t) on this screen only; a glowing ring behind him; inside it your horse keeps
 --   Pip's pace by itself. "Stay with Pip!" is the only nudge.
 --   Easy Rein (Settings): TrainingState.aim is where RideClient steers strongly.
+--   Ghosts (T4): TrainGhosts brings your best ride on the course (and, riding alone, friends'
+--   who share theirs); each runs as a see-through horse on the ride clock.
+--   Ride together (T4): a friend's invite shows as a card with "Ride together" and "Not now"
+--   (nothing happens unless you accept; it goes away by itself); after the ride the end card
+--   shows how your friend did, in stars and ribbons only.
 -- The glow, hoofprints and feedback come from this client's own position with the same
 -- tracker the server uses; the server's samples decide the score.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -47,6 +52,13 @@ local TrainBegin = remotes:WaitForChild("TrainBegin")
 local TrainEnd = remotes:WaitForChild("TrainEnd")
 local TrainAbort = remotes:WaitForChild("TrainAbort")
 local TrainCue = remotes:WaitForChild("TrainCue")
+local TrainGhosts = remotes:WaitForChild("TrainGhosts")
+local TrainInvited = remotes:WaitForChild("TrainInvited")
+local TrainInviteReply = remotes:WaitForChild("TrainInviteReply")
+local TrainInviteGone = remotes:WaitForChild("TrainInviteGone")
+local TrainTogether = remotes:WaitForChild("TrainTogether")
+local Ghost = require(Shared:WaitForChild("Ghost"))
+local RideTogether = require(Shared:WaitForChild("RideTogether"))
 local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 local CFG = GameConfig.training
 local TC = TrainingCourses
@@ -329,6 +341,51 @@ local function buildPip(): Model
 		l.TextStrokeTransparency = 0.3
 	end
 	m.Name = "Pip"
+	m.Parent = printsFolder.Parent
+	table.insert(extras, m)
+	return m
+end
+
+-- A see-through horse for a ghost (the coat it was ridden on), labelled.
+local function buildGhost(coat: string?, text: string, mine: boolean): Model
+	local f = ReplicatedStorage:FindFirstChild("RaceModels")
+	local c = coat or "bay"
+	local anim = f and f:FindFirstChild("horse_anim_" .. c)
+	if anim and not HorseLegs.has(anim) then anim = nil end
+	local src = f and (anim or f:FindFirstChild("horse_stand_" .. c) or f:FindFirstChild("horse_gallop_" .. c) or f:FindFirstChild("horse_" .. c))
+	local m: Model
+	if src then
+		m = src:Clone()
+	else
+		m = Instance.new("Model")
+		local body = Instance.new("Part")
+		body.Size, body.Color = Vector3.new(2, 3, 6.5), Ui.coatColors[c] or Ui.coatColors.bay
+		body.CFrame = CFrame.new(0, 3.5, 0)
+		body.Parent = m
+		m.PrimaryPart = body
+		m.WorldPivot = CFrame.new()
+	end
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch, d.CastShadow = true, false, false, false, false
+			d.Transparency = math.max(d.Transparency, if mine then 0.6 else 0.7)
+		elseif d:IsA("Decal") or d:IsA("Texture") then
+			d.Transparency = math.max(d.Transparency, 0.6)
+		end
+	end
+	local anchor = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true)
+	if anchor then
+		local tag = Instance.new("BillboardGui")
+		tag.Size = UDim2.fromOffset(150, 26)
+		tag.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+		tag.MaxDistance = 120
+		tag.Parent = anchor
+		local l = Ui.text(tag, "👻 " .. text, 18, { Size = UDim2.fromScale(1, 1), TextScaled = true })
+		l.TextColor3 = C.white
+		l.TextStrokeTransparency = 0.4
+		l.TextTransparency = 0.2
+	end
+	m.Name = "Ghost"
 	m.Parent = printsFolder.Parent
 	table.insert(extras, m)
 	return m
@@ -680,10 +737,28 @@ local function pipFrame(s, cur, dt: number)
 	end
 end
 
+local function ghostFrame(s, dt: number)
+	if not s.ghosts then return end
+	local t = TrainingRide.rideClock(workspace:GetServerTimeNow(), s.goAtServer)
+	for _, gh in s.ghosts do
+		local x, y, z, fx, fz = Ghost.at(gh.points, gh.hz, math.max(0, t - gh.t0))
+		if x then
+			local pos = Vector3.new(x, GROUND_Y + TC.groundHeight(x, z :: number) + math.max(0, y :: number), z :: number)
+			if fx and (fx * fx + (fz :: number) ^ 2) > 0.01 then gh.look = Vector3.new(fx, 0, fz :: number).Unit end
+			gh.model:PivotTo(CFrame.lookAt(pos, pos + gh.look))
+			if HorseLegs.has(gh.model) then HorseLegs.apply(gh.model, if gh.last then (pos - gh.last).Magnitude else 0, dt) end
+			gh.last = pos
+		elseif gh.model.Parent then
+			gh.model.Parent = nil -- the ghost has finished its ride
+		end
+	end
+end
+
 RunService.RenderStepped:Connect(function(dt)
 	local s = session
 	if not s then return end
 	TrainingState.easyRein = PlayerState.data ~= nil and PlayerState.data.settings ~= nil and PlayerState.data.settings.easyRein == true
+	ghostFrame(s, dt)
 	if TrainingState.phase ~= "ride" or not s.tracker then return end
 	local cur = sampleNow(s)
 	if not cur then return end
@@ -785,12 +860,35 @@ body.Size = UDim2.fromScale(1, 1)
 body.Parent = card
 local cardGen = 0
 local lastResult = nil
+local together = nil -- { course, list } from TrainTogether
+local togetherStrip: Frame? = nil
 
 local RIBBON = {
 	bronze = { emoji = "🥉", text = "Bronze ribbon", color = Color3.fromHex("E3A26B") },
 	silver = { emoji = "🥈", text = "Silver ribbon", color = Color3.fromHex("D7DCE3") },
 	gold = { emoji = "🥇", text = "Gold ribbon", color = C.gold },
 }
+
+local RIBBON_EMOJI = { bronze = "🥉", silver = "🥈", gold = "🥇" }
+
+-- Ride together: how your friend did, stars and ribbons only (never times or places).
+local function renderTogether()
+	local strip = togetherStrip
+	if not strip or not together or not lastResult or together.course ~= lastResult.course then return end
+	strip:ClearAllChildren()
+	local parts = {}
+	for _, m in together.list do
+		if m.userId ~= player.UserId then
+			local what = if m.resting then "🐴 is taking a rest"
+				elseif m.done then string.rep("★", math.clamp(tonumber(m.stars) or 1, 1, 3)) .. " " .. (RIBBON_EMOJI[m.ribbon] or "")
+				else "🐴 still riding…"
+			table.insert(parts, tostring(m.name) .. "  " .. what)
+		end
+	end
+	if #parts == 0 then return end
+	strip.Visible = true
+	Ui.text(strip, "👫 " .. table.concat(parts, "   ·   "), 20, { Size = UDim2.fromScale(1, 1), TextColor3 = C.plum })
+end
 
 local function closeCard(tellServer: boolean)
 	cardGen += 1
@@ -872,6 +970,18 @@ local function showCard(r)
 	local ribbon = Ui.card(body, UDim2.fromOffset(300, 48), UDim2.new(0.5, -150, 0, 292), C.cream)
 	ribbon.Visible = false
 	local ribbonText = Ui.text(ribbon, "", 22, { Size = UDim2.fromScale(1, 1) })
+	-- Riding together: your friend's stars and ribbon (the card grows to fit).
+	local withFriend = together ~= nil and together.course == r.course
+	CH = if withFriend then 470 else 420
+	card.Size = UDim2.fromOffset(CW, CH)
+	rescale()
+	togetherStrip = Instance.new("Frame")
+	togetherStrip.BackgroundTransparency = 1
+	togetherStrip.Position = UDim2.new(0, 20, 0, 346)
+	togetherStrip.Size = UDim2.new(1, -40, 0, 40)
+	togetherStrip.Visible = false
+	togetherStrip.Parent = body
+	renderTogether()
 	-- Buttons.
 	local again = Ui.button(body, "🔁 Ride again", UDim2.fromOffset(200, 56), UDim2.new(0.5, -210, 1, -72), C.orange, 22)
 	local done = Ui.button(body, "Done", UDim2.fromOffset(200, 56), UDim2.new(0.5, 10, 1, -72), C.green, 22)
@@ -918,6 +1028,7 @@ end
 -- Remotes -----------------------------------------------------------------------------------------
 TrainBegin.OnClientEvent:Connect(function(course, seed, n, goAtServer)
 	closeCard(false)
+	together = nil
 	local count = tonumber(n) or CFG.countdownSeconds
 	beginSession(course, count, tonumber(seed) or 1, tonumber(goAtServer) or (workspace:GetServerTimeNow() + count))
 end)
@@ -985,6 +1096,71 @@ TrainCue.OnClientEvent:Connect(function(kind, data)
 			say("Back to the gate!", C.white)
 		end
 	end
+end)
+
+TrainGhosts.OnClientEvent:Connect(function(course, list)
+	local s = session
+	if not s or s.course ~= course or typeof(list) ~= "table" then return end
+	s.ghosts = s.ghosts or {}
+	for i, g in list do
+		if i > 3 then break end
+		local pts = Ghost.decode(g)
+		if pts and #pts > 1 then
+			local model = buildGhost(g.coat, if g.mine then "Your best" else tostring(g.label), g.mine == true)
+			table.insert(s.ghosts, { points = pts, hz = tonumber(g.hz) or Ghost.HZ, t0 = tonumber(g.t0) or 0, model = model,
+				look = Vector3.new(TC.courses[course].start.lookX, 0, TC.courses[course].start.lookZ) })
+		end
+	end
+end)
+
+TrainTogether.OnClientEvent:Connect(function(course, list)
+	if typeof(list) ~= "table" then return end
+	together = { course = course, list = list }
+	if cardGui.Enabled and lastResult and lastResult.course == course then
+		if CH ~= 470 then
+			CH = 470
+			card.Size = UDim2.fromOffset(CW, CH)
+			rescale()
+		end
+		renderTogether()
+	end
+end)
+
+-- A friend's invite: accept-only, no timer shown, and it goes away by itself.
+local inviteGui = Ui.screen("TrainingInvite", 14)
+inviteGui.Enabled = false
+local inviteCard = Ui.card(inviteGui, UDim2.fromOffset(440, 210), UDim2.new(0.5, 0, 0, 90), C.paper)
+inviteCard.AnchorPoint = Vector2.new(0.5, 0)
+local inviteText = Ui.text(inviteCard, "", 24, { Position = UDim2.new(0, 16, 0, 16), Size = UDim2.new(1, -32, 0, 96) })
+local inviteYes = Ui.button(inviteCard, "👫 Ride together", UDim2.fromOffset(190, 56), UDim2.new(0.5, -200, 1, -72), C.green, 22)
+local inviteNo = Ui.button(inviteCard, "Not now", UDim2.fromOffset(190, 56), UDim2.new(0.5, 10, 1, -72), C.white, 22)
+local inviteId = nil
+local function closeInvite(answer: boolean?)
+	if inviteId ~= nil and answer ~= nil then TrainInviteReply:FireServer(inviteId, answer) end
+	inviteId = nil
+	inviteGui.Enabled = false
+end
+inviteYes.Activated:Connect(function() closeInvite(true) end)
+inviteNo.Activated:Connect(function() closeInvite(false) end)
+
+TrainInvited.OnClientEvent:Connect(function(id, fromName, course)
+	local c = TC.courses[course]
+	if typeof(id) ~= "number" or not c then return end
+	if session or player:GetAttribute("Racing") or player:GetAttribute("InLine") then
+		TrainInviteReply:FireServer(id, false) -- busy: quietly "not now"
+		return
+	end
+	inviteId = id
+	inviteText.Text = string.format("🐴 %s would like to ride %s %s with you!", tostring(fromName), c.emoji, c.name)
+	inviteGui.Enabled = true
+	Ui.pop(inviteCard)
+	task.delay(RideTogether.INVITE_SECONDS, function()
+		if inviteId == id then closeInvite(nil) end
+	end)
+end)
+
+TrainInviteGone.OnClientEvent:Connect(function(id)
+	if inviteId == id then closeInvite(nil) end
 end)
 
 TrainEnd.OnClientEvent:Connect(function(result)

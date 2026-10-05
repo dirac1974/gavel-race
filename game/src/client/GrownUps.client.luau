@@ -2,7 +2,8 @@
 -- GrownUps (D-045, D-049): the ⚙️ button (top right) opens settings and a page for parents;
 -- plus the first-ten-minutes tour card and the optional break reminder.
 --   Settings: who can visit your stable (Friends or Nobody), break reminder on or off, sound on or off,
---   Easy Rein (steering help on training courses, D-053) on or off.
+--   Easy Rein (steering help on training courses, D-053) on or off, and whether friends may see
+--   your training ghosts (off by default). "Nobody" visits also turns off Ride together invites.
 --   For grown-ups: how races work (no gambling, nothing buys speed), what's saved, chat and
 --   safety, this week's play time, and where Roblox's parental controls live.
 --   Tour: one friendly step at a time with a GO button (golden hoofprints) and Skip.
@@ -120,14 +121,16 @@ local function settingsTab()
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("sound", v) end, 3)
 	choice("Easy Rein (helps steer on training rides)", { { true, "🐴 On" }, { false, "Off" } }, d.settings.easyRein == true,
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("easyRein", v) end, 4)
+	choice("Share my ghost with friends", { { true, "👻 On" }, { false, "Off" } }, d.settings.shareGhost == true,
+		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("shareGhost", v) end, 5)
 	local tourBtn = Ui.button(body, "🧭 Show me around again", UDim2.fromOffset(260, 46), UDim2.new(), C.sky, 18)
-	tourBtn.LayoutOrder = 5
+	tourBtn.LayoutOrder = 6
 	tourBtn.Activated:Connect(function()
 		Ui.toast("Follow the steps at the top of the screen!", "map", "🧭")
 		panelGui.Enabled = false
 		gameRemotes:WaitForChild("SetSetting"):FireServer("tour", "restart")
 	end)
-	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable.", 15, 6).TextColor3 = C.plum
+	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable. \"Nobody\" also means no Ride together invites.", 15, 7).TextColor3 = C.plum
 end
 
 local function grownUpsTab()
