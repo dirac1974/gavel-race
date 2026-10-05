@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-10-04
+Last updated: 2026-10-05
 
 ## Current state
 
@@ -13,76 +13,26 @@ Last updated: 2026-10-04
 
 ## In progress
 
-**Stage 2 — The world** (branch `claude/stage2-world`):
-- `WorldLayout` (pure, tested): Fair Street on z = -324 through a tunnel in the grandstand (Gate 1), Barn Lane on x = 1220 with 20 plots (90 × 118), the Trail loop and meadow east of the lane; ground and bounds extended to x = 1900.
-- `WorldScene`: builds the street (fountain, lamps, bunting), Race Board, Feed & Seed, Vet, Training Paddock, Market Corral, Trail Gate, Trail, trees and lighting; uploaded models replace part-built ones when they load.
-- `StableService`: plot per player, barn with one bay per stall and stalled horses, spawn at your gate, Map travel (`Travel` remote), visit setting published on the plot.
-- `Rides`/`RideClient`: ride your active horse anywhere (Humanoid rig owned by the rider; walk 16, gallop 46; stand/gallop models switched by speed, bob via Motor6D).
-- `WorldClient`: privacy walls solid for players who aren't allowed in (default Friends), Map panel, Race Board prompt. `Guide`: pathfinding hoofprints for GO buttons (used from Stage 5).
-
-**Stage 3 — Care and food** (branch `claude/stage3-care`, stacked on Stage 2):
-- `Care` (pure, tested): feed (hay/grain), groom, treats (3 a day), pet, garden (carrot 1 h, apple 4 h, oats 8 h; never withers), chores (hay + cash, 4 h per stall), Feed & Seed prices and selling crops.
-- `CareService`: checks ownership, distance to your plot or the shop, rate limits; `CareFx` hearts and sparkles for everyone.
-- `CareClient`: care card per horse, brushing game, garden and shop cards, prompts on your own plot only.
-- `StableService`: stall doors named for chores, garden beds with crops growing in stages and a sparkle when ready, a sparkle on horses brushed today; refreshes every 20 s.
-
-**Stage 5 — Stable Board** (branch `claude/stage5-board`, stacked on Stage 3):
-- `Jobs` (pure, tested): 3 daily / 5 weekly / 5 monthly from pools seeded by player and period, effort events only, claim, auto-claim at rollover, one free swap a day, monthly stamps. `Advice` (pure, tested): one fact and one next step per horse, never guilt.
-- `Progress` (server): records events from care, garden, chores, rides, races (Great taps via `PaceMeter.countAtLeast`, Great bursts) and visits (a day, the Trail meadow).
-- `JobService`: rollover, claim, swap, adds jobs and garden readiness to the profile view.
-- `StableBoard` (client): board with horse cards, job cards with GO hoofprints and Claim, ribbons, "All done today!", pinned job; 📋 dock button and barn noticeboard.
-
-**Stage 6 — Training and the vet** (branch `claude/stage6-training`, stacked on Stage 5):
-- `Training` (pure, tested): gain = 0.12 × (Potential − stat) × (0.5 + 0.5 × score/100), ×1.5 when rested (3 h since the last session), weekly cap 6 points per horse, never past Potential; vet check-up +1 bond a day and the next of five Health Passport stamps (the second reveals Potential).
-- `TrainingService`: horse is yours and stalled, you're at the paddock or the vet, rate limits; jobs count `train` and `checkup`.
-- `PaddockClient`: four training games (Sprint Lane, Gate Break, Hill Climb, Mud Splash) and the heartbeat check-up with the Health Passport.
-
-**Stage 4 — Race Board and two courses** (branch `claude/stage4-raceboard`, stacked on Stage 6):
-- `TrackLayout.churchillTurf` (turf course inside the dirt, same finish line) and `TrackLayout.courses`; `TrackScene.course(id, cfg)` objects with their own gate, horses and saddles.
-- `RaceService` rewritten around courses: a card per course (league, distance alternating Sprint/Mile for Rookie, surface, weather), a line per course, both courses race at once, events carry the course id last, `RaceCards` every second (also drawn on the Race Board).
-- Clients follow one race (`RaceState.consider/isFocus`: yours, else the newest); `RaceView` animates every race; Minimap and Replay course-aware.
-- `RacePicker`: race cards, horse choice with "suits today" from Rating (never win chance), Join.
-
-**Stage 7 — Spectators** (branch `claude/stage7-fans`, stacked on Stage 4):
-- `Fans` (pure, tested): Fan XP from the cheered horse's checkpoint and burst results (+2 for a win, 11 a race, 100 a day), Clap Along scoring (±80 ms, extras count against), steadiness flag (spread < 12 ms over 48+ beats), crowd = best fan + 0.15 + 0.10 assists, boost 0.03 × crowd, drifting beats, Top Fans and ranks.
-- `RaceSession:setCrowd` / `tilts`: the boost joins the live tilt as κR + c; riding gain keeps the crowd fixed.
-- `FanService`: cheers lock at the first checkpoint, claps via TapTime, crowd before each segment closes, Fan XP and strikes (2nd private note, 3rd fan play off 30 days, expire after 90) saved in the profile, Top Fans to all and your rank to you; cheer jobs.
-- `FanClient`: cheer bar, CLAP! button with beat ring and per-clap labels, Top Fans panel with Fan XP.
-
-**Stage 8 — More horses** (branch `claude/stage8-horses`, stacked on Stage 7):
-- `Market` (pure, tested): weekly stock seeded by week (same everywhere, personal purchases, no scarcity), price from bloodline (Potential) with ★ hints, buy into a stall or the pasture, 20 horses max; taming (treat, wild coats, surprise Potential, one a day); stall prices 300/800/2000/4000 up to 6; rename by word chips.
-- `MarketService`: corral horses and signs from the stock, buy/tame/build stall/swap/rename remotes with checks; market added to the profile view (`Profiles.addDecorator`).
-- `WildHorses`: deterministic wandering wild horses in the meadow (same on every client) and the gentle trust game. `HorsesClient`: My Horses panel and Market cards. Pasture horses graze in your yard.
-
-**Stage 9 — Leagues** (branch `claude/stage9-leagues`, stacked on Stage 8):
-- `Leagues` (pure, tested): Rookie → Champion, Stakes unlock at D-013 points or over the league ceiling (Rookie 58, Bronze 68, Silver 78, Gold 88 best base Rating), Stakes win promotes and resets points, entry rules (own league, Practice always), Hall of Fame plaques on retiring.
-- `RaceService`: cards open until the first rider sets league and kind (race, Stakes, Practice); Practice pays nothing, Stakes winner gets 3B and moves up; Energy per card; Bronze adds the Classic.
-- Picker race kinds, My Horses league line, retire with Hall of Fame, board advice for open Stakes.
-
-**Stage 10 — Polish** (branch `claude/stage10-polish`, stacked on Stage 9):
-- `Tour` (pure, tested) and `SettingsService`: five-step first-ten-minutes tour driven by Progress events, skip and replay; visit setting (Friends/Nobody), break reminder, play time per week.
-- `GrownUps` client: ⚙️ Settings and For grown-ups pages, tour card with GO and Skip, optional hourly break reminder.
-- Still open for David: sound and voice (ElevenLabs credits), the Diamond store, a Studio playtest of everything.
+(none) — the world build (Stages 1–10, D-035 to D-049) is merged. Nothing has been run in Roblox Studio yet: the next step is David's playtest with `game/PLAYTEST.md`.
 
 ## Backlog (top = next)
 
-World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.
-
-1. **Stage 1 — Your horse**: Profile and DataStore (session lock, autosave, migrations), horse records, wallet and items, starter pick and naming, races use your active horse and pay into your save, HUD.
-2. **Stage 2 — The world**: Fair Street, Barn Row plots, your barn with stalls and horses, Map fast-travel, hoofprints, riding your horse around.
-3. **Stage 3 — Care and food**: feed, groom, pet, garden, Feed & Seed, chores; care and bond in Rating; Energy top-ups.
-4. **Stage 4 — Race Board**: league cards, horse picker, queue, dirt and turf races at once, Friend Races.
-5. **Stage 5 — Stable Board**: horse status, next step, daily/weekly/monthly jobs, auto-claim, GO hoofprints.
-6. **Stage 6 — Training and vet**: four training games, Potential, weekly cap, rested bonus; heartbeat check-up and Health Passport.
-7. **Stage 7 — Spectators**: cheer cards, Clap Along, Fan XP, Top Fans (D-019, D-020).
-8. **Stage 8 — More horses**: Market Corral, the Trail, taming, pasture, stall purchases.
-9. **Stage 9 — Leagues**: League Points, Stakes, promotion, Bronze and up, Hall of Fame.
-10. **Stage 10 — Polish**: first 10 minutes, For grown-ups, sound, art pass, mobile pass, performance.
-11. Older items still open: anti-cheat tooling (save trackers once Stage 1 lands), economy sim v2 (Energy, training, sinks, jobs ≤ 10% of race income), running styles (debate 008 research), "How races work" animation, race presentation extras (riding animation, dust, saddle cloths).
-12. **Art (parallel)**: Meshy models for barns, stalls, Fair Street, crops, props, more coats (budget in memory).
+1. **Studio playtest of the world** (David): `game/PLAYTEST.md`, every section; enable API access in Game Settings → Security to test saving. Fix what breaks.
+2. **Sound and voice**: announcer lines, hoofbeats, crowd, UI clicks (needs David's OK for ElevenLabs credits, OPEN_QUESTIONS 4).
+3. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
+4. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
+5. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
+6. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
+7. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
+8. **Diamond store** (D-044, waits for David's sign-off on D-002a).
+9. **Cross-server Cup finals and Derby Day** (D-036 later).
+10. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
+11. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.
+12. **Performance pass**: StreamingEnabled check, model counts on phones (58 models in ReplicatedStorage), trees and fences.
 
 ## Done
 
+- 2026-10-05: world build merged (PRs #17–#27): saving and owning horses, the world (Fair Street, Barn Lane, riding, map), care and food, two courses with the Race Board, Stable Board jobs, training and the vet, spectators (cheer, Clap Along, Fan XP), more horses (market, taming, stalls), leagues (Cups, Practice, Hall of Fame), polish (tour, settings, For grown-ups). Art pass (#20): 51 Meshy models and 66 icons uploaded; Meshy balance 460.
 - 2026-10-04: Stage 1 your horse (PR #17): saved profiles, starter pick, race queue, dock HUD.
 - 2026-10-04: world design (D-035 to D-047) from the design council's world workshop; build stages planned.
 - 2026-10-04: exponential race and race shape (D-033), stretch-drive previews, ride report, replays (D-034); debate 008.
