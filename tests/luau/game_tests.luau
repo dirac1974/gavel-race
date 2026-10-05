@@ -1,5 +1,5 @@
 --!strict
--- Tests for the pure game modules: BurstMeter, TapTime, Stride, PaceMeter, TrackLayout, Integrity, RaceSession.
+-- Tests for the pure game modules: BurstMeter, TapTime, Stride, PaceMeter, TrackLayout, Integrity, RaceShape, RaceSession.
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -10,6 +10,7 @@ local Integrity = require("../../game/src/shared/Integrity")
 local RaceSession = require("../../game/src/shared/RaceSession")
 local TrackLayout = require("../../game/src/shared/TrackLayout")
 local PaceMeter = require("../../game/src/shared/PaceMeter")
+local RaceShape = require("../../game/src/shared/RaceShape")
 
 local function makeRng(seed0: number)
 	local seed = seed0
@@ -188,8 +189,71 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	for k = 0, 36 * 8 do table.insert(mash, 100 + k / 8) end
 	check((PaceMeter.score(passes, mash)) < 2, "mashing scores about 0")
 
+	-- RaceShape (D-033) -------------------------------------------------------
+	-- The exponential race gives the Harville finish: win share = live chance, and
+	-- P(k 2nd) = sum over j ~= k of p_j * p_k / (1 - p_j).
+	local live4 = { 0.4, 0.3, 0.2, 0.1 }
+	local rngShape = makeRng(2024)
+	local N = 20000
+	local wins, seconds = { 0, 0, 0, 0 }, { 0, 0, 0, 0 }
+	for _ = 1, N do
+		local order = RaceShape.order(RaceShape.drawLuck(rngShape, 4), live4)
+		wins[order[1]] += 1
+		seconds[order[2]] += 1
+	end
+	for k = 1, 4 do
+		check(close(wins[k] / N, live4[k], 0.015), "luck race: wins match live chance (lane " .. k .. ")")
+		local second = 0
+		for j = 1, 4 do
+			if j ~= k then second += live4[j] * live4[k] / (1 - live4[j]) end
+		end
+		check(close(seconds[k] / N, second, 0.015), "luck race: 2nd places match Harville (lane " .. k .. ")")
+	end
+
+	-- Monotone: raising one horse's chance never makes it finish worse, and never swaps
+	-- two other horses.
+	local monoOk = true
+	for _ = 1, 300 do
+		local luck = RaceShape.drawLuck(rngShape, 4)
+		local before = RaceShape.order(luck, live4)
+		local boosted = { 0.25, 0.3, 0.2, 0.1 } -- lane 1 down
+		local after = RaceShape.order(luck, boosted)
+		local function without(order, lane)
+			local out = {}
+			for _, l in order do if l ~= lane then table.insert(out, l) end end
+			return out
+		end
+		local b, a = without(before, 1), without(after, 1)
+		for k = 1, 3 do if a[k] ~= b[k] then monoOk = false end end
+		if RaceShape.placeIn(luck, boosted, 1) < RaceShape.placeIn(luck, live4, 1) then monoOk = false end
+		for place, lane in before do
+			if RaceShape.placeIn(luck, live4, lane) ~= place then monoOk = false end
+		end
+	end
+	check(monoOk, "luck race is monotone and placeIn agrees with order")
+
+	check(close(RaceShape.blendWeight(10, 10, 20), 0, 1e-12) and close(RaceShape.blendWeight(20, 10, 20), 1, 1e-12)
+		and close(RaceShape.blendWeight(15, 10, 20), 0.25, 1e-12) and close(RaceShape.blendWeight(15, 10, 20, 1), 0.5, 1e-12)
+		and RaceShape.blendWeight(5, 10, 20) == 0 and RaceShape.blendWeight(25, 10, 20) == 1, "blend weight: x^power 0 -> 1, clamped")
+
+	local cfgShape = RaceShape.default
+	local skill = RaceShape.offsets(live4, { 1, 1, 1, 1 }, 0, cfgShape)
+	local skillSum = 0
+	for _, v in skill do skillSum += v end
+	check(close(skillSum, 0, 1e-9) and skill[1] > skill[2] and skill[2] > skill[3] and skill[3] > skill[4],
+		"skill offsets: favourite ahead, field centred on the pace")
+	local luckFixed = { 0.9, 0.1, 0.5, 0.05 }
+	local order4 = RaceShape.order(luckFixed, live4)
+	local shown = RaceShape.offsets(live4, luckFixed, 1, cfgShape)
+	local shapeOk = close(shown[order4[1]], cfgShape.leaderFeet, 1e-9)
+	for k = 2, 4 do
+		local gap = shown[order4[k - 1]] - shown[order4[k]]
+		if gap < cfgShape.minGap - 1e-9 or gap > cfgShape.maxGap + 1e-9 then shapeOk = false end
+	end
+	check(shapeOk, "at the line the field is spread in finish order")
+
 	-- RaceSession ------------------------------------------------------------
-	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter }
+	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape }
 	local humans = {
 		{ id = "1", name = "Ava", rating = 60, isBot = false },
 		{ id = "2", name = "Ben", rating = 55, isBot = false },
@@ -307,6 +371,32 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 			check(p.leaguePoints == (GameConfig.leaguePoints[p.place] or GameConfig.finishPoints), "league points")
 		end
 	end
+
+	-- D-033: the finish is the luck order; the stretch-drive preview matches the close;
+	-- riding gains are positive for a perfect rider and never positive for one who misses.
+	local gainsOk, orderOk = true, true
+	for seed = 1, 60 do
+		local sp, rp = runRace(seed, true, false)
+		local expect = RaceShape.order(sp.luck, sp.live)
+		for k = 1, 8 do if rp.order[k] ~= expect[k] then orderOk = false end end
+		if sp:ridingGain(1) < 0 then gainsOk = false end
+		local sm = select(1, runRace(seed, false, false))
+		if sm:ridingGain(1) > 0 then gainsOk = false end
+	end
+	check(orderOk, "finish order is the luck order")
+	check(gainsOk, "riding gain: perfect >= 0, missed <= 0")
+
+	local sv = newSession(21)
+	sv:paceSchedule({ { 10, 36 } }, { { 10, 22 }, { 22, 34 }, { 34, 46 } })
+	for seg = 1, 3 do sv:closeSegment(seg) end
+	local tapsLast = {}
+	for _, pp in sv:pacePasses(4) do table.insert(tapsLast, PaceMeter.idealTime(pp)) end
+	local scored = sv:scorePace("1", 4, tapsLast)
+	local preview = sv:previewLive(4, { [1] = (scored :: any).score })
+	local closed = sv:closeSegment(4)
+	local previewOk = true
+	for i = 1, 8 do if not close(preview[i], closed[i], 1e-12) then previewOk = false end end
+	check(previewOk, "stretch-drive preview equals the closed segment")
 
 	-- Determinism: same seed, same result.
 	local _, r1 = runRace(42, true, false)

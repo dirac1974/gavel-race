@@ -41,6 +41,18 @@ GameConfig.burstLeadSeconds = 1.5    -- pace pauses and "FINAL BURST" shows this
 GameConfig.burstAfterTurnSeconds = 0.5 -- the burst opens this long after the field enters the homestretch
 GameConfig.stretchGapSeconds = 1.0   -- after the burst, the slider resumes for the stretch drive
 GameConfig.finishMarginSeconds = 1.5 -- the stretch drive's slider stops this long before the line
+-- Race shape (D-033): skill shows until the far turn, luck blends in to the last tap.
+GameConfig.raceShape = {
+	leadFeetPerShare = 320, -- skill: feet ahead per unit of (win chance - fair share)
+	leaderFeet = 20,        -- luck: projected leader's lead over the pace
+	feetPerLog = 24,        -- luck: margin per unit of log(T ratio), clamped below
+	minGap = 2,
+	maxGap = 40, blendPower = 2,
+}
+GameConfig.offsetsPerSecond = 4      -- how often the server sends on-screen gaps
+GameConfig.stretchPreviewSeconds = 1 -- how often live chances refresh during the stretch drive
+GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own screen for a Great or Perfect tap
+GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
 GameConfig.stride = {

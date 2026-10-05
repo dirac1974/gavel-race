@@ -461,6 +461,23 @@ function TrackScene.seatRider(i: number, character: Model?): boolean
 	return true
 end
 
+-- One rider off (they pressed Done), standing on the apron by the finish line.
+function TrackScene.dismount(character: Model?)
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+	for i, saddle in saddles do
+		if saddle.Occupant == humanoid then
+			local weld = saddle:FindFirstChild("SeatWeld")
+			if weld then weld:Destroy() end
+			humanoid.Sit = false
+			local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+			local _, _, lineZ = TrackLayout.finishLine(CFG)
+			local base = if spawn then spawn.CFrame else CFrame.new(TrackLayout.outerRadius(CFG) + 12, 0, lineZ)
+			character:PivotTo(base * CFrame.new((i - 4.5) * 3, 3.5, 0))
+		end
+	end
+end
+
 -- After a race: everyone off, standing on the apron by the finish line.
 function TrackScene.dismountAll()
 	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")

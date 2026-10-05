@@ -282,3 +282,20 @@ Template:
 - Open for David: three of four designers say the running-order board on the left is now one display too many (place badge plus strip cover it) and suggest hiding it during the race. Kept for now because David asked for it.
 - Links: game/src/client/Minimap.client.luau
 
+
+## D-033 — The horse sets the odds, taps move them, luck shows from the far turn
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, debate 008 (blend while tapping: child safety, competitive and moderator; hands-off reveal: engagement, young player); David agreed with the panel's direction
+- Decision: the finish is an exponential race. At the gate each horse gets a secret luck number `L ~ Exp(1)` (never sent to clients); its projected finish time is `T = L / p` with `p` its live chance, and the finish order is sorted by `T`, which is exactly the Harville distribution the race always used, so purses and odds are unchanged. On screen, up to the final far turn each horse's offset from the shared pace comes from live chance (skill, 320 ft per unit of share above fair); from the far turn to the last tap the offsets blend toward the projected order (luck: leader +20 ft, gaps 24·log(T ratio) clamped 2–40 ft) with weight `x²`, so late chargers come through while taps still count and the order on screen at the line is the result (no reshuffle). The stretch drive previews live chances every second. A Great or Perfect pace tap gives your own horse an instant 2 ft nudge (same for everyone, never luck), the place badge shows an up or down arrow when your chance moves (never a percentage), and the results card leads with "You rode ★★☆" and, only when positive, "Your riding gained you N places!" (your place versus riding at the race average with the same luck). Energy stays out of speed (D-015 stands); a rested horse trains 50% faster inside the weekly cap (to build with training).
+- Tuning: in simulation the eighth-pole leader wins 61% and 11% of winners come from 3rd or worse there (Kentucky Derby proxy 74% and 12%); smoothstep gave 89% and 1%. All values in `GameConfig.raceShape`.
+- Alternatives: hands-off reveal after the last tap (slot-machine structure), no race shape (no comebacks), energy as a speed factor (punishes play and absence, invites paid speed).
+- Links: game/src/shared/RaceShape.luau, game/src/shared/RaceSession.luau (luck, previewLive, ridingGain), game/src/server/RaceService.server.luau (offsets, previews, RideReport), game/src/client/RaceView.client.luau, docs/debates/008-race-dynamics-and-replay.md
+
+## D-034 — Replays: the finish, or the whole race at 3x
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, debate 008 replay round (4/4); David asked for "just the last 1/4 of the race, or a full race sped up"
+- Decision: after every race the results card offers "↺ Watch the finish" (final quarter at real speed, from when the leader passes 75%) and "Whole race ×3" (3x until the final quarter, then real speed); never autoplayed. Riders stay in the saddle until they press Done (server dismounts everyone after 60 s). Playback uses only what this screen recorded (10 frames a second) and ends on the official result: no re-simulation, no ghost horses. Side-on camera on your horse with a Behind toggle; Reduced Motion gets a fixed finish-line camera. REPLAY banner, letterbox and warm tint, no tap pad, no prompts. Overlays: your tap results, checkpoint stars, burst pulse, "+N" where you gained places in the final quarter. Half speed over the last 2 s only when you won; a photo-finish still when 1st and 2nd were under a length apart. A new race cancels any replay.
+- Alternatives: autoplay (pressure to watch), server-side re-simulation (could show things not shown live), slow motion on narrow losses (replays the near miss).
+- Links: game/src/client/Replay.client.luau, game/src/client/RaceController.client.luau (results buttons), game/src/client/RaceState.luau

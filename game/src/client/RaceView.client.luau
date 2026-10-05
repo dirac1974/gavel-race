@@ -1,14 +1,19 @@
 --!nonstrict
--- RaceView: animates the horses round the racecourse on every client (D-025, D-027), so they gallop
--- smoothly instead of stepping with server updates. Everyone gets the same timeline from
--- the server (start time, expected end, live chances, finish order), so all screens show
--- the same race. Riders are welded to their horse's saddle and move with it.
---   During the race: all horses run at the race's constant speed, so they reach the line
---   when the race ends; near the line they ease toward it until the result is known;
---   the likelier winners (live win chance) edge ahead, eased in so nobody lurches.
---   Run-in: when the result arrives, horses cross the line in finish order, one by one.
+-- RaceView: animates the horses round the racecourse on every client (D-025, D-027,
+-- D-033), so they gallop smoothly. Everyone gets the same timeline from the server, so all
+-- screens show the same race. Riders are welded to their horse's saddle and move with it.
+--   Pace: every horse runs at the race's constant speed, so the field reaches the line as
+--   the race ends.
+--   Gaps: the server sends each horse's offset from the pace a few times a second. Up to
+--   the far turn it comes from live chance (skill); from the far turn to the last tap it
+--   blends toward the projected finish order (luck), so late chargers come through and the
+--   order on screen at the line is the result. No reshuffle at the line.
+--   Your own horse also gets a small instant nudge on a Great or Perfect tap (same size for
+--   everyone, never luck), so a rider sees their tap work straight away.
+-- It also records the race (positions 10 times a second) for the replay.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -19,17 +24,16 @@ local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 
 local CFG = TrackLayout.churchill
-local LEAD_FEET = 320        -- feet of lead per unit of (win chance - fair share): ~55 ft for a strong favourite
-local SOFT_FROM, SOFT_MAX = 0.975, 0.995 -- near the line, ease toward it; nobody crosses before the result
+local myId = tostring(Players.LocalPlayer.UserId)
 local BOB_HZ, BOB_STUDS = 1.8, 0.3
-local FIRST_CROSS, CROSS_GAP = 1.0, 0.25 -- run-in: winner crosses after 1 s, the rest 0.25 s apart
+local PAST_LINE = 0.012     -- past the line, horses ease to a stop within about this fraction
+local RECORD_HZ = 10
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
 
--- race = { start, finishEst, lanes = n, offset = {}, target = {}, ids = {[userId] = lane},
---          runIn = nil | { t0, from = {}, cross = {} } }
+-- race = { start, plan, lanes, myLane, offset = {}, target = {}, done = false, doneAt }
 local race = nil
 
 local function horseModel(i: number): Model?
@@ -38,89 +42,81 @@ local function horseModel(i: number): Model?
 	return horses and horses:FindFirstChild("Lane" .. i)
 end
 
-local function place(i: number, p: number, bob: number)
+local function place(i: number, p: number, bob: number, plan)
 	local horse = horseModel(i)
 	if not horse then return end
-	local x, z, dx, dz = TrackLayout.lanePoint(CFG, race.plan, i, p)
+	local x, z, dx, dz = TrackLayout.lanePoint(CFG, plan, i, p)
 	local pos = Vector3.new(x, bob, z)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
 end
+RaceState.placeHorse = place -- the replay uses the same placement
 
--- Past SOFT_FROM, progress bends smoothly toward SOFT_MAX instead of stopping dead.
-local function soften(p: number): number
-	if p <= SOFT_FROM then return p end
-	local room = SOFT_MAX - SOFT_FROM
-	return SOFT_FROM + room * (1 - math.exp(-(p - SOFT_FROM) / room))
+-- Past the line, ease to a stop instead of running on.
+local function easePastLine(p: number): number
+	if p <= 1 then return p end
+	return 1 + PAST_LINE * (1 - math.exp(-(p - 1) / PAST_LINE))
 end
 
--- Progress of lane i during the race (before the result): the race's constant speed plus
--- the horse's lead, which grows in over the first third.
-local function racing(i: number, t: number): number
-	local b = math.max(0, (t - race.start) * GameConfig.raceSpeedStudsPerSecond / race.plan.lengths[1])
-	return soften(math.max(0, b + race.offset[i] * math.min(1, b / 0.3)))
-end
-
-remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, cond, finishEst)
+remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, cond)
 	local plan = TrackLayout.plan(CFG, TrackLayout.distances[cond and cond.distance or "Sprint"] or TrackLayout.distances.Sprint)
-	race = { start = start, finishEst = finishEst or (start + 60), plan = plan,
-		lanes = #laneList, offset = {}, target = {}, runIn = nil }
-	for i = 1, #laneList do
+	race = { start = start, plan = plan, lanes = #laneList, offset = {}, target = {}, done = false }
+	for i, lane in laneList do
 		race.offset[i], race.target[i] = 0, 0
+		if lane.id == myId then race.myLane = i end
 	end
 	RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 	RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
+	RaceState.myLane = race.myLane
+	RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {} }
+	RaceState.nudgeAt = -math.huge
 end)
 
-remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
+remotes.RaceOffsets.OnClientEvent:Connect(function(offsets)
 	if not race then return end
-	local fair = 1 / race.lanes
-	for i, c in live do race.target[i] = LEAD_FEET * (c - fair) / race.plan.lengths[i] end
+	for i, feet in offsets do race.target[i] = feet end
 end)
 
 remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 	if not race then return end
-	local t = serverNow()
-	local from, cross = {}, {}
-	for i = 1, race.lanes do from[i] = racing(i, t) end
-	for _, row in summary do
-		local lane = row.lane
-		if lane then cross[lane] = FIRST_CROSS + (row.place - 1) * CROSS_GAP end
-	end
-	for i = 1, race.lanes do cross[i] = cross[i] or (FIRST_CROSS + race.lanes * CROSS_GAP) end
-	race.runIn = { t0 = t, from = from, cross = cross }
-	task.delay(GameConfig.runInSeconds, RaceState.setFinal, summary) -- official order once they're home
+	RaceState.setFinal(summary)
+	race.done = true
+	race.doneAt = serverNow()
+	if RaceState.recording then RaceState.recording.summary = summary end
 end)
 
+local lastRecord = 0
 RunService.RenderStepped:Connect(function(dt)
 	if not race then return end
 	local t = serverNow()
-	local k = math.min(1, dt * 1.2)
+	local k = math.min(1, dt * 2.5)
+	local base = math.max(0, (t - race.start) * GameConfig.raceSpeedStudsPerSecond)
+	local nudge = GameConfig.tapNudgeFeet * math.exp(-(t - (RaceState.nudgeAt or -math.huge)) / 0.6)
+	local allStopped = true
 	for i = 1, race.lanes do
 		race.offset[i] += (race.target[i] - race.offset[i]) * k
-		local p, moving
-		if race.runIn then
-			-- Reach the line (p = 1) exactly at this horse's crossing time, then ease off.
-			local tau = t - race.runIn.t0
-			local tc, p0 = race.runIn.cross[i], race.runIn.from[i]
-			local speed = (1 - p0) / tc
-			if tau <= tc then
-				p = p0 + speed * tau
-			else
-				local over = math.min(tau - tc, 3)
-				p = 1 + speed * (over - over * over / 6) -- eases to a stop 3 s past the line, never backwards
-			end
-			moving = tau < tc + 3
-		else
-			p = racing(i, t)
-			moving = t > race.start
-		end
+		local len = race.plan.lengths[i]
+		-- Gaps grow in over the first 30% so the field leaves the gate together.
+		local feet = base + race.offset[i] * math.min(1, base / (0.3 * len))
+		if i == race.myLane then feet += nudge end
+		local raw = math.max(0, feet / len)
+		local p = easePastLine(raw)
+		local moving = t > race.start and raw < 1 + 3 * PAST_LINE
+		if moving then allStopped = false end
 		local bob = if moving then BOB_STUDS * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi)) else 0
-		place(i, p, bob)
+		place(i, p, bob, race.plan)
 		RaceState.progress[i] = p
 	end
 	RaceState.rank()
-	if race.runIn and t - race.runIn.t0 > GameConfig.runInSeconds + 4 then
-		race = nil -- the server rebuilds the track at the next race
+	-- Record for the replay.
+	local rec = RaceState.recording
+	if rec and t - lastRecord >= 1 / RECORD_HZ and t >= race.start then
+		lastRecord = t
+		local frame = { t = t }
+		for i = 1, race.lanes do frame[i] = RaceState.progress[i] end
+		table.insert(rec.frames, frame)
+	end
+	if race.done and (allStopped or t - race.doneAt > GameConfig.runInSeconds + 4) then
+		race = nil -- the horses stay where they stopped until the next race (or the replay)
 		RaceState.active = false
 	end
 end)

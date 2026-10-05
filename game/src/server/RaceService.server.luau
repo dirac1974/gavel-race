@@ -25,6 +25,7 @@ local Integrity = require(Shared:WaitForChild("Integrity"))
 local RaceSession = require(Shared:WaitForChild("RaceSession"))
 local RaceRating = require(Shared:WaitForChild("RaceRating"))
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
+local RaceShape = require(Shared:WaitForChild("RaceShape"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
 
 local LEAGUE = "Rookie" -- prototype: one league
@@ -51,6 +52,12 @@ local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst s
 local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances after it
 local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results
 local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
+local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place (D-033)
+local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
+-- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
+local RaceOffsets = Instance.new("UnreliableRemoteEvent")
+RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck)
+RaceOffsets.Parent = remotes
 local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst (small badge sparkle)
 local PaceTap = makeRemote("PaceTap")             -- client -> server: claimed server time
 local BurstTap = makeRemote("BurstTap")           -- client -> server: seg, claimed server time
@@ -133,6 +140,11 @@ BurstTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
 	end
 end)
 
+Dismount.OnServerEvent:Connect(function(player: Player)
+	if current then return end -- not during a race
+	TrackScene.dismount(player.Character)
+end)
+
 Players.PlayerRemoving:Connect(function(player: Player)
 	if current and current.seg then
 		current.session:dropSegment(tostring(player.UserId), current.seg)
@@ -209,7 +221,7 @@ local function runRace(players: { Player })
 	end
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
 	local session = RaceSession.new({
-		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter },
+		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape },
 		config = GameConfig,
 		leagueName = LEAGUE,
 		lanes = lanes,
@@ -237,7 +249,11 @@ local function runRace(players: { Player })
 		{ { tStart, preEnd - tStart - longestPass }, { postStart, postEnd - postStart - longestPass } },
 		{ { tStart, mid }, { mid, preEnd }, { postStart, postEnd } })
 	local resultAt = postEnd + LATENCY_GRACE
+	-- Luck shows from the field entering the final far turn until the last tap (D-033).
+	local r1 = TrackLayout.laneRadius(cfg, 1)
+	local tFar = tFinish - (cfg.finishFromTop + math.pi * r1) / speed
 
+	TrackScene.dismountAll() -- anyone still sitting from the last race
 	TrackScene.build(plan) -- rebuilt each race: the gate moves with the distance, models appear once approved
 	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, resultAt, burstOpen)
 	PaceSchedule:FireAllClients(passes)
@@ -260,6 +276,34 @@ local function runRace(players: { Player })
 		session = session, seg = 1, kind = "pace", open = tStart, close = preLast,
 		taps = {}, allowances = snapshotAllowances(), maxTaps = #passes * 2 + 10,
 	}
+	-- Live chances shown on screen: closed segments, refreshed each second in the stretch drive.
+	local shownLive = table.clone(session.live)
+	local racing = true
+	task.spawn(function()
+		local period = 1 / GameConfig.offsetsPerSecond
+		while racing do
+			local w = RaceShape.blendWeight(now(), tFar, postEnd, GameConfig.raceShape.blendPower)
+			RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape))
+			task.wait(period)
+		end
+	end)
+	local function previewStretch(seg: number)
+		-- Riders' provisional stretch-drive scores over the passes finished so far.
+		local done = {}
+		for _, p in session:pacePasses(seg) do
+			if p.t1 <= now() then table.insert(done, p) end
+		end
+		if #done == 0 then return end
+		local partial = {}
+		for i, lane in session.lanes do
+			if not lane.isBot then
+				partial[i] = (PaceMeter.score(done, current.taps[tonumber(lane.id)] or {}))
+			end
+		end
+		shownLive = session:previewLive(seg, partial)
+		LiveChances:FireAllClients(seg, shownLive)
+	end
+
 	local errors: { [number]: { number } } = {}
 	local matched: { [number]: number } = {}
 	for seg, kind in GameConfig.segments do
@@ -270,6 +314,13 @@ local function runRace(players: { Player })
 			end
 			local segPasses = session:pacePasses(seg)
 			local lastEnd = if #segPasses > 0 then segPasses[#segPasses].t1 else select(2, session:paceRange(seg))
+			if seg > 1 and GameConfig.segments[seg - 1] == "burst" then
+				-- The stretch drive stays live: taps move the horse while it runs (D-033).
+				while now() < lastEnd do
+					task.wait(GameConfig.stretchPreviewSeconds)
+					previewStretch(seg)
+				end
+			end
 			waitUntil(lastEnd + LATENCY_GRACE)
 			current.allowances = snapshotAllowances()
 			for _, p in players do
@@ -298,11 +349,13 @@ local function runRace(players: { Player })
 			end
 			if #great > 0 then BurstSparkle:FireAllClients(great) end
 		end
-		LiveChances:FireAllClients(seg, session:closeSegment(seg))
+		shownLive = session:closeSegment(seg)
+		LiveChances:FireAllClients(seg, shownLive)
 	end
 	current.seg = nil
 
-	local result = session:finish() -- clients run the horses home in this order, then show results
+	local result = session:finish() -- by now the order on screen is this order (D-033)
+	task.delay(GameConfig.runInSeconds + 2, function() racing = false end)
 	local summary = {}
 	for _, prize in result.prizes do
 		local laneIdx = session:laneIndex(prize.id)
@@ -318,8 +371,21 @@ local function runRace(players: { Player })
 		end
 	end
 	RaceFinished:FireAllClients(summary)
+	-- Your ride: stars from your score, and places your riding gained versus riding at the race
+	-- average (same luck, everything else the same). Only gains are shown to the rider.
+	local S = session:scoresSoFar()
+	local placeOf = {}
+	for place, laneIdx in result.order do placeOf[laneIdx] = place end
+	for _, p in players do
+		local i = session:laneIndex(tostring(p.UserId))
+		if i then
+			local stars = if S[i] >= 85 then 3 elseif S[i] >= 65 then 2 elseif S[i] >= 40 then 1 else 0
+			RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i])
+		end
+	end
 	recordIntegrity(players, errors, matched)
-	task.delay(GameConfig.runInSeconds + 3, TrackScene.dismountAll) -- run-in, results, then off the horse
+	-- Riders stay on their horse for the results and replay; they press Done to get off.
+	task.delay(GameConfig.dismountTimeoutSeconds, TrackScene.dismountAll)
 	current = nil
 end
 

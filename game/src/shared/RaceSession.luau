@@ -12,6 +12,10 @@
 --   pace:  scorePace(id, seg, taps) ... -> closeSegment(seg)
 --   burst: burstSpec() -> submitBurst(id, seg, t) ... -> closeSegment(seg)
 --   (segments close in config order) -> finish()
+--
+-- The finish (D-033): each horse gets a secret luck number at the gate; the order is by
+-- luck / live chance (RaceShape), which is the same Harville distribution as before.
+-- Bot scores are drawn at the gate too, so live chances can be previewed mid-segment.
 
 export type Rng = { NextNumber: (self: any) -> number }
 
@@ -67,7 +71,7 @@ function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: 
 end
 
 function RaceSession.new(params: {
-	deps: { RaceMath: any, BurstMeter: any, PaceMeter: any },
+	deps: { RaceMath: any, BurstMeter: any, PaceMeter: any, RaceShape: any },
 	config: any,
 	leagueName: string,
 	lanes: { LaneInput },
@@ -95,6 +99,17 @@ function RaceSession.new(params: {
 	self.q = RaceMath.baseChances(ratings, self.mathCfg)
 	self.purses = RaceMath.lockPurses(self.q, self.mathCfg)
 	self.live = table.clone(self.q)
+	self.luck = self.deps.RaceShape.drawLuck(self.rng, #self.lanes) -- secret; never sent to clients
+	self.botScores = {} :: { [number]: { [number]: number } }
+	for seg, kind in config.segments do
+		local isBurst = kind == "burst"
+		local mean = if isBurst then config.botBurstMean else config.botPaceMean
+		local sd = if isBurst then config.botBurstSd else config.botPaceSd
+		self.botScores[seg] = {}
+		for i, lane in self.lanes do
+			if lane.isBot then self.botScores[seg][i] = math.clamp(gauss(self.rng, mean, sd), 0, 100) end
+		end
+	end
 	self.closed = 0
 	self.passes = nil :: any
 	self.paceRanges = {} :: { [number]: { number } }
@@ -250,13 +265,10 @@ end
 function RaceSession:closeSegment(seg: number): { number }
 	assert(seg == self.closed + 1, "segments must close in order")
 	local config = self.config
-	local isBurst = self:kind(seg) == "burst"
-	local botMean = if isBurst then config.botBurstMean else config.botPaceMean
-	local botSd = if isBurst then config.botBurstSd else config.botPaceSd
 	local played, sum = 0, 0
-	for _, lane in self.lanes do
+	for i, lane in self.lanes do
 		if lane.isBot then
-			lane.scores[seg] = math.clamp(gauss(self.rng, botMean, botSd), 0, 100)
+			lane.scores[seg] = self.botScores[seg][i]
 		elseif lane.scores[seg] == nil then
 			lane.scores[seg] = config.missedTapScore
 		end
@@ -276,6 +288,53 @@ function RaceSession:closeSegment(seg: number): { number }
 	return self.live
 end
 
+-- Live chances if segment `seg` closed now with these provisional scores for riders
+-- (`partial[laneIndex]`); bots use their drawn scores. Nothing is stored. Used to keep the
+-- stretch drive live (D-033).
+function RaceSession:previewLive(seg: number, partial: { [number]: number }): { number }
+	assert(seg == self.closed + 1, "preview the open segment")
+	local weights = self.config.segmentWeights
+	local S = {}
+	local played, sum = 0, 0
+	local now = {}
+	for i, lane in self.lanes do
+		local s = if lane.isBot then self.botScores[seg][i] else (partial[i] or self.config.missedTapScore)
+		now[i] = s
+		if not lane.averageOnly and lane.scores[seg] ~= DROPPED then
+			played += 1
+			sum += s
+		end
+	end
+	local average = if played > 0 then sum / played else 50
+	for i, lane in self.lanes do
+		local total, wsum = 0, 0
+		for k = 1, seg do
+			local w = weights[k] or 1
+			local v = if k == seg then (if lane.averageOnly or lane.scores[seg] == DROPPED then average else now[i]) else (lane.scores[k] or 0)
+			total += w * v
+			wsum += w
+		end
+		S[i] = total / wsum
+	end
+	local RaceMath = self.deps.RaceMath
+	return RaceMath.liveChances(self.q, RaceMath.skills(S, self.mathCfg), self.mathCfg)
+end
+
+-- On-screen offsets (feet ahead of the pace) for blend weight w (RaceShape).
+function RaceSession:displayOffsets(live: { number }, w: number, shapeCfg: any): { number }
+	return self.deps.RaceShape.offsets(live, self.luck, w, shapeCfg)
+end
+
+-- Where lane `i` would have finished riding at the race average (R = 0), all else the same.
+-- Positive gain = their riding won them places (D-033 "Your ride" card).
+function RaceSession:ridingGain(i: number): number
+	local RaceMath, RaceShape = self.deps.RaceMath, self.deps.RaceShape
+	local R = RaceMath.skills(self:scoresSoFar(), self.mathCfg)
+	R[i] = 0
+	local liveAvg = RaceMath.liveChances(self.q, R, self.mathCfg)
+	return RaceShape.placeIn(self.luck, liveAvg, i) - RaceShape.placeIn(self.luck, self.live, i)
+end
+
 -- Each lane's S over the closed segments (weighted; the Final Burst counts double).
 function RaceSession:scoresSoFar(): { number }
 	local S = {}
@@ -288,7 +347,7 @@ function RaceSession:finish(): { order: { number }, prizes: { Prize } }
 	assert(self.closed == self:segmentCount(), "close all segments first")
 	assert(not self.finished, "already finished")
 	self.finished = true
-	local order = self.deps.RaceMath.drawFinish(self.live, self.rng)
+	local order = self.deps.RaceShape.order(self.luck, self.live) -- exponential race (D-033)
 	local B = self.league.B
 	local prizes = {}
 	for place, laneIdx in order do
