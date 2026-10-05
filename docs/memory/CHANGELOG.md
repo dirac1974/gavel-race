@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — fix: training T5 review — profile repair keeps unknown course keys (a rolling update never erases newer ribbons) and keeps the old `grit` key alongside layout 1, tests restore the shipped `layoutPin`, every layout pair compared, bigger picker ribbon icons on phones, GymkhanaView keeps waiting for its layouts, publish note for T2–T4 servers (D-053)
 - 2026-10-05 — feat: training rides T5 "This week's course": four Mud Splash layouts, one a week from the server's clock (kept for a whole ride), ribbons, best runs and ghosts per layout (the old Mud Splash is layout 1), props rebuilt on each screen between rides, four ribbon icons on the picker with no dates or timers, one Mud Splash rosette for a gold on any layout (D-053)
 - 2026-10-05 — fix: steering S1 review nits: legs stride by the ground actually covered, `GameConfig.steering.drawPosts` switch, accurate notes on the Final Burst draw, ride-report and mid-race refusal tests, deviation recorded in D-054
 - 2026-10-05 — feat: steering S1 (D-054): rail coordinates (`TrackLayout.railLength`, `railPoint`, `phaseA` matching `src/trip.py`), horses placed by (s, x) so they're abreast on turns, posts drawn from the race's generator after every gate draw (`RaceSession.drawPosts`/`assignPosts`, lanes numbered by post), `RaceState.lane`, Lune tests

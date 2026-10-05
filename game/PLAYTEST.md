@@ -5,6 +5,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 ## Setup
 - [ ] `cd game && rojo serve`, connect the Rojo plugin in a new Baseplate, press Play.
 - [ ] Publish the place to the **LlamaWorks** group (File → Publish to Roblox As), so it can load the uploaded art.
+- [ ] Publishing an update while players are on: if any T2–T4 training build is live when T5 ("This week's course") ships, publish with **Shut Down All Servers** or **Migrate to latest update**. A T2–T4 server drops training ribbons it doesn't know, so a kid hopping from a T5 server back to an old one would lose their Mud Splash layout ribbons (T5 and later keep unknown ones).
 - [ ] Output window shows no red errors on start. `[AssetService] ... not loaded yet` warnings mean an asset is still in moderation or the place isn't group-owned; placeholders show meanwhile.
 
 ## Track and art
@@ -168,7 +169,7 @@ This week's course (T5):
 - [ ] The other layouts: before pressing Play, set `GameConfig.training.grit.layoutPin` to 1, 2, 3 or 4 (0 = by the week). Each has its canter lane in a different place (lanes 4, 2, 5, 3), 4 puddles, 3 logs and 4 poles, nothing on the turns and no log on the walk from the street gate to the south gate; the start line is always in the same corner. A perfect ride is gold on each. Layout 1 is the Mud Splash from before T5, and an older save's Mud Splash ribbon shows on its icon.
 - [ ] Each layout has its own ghost ("👻 Your best" on that layout only). A gold on any layout puts one Mud Splash rosette on the stall, not one per layout.
 - [ ] Riding together: both riders get the same layout. Quick train's Mud Splash game is unchanged.
-- [ ] If you're riding Mud Splash when the week turns over (Monday 00:00 UTC: Sunday evening in the US), your ride keeps its layout to the finish; the arena changes to the new one after the end card. Everyone else sees the new layout straight away.
+- [ ] If you're riding Mud Splash when the week turns over (Monday 00:00 UTC: Sunday evening in the US), your ride keeps its layout to the finish; the arena changes to the new one as the end card opens. Everyone else sees the new layout straight away.
 
 ## Race Board and two courses (Stage 4, D-036)
 

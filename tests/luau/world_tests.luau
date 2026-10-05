@@ -574,8 +574,9 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 	local loaded = Profile.migrate(saved, T0)
 	local a, b, c = loaded.horses[1], loaded.horses[2], loaded.horses[3]
 	check(a.ribbons.speed == "silver" and a.trainingBest.speed.seconds == 46, "ribbons and best runs survive a save")
-	check(b.ribbons.speed == "gold" and b.ribbons.grit == nil and b.ribbons.luck == nil and b.trainingBest.speed.score == 100
-		and b.trainingBest.speed.seconds == 41.5 and b.trainingBest.grit == nil and b.trainingBest.accel == nil, "migration repairs bad ribbons and runs")
+	check(b.ribbons.speed == "gold" and b.ribbons.grit == nil and b.ribbons.luck == "gold" and b.trainingBest.speed.score == 100
+		and b.trainingBest.speed.seconds == 41.5 and b.trainingBest.grit == nil and b.trainingBest.accel == nil,
+		"migration repairs bad ribbons and runs (a well-formed course it doesn't know passes through, T5)")
 	check(typeof(c.ribbons) == "table" and next(c.ribbons) == nil and typeof(c.trainingBest) == "table", "older horses get empty records")
 	local view = Horse.view(a, T0, GameConfig.energy)
 	check(view.ribbons.speed == "silver" and view.trainingBest.speed.score == 80, "the owner's view shows ribbons and best runs")
@@ -1506,16 +1507,20 @@ local function trainingT5Tests(check: (boolean, string) -> (), close: (number, n
 		check(orderOk, key .. ": pieces listed in riding order")
 		check(gr.start.x == TC.courses.grit_w1.start.x and gr.start.z == TC.courses.grit_w1.start.z, key .. ": every layout starts at the same line")
 	end
-	local differ = 0
-	for n = 2, #TC.LAYOUTS do
-		local a, b = TC.courses[TC.LAYOUTS[1]], TC.courses[TC.LAYOUTS[n]]
-		local same = a.poleLane == b.poleLane
-		for i, e in a.elements do
-			if b.elements[i].x ~= e.x or b.elements[i].z ~= e.z or b.elements[i].kind ~= e.kind then same = false end
+	local differ, pairCount = 0, 0
+	for i = 1, #TC.LAYOUTS do
+		for j = i + 1, #TC.LAYOUTS do
+			local a, b = TC.courses[TC.LAYOUTS[i]], TC.courses[TC.LAYOUTS[j]]
+			local samePieces = #a.elements == #b.elements
+			for k, e in a.elements do
+				local o = b.elements[k]
+				if not o or o.x ~= e.x or o.z ~= e.z or o.kind ~= e.kind then samePieces = false end
+			end
+			pairCount += 1
+			if not samePieces and a.poleLane ~= b.poleLane then differ += 1 end
 		end
-		if not same then differ += 1 end
 	end
-	check(differ == 3, "the four layouts are all different")
+	check(pairCount == 6 and differ == 6, "every pair of layouts differs (pieces and canter lane)")
 
 	-- All reachable: a perfect ride round each layout (lope, canter in its pole lane, a hop at
 	-- every log) scores 100, passes every piece in order and finishes at about its ideal time.
@@ -1575,6 +1580,10 @@ local function trainingT5Tests(check: (boolean, string) -> (), close: (number, n
 	end
 
 	-- This week's course: Training.week(now) % 4, stable within a week, from the server's clock.
+	-- (Checked with layoutPin 0, whatever value ships; the shipped value is put back at the end.)
+	local shippedPin = CFG.grit.layoutPin
+	check(shippedPin == 0 or TC.LAYOUTS[shippedPin] ~= nil, "layoutPin ships as 0 (by the week) or a layout 1-4")
+	CFG.grit.layoutPin = 0
 	check(TC.layoutFor(0) == 1 and TC.layoutFor(1) == 2 and TC.layoutFor(2) == 3 and TC.layoutFor(3) == 4 and TC.layoutFor(4) == 1
 		and TC.layoutFor(2962) == 3, "layout = week % 4 + 1")
 	check(Training.week(OCT5) == 2962 and Training.week(OCT5 - 1) == 2961, "weeks start on Monday 00:00 UTC (as the training cap)")
@@ -1646,17 +1655,58 @@ local function trainingT5Tests(check: (boolean, string) -> (), close: (number, n
 		return Profile.migrate(p, T0).horses[1]
 	end
 	local m1 = loadOne(horseWith({ grit = "silver", speed = "gold" }, { grit = { score = 80, seconds = 41 } }))
-	check(m1.ribbons.grit_w1 == "silver" and m1.ribbons.grit == nil and m1.ribbons.speed == "gold" and m1.trainingBest.grit_w1.score == 80
-		and m1.trainingBest.grit == nil, "an old Mud Splash ribbon and best run move to layout 1")
+	check(m1.ribbons.grit_w1 == "silver" and m1.ribbons.grit == "silver" and m1.ribbons.speed == "gold" and m1.trainingBest.grit_w1.score == 80
+		and m1.trainingBest.grit.score == 80 and m1.trainingBest.grit ~= m1.trainingBest.grit_w1,
+		"an old Mud Splash ribbon and best run count for layout 1, and the old key stays for T2-T4 servers")
 	local m2 = loadOne(horseWith({ grit = "gold", grit_w1 = "bronze", grit_w3 = "silver", grit_w2 = "platinum" },
 		{ grit = { score = 80, seconds = 40 }, grit_w1 = { score = 80, seconds = 42 }, grit_w4 = "junk" }))
-	check(m2.ribbons.grit_w1 == "gold" and m2.ribbons.grit_w3 == "silver" and m2.ribbons.grit_w2 == nil and m2.trainingBest.grit_w1.seconds == 40
-		and m2.trainingBest.grit_w4 == nil, "the better of old and new is kept; other layouts stay; junk is dropped")
+	check(m2.ribbons.grit_w1 == "gold" and m2.ribbons.grit == "gold" and m2.ribbons.grit_w3 == "silver" and m2.ribbons.grit_w2 == nil
+		and m2.trainingBest.grit_w1.seconds == 40 and m2.trainingBest.grit.seconds == 40 and m2.trainingBest.grit_w4 == nil,
+		"the better of old and new is kept under both names; other layouts stay; junk is dropped")
 	local m3 = loadOne(horseWith({ grit = "bronze", grit_w1 = "gold" }, { grit = { score = 50, seconds = 30 }, grit_w1 = { score = 90, seconds = 44 } }))
-	check(m3.ribbons.grit_w1 == "gold" and m3.trainingBest.grit_w1.score == 90, "a worse old ribbon or run never replaces a better new one")
-	local again = loadOne(m2)
-	check(again.ribbons.grit_w1 == "gold" and again.ribbons.grit_w3 == "silver" and again.trainingBest.grit_w1.seconds == 40,
-		"repair is the same on every load")
+	check(m3.ribbons.grit_w1 == "gold" and m3.ribbons.grit == "gold" and m3.trainingBest.grit_w1.score == 90 and m3.trainingBest.grit.score == 90,
+		"a worse old ribbon or run never replaces a better new one (a T2-T4 server sees layout 1's)")
+	-- A newer build's course (a rolling update) survives loads here; junk doesn't.
+	local m4 = loadOne(loadOne(horseWith({ grit_w5 = "gold", speed = "bronze" }, { grit_w5 = { score = 95, seconds = 39.5 } })))
+	check(m4.ribbons.grit_w5 == "gold" and m4.trainingBest.grit_w5 ~= nil and m4.trainingBest.grit_w5.score == 95
+		and m4.trainingBest.grit_w5.seconds == 39.5 and m4.ribbons.speed == "bronze", "a course this version doesn't know (grit_w5) survives two loads")
+	local long, longest = string.rep("k", 33), string.rep("k", 32)
+	local junkR: { [any]: any } = { foo = "platinum", [7] = "gold", [long] = "gold", [longest] = "silver", [""] = "gold", bar = 5, speed = "gold" }
+	local junkB: { [any]: any } = { foo = { score = "x" }, [3] = { score = 50, seconds = 40 }, [long] = { score = 50, seconds = 40 } }
+	for k = 1, 20 do junkR[string.format("extra_%02d", k)] = "bronze" end
+	local m5 = loadOne(horseWith(junkR, junkB))
+	local nR, nB = 0, 0
+	for _ in m5.ribbons do nR += 1 end
+	for _ in m5.trainingBest do nB += 1 end
+	check(m5.ribbons.foo == nil and m5.ribbons[7] == nil and m5.ribbons[long] == nil and m5.ribbons[""] == nil and m5.ribbons.bar == nil
+		and m5.trainingBest.foo == nil and m5.trainingBest[3] == nil and nB == 0, "junk is dropped: bad values, number keys, empty or over-long keys")
+	check(m5.ribbons[longest] == nil and m5.ribbons.speed == "gold" and nR == 1 + Profile.MAX_EXTRA_KEYS
+		and m5.ribbons.extra_01 == "bronze" and m5.ribbons.extra_16 == "bronze" and m5.ribbons.extra_17 == nil,
+		string.format("at most %d unknown keys per map, the first in alphabetical order (%d kept)", Profile.MAX_EXTRA_KEYS, nR))
+	local m6 = loadOne(horseWith({ [longest] = "silver" }, {}))
+	check(m6.ribbons[longest] == "silver", "a 32-character key is allowed")
+	-- Repairing twice is the same as repairing once.
+	local function deepEqual(a: any, b: any): boolean
+		if typeof(a) ~= "table" or typeof(b) ~= "table" then return a == b end
+		for k, v in a do
+			if not deepEqual(v, b[k]) then return false end
+		end
+		for k in b do
+			if a[k] == nil then return false end
+		end
+		return true
+	end
+	local idem = true
+	local sources = { { m2.ribbons, m2.trainingBest }, { junkR, junkB },
+		{ { grit = "gold", grit_w1 = "silver", luck = "bronze" }, { grit_w1 = { score = 70, seconds = 50 } } } }
+	for _, src in sources do
+		local once = horseWith(table.clone(src[1]), table.clone(src[2]))
+		Profile.repairTraining(once)
+		local twice = horseWith(table.clone(once.ribbons), table.clone(once.trainingBest))
+		Profile.repairTraining(twice)
+		if not deepEqual(once.ribbons, twice.ribbons) or not deepEqual(once.trainingBest, twice.trainingBest) then idem = false end
+	end
+	check(idem, "repairing twice gives the same as repairing once")
 
 	-- Ribbons are saved under the layout ridden: the server's key for that week.
 	local rh = Horse.starter("h2", "Maple", "bay", makeRng(6), T0)
@@ -1716,11 +1766,12 @@ local function trainingT5Tests(check: (boolean, string) -> (), close: (number, n
 			if string.find(low, bad, 1, true) then calm = false end
 		end
 	end
-	check(calm and string.find(paddock, "This week's course", 1, true) ~= nil and string.find(paddock, "layoutRibbons(b, h, 92)", 1, true) ~= nil,
+	check(calm and string.find(paddock, "This week's course", 1, true) ~= nil and string.find(paddock, "if weekly then layoutRibbons(b, h,", 1, true) ~= nil,
 		"the picker says \"This week's course\" with four ribbon icons and no countdown or last-chance text")
 	check(Training.GAMES.grit ~= nil and Training.GAMES.grit_w1 == nil and #QT.STATS == 4 and QT.STATS[4] == "grit"
 		and string.find(service, "if typeof(stat) ~= \"string\" or not Training.GAMES[stat] then return end", 1, true) ~= nil,
 		"Quick train is unaffected (its four games, keyed by stat)")
+	CFG.grit.layoutPin = shippedPin
 end
 
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)

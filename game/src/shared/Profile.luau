@@ -74,12 +74,18 @@ end
 --   h.trainingBest[course] = { score = 0..100, seconds = ride time }
 -- Each Mud Splash layout is its own course (T5, "This week's course"): grit_w1..grit_w4
 -- (TrainingCourses.LAYOUTS; a world test keeps these lists the same). The single Mud Splash of
--- T2-T4 was saved as "grit"; it is layout 1, so a load moves it to grit_w1 (the better ribbon
--- and run of the two stay) and drops the old key.
+-- T2-T4 was saved as "grit"; it is layout 1, so "grit" and "grit_w1" name the same course:
+-- a load gives both the better ribbon and run of the two, and keeps "grit" so a T2-T4 server
+-- still finds its Mud Splash ribbon.
+-- Repair never erases a course it doesn't know (a newer build's, during a rolling update):
+-- any other entry with a string key of up to MAX_KEY_LEN characters and a valid value passes
+-- through, at most MAX_EXTRA_KEYS per map (alphabetical first); junk is dropped.
 Profile.COURSES = { "speed", "accel", "stamina", "grit_w1", "grit_w2", "grit_w3", "grit_w4" }
 Profile.COURSE_STAT = { speed = "speed", accel = "accel", stamina = "stamina", grit_w1 = "grit", grit_w2 = "grit", grit_w3 = "grit", grit_w4 = "grit" }
 Profile.LEGACY_COURSES = { grit = "grit_w1" }
 Profile.RIBBONS = { bronze = true, silver = true, gold = true }
+Profile.MAX_KEY_LEN = 32
+Profile.MAX_EXTRA_KEYS = 16
 local RIBBON_RANK = { bronze = 1, silver = 2, gold = 3 }
 
 local function cleanBest(b: any): { score: number, seconds: number }?
@@ -97,29 +103,44 @@ local function betterBest(a: any, b: any?): boolean
 	return a.seconds < b.seconds
 end
 
+local function cleanRibbon(r: any): string?
+	return if typeof(r) == "string" and Profile.RIBBONS[r] then r else nil
+end
+
+local function betterRibbon(a: any, b: any?): boolean
+	return RIBBON_RANK[a] > (RIBBON_RANK[b] or 0)
+end
+
+local KNOWN: { [string]: boolean } = {}
+for _, c in Profile.COURSES do KNOWN[c] = true end
+for old in Profile.LEGACY_COURSES do KNOWN[old] = true end
+
+-- One per-course map (ribbons or best runs), repaired. `clean` returns a fresh valid value or nil.
+local function repairMap(src: any, clean: (any) -> any?, better: (any, any?) -> boolean): { [string]: any }
+	local out = {}
+	if typeof(src) ~= "table" then return out end
+	for _, c in Profile.COURSES do out[c] = clean(src[c]) end
+	-- an old name and its new one are the same course: both get the better of the two
+	for old, new in Profile.LEGACY_COURSES do
+		local a, b = clean(src[old]), out[new]
+		local pick = if a and better(a, b) then a else b
+		out[new], out[old] = pick, if pick then clean(pick) else nil
+	end
+	-- courses this version doesn't know pass through (valid values, short string keys, a few)
+	local extra = {}
+	for k, v in src do
+		if typeof(k) == "string" and not KNOWN[k] and #k >= 1 and #k <= Profile.MAX_KEY_LEN and clean(v) ~= nil then
+			table.insert(extra, k)
+		end
+	end
+	table.sort(extra)
+	for i = 1, math.min(#extra, Profile.MAX_EXTRA_KEYS) do out[extra[i]] = clean(src[extra[i]]) end
+	return out
+end
+
 function Profile.repairTraining(h: any)
-	local ribbons = {}
-	if typeof(h.ribbons) == "table" then
-		for _, c in Profile.COURSES do
-			if Profile.RIBBONS[h.ribbons[c]] then ribbons[c] = h.ribbons[c] end
-		end
-		for old, new in Profile.LEGACY_COURSES do
-			local r = h.ribbons[old]
-			if Profile.RIBBONS[r] and RIBBON_RANK[r] > (RIBBON_RANK[ribbons[new]] or 0) then ribbons[new] = r end
-		end
-	end
-	h.ribbons = ribbons
-	local best = {}
-	if typeof(h.trainingBest) == "table" then
-		for _, c in Profile.COURSES do
-			best[c] = cleanBest(h.trainingBest[c])
-		end
-		for old, new in Profile.LEGACY_COURSES do
-			local b = cleanBest(h.trainingBest[old])
-			if b and betterBest(b, best[new]) then best[new] = b end
-		end
-	end
-	h.trainingBest = best
+	h.ribbons = repairMap(h.ribbons, cleanRibbon, betterRibbon)
+	h.trainingBest = repairMap(h.trainingBest, cleanBest, betterBest)
 end
 
 -- The stall's gold rosettes (D-053): one per stat whose course has a gold ribbon, in stat

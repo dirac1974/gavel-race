@@ -511,13 +511,16 @@ end
 -- The course picker (D-053): four picture tiles and Quick train.
 local RIBBON_EMOJI = { bronze = "🥉", silver = "🥈", gold = "🥇" }
 
--- Mud Splash's four layouts (T5): a small ribbon icon for each, this week's ringed.
+-- Mud Splash's four layouts (T5): a small ribbon icon for each, this week's ringed. The card
+-- shrinks on phones (cardScale), so the icons grow to stay at least MIN_ICON_PX on screen.
+local MIN_ICON_PX = 22
 local function layoutRibbons(parent: Instance, h, y: number)
+	local size = math.clamp(math.ceil(MIN_ICON_PX / math.max(cardScale.Scale, 0.1)), 36, 46)
 	local row = Instance.new("Frame")
 	row.Name = "LayoutRibbons"
 	row.BackgroundTransparency = 1
 	row.Position = UDim2.new(0, 0, 0, y)
-	row.Size = UDim2.new(1, 0, 0, 28)
+	row.Size = UDim2.new(1, 0, 0, size)
 	row.Parent = parent
 	local l = Instance.new("UIListLayout")
 	l.FillDirection = Enum.FillDirection.Horizontal
@@ -529,14 +532,13 @@ local function layoutRibbons(parent: Instance, h, y: number)
 		local got = h.ribbons and RIBBON_EMOJI[h.ribbons[key]]
 		local cell = Instance.new("Frame")
 		cell.LayoutOrder = n
-		cell.Size = UDim2.fromOffset(28, 28)
+		cell.Size = UDim2.fromOffset(size, size)
 		cell.BackgroundColor3 = if got then C.paper else C.white
-		cell.BackgroundTransparency = if got then 0 else 0.3
 		Ui.corner(cell, 8)
 		Ui.stroke(cell, if key == week then 3 else 1.5, if key == week then C.orange else C.shade)
 		cell.Parent = row
-		local t = Ui.text(cell, got or "🎀", 18, { Size = UDim2.fromScale(1, 1) })
-		if not got then t.TextTransparency = 0.65 end
+		local t = Ui.text(cell, got or "🎀", math.floor(size * 0.62), { Size = UDim2.fromScale(1, 1) })
+		if not got then t.TextTransparency = 0.4 end
 	end
 	return row
 end
@@ -574,12 +576,16 @@ local function coursePicker()
 			else "Coming soon"
 		local b = Ui.button(grid, "", UDim2.new(), UDim2.new(), if ready then C.cream else C.white, 20)
 		b.LayoutOrder = i
-		local top = if weekly then -4 else 8
-		Ui.text(b, c.emoji, if weekly then 36 else 44, { Position = UDim2.new(0, 0, 0, top), Size = UDim2.new(1, 0, 0, 44) })
-		Ui.text(b, c.name, 24, { Position = UDim2.new(0, 0, 0, top + (if weekly then 40 else 52)), Size = UDim2.new(1, 0, 0, 30) })
-		local l = Ui.text(b, line, 18, { Position = UDim2.new(0, 0, 0, if weekly then 66 else 92), Size = UDim2.new(1, 0, 0, 24) })
+		if weekly then
+			-- the emoji joins the name so the four ribbon icons have room to be big
+			Ui.text(b, c.emoji .. " " .. c.name, 24, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 30) })
+		else
+			Ui.text(b, c.emoji, 44, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 50) })
+			Ui.text(b, c.name, 24, { Position = UDim2.new(0, 0, 0, 60), Size = UDim2.new(1, 0, 0, 30) })
+		end
+		local l = Ui.text(b, line, 18, { Position = UDim2.new(0, 0, 0, if weekly then 40 else 92), Size = UDim2.new(1, 0, 0, 24) })
 		l.TextColor3 = if ready then C.plum else C.shade
-		if weekly then layoutRibbons(b, h, 92) end
+		if weekly then layoutRibbons(b, h, 68) end
 		b.Activated:Connect(function()
 			if not ready then
 				Ui.toast(c.name .. " is coming soon!", "stat_" .. key, c.emoji)

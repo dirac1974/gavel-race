@@ -31,7 +31,9 @@ local function refresh()
 	local key = wanted()
 	local root = ReplicatedStorage:FindFirstChild("Gymkhanas")
 	local template = key and root and root:FindFirstChild(key)
-	if not template then return end -- keep what's shown until that layout arrives
+	-- Not here yet (also when pinned to a layout that isn't shown): keep what's shown; the
+	-- template's ChildAdded calls refresh again when it arrives.
+	if not template then return end
 	if current and current.Parent and shownKey == key then
 		-- the same layout: a rebuilt copy (uploaded models arriving) waits until a ride is over
 		if shownFrom == template or pinned then return end
@@ -64,8 +66,11 @@ end
 
 ReplicatedStorage:GetAttributeChangedSignal("WeeklyCourse"):Connect(refresh)
 task.spawn(function()
-	local root = ReplicatedStorage:WaitForChild("Gymkhanas", 120)
-	if not root then return end
+	-- keep waiting however long the world takes to build (no warning spam: 30 s at a time)
+	local root = ReplicatedStorage:FindFirstChild("Gymkhanas")
+	while not root do root = ReplicatedStorage:WaitForChild("Gymkhanas", 30) end
+	-- a layout arriving (or rebuilt): refresh, whether it's this week's or the one a ride is
+	-- pinned to and not yet shown
 	root.ChildAdded:Connect(function() task.defer(refresh) end)
 	refresh()
 end)
