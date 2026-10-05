@@ -37,6 +37,7 @@ end
 local OpenStarter = localEvent("OpenStarter")
 local OpenMap = localEvent("OpenMap")
 local OpenBoard = localEvent("OpenBoard")
+local OpenRacePicker = localEvent("OpenRacePicker")
 
 -- Dock --------------------------------------------------------------------------
 local dock = Instance.new("Frame")
@@ -192,16 +193,18 @@ raceBtn.Activated:Connect(function()
 		return
 	end
 	if inLine then return end
-	raceRemotes:WaitForChild("JoinRace"):FireServer(true)
+	OpenRacePicker:Fire() -- pick a course and a horse (D-036)
 end)
 leaveBtn.Activated:Connect(function()
 	raceRemotes:WaitForChild("JoinRace"):FireServer(false)
 end)
 
-raceRemotes:WaitForChild("QueueStatus").OnClientEvent:Connect(function(isIn, count, seconds)
+local COURSE_SHORT = { dirt = "Dirt", turf = "Turf" }
+raceRemotes:WaitForChild("QueueStatus").OnClientEvent:Connect(function(isIn, count, seconds, courseId)
 	inLine = isIn
 	if isIn then
 		local detail = if seconds then string.format("%ds", seconds) else ""
+		if COURSE_SHORT[courseId] then detail = string.format("%s %s", COURSE_SHORT[courseId], detail) end
 		if count and count > 1 then detail = string.format("%s · %d riders", detail, count) end
 		setRaceButton("line", detail)
 	else

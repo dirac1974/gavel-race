@@ -37,6 +37,12 @@ Last updated: 2026-10-04
 - `TrainingService`: horse is yours and stalled, you're at the paddock or the vet, rate limits; jobs count `train` and `checkup`.
 - `PaddockClient`: four training games (Sprint Lane, Gate Break, Hill Climb, Mud Splash) and the heartbeat check-up with the Health Passport.
 
+**Stage 4 — Race Board and two courses** (branch `claude/stage4-raceboard`, stacked on Stage 6):
+- `TrackLayout.churchillTurf` (turf course inside the dirt, same finish line) and `TrackLayout.courses`; `TrackScene.course(id, cfg)` objects with their own gate, horses and saddles.
+- `RaceService` rewritten around courses: a card per course (league, distance alternating Sprint/Mile for Rookie, surface, weather), a line per course, both courses race at once, events carry the course id last, `RaceCards` every second (also drawn on the Race Board).
+- Clients follow one race (`RaceState.consider/isFocus`: yours, else the newest); `RaceView` animates every race; Minimap and Replay course-aware.
+- `RacePicker`: race cards, horse choice with "suits today" from Rating (never win chance), Join.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.

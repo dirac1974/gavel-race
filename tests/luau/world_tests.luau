@@ -373,4 +373,21 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(stamp2 == nil and vh.bond == 1, "one check-up a day counts")
 	local _, _, stamp3 = Training.checkup(vh, 20, T0 + 86400)
 	check(stamp3 == "potential" and vh.stamps.potential and Horse.view(vh, T0 + 86400, E).potential ~= nil, "second visit reveals Potential")
+
+	-- Two courses (Stage 4) -------------------------------------------------------------
+	local dirtCfg, turfCfg = TrackLayout.churchill, TrackLayout.churchillTurf
+	local _, _, dz = TrackLayout.finishLine(dirtCfg)
+	local _, _, tz = TrackLayout.finishLine(turfCfg)
+	check(close(dz, tz, 1e-9), "both courses finish on the same line")
+	check(TrackLayout.outerRadius(turfCfg) < dirtCfg.railRadius - 10, "turf course sits inside the dirt rail")
+	local okLen = true
+	for _, d in { "Sprint", "Mile", "Classic", "Marathon" } do
+		local plan = TrackLayout.plan(turfCfg, TrackLayout.distances[d])
+		if math.abs(plan.lengths[1] - TrackLayout.distances[d]) > 800 then okLen = false end -- gates snap forward to a straight
+		for i = 2, 8 do
+			if plan.lengths[i] < plan.lengths[1] - 1 then okLen = false end -- outer lanes run at least as far
+		end
+	end
+	check(okLen, "turf races run about their distance in every lane")
+	check(TrackLayout.courses.dirt == dirtCfg and TrackLayout.courses.turf == turfCfg, "course table")
 end

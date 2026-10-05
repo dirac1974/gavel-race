@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: Stage 4 Race Board: dirt and turf races at once, race cards, horse picker with today's fit (D-036)
 - 2026-10-04 — feat: Stage 6 training games and vet check-ups with the Health Passport (D-039, D-040)
 - 2026-10-04 — feat: Stage 5 Stable Board: daily, weekly and monthly jobs, horse tips, GO hoofprints, pinned job (D-043)
 - 2026-10-04 — feat: Stage 3 care and food: feeding, brushing game, treats, petting, garden, chores, Feed & Seed (D-038)

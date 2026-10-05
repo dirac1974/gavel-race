@@ -179,7 +179,16 @@ camBtn.Activated:Connect(function()
 	playing.view = if playing.view == "side" then "behind" else "side"
 	camBtn.Text = if playing.view == "side" then "Behind" else "Side"
 end)
-remotes.RaceStarted.OnClientEvent:Connect(stop) -- a new race always wins
+remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList)
+	-- A new race of yours always wins; someone else's race on the other course doesn't stop it.
+	local myId = tostring(player.UserId)
+	for _, lane in laneList do
+		if lane.id == myId then
+			stop()
+			return
+		end
+	end
+end)
 
 local function placeAll(rec, t: number)
 	local a, b, f = frameAt(rec, t)
@@ -187,7 +196,7 @@ local function placeAll(rec, t: number)
 	for i = 1, rec.lanes do
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
-		RaceState.placeHorse(i, p, 0, rec.plan)
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course)
 	end
 	return progress
 end
@@ -216,13 +225,14 @@ RunService.RenderStepped:Connect(function(dt)
 
 	-- Camera.
 	local camera = workspace.CurrentCamera
-	local track = workspace:FindFirstChild("RaceTrack")
+	local track = RaceState.trackFolder(rec.course)
 	local horse = me and track and track:FindFirstChild("Horses") and track.Horses:FindFirstChild("Lane" .. me)
 	if camera and reducedMotion() then
-		if not RaceState.finishCam then
+		if not RaceState.finishCam or RaceState.finishCamCourse ~= rec.course then
+			RaceState.finishCamCourse = rec.course
 			-- A fixed camera outside the finish line, looking across the track.
 			local tl = require(ReplicatedStorage.Shared.TrackLayout)
-			local x0, x1, lineZ = tl.finishLine(tl.churchill)
+			local x0, x1, lineZ = tl.finishLine(tl.courses[rec.course or "dirt"] or tl.churchill)
 			RaceState.finishCam = CFrame.lookAt(Vector3.new(x1 + 30, 12, lineZ + 40), Vector3.new((x0 + x1) / 2, 3, lineZ))
 		end
 		camera.CFrame = RaceState.finishCam

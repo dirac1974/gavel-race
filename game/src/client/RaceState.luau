@@ -19,6 +19,36 @@ RaceState.ReplayClosed = Instance.new("BindableEvent")
 RaceState.recording = nil  -- { start, plan, lanes, frames = { {t, p1..pn} }, events = { {t, kind, ...} }, summary }
 RaceState.myLane = nil
 
+-- Two courses can race at once (D-036). Each client follows one race, the "focus": the race
+-- it rides in, or else the newest race when watching. RaceView and RaceController both ask
+-- `consider` when a race starts; the first answer for that race sticks.
+local myId = tostring(game:GetService("Players").LocalPlayer.UserId)
+RaceState.focus = nil      -- course id ("dirt" | "turf") the HUD follows
+local decided: { [string]: boolean } = {}
+
+function RaceState.consider(courseId: string?, laneList, start: number): boolean
+	local key = tostring(courseId) .. ":" .. tostring(start)
+	if decided[key] ~= nil then return decided[key] end
+	local mine = false
+	for _, lane in laneList do
+		if lane.id == myId then mine = true end
+	end
+	local ridingElsewhere = RaceState.active and RaceState.myLane ~= nil and RaceState.focus ~= courseId
+	local focus = mine or not ridingElsewhere
+	decided[key] = focus
+	if focus then RaceState.focus = courseId end
+	return focus
+end
+
+function RaceState.isFocus(courseId: string?): boolean
+	return courseId == nil or courseId == RaceState.focus
+end
+
+-- The folder holding a course's gate and horses (TrackScene).
+function RaceState.trackFolder(courseId: string?): Instance?
+	return workspace:FindFirstChild(if courseId == nil or courseId == "dirt" then "RaceTrack" else "RaceTrack_" .. courseId)
+end
+
 local SUFFIX = { "st", "nd", "rd" }
 
 function RaceState.ordinal(n: number): string

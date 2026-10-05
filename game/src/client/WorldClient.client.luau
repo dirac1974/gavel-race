@@ -150,7 +150,7 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt)
 		if not PlayerState.activeHorse() then
 			HudEvents:WaitForChild("OpenStarter"):Fire()
 		else
-			raceRemotes:WaitForChild("JoinRace"):FireServer(true)
+			HudEvents:WaitForChild("OpenRacePicker"):Fire()
 		end
 	end
 end)

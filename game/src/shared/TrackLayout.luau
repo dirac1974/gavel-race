@@ -53,6 +53,23 @@ TrackLayout.churchill = {
 	turfWidth = 80,
 } :: Config
 
+-- The turf course inside the dirt (D-036): same straights and finish line, its own lanes.
+TrackLayout.churchillTurf = {
+	centerX = 0,
+	centerZ = 0,
+	straight = 1320,
+	railRadius = 417 - 30 - 80, -- dirt rail − turfGap − turfWidth
+	width = 80,
+	laneOffset = 4,
+	laneWidth = 6,
+	lanes = 8,
+	finishFromTop = 1234.5,
+	turfGap = 0,
+	turfWidth = 0,
+} :: Config
+
+TrackLayout.courses = { dirt = TrackLayout.churchill, turf = TrackLayout.churchillTurf }
+
 -- Furlongs: Sprint 6f, Mile 8f, Classic 10f (the Derby), Marathon 12f.
 TrackLayout.distances = { Sprint = 3960, Mile = 5280, Classic = 6600, Marathon = 7920 }
 
