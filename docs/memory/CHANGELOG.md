@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — D-020: crowd = best fan + assists; Top Fans board after each race
 - 2026-10-04 — fix: tap-time allowance follows measured latency (D-021)
 - 2026-10-04 — Clap Along crowd boost (D-020); gavel tap-time exploit added to the anti-cheat backlog
 - 2026-10-04 — Spectator cheering (D-019), research on prediction games, hard rule 1 clarified
