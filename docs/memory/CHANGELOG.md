@@ -3,6 +3,7 @@
 Newest first. One line per commit.
 
 - 2026-10-04 — Debate 007: stride stretches replace single taps, macro detection and rider ladder (D-022)
+- 2026-10-04 — D-020: strikes for flagged fans (quiet, warning, 30-day block)
 - 2026-10-04 — D-020: crowd = best fan + assists; Top Fans board after each race
 - 2026-10-04 — fix: tap-time allowance follows measured latency (D-021)
 - 2026-10-04 — Clap Along crowd boost (D-020); gavel tap-time exploit added to the anti-cheat backlog
