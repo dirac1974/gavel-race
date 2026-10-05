@@ -48,15 +48,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local baselineJson = serde.decode("json", fs.readFile("tests/fixtures/trip_baseline.json"))
 
 	-- GameConfig mirrors the Python CONFIG and RACE; TripBaseline is the generated table.
-	-- GameConfig.steering mirrors CONFIG, except S1's post switch and the scale: S2 ships cosmetic
-	-- (scale 0) until the rider controls go live in S3, which sets src/trip.py's 1.
+	-- GameConfig.steering mirrors CONFIG, except two game-only switches (S1's post draw and S3's
+	-- spam limit on steering requests) and the scale, a documented switch (0 = cosmetic; S3 ships
+	-- the model's 1). Parity runs at the fixture's scale.
 	local steering = table.clone(GameConfig.steering)
 	steering.drawPosts = nil
+	steering.requestsPerSecond = nil
 	steering.scale = nil
 	local pyCfg = table.clone(data.cfg)
 	pyCfg.scale = nil
-	check(deepEqual(steering, pyCfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py (scale aside)")
-	check(GameConfig.steering.scale == 0 and data.cfg.scale == 1, "S2 ships cosmetic (scale 0); the model's scale is 1")
+	check(deepEqual(steering, pyCfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py (the scale switch aside)")
+	check(GameConfig.steering.scale >= 0 and GameConfig.steering.scale <= 1, "the steering scale is between 0 (cosmetic) and 1")
 	local race = Trip.raceParams(GameConfig)
 	check(deepEqual(race, data.race, 0), "Trip.raceParams(GameConfig) mirrors RACE in src/trip.py")
 	check(deepEqual(TripBaseline, baselineJson.baseline, 1e-15), "TripBaseline.luau is trip_baseline.json's baseline")
@@ -73,7 +75,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local function runConfig(run: any): any
 		local cfg = table.clone(GameConfig.steering)
 		cfg.drawPosts = nil
-		cfg.scale = data.cfg.scale -- the model's scale (S2 ships 0; the fixture uses 1)
+		cfg.requestsPerSecond = nil
+		cfg.scale = data.cfg.scale -- the fixture's scale, whatever the game ships
 		cfg.smart = table.clone(cfg.smart)
 		if run.cfg then -- a run with other settings: copy the ones that differ (simple values)
 			for key, value in run.cfg do
@@ -310,7 +313,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 				everyoneSmart = false
 			end
 		end
-		check(everyoneSmart, "everyone steers with Smart Steer; riders with its plain settings (no input until S3)")
+		check(everyoneSmart, "everyone steers with Smart Steer; riders with its plain settings (nobody turned it off)")
 		-- A late, jumpy server reaches exactly the same state as one stepping on time.
 		local ref = Trip.start(GameConfig, s, track, plan, TripBaseline.turf.Mile, makeRng(5), TrackLayout)
 		local t, locked = 0, false
@@ -355,13 +358,13 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		check(inside, "cosmetic lanes stay on the track")
 	end
 	-- Overlaps on screen (B1 of the S2 review): whole races as RaceService runs them and RaceView
-	-- draws them, steering at scale 0 (as shipped) and 1 (from S3). No horse may come within half
-	-- a lane and 6 ft of another anywhere, and the order across the line must be the result.
+	-- draws them, steering at scale 1 (as shipped from S3) and 0 (cosmetic). No horse may come within
+	-- half a lane and 6 ft of another anywhere, and the order across the line must be the result.
 	-- (tests/luau/overlap_report.luau runs the same at any size: 960 races, 0 overlaps.)
 	do
 		local s1 = table.clone(GameConfig)
 		s1.steering = table.clone(GameConfig.steering)
-		s1.steering.scale = 1
+		s1.steering.scale = 0
 		local races, overlaps, wrongOrder, cell = 0, 0, 0, 0
 		for _, course in { "dirt", "turf" } do
 			for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do

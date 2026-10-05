@@ -27,7 +27,7 @@ local Sound = {}
 local LEVEL = {
 	gallop_loop = 0.45, crowd_cheer = 0.55, gate_bell = 0.5, burst_whoosh = 0.6, tap_good = 0.35,
 	finish_fanfare = 0.6, ui_pop = 0.3, coin = 0.45, horse_nicker = 0.5, brush = 0.5, munch = 0.5,
-	harvest_pop = 0.5, job_done = 0.55, clap = 0.45, heartbeat = 0.6,
+	harvest_pop = 0.5, job_done = 0.55, clap = 0.45, heartbeat = 0.6, lock_tick = 0.35,
 }
 local VOICE_LEVEL = 0.7
 local DEFAULT_LEVEL = 0.5

@@ -13,7 +13,7 @@
 -- fractional while gliding. Lanes are indexed 1..n here (0..n-1 in Python); posts and lane
 -- positions are 1-based in both.
 --
--- The race helpers at the bottom (start, advance, raceTau, frame, cosmetic) are what
+-- The race helpers at the bottom (start, submit, advance, raceTau, frame, cosmetic) are what
 -- RaceService calls; they are Luau only.
 
 export type Rng = { NextNumber: (self: any) -> number }
@@ -446,20 +446,38 @@ function Trip.raceParams(config: any): any
 	}
 end
 
+-- How a rider rides this race (S3). The ◀ ▶ buttons show from their introRaces + 1-th race that
+-- counts (data.totals.races, the races before this one; Practice doesn't count), the first time
+-- with the ghost-thumb tip (data.flags.steerTip once shown). kind: "intro" (no buttons yet: Smart
+-- Steer whatever Settings says, and tau 0, since they can't affect their trip), "smart" (buttons,
+-- Smart Steer on) or "manual" (buttons, Smart Steer turned off: lanes change only on presses).
+-- A missing profile counts as a first race.
+function Trip.riderControls(data: any?, steer: any): { shown: boolean, smart: boolean, tip: boolean, kind: string }
+	local races = if data ~= nil and type(data.totals) == "table" then tonumber(data.totals.races) or 0 else 0
+	local shown = data ~= nil and races >= steer.introRaces
+	local off = shown and type(data.settings) == "table" and data.settings.smartSteer == false
+	local kind = if not shown then "intro" elseif off then "manual" else "smart"
+	local seen = data ~= nil and type(data.flags) == "table" and data.flags.steerTip == true
+	return { shown = shown, smart = kind ~= "manual", tip = shown and not seen, kind = kind }
+end
+
 -- A race's trip, built after the posts are drawn (lane index = post), or nil when steering is
 -- off (GameConfig.steering.enabled = false: today's race exactly, nothing drawn). Draws two
 -- uniforms per lane from the race's generator, after every other gate draw. Bots use Smart Steer
--- with variety; riders use Smart Steer (no rider input until S3).
-function Trip.start(config: any, session: any, track: any, plan: any, baselineRow: { number }, rng: Rng, TrackLayout: any): any
+-- with variety. riders = lane id -> Trip.riderControls kind; a rider not listed rides "smart".
+function Trip.start(config: any, session: any, track: any, plan: any, baselineRow: { number }, rng: Rng, TrackLayout: any,
+	riders: { [string]: string }?): any
 	local steer = config.steering
 	if not steer or not steer.enabled then return nil end
 	local n = #session.lanes
 	local uniforms = table.create(2 * n)
 	for k = 1, 2 * n do uniforms[k] = rng:NextNumber() end
-	local posts, kinds = table.create(n), table.create(n)
+	local posts, kinds, riderKind = table.create(n), table.create(n), {}
 	for i, lane in session.lanes do
 		posts[i] = i
-		kinds[i] = if lane.isBot then "bot" else "smart"
+		local kind = if lane.isBot then "bot" else (riders and riders[lane.id]) or "smart"
+		if not lane.isBot then riderKind[i] = kind end
+		kinds[i] = if kind == "intro" then "smart" else kind
 	end
 	local race = Trip.raceParams(config)
 	local geo = TrackLayout.phaseA(track, plan)
@@ -471,20 +489,75 @@ function Trip.start(config: any, session: any, track: any, plan: any, baselineRo
 	st.shown = table.clone(st.x)     -- lanes on screen after the lock (cosmetic, see Trip.cosmetic)
 	st.shownTgt = table.clone(st.tgt)
 	st.view = table.clone(st.off)
+	-- Rider requests (S3): waiting for their tick { lane, dir, arrival }, the last seq and recent
+	-- arrival times per lane (the spam limit), and the answers given so far (for the race log).
+	st.riderKind = riderKind -- lane -> "intro" | "smart" | "manual" (riders only)
+	st.pending = {}
+	st.seq = table.create(n, -math.huge)
+	st.ack = table.create(n, 0) -- the last seq answered per lane (applied on a tick, or dropped as spam)
+	st.recent = table.create(n)
+	for i = 1, n do st.recent[i] = {} end
+	st.requestsPerSecond = steer.requestsPerSecond
+	st.answers = {}
 	return st
+end
+
+-- A SteerRequest from a player (S3), checked as it arrives: the player rides in this race (a
+-- rider's lane, never a bot's), it's before the lock, dir is -1 (in) or 1 (out), seq rises, and
+-- the rider has sent fewer than requestsPerSecond in the last second (spam is dropped). A request
+-- that passes waits for the next fixed tick, which applies the waiting requests in arrival order
+-- through Trip.step (acceptIntent: the request gap, the queue, the track's edges; every press
+-- there pauses Smart Steer for resumeSeconds). t = race time of arrival; a press before the gate
+-- (during the countdown) is refused. Returns "sent", or why not: "notRacing", "locked", "invalid",
+-- "early", "spam". The rider's screen learns each answer from st.ack (SteerLane).
+function Trip.submit(st: any, session: any, userId: string, d: any, seq: any, t: number): string
+	local i = session:laneIndex(userId)
+	if i == nil or session.lanes[i].isBot then return "notRacing" end
+	if st.locked or t >= st.lockT - EPS then return "locked" end
+	if d ~= 1 and d ~= -1 then return "invalid" end
+	if type(seq) ~= "number" or seq ~= seq or seq <= st.seq[i] then return "invalid" end
+	st.seq[i] = seq
+	if t < 0 then
+		st.ack[i] = seq
+		return "early"
+	end
+	local recent = st.recent[i]
+	while #recent > 0 and t - recent[1] >= 1 do table.remove(recent, 1) end
+	if #recent >= st.requestsPerSecond then
+		st.ack[i] = seq
+		return "spam"
+	end
+	table.insert(recent, t)
+	table.insert(st.pending, { i, d, t, seq })
+	return "sent"
 end
 
 -- Step every fixed tick due by race time t (seconds since the gate), with the live chances the
 -- race shows now; at the lock time, lock. Returns true on the call that locks. Ticks are
 -- t = k * dt whatever the server's timing, so a late server catches up with the same steps.
+-- Each tick takes the requests that arrived by its time, in arrival order; requests still
+-- waiting at the lock are dropped (lanes are locked).
 function Trip.advance(st: any, live: { number }, t: number): boolean
 	if st.locked then return false end
 	while st.tick * st.dt < st.lockT - EPS and st.tick * st.dt <= t + EPS do
-		Trip.step(st, live, {}, st.tick * st.dt, st.dt)
+		local tt = st.tick * st.dt
+		local due, seqs = {}, {}
+		while #st.pending > 0 and st.pending[1][3] <= tt + EPS do
+			local p = table.remove(st.pending, 1)
+			table.insert(due, { p[1], p[2] })
+			table.insert(seqs, p[4])
+		end
+		local answers = Trip.step(st, live, due, tt, st.dt)
+		for k, a in answers do
+			st.answers[a] = (st.answers[a] or 0) + 1
+			local i = due[k][1]
+			st.ack[i] = math.max(st.ack[i], seqs[k])
+		end
 		st.tick += 1
 	end
 	if t >= st.lockT - EPS and not (st.tick * st.dt < st.lockT - EPS) then
 		Trip.lock(st)
+		table.clear(st.pending)
 		st.shown = table.clone(st.x)
 		st.shownTgt = table.clone(st.tgt) -- a glide under way at the bell finishes on screen
 		st.view = table.clone(st.off)     -- the screen showed Trip's offsets up to now
@@ -493,9 +566,14 @@ function Trip.advance(st: any, live: { number }, t: number): boolean
 	return false
 end
 
--- tau for this race at the lock.
+-- tau for this race at the lock. Riders still without buttons ("intro") get 0 after the clamp:
+-- they couldn't affect their trip. Everyone else (bots included) keeps theirs.
 function Trip.raceTau(st: any): { number }
-	return Trip.tau(Trip.tripValues(st), st.posts, st.baselineRow, st.cfg)
+	local tau = Trip.tau(Trip.tripValues(st), st.posts, st.baselineRow, st.cfg)
+	for i, kind in st.riderKind do
+		if kind == "intro" then tau[i] = 0 end
+	end
+	return tau
 end
 
 -- After the lock the screen eases each horse toward the race shape's offsets (RaceView: eased at

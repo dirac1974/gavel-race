@@ -2,8 +2,9 @@
 -- GrownUps (D-045, D-049): the ⚙️ button (top right) opens settings and a page for parents;
 -- plus the first-ten-minutes tour card and the optional break reminder.
 --   Settings: who can visit your stable (Friends or Nobody), break reminder on or off, sound on or off,
---   Easy Rein (steering help on training courses, D-053) on or off, and whether friends may see
---   your training ghosts (off by default). "Nobody" visits also turns off Ride together invites.
+--   Easy Rein (steering help on training courses, D-053) on or off, Smart Steer in races (D-054, on
+--   by default), and whether friends may see your training ghosts (off by default). "Nobody"
+--   visits also turns off Ride together invites.
 --   For grown-ups: how races work (no gambling, nothing buys speed), what's saved, chat and
 --   safety, this week's play time, and where Roblox's parental controls live.
 --   Tour: one friendly step at a time with a GO button (golden hoofprints) and Skip.
@@ -121,16 +122,18 @@ local function settingsTab()
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("sound", v) end, 3)
 	choice("Easy Rein (helps steer on training rides)", { { true, "🐴 On" }, { false, "Off" } }, d.settings.easyRein == true,
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("easyRein", v) end, 4)
+	choice("Smart Steer (your race horse finds the rail)", { { true, "🧭 On" }, { false, "Off" } }, d.settings.smartSteer ~= false,
+		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("smartSteer", v) end, 5)
 	choice("Share my ghost with friends", { { true, "👻 On" }, { false, "Off" } }, d.settings.shareGhost == true,
-		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("shareGhost", v) end, 5)
+		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("shareGhost", v) end, 6)
 	local tourBtn = Ui.button(body, "🧭 Show me around again", UDim2.fromOffset(260, 46), UDim2.new(), C.sky, 18)
-	tourBtn.LayoutOrder = 6
+	tourBtn.LayoutOrder = 7
 	tourBtn.Activated:Connect(function()
 		Ui.toast("Follow the steps at the top of the screen!", "map", "🧭")
 		panelGui.Enabled = false
 		gameRemotes:WaitForChild("SetSetting"):FireServer("tour", "restart")
 	end)
-	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable. \"Nobody\" also means no Ride together invites.", 15, 7).TextColor3 = C.plum
+	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable. \"Nobody\" also means no Ride together invites.", 15, 8).TextColor3 = C.plum
 end
 
 local function grownUpsTab()
@@ -139,6 +142,7 @@ local function grownUpsTab()
 	para("👋 Hello, grown-ups!", 24, 1)
 	para(string.format("Play time this week: %d h %d min", mins // 60, mins % 60), 18, 2)
 	para("🏁 How races work: each horse's chance comes from its care and training; riding well (tapping in time) moves it up; a little luck shows near the finish. There is no gambling of any kind: entry is free, prizes are fixed before the race, and nothing can be bought to win.", 16, 3)
+	para("🧭 Riders can steer a little: the best trip is worth about 2 points of a 100-point ride, and nothing buys it. Smart Steer is on unless turned off, and always on in a rider's first 3 races.", 16, 31)
 	local shop = d and d.shop
 	para("💎 Diamonds cost real money through Robux, 1 Diamond = 1 Robux in every pack (no bigger-pack bonus). They buy looks only: saddle cloths and helmets for riding around, barn paint, name plates and yard decor.", 16, 4)
 	para("Never for sale: horses, coats, stats, speed, Green Cash, food, Energy, race entries, fan gear, trophies, rosettes or anything random.", 16, 41)

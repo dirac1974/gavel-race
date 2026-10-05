@@ -188,6 +188,7 @@ require("./game_tests")(check, close)
 require("./world_tests")(check, close)
 require("./steering_tests")(check, close)
 require("./trip_tests")(check, close)
+require("./steer_controls_tests")(check, close)
 
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

@@ -14,6 +14,8 @@
    "prompt": "One bright starting bell ring with a light metal gate clang, horse race start, clean, short"},
   {"name": "count_tick", "priority": "P1", "kind": "sfx", "seconds": 0.5, "influence": 0.5,
    "prompt": "One soft round wooden drum tick, friendly and warm, countdown beat for a kids game, short and clean"},
+  {"name": "lock_tick", "priority": "P1", "kind": "sfx", "seconds": 0.8, "influence": 0.5,
+   "prompt": "One soft gentle bell ting, small and warm like a shop door bell, calm, short and clean"},
   {"name": "burst_whoosh", "priority": "P0", "kind": "sfx", "seconds": 1.5, "influence": 0.5,
    "prompt": "Sparkly magical whoosh rising with twinkling chimes, bright and cheerful power-up for a kids game"},
   {"name": "tap_good", "priority": "P0", "kind": "sfx", "seconds": 0.5, "influence": 0.6,

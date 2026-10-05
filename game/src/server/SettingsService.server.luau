@@ -3,6 +3,7 @@
 --   Stable visits: Friends (default) or Nobody (D-042); the plot's walls follow it.
 --   Break reminder: optional, off by default (D-045).
 --   Sound: on by default; Off mutes the client's effects and announcer (Sound.luau).
+--   Smart Steer: on by default; Off means your race horse changes lane only when you press ◀ ▶ (D-054).
 --   Play time this week: counted while playing, shown in the For grown-ups panel (D-045).
 --   The first-ten-minutes tour (D-049): each step finishes when the player does the thing
 --   (Progress events); players can skip it.
@@ -74,6 +75,8 @@ SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
 		data.settings.sound = value -- client Sound module; nil = on
 	elseif key == "easyRein" and typeof(value) == "boolean" then
 		data.settings.easyRein = value -- steering help on training courses (D-053); no score change
+	elseif key == "smartSteer" and typeof(value) == "boolean" then
+		data.settings.smartSteer = value -- Smart Steer in races (D-054); on by default
 	elseif key == "shareGhost" and typeof(value) == "boolean" then
 		data.settings.shareGhost = value -- friends here may see your training ghosts (D-053); off by default
 	elseif key == "tour" and value == "restart" then

@@ -23,7 +23,7 @@ The key has no `user_read` permission, so `GET /v1/user/subscription` returns 40
 | Batch | When (UTC) | Usage before | Usage after | Spent | Estimate (upper bound) |
 | --- | --- | --- | --- | --- | --- |
 | Voice, 8 lines (128 characters) | 2026-10-05 14:43 | 55,641 | 55,670 | **29** | 129 |
-| Sound effects, P0 + P1 (21.1 s) | blocked | | | 0 | 844 (1,688 with every re-roll) |
+| Sound effects, P0 + P1 (21.9 s) | blocked | | | 0 | 876 (1,752 with every re-roll) |
 | **Total** | | | | **29 of 2,000** | |
 
 ## Sounds
@@ -34,6 +34,7 @@ The key has no `user_read` permission, so `GET /v1/user/subscription` returns 40
 | crowd_cheer | P0 | friendly fair crowd cheer | 3.0 s | 120 | | | not made |
 | gate_bell | P0 | starting bell and gate clang | 1.5 s | 60 | | | not made |
 | count_tick | P1 | soft drum tick for "3, 2, 1" (a drum, not a bell: D-054's lane lock uses bell ticks; D-055) | 0.5 s | 20 | | | not made |
+| lock_tick | P1 | soft bell ting, three before the lanes lock at the far turn (D-054 S3) | 0.8 s | 32 | | | not made |
 | burst_whoosh | P0 | sparkly whoosh for the Final Burst | 1.5 s | 60 | | | not made |
 | tap_good | P0 | soft bright tick (Great / Perfect tap) | 0.5 s | 20 | | | not made |
 | finish_fanfare | P0 | short cheerful brass flourish | 2.5 s | 100 | | | not made |
@@ -62,6 +63,7 @@ Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_
 | Moment | Sound | Code |
 | --- | --- | --- |
 | Countdown | count_tick on "3", "2" and "1" (D-055) | `RaceController` (RaceStarted) |
+| Lanes lock at the far turn | lock_tick three times, a second apart, before "Lanes locked!" (riders with the steering buttons only; D-054 S3) | `RaceController` (TripInfo) |
 | Gate opens | gate_bell, then vo_off 0.25 s later so they don't stack | `RaceController` (RaceStarted, cued at the start time) |
 | Your race runs | gallop_loop (riders only, while in the saddle; stops when the race ends, you leave the saddle or respawn) | `RaceController` |
 | Field enters the final far turn | vo_far_turn (skipped if under 4 s after the start) | `RaceController` (same sum as RaceService's `tFar`) |
@@ -92,4 +94,4 @@ python tools/audio/generate_audio.py --priority P0 P1
 python tools/roblox/upload_assets.py --kind Audio
 ```
 
-Roblox audio uploads are capped per 30 days: 100 for ID-verified accounts, 10 otherwise, so `upload_assets.py --force` re-uploads sounds only with `--kind Audio`, and an upload request is never resent when it may already have gone through. Sounds that moderation marks Rejected are left out of `SoundAssets.luau`. The 8 voice lines used 8; the 15 effects need ID verification on the uploading account (or packing effects into one sheet with `Sound.PlaybackRegion`).
+Roblox audio uploads are capped per 30 days: 100 for ID-verified accounts, 10 otherwise, so `upload_assets.py --force` re-uploads sounds only with `--kind Audio`, and an upload request is never resent when it may already have gone through. Sounds that moderation marks Rejected are left out of `SoundAssets.luau`. The 8 voice lines used 8; the 17 effects need ID verification on the uploading account (or packing effects into one sheet with `Sound.PlaybackRegion`).
