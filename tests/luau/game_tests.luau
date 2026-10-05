@@ -91,7 +91,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local sMiss = select(1, runRace(11, nil, false))
 	check(sPerfect.live[1] > sMiss.live[1], "perfect taps beat missed taps")
 
-	-- Payout rules over many races.
+	-- Prize rules over many races.
 	local B = GameConfig.leagues.Bronze.B
 	for seed = 1, 200 do
 		local sess, result = runRace(seed, perfectT, true)
@@ -99,7 +99,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		for _, v in sess.live do livesum += v end
 		check(close(livesum, 1, 1e-12), "live chances sum to 1")
 		check(sess.lanes[2].scores[2] ~= nil and sess.lanes[2].scores[2] >= 0, "dropped window scored at average")
-		for _, p in result.payouts do
+		for _, p in result.prizes do
 			if p.isBot then
 				check(p.cash == 0, "bots are never paid")
 			elseif p.place == 1 then

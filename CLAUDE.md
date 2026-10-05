@@ -36,7 +36,7 @@ You are the **tech lead**. For each loop:
 1. **Pick** the top item in `STATUS.md` → Backlog. If it needs a design decision, run a short design-council debate (or decide it yourself for small calls), log it as provisional, and continue.
 2. **Plan** in 3–6 lines inside `STATUS.md` → In progress.
 3. **Implement** by delegating: `model-engineer` (Python model and simulations), `roblox-engineer` (Luau/Roblox), `economy-analyst` (balance sims).
-4. **Test**: delegate to `test-engineer`. All tests must pass: `python -m pytest -q`.
+4. **Test**: delegate to `test-engineer`. All tests and the policy guard must pass: `python -m pytest -q && bash scripts/policy_guard.sh`.
 5. **Review**: delegate to `code-reviewer`. Fix every blocking finding, then re-test.
 6. **Record**: delegate to `scribe` to update `DECISIONS.md`, `STATUS.md`, `CHANGELOG.md`, and open questions.
 7. **Commit and push** to `main` with a conventional message (`feat:`, `fix:`, `test:`, `docs:`). If `main` rejects the push, push a `claude/<topic>` branch and open a pull request instead.
@@ -52,5 +52,6 @@ Stop the loop and report if tests can't be made green in three attempts.
 ```bash
 bash scripts/setup_cloud.sh          # once per session: pytest + Lune
 python -m pytest -q                  # all tests (Luau parity runs when lune is on PATH)
+bash scripts/policy_guard.sh         # no wagering words in game code, no model names anywhere
 python src/gavel_race_v2.py          # reference model + simulations
 ```

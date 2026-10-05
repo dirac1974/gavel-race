@@ -119,10 +119,9 @@ def test_purse_expected_value_equals_B(B):
     cfg = m.Config(B=B)
     q = m.base_chances([70, 67, 64, 62, 60, 58, 56, 52], cfg)
     purses = m.lock_purses(q, cfg)
-    assert all(p % 5 == 0 for p in purses)
     for qi, pu in zip(q, purses):
-        # rounding to 5 cash: error <= 2.5 / purse relative
-        assert abs(qi * pu - B) <= qi * 2.5 + 1e-9
+        # whole-cash rounding moves q * purse by at most 0.5 q
+        assert abs(qi * pu - B) <= qi * 0.5 + 1e-9
 
 
 def test_window_score_bounds():

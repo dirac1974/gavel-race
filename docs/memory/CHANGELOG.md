@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — Merge parallel review: whole-cash purses (D-017), policy guard, Claude Code permissions, KICKOFF prompts, extra tests
 - 2026-10-04 — Energy (D-015), prizes and exactas (D-016), Diamond limits amended
 - 2026-10-04 — Race Rating (D-014) in Python and Luau; conditions in the prototype
 - 2026-10-04 — Economy simulator, Stakes thresholds (D-013), Studio playtest checklist

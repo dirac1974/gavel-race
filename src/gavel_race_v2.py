@@ -3,7 +3,7 @@
 
 Six steps per race:
   1. Base win chance q from Race Ratings (softmax, temperature T, floor).
-  2. Locked win purse in cash: 5 * round(B / (5 q)). Every horse expects B.
+  2. Locked win purse in whole cash: round(B / q). Every horse expects B (within 0.5 q / B).
   3. Gavel window score: 100 * (1 - d), constant-speed meter.
   4. Skill vs. this race's average: R = clamp((S - mean S) / 50, rFloor, 1).
   5. Live win chance by exponential tilt: p' ∝ q * exp(kappa * R).
@@ -51,9 +51,9 @@ def base_chances(ratings: Sequence[float], cfg: Config) -> List[float]:
 
 # Step 2
 def lock_purses(q: Sequence[float], cfg: Config) -> List[int]:
-    # floor(x + 0.5) rather than round(): Python's round() is banker's rounding,
-    # Luau's math.round rounds half away from zero. This keeps both identical.
-    return [5 * math.floor(cfg.B / (5 * qi) + 0.5) for qi in q]
+    # Whole cash (D-017). floor(x + 0.5) rather than round(): Python's round() is
+    # banker's rounding, Luau's math.round rounds half away from zero.
+    return [math.floor(cfg.B / qi + 0.5) for qi in q]
 
 
 # Step 3

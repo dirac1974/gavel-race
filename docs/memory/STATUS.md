@@ -6,7 +6,7 @@ Last updated: 2026-10-04
 
 - **Race model v2**: Python reference and Luau module agree exactly (300 fixture races, purses and finish orders included).
 - **Roblox prototype (Phase 1)**: Rojo project in `game/`. Pure modules (GameConfig, ThemePack, GavelMeter, RaceSession) are tested under Lune. Server loop and client UI are written and compile, but **have not been run in Roblox Studio**.
-- **Tests**: 513 Python tests; 17,600+ Luau checks; syntax check for every Luau file; GitHub Actions runs all of it.
+- **Tests**: 1,080 Python tests; 17,600+ Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
 - **Design**: debate 001 decided the gavel meter (D-010). Provisional decisions listed in REVIEW_QUEUE.md.
 
 ## In progress
@@ -25,6 +25,7 @@ Last updated: 2026-10-04
 
 ## Done
 
+- 2026-10-04: merged a parallel review: whole-cash purses (D-017), policy guard in CI, `.claude/settings.json`, `docs/KICKOFF.md`, 567 extra tests.
 - 2026-10-04: Energy (D-015), prizes and exactas (D-016), Diamond limits amended (D-002a).
 - 2026-10-04: Race Rating formula (D-014) in Python and Luau; prototype races now use random conditions and starter stats.
 - 2026-10-04: Studio playtest checklist; economy simulator; Stakes thresholds (D-013).

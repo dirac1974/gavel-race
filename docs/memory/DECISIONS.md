@@ -44,7 +44,7 @@ Template:
 - Date: 2026-10-04
 - Status: Accepted
 - Decided by: David
-- Decision: exponential tilt `p' ∝ q · e^{κR}`, cash purses `5 · round(B / 5q)`, no margin, no tiered rounding, no skill noise, Harville finish order, flat place prizes 2nd 1.2B / 3rd 0.8B / 4th 0.4B.
+- Decision: exponential tilt `p' ∝ q · e^{κR}`, cash purses `5 · round(B / 5q)` (rounding superseded by D-017), no margin, no tiered rounding, no skill noise, Harville finish order, flat place prizes 2nd 1.2B / 3rd 0.8B / 4th 0.4B.
 - Consequences: exact per-race cash invariance traded for ~0.2–0.5% drift.
 - Links: docs/V2_PROPOSAL.md
 
@@ -139,3 +139,11 @@ Template:
 - Decided by: team, under D-009
 - Decision: 2nd–4th prizes stay flat (1.2, 0.8, 0.4 B). Fully upset-scaling them would make every horse expect the same cash (favorite vs. longshot 1.00× instead of 1.30×), removing the cash reward for training. UI shows ribbons and "1st prize", never place, show, or payout. Exactas are not a prize; at most a free spectator "call the top two" game for cosmetic ribbons.
 - Links: docs/V2_PROPOSAL.md, GameConfig.ribbons
+
+## D-017 — Win purses round to whole cash
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: team (engineering correction)
+- Context: rounding purses to 5 cash was documented as < 0.2% error, but the real bound is `2.5 q / B`, up to ~4.4% for a strong favorite in Rookie. Found in a parallel review of the repo.
+- Decision: `Purse = round(B / q)` in whole cash (floor(x + 0.5) in both languages). Error bound `0.5 q / B`: ≤ 1% in Rookie, ≤ 0.2% from Silver up.
+- Links: src/gavel_race_v2.py, src/RaceMath.luau, docs/V2_PROPOSAL.md

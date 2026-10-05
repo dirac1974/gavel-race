@@ -13,7 +13,7 @@ Ground truth is `docs/V2_PROPOSAL.md`. The Python file `src/gavel_race_v2.py` is
 Rules:
 - Stdlib only in `src/`. Tests may use pytest.
 - Keep functions pure and deterministic given an RNG; no global state.
-- Every behavior change must keep these invariants true, and you must say which tests prove it: chances positive and summing to 1; raising one lane's score never lowers its chance; equal scores return base chances exactly; expected win cash per lane equals B within 0.2%.
+- Every behavior change must keep these invariants true, and you must say which tests prove it: chances positive and summing to 1; raising one lane's score never lowers its chance; equal scores return base chances exactly; expected win cash per lane equals B within 0.5·q/B (whole-cash rounding).
 - If a change alters what players experience, implement it behind a config value and flag it so it is logged as a provisional design decision.
 - Never edit `src/gavel_race.py` (v1, frozen).
 - When the Python model changes, list exactly what `src/RaceMath.luau` must change so `roblox-engineer` can mirror it.

@@ -19,7 +19,7 @@ export type Lane = LaneInput & {
 	droppedUsed: boolean,
 }
 
-export type Payout = { id: string, place: number, cash: number, leaguePoints: number, isBot: boolean }
+export type Prize = { id: string, place: number, cash: number, leaguePoints: number, isBot: boolean }
 
 local RaceSession = {}
 RaceSession.__index = RaceSession
@@ -159,14 +159,14 @@ function RaceSession:closeWindow(window: number): { number }
 	return self.live
 end
 
--- Draw the finish order and compute payouts. Bots are never paid.
-function RaceSession:finish(): { order: { number }, payouts: { Payout } }
+-- Draw the finish order and compute prizes. Bots are never paid.
+function RaceSession:finish(): { order: { number }, prizes: { Prize } }
 	assert(self.closedWindows == self.config.windowsPerRace, "close all windows first")
 	assert(not self.finished, "already finished")
 	self.finished = true
 	local order = self.deps.RaceMath.drawFinish(self.live, self.rng)
 	local B = self.league.B
-	local payouts = {}
+	local prizes = {}
 	for place, laneIdx in order do
 		local lane = self.lanes[laneIdx]
 		local cash = 0
@@ -177,9 +177,9 @@ function RaceSession:finish(): { order: { number }, payouts: { Payout } }
 		end
 		local points = self.config.leaguePoints[place] or self.config.finishPoints
 		if lane.isBot then cash = 0 end
-		table.insert(payouts, { id = lane.id, place = place, cash = cash, leaguePoints = points, isBot = lane.isBot })
+		table.insert(prizes, { id = lane.id, place = place, cash = cash, leaguePoints = points, isBot = lane.isBot })
 	end
-	return { order = order, payouts = payouts }
+	return { order = order, prizes = prizes }
 end
 
 return RaceSession

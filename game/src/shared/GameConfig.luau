@@ -42,7 +42,7 @@ GameConfig.energy = {
 	freeLeagues = { Rookie = true }, -- Rookie races cost no Energy
 }
 
--- Prize ribbons for the UI (D-016). Never "place", "show", or "payout".
+-- Prize ribbons for the UI (D-016). Never use racing-wager terms in UI text. -- policy-ok
 GameConfig.ribbons = { "Blue", "Red", "Yellow", "White" }
 
 GameConfig.scoreLabels = {

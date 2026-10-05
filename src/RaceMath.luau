@@ -33,11 +33,11 @@ function RaceMath.baseChances(ratings: {number}, cfg: Config): {number}
 	return normalize(q)
 end
 
--- Step 2: locked win purses, rounded to 5 cash
+-- Step 2: locked win purses, rounded to whole cash (D-017)
 function RaceMath.lockPurses(q: {number}, cfg: Config): {number}
 	local purses = table.create(#q)
 	-- floor(x + 0.5) to match the Python reference exactly (see gavel_race_v2.py)
-	for i, qi in q do purses[i] = 5 * math.floor(cfg.B / (5 * qi) + 0.5) end
+	for i, qi in q do purses[i] = math.floor(cfg.B / qi + 0.5) end
 	return purses
 end
 

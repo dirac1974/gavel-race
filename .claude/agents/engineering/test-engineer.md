@@ -11,7 +11,7 @@ You are the test engineer for Gavel Derby.
 Run `python -m pytest -q` first and report the baseline.
 
 What must always be covered:
-- Invariants: positivity, sum to 1, own-skill monotonicity, equal-scores-return-base, shift invariance of race-average centering, clamp limits, purse expected value equal to B within 0.2%.
+- Invariants: positivity, sum to 1, own-skill monotonicity, equal-scores-return-base, shift invariance of race-average centering, clamp limits, purse expected value equal to B within 0.5·q/B (whole-cash rounding).
 - Statistical checks with fixed seeds and tolerances wide enough to be stable (state the tolerance and why).
 - Finish order: sampled win frequencies match `p'`; Harville place probabilities match sampled ones.
 - Regression: the repo example field produces the numbers recorded in `docs/V2_PROPOSAL.md` within tolerance.

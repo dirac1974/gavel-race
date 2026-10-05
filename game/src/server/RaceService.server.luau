@@ -146,15 +146,15 @@ local function runRace(players: { Player })
 	task.wait(2) -- final stretch animation time
 	local result = session:finish()
 	local summary = {}
-	for _, payout in result.payouts do
-		local lane = session.lanes[session:laneIndex(payout.id)]
-		table.insert(summary, { name = lane.name, place = payout.place, cash = payout.cash, isBot = payout.isBot, id = payout.id })
-		if not payout.isBot then
-			local player = Players:GetPlayerByUserId(tonumber(payout.id))
+	for _, prize in result.prizes do
+		local lane = session.lanes[session:laneIndex(prize.id)]
+		table.insert(summary, { name = lane.name, place = prize.place, cash = prize.cash, isBot = prize.isBot, id = prize.id })
+		if not prize.isBot then
+			local player = Players:GetPlayerByUserId(tonumber(prize.id))
 			local stats = player and player:FindFirstChild("leaderstats")
 			if stats then
-				stats[ThemePack.currency.earned].Value += payout.cash
-				stats["League Points"].Value += payout.leaguePoints
+				stats[ThemePack.currency.earned].Value += prize.cash
+				stats["League Points"].Value += prize.leaguePoints
 			end
 		end
 	end

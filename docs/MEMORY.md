@@ -57,7 +57,7 @@ The model is being used for a kid-friendly Roblox horse racing game. Roblox proh
 ### v2 decisions
 
 1. Base chance `q = softmax(Rating / T)`, floored at 2.5%; `T` by league (Rookie 22 … Champion 12).
-2. Win purse `5 · round(B / 5q)`: every horse expects `B` at average play. No margin, no tiered rounding.
+2. Win purse `round(B / q)` in whole cash (D-017; first written as rounding to 5): every horse expects `B` at average play. No margin, no tiered rounding.
 3. Window score `100 (1 − d)`, constant-speed meter; `S` = mean of 3 windows.
 4. Skill measured against **this race's average**: `R = clamp((S − mean S) / 50, −0.5, 1)`. Same chances as a league median (the tilt is shift-invariant) except at clamp edges; chosen for clarity, no gameable statistic, and lower collusion gain.
 5. Exponential tilt `p' ∝ q · e^{κR}`, `κ = 1.0`. Always positive; better timing never lowers your own chance.

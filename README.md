@@ -14,7 +14,7 @@ Roblox prohibits both simulated and actual gambling, including bets with free cu
 ## v2 in six steps
 
 1. Base win chance from Race Ratings: `q = softmax(Rating / T)`, floored at 2.5%.
-2. Locked win purse: `5 · round(B / 5q)`. Every horse expects `B` at average play.
+2. Locked win purse: `round(B / q)` in whole cash. Every horse expects `B` at average play.
 3. Gavel window score: `100 (1 − d)` on a constant-speed meter; `S` = mean of 3 windows.
 4. Skill vs. this race: `R = clamp((S − mean S) / 50, −0.5, 1)`.
 5. Live win chance: `p' ∝ q · e^{κR}`, `κ = 1.0`.
@@ -38,6 +38,7 @@ Stdlib only. `src/RaceMath.luau` is the same v2 model as a Roblox server ModuleS
 | Path | What |
 | --- | --- |
 | `CLAUDE.md` | Rules and workflow for the Claude Code agent team (start here) |
+| `docs/KICKOFF.md` | Prompts to run build loops, debates, and reviews |
 | `.claude/agents/` | Engineering team and Roblox design council agents |
 | `docs/memory/` | Decisions, status and backlog, review queue, changelog |
 | `docs/debates/`, `docs/research/` | Design council records and cited research |
