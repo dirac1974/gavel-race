@@ -17,6 +17,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 
@@ -148,6 +149,7 @@ end
 if player.Character then task.spawn(watchSeat, player.Character) end
 player.CharacterAdded:Connect(function(character)
 	if rideCamOn then rideCamera(false) end -- a new character starts on foot
+	setJumping(true) -- ...never in a race saddle: the move controls come back (Disable outlives a respawn)
 	task.spawn(watchSeat, character)
 end)
 
@@ -623,13 +625,21 @@ end
 -- left-stick flick (RaceInput). None of them is a tap (D-055). Chips above the buttons say what
 -- steering did ("Saved ground!", "Tucked in!" with wind lines) and give a gentle tip when you're
 -- wide into a turn; never a lost place, never a countdown.
+-- The buttons, chips and tip live in their own screen inside the device's safe area (clear of a
+-- notch), drawn over RaceUI so a press on them never reaches the tap area.
+local steerGui = Instance.new("ScreenGui")
+steerGui.Name = "RaceSteer"
+steerGui.ResetOnSpawn = false
+steerGui.DisplayOrder = gui.DisplayOrder + 1
+pcall(function() steerGui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets end)
+steerGui.Parent = player:WaitForChild("PlayerGui")
 local steerPad = Instance.new("Frame")
 steerPad.Name = "SteerPad"
 steerPad.AnchorPoint = Vector2.new(0, 1)
 steerPad.BackgroundTransparency = 1
 steerPad.ZIndex = 8
 steerPad.Visible = false
-steerPad.Parent = gui
+steerPad.Parent = steerGui
 local BUTTON_COLOUR, LOCKED_COLOUR = Color3.fromHex("F4EFE6"), Color3.fromRGB(170, 170, 170)
 local function steerButton(text: string): TextButton
 	local b = Instance.new("TextButton")
@@ -655,7 +665,7 @@ local function steerButton(text: string): TextButton
 end
 local inBtn, outBtn = steerButton("◀ In"), steerButton("Out ▶")
 
-local steerChip = label(gui, UDim2.fromOffset(320, 44), UDim2.new(), "", 20)
+local steerChip = label(steerGui, UDim2.fromOffset(320, 44), UDim2.new(), "", 20)
 steerChip.AnchorPoint = Vector2.new(0, 1)
 steerChip.BackgroundColor3 = BUTTON_COLOUR
 steerChip.BackgroundTransparency = 0.1
@@ -676,7 +686,7 @@ local chipScale = Instance.new("UIScale")
 chipScale.Parent = steerChip
 
 -- The ghost-thumb tip (first race with the buttons): a see-through thumb pressing ◀ In.
-local thumb = label(gui, UDim2.fromOffset(64, 64), UDim2.new(), "👆", 52)
+local thumb = label(steerGui, UDim2.fromOffset(64, 64), UDim2.new(), "👆", 52)
 thumb.AnchorPoint = Vector2.new(0.5, 0)
 thumb.TextTransparency = 0.35
 thumb.TextStrokeTransparency = 1
@@ -711,7 +721,7 @@ steerLayout = function()
 	local w = if camera then camera.ViewportSize.X else 1280
 	local size = if RaceState.phone() then SHUD.minButtonPx
 		else math.max(SHUD.minButtonPx, math.floor(SHUD.buttonPx * RaceState.hudScale()))
-	local gap, left = 12, 24
+	local gap, left = 12, 12 -- from the safe area's left edge (a notch is already outside it)
 	steerPad.Size = UDim2.fromOffset(2 * size + gap, size)
 	steerPad.Position = UDim2.new(0, left, 0.75, -8)
 	inBtn.Size, outBtn.Size = UDim2.fromOffset(size, size), UDim2.fromOffset(size, size)
@@ -719,7 +729,7 @@ steerLayout = function()
 	steerChip.Position = UDim2.new(0, left, 0.75, -8 - size - 10)
 	steerChip.Size = UDim2.fromOffset(math.max(2 * size + gap, 320), 44)
 	thumbX, thumbY = left + size / 2, -8 - size / 2
-	local right = left + 2 * size + gap + 12
+	local right = (steerGui.AbsolutePosition.X - gui.AbsolutePosition.X) + left + 2 * size + gap + 12
 	if steerPad.Visible and w / 2 - 260 < right then
 		feedback.Position, feedback.Size = UDim2.new(0, right, 0.62, 0), UDim2.new(1, -right - 12, 0, 46)
 		hint.Position, hint.Size = UDim2.new(0, right, 0.68, 0), UDim2.new(1, -right - 12, 0, 28)
@@ -733,9 +743,35 @@ end
 layout()
 
 -- steer = the race you ride: { race, course, start, geo (TrackLayout.phaseA), shown, smart, tipAt,
--- tipUntil, lockAt, locked, hideAt, seq, lastPress, armed (stick), turnAcc, tipped, tips,
--- tuckedFor, tuckChipAt, bellArmed }
+-- tipUntil, lockAt, locked, hideAt, seq, lastPress, pressed, armed (stick), turnAcc, tipped, tips,
+-- tuckedFor, tuckedTotal, tuckChips, tuckChipAt, bellArmed }
 local steer = nil
+
+-- While you have the buttons, the steering keys (A/D, the arrows, the D-pad) are bound above the
+-- camera's own keys and sunk, so the arrows steer instead of turning the camera, and never tap.
+local STEER_ACTION = "GiddyUpSteer"
+local STEER_KEYS = {}
+for name in RaceInput.STEER do
+	local ok, code = pcall(function() return (Enum.KeyCode :: any)[name] end)
+	if ok and code then table.insert(STEER_KEYS, code) end
+end
+local steerBound = false
+local steerPress: (number) -> () = function(_dir: number) end -- set below
+local function bindSteer(on: boolean)
+	if on == steerBound then return end
+	steerBound = on
+	if on then
+		ContextActionService:BindActionAtPriority(STEER_ACTION, function(_, state, input)
+			if state == Enum.UserInputState.Begin then
+				local dir = RaceInput.steerDir(input.KeyCode.Name)
+				if dir then steerPress(dir) end
+			end
+			return Enum.ContextActionResult.Sink
+		end, false, Enum.ContextActionPriority.High.Value + 1, table.unpack(STEER_KEYS))
+	else
+		ContextActionService:UnbindAction(STEER_ACTION)
+	end
+end
 
 local chipToken = 0
 local function showChip(text: string, seconds: number?)
@@ -769,20 +805,22 @@ end
 
 local function clearSteer()
 	steer = nil
+	bindSteer(false)
 	chipToken += 1
 	steerChip.Visible, thumb.Visible, wind.Visible = false, false, false
 end
 
 -- A press: one lane in (-1) or out (1). The server decides; your own glide starts at once.
-local function steerPress(dir: number)
+steerPress = function(dir: number)
 	local s = steer
 	if not (s and s.shown and riding and not s.locked and s.race == cueRace) then return end
 	local t = serverNow()
 	if t < s.start or (s.lockAt and t >= s.lockAt) then return end
 	s.seq += 1
 	s.lastPress = os.clock()
+	s.pressed = true
 	remotes:WaitForChild("SteerRequest"):FireServer(dir, s.seq)
-	RaceState.predictSteer(dir)
+	RaceState.predictSteer(dir, s.seq)
 	if RaceState.recording then table.insert(RaceState.recording.events, { t = t, kind = "steer", dir = dir }) end
 end
 for _, pair in { { inBtn, -1 }, { outBtn, 1 } } do
@@ -795,8 +833,8 @@ for _, pair in { { inBtn, -1 }, { outBtn, 1 } } do
 	end)
 end
 -- The left stick steers by flicks: past 0.6 fires once, back under 0.3 re-arms.
-UserInputService.InputChanged:Connect(function(input)
-	if input.KeyCode ~= Enum.KeyCode.Thumbstick1 or not steer then return end
+UserInputService.InputChanged:Connect(function(input, gameProcessed)
+	if gameProcessed or input.KeyCode ~= Enum.KeyCode.Thumbstick1 or not steer then return end
 	local dir, armed = RaceInput.flick(steer.armed, input.Position.X)
 	steer.armed = armed
 	if dir then steerPress(dir) end
@@ -853,7 +891,8 @@ local function updateSteer(t: number, dt: number)
 		end
 	end
 	local fieldX = if n > 0 then sum / n else x[me]
-	-- "Saved ground!" leaving a turn ridden on the rail, or well inside the field.
+	-- "Saved ground!" leaving a turn ridden on the rail, or well inside the field, once you have
+	-- steered this race (Smart Steer's own moves don't earn it).
 	for k, turn in s.geo.turns do
 		local acc = s.turnAcc[k]
 		if sPace >= turn[1] and sPace < turn[2] then
@@ -863,7 +902,9 @@ local function updateSteer(t: number, dt: number)
 		elseif sPace >= turn[2] and not acc.done then
 			acc.done = true
 			local own, field = acc.own / math.max(acc.time, 1e-6), acc.field / math.max(acc.time, 1e-6)
-			if acc.time > 0.5 and (own < SHUD.railLane or own <= field - SHUD.belowField) then showChip("Saved ground!") end
+			if s.pressed and acc.time > 0.5 and (own < SHUD.railLane or own <= field - SHUD.belowField) then
+				showChip("Saved ground!")
+			end
 		end
 	end
 	-- A gentle tip when you steer yourself and are wide going into a turn (the far turn included).
@@ -891,9 +932,15 @@ local function updateSteer(t: number, dt: number)
 			end
 		end
 	end
+	-- The tucked-in credit stops at draftCap (draftCap / draftPerSecond seconds tucked in), and so
+	-- do the chip and the wind lines; at most tuckedPerRace chips.
 	s.tuckedFor = if tucked then s.tuckedFor + dt else 0
-	if s.tuckedFor >= SHUD.tuckedSeconds and os.clock() - s.tuckChipAt >= SHUD.tuckedAgainSeconds then
+	if tucked then s.tuckedTotal += dt end
+	if s.tuckedTotal * STEER.draftPerSecond >= STEER.draftCap then s.tuckedFor = 0 end
+	if s.tuckedFor >= SHUD.tuckedSeconds and os.clock() - s.tuckChipAt >= SHUD.tuckedAgainSeconds
+		and s.tuckChips < SHUD.tuckedPerRace then
 		s.tuckChipAt = os.clock()
+		s.tuckChips += 1
 		showChip("Tucked in!")
 	end
 	wind.Visible = s.tuckedFor >= 0.3
@@ -947,7 +994,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if kind == Enum.UserInputType.Keyboard or pad then
 		local dir = RaceInput.steerDir(input.KeyCode.Name)
 		if dir then
-			steerPress(dir) -- steering keys and the D-pad steer and never tap (D-054, D-055)
+			return -- steering keys never tap (D-054, D-055); with the buttons they steer through bindSteer
 		elseif TAP_KEYS[input.KeyCode] then
 			tap()
 		elseif not keyHintShown and not QUIET_KEYS[input.KeyCode] and riding and paceState
@@ -1112,7 +1159,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		for k = 1, #geo.turns do acc[k] = { own = 0, field = 0, time = 0, done = false } end
 		steer = { race = cueRace, course = courseId or "dirt", start = start, geo = geo, shown = false, smart = true,
 			locked = false, seq = 0, lastPress = -math.huge, armed = true, turnAcc = acc, tipped = {}, tips = 0,
-			tuckedFor = 0, tuckChipAt = -math.huge }
+			tuckedFor = 0, tuckedTotal = 0, tuckChips = 0, tuckChipAt = -math.huge, pressed = false }
 	end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
 	status.Text = string.format("%s race: %s%s", league, conditions, if riding then "" else "  (watching)")
@@ -1184,7 +1231,10 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		task.spawn(function()
 			task.wait(math.max(0, start - countFrom - serverNow()))
 			while id == cueRace and not seated() and serverNow() < start + 1 do task.wait(0.05) end
-			if id == cueRace and seated() then rideCamera(true) end
+			if id == cueRace and seated() then
+				rideCamera(true)
+				setJumping(false) -- again: leaving the other course's horse may have brought the controls back
+			end
 		end)
 	end
 	task.spawn(function()
@@ -1245,6 +1295,7 @@ remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smar
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace then return end
 	s.shown, s.smart = shown == true, smart ~= false
 	if s.shown and tip then s.tipAt = s.start + 1.5 end
+	bindSteer(s.shown)
 	armBell(s)
 end)
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)

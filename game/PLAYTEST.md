@@ -301,16 +301,16 @@ This week's course (T5):
 
 ## Steering controls (steering S3, D-054)
 To see the buttons on a new profile, ride 3 races first (or set `totals.races` to 3 in the saved profile).
-- [ ] **First three races:** no ◀ ▶ buttons, no bell, no chips; your horse uses Smart Steer even if Settings has it Off.
+- [ ] **First three races:** no ◀ ▶ buttons, no bell, no chips; your horse uses Smart Steer even if Settings has it Off, and the `[Trip]` line shows `intro` with tau 0 for you.
 - [ ] **Fourth race:** ◀ In and Out ▶ appear bottom-left at "GO!", with a see-through thumb pressing ◀ In and "Steer to the rail before the turn ◀" for about 5 s. The tip shows once, never again.
-- [ ] **Phone, two thumbs:** the buttons are big (at least 88 px), sit above where the thumbstick would be, and nothing hides behind them: on a narrow phone the tap words move to the right of them. There's no thumbstick or jump button during the race. Every other touch still taps the slider.
-- [ ] **Keyboard:** A or ← moves you in, D or → out, while you tap Space. Your character never walks, and steering keys never show "Tap: SPACE or click".
+- [ ] **Phone, two thumbs:** the buttons are big (at least 88 px), sit above where the thumbstick would be and clear of a notch, and nothing hides behind them: on a narrow phone the tap words move to the right of them. There's no thumbstick or jump button during the race; both come back after the race, and after a respawn. Every other touch still taps the slider.
+- [ ] **Keyboard:** A or ← moves you in, D or → out, while you tap Space. Your character never walks, steering keys never show "Tap: SPACE or click", and **the camera stays put** when you press ← or → (they steer instead of turning the camera). In your first three races, ← → turn the camera as before.
 - [ ] **Gamepad:** D-pad left and right steer, and so does a flick of the left stick (one lane per flick; let the stick come back to the middle before the next). A and R2 still tap.
 - [ ] **No steering press ever scores as a tap:** press only ◀ ▶ (or A/D, or the D-pad) through a few passes: no tap word, the speed meter dips as for untapped passes, and the Final Burst is never spent.
-- [ ] Your horse starts gliding the moment you press, even with lag (network simulator at 200 ms). If the lane has no room, it eases back and tucks in instead; it never swerves out and back.
+- [ ] Your horse starts gliding the moment you press, even with lag (network simulator at 200 ms), and never ends up in a lane the server didn't give it: mash ◀, press twice quickly, and press In then Out; your horse always settles where the others see it. If the lane has no room, it eases back and tucks in instead.
 - [ ] **Smart Steer:** after a press your horse is left alone for 5 s, then heads in before the turns again, never out (a rider who took the rail keeps it). With Settings → Smart Steer Off, your horse changes lane only when you press.
 - [ ] **The lock:** three soft bell ticks (silent until `lock_tick` is uploaded), then "Lanes locked!" at the far turn on every distance. The buttons grey, then fade before the Final Burst. With Reduced Motion on, nothing pops or shakes.
-- [ ] **Chips:** "Saved ground!" leaving a turn on the rail; "Tucked in!" with wind lines while you sit behind a horse in your lane; "The rail is shorter on turns ◀" when you steer yourself and are wide going into a turn (at most twice a race). No chip ever says you lost a place, and nothing counts down.
+- [ ] **Chips:** "Saved ground!" leaving a turn on the rail (after you've steered that race); "Tucked in!" with wind lines while you sit behind a horse in your lane (at most 3 a race); "The rail is shorter on turns ◀" when you steer yourself and are wide going into a turn (at most twice a race). No chip ever says you lost a place, and nothing counts down.
 - [ ] Steering counts now (`GameConfig.steering.scale = 1`): at the lock the arrow on your place badge may move a little. Results look as before (the trip line comes in S4).
 - [ ] Output prints one `[Trip]` line per race at the lock (riders' posts, Smart Steer or not, tau, how presses were answered). A rider leaving mid-race goes to Smart Steer, with no errors.
 

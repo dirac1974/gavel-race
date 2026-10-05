@@ -32,9 +32,9 @@ RaceState.watchHidden = false   -- watching: the HUD is hidden (busy, or walked 
 RaceState.cheeredLane = nil     -- watching: the lane you cheered for (FanClient)...
 RaceState.cheeredCourse = nil   -- ...in a race on this course
 RaceState.cheerOpen = false     -- watching: the cheer strip is still open (FanClient)
--- Steering (D-054 S3): RaceView sets this; RaceController calls it on each press, so your own
--- glide starts on your screen at once. Returns true if your horse started over.
-RaceState.predictSteer = function(_dir: number): boolean return false end
+-- Steering (D-054 S3): RaceView sets this; RaceController calls it on each press (dir, seq), so
+-- your own glide starts on your screen at once. Returns true if your horse started over.
+RaceState.predictSteer = function(_dir: number, _seq: number): boolean return false end
 
 -- Race HUD size on small screens (D-055): the board, place badge, results card and race map
 -- shrink with the screen height. The race map's top and unscaled height place the badge under it.

@@ -48,13 +48,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local baselineJson = serde.decode("json", fs.readFile("tests/fixtures/trip_baseline.json"))
 
 	-- GameConfig mirrors the Python CONFIG and RACE; TripBaseline is the generated table.
-	-- GameConfig.steering mirrors CONFIG, except two game-only switches: S1's post draw and S3's
-	-- spam limit on steering requests. S2 shipped cosmetic (scale 0); S3's controls set the model's 1.
+	-- GameConfig.steering mirrors CONFIG, except two game-only switches (S1's post draw and S3's
+	-- spam limit on steering requests) and the scale, a documented switch (0 = cosmetic; S3 ships
+	-- the model's 1). Parity runs at the fixture's scale.
 	local steering = table.clone(GameConfig.steering)
 	steering.drawPosts = nil
 	steering.requestsPerSecond = nil
-	check(deepEqual(steering, data.cfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py")
-	check(GameConfig.steering.scale == 1 and data.cfg.scale == 1, "S3: steering counts (scale 1, as in the model)")
+	steering.scale = nil
+	local pyCfg = table.clone(data.cfg)
+	pyCfg.scale = nil
+	check(deepEqual(steering, pyCfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py (the scale switch aside)")
+	check(GameConfig.steering.scale >= 0 and GameConfig.steering.scale <= 1, "the steering scale is between 0 (cosmetic) and 1")
 	local race = Trip.raceParams(GameConfig)
 	check(deepEqual(race, data.race, 0), "Trip.raceParams(GameConfig) mirrors RACE in src/trip.py")
 	check(deepEqual(TripBaseline, baselineJson.baseline, 1e-15), "TripBaseline.luau is trip_baseline.json's baseline")
@@ -72,6 +76,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		local cfg = table.clone(GameConfig.steering)
 		cfg.drawPosts = nil
 		cfg.requestsPerSecond = nil
+		cfg.scale = data.cfg.scale -- the fixture's scale, whatever the game ships
 		cfg.smart = table.clone(cfg.smart)
 		if run.cfg then -- a run with other settings: copy the ones that differ (simple values)
 			for key, value in run.cfg do

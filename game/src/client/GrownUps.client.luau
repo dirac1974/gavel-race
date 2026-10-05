@@ -142,7 +142,7 @@ local function grownUpsTab()
 	para("👋 Hello, grown-ups!", 24, 1)
 	para(string.format("Play time this week: %d h %d min", mins // 60, mins % 60), 18, 2)
 	para("🏁 How races work: each horse's chance comes from its care and training; riding well (tapping in time) moves it up; a little luck shows near the finish. There is no gambling of any kind: entry is free, prizes are fixed before the race, and nothing can be bought to win.", 16, 3)
-	para("🧭 Riders can steer a little: the best trip is worth about 2 points of a 100-point ride, and nothing buys it. Smart Steer (on at first, in Settings) steers for riders who don't.", 16, 31)
+	para("🧭 Riders can steer a little: the best trip is worth about 2 points of a 100-point ride, and nothing buys it. Smart Steer is on unless turned off, and always on in a rider's first 3 races.", 16, 31)
 	local shop = d and d.shop
 	para("💎 Diamonds cost real money through Robux, 1 Diamond = 1 Robux in every pack (no bigger-pack bonus). They buy looks only: saddle cloths and helmets for riding around, barn paint, name plates and yard decor.", 16, 4)
 	para("Never for sale: horses, coats, stats, speed, Green Cash, food, Energy, race entries, fan gear, trophies, rosettes or anything random.", 16, 41)

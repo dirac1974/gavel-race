@@ -71,6 +71,7 @@ local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on,
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
+local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, course (D-054 S3)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
@@ -561,13 +562,13 @@ local function runRace(c, players: { Player })
 	-- Steering (D-054): the trip state, built after the posts (lane index = post), drawing its
 	-- two uniforms per lane after every other gate draw. Bots steer with Smart Steer and its bot
 	-- variety. nil when GameConfig.steering.enabled is false: today's race exactly.
-	-- Rider controls (S3): the ◀ ▶ buttons show from a player's introRaces + 1-th race (counting
-	-- the races before this one), the first time with a ghost-thumb tip. Riders ride with Smart
-	-- Steer, which their presses pause; a rider who turned it off in Settings and has the buttons
-	-- steers alone. While the buttons are hidden everyone has Smart Steer, so no kid is ever left
-	-- at their post with no way to move.
+	-- Rider controls (S3, Trip.riderControls): the ◀ ▶ buttons show from a player's introRaces +
+	-- 1-th race that counts, the first time with a ghost-thumb tip. Riders ride with Smart Steer,
+	-- which their presses pause; a rider who turned it off in Settings and has the buttons steers
+	-- alone. While the buttons are hidden everyone has Smart Steer (no kid is left at their post
+	-- with no way to move) and their tau is 0 (they can't affect their trip).
 	local trip = nil
-	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean } } = {}
+	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, kind: string } } = {}
 	local steers: { [Player]: boolean } = {}
 	if GameConfig.steering.enabled then
 		local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
@@ -575,16 +576,14 @@ local function runRace(c, players: { Player })
 			warn(string.format("[RaceService] no trip baseline for %s %s; posts count as equal", c.id, tostring(cond.distance)))
 			tripRow = table.create(GameConfig.lanes, 0)
 		end
-		local manual = {}
+		local riders = {}
 		for _, p in players do
-			local data = Profiles.get(p)
-			local shown = data ~= nil and (data.totals.races or 0) >= GameConfig.steering.introRaces
-			local smart = not (data and data.settings.smartSteer == false)
-			controls[p] = { shown = shown, smart = smart or not shown, tip = shown and data.flags.steerTip ~= true }
-			if shown then steers[p] = true end
-			if shown and not smart then manual[tostring(p.UserId)] = true end
+			local ctl = Trip.riderControls(Profiles.get(p), GameConfig.steering)
+			controls[p] = ctl
+			if ctl.shown then steers[p] = true end
+			riders[tostring(p.UserId)] = ctl.kind
 		end
-		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout, manual)
+		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout, riders)
 	end
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
@@ -658,7 +657,7 @@ local function runRace(c, players: { Player })
 			local parts, answers = {}, {}
 			for i, lane in session.lanes do
 				if not lane.isBot then
-					table.insert(parts, string.format("post %d %s tau %.4f", i, if trip.smart[i] then "smart" else "manual", session.tau[i]))
+					table.insert(parts, string.format("post %d %s tau %.4f", i, trip.riderKind[i] or "smart", session.tau[i]))
 				end
 			end
 			for answer, count in trip.answers do table.insert(answers, answer .. " " .. count) end
@@ -686,12 +685,29 @@ local function runRace(c, players: { Player })
 		-- once a second (a dropped packet is harmless).
 		local last = now()
 		local sentLanes, lanesAt = nil, -math.huge
+		local sentOwn: { [Player]: { number } } = {}
 		while alive() do
 			local t = now()
 			advanceTrip(t)
 			local w = RaceShape.blendWeight(t, tFar, postEnd, GameConfig.raceShape.blendPower)
 			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, t - last, t - tStart)
 			last = t
+			-- Each rider with the buttons hears about their own lane when it changes, up to the lock:
+			-- the lane taken, where it ends, the last press answered (their screen's prediction
+			-- starts from it and ends on the answer: SteerPredict).
+			if not trip.locked then
+				for p in steers do
+					local i = session:laneIndex(tostring(p.UserId))
+					if i and p.Parent then
+						local own = { trip.tgt[i], Trip.laneAfter(trip, i), trip.ack[i] }
+						local was = sentOwn[p]
+						if not was or was[1] ~= own[1] or was[2] ~= own[2] or was[3] ~= own[3] then
+							sentOwn[p] = own
+							SteerLane:FireClient(p, own[1], own[2], own[3], c.id)
+						end
+					end
+				end
+			end
 			local changed = sentLanes == nil or t - lanesAt >= 1
 			if not changed and lanes then
 				for i, x in lanes do
