@@ -90,6 +90,12 @@ GameConfig.touchLayout = {
 }
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
+-- Riding your own horse (D-056).
+GameConfig.riding = {
+	hopButton = true,   -- touch: a Hop button at Roblox's own jump spot while you ride
+	bobAmp = 0.15,      -- body bob, in step with the legs (hooves stay on the ground)
+	legLength = 2.45,   -- hip to hoof, for the hoof-lift correction
+}
 GameConfig.fans = {
 	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
 	clapSizeOnFoot = { 170, 90 },

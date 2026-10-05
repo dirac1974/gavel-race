@@ -214,6 +214,21 @@ function HorseLegs.apply(model: Instance, dist: number, dt: number, timeScale: n
 	pose(s)
 end
 
+-- The pose state of a horse `apply` is animating (phase, gait, blend), or nil.
+function HorseLegs.stateOf(model: Instance): any
+	return states[model]
+end
+
+-- How far the lowest hoof is lifted off the ground (studs) for legs `length` long: the body
+-- drops by this so a hoof is always planted (D-056).
+function HorseLegs.lowestLift(s, length: number): number
+	local lift = math.huge
+	for _, leg in HorseLegs.LEGS do
+		lift = math.min(lift, length * (1 - math.cos(math.rad(HorseLegs.poseAngle(s, leg)))))
+	end
+	return if lift == math.huge then 0 else lift
+end
+
 -- Legs straight down at once (a race or replay that has ended).
 function HorseLegs.rest(model: Instance?)
 	if not model then return end

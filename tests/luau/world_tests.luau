@@ -1342,6 +1342,18 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(HorseLegs.angle("stand", "LegFL", 0.3) == 0, "standing horses don't swing")
 	check(HorseLegs.gaitFor(16) == "trot" and HorseLegs.gaitFor(46) == "gallop", "riding trots at riding speed, gallops on Gallop (D-056)")
 	check(HorseLegs.gaitFor(10) == "walk", "slow walking is a walk")
+	-- The body drops by the lowest hoof's lift, so a hoof is always planted (D-056).
+	local lift = HorseLegs.newState()
+	check(HorseLegs.lowestLift(lift, 2.45) == 0, "standing: no hoof is lifted")
+	local maxLift = 0
+	for _ = 1, 600 do
+		HorseLegs.step(lift, 46 / 60, 1 / 60, 46)
+		local l = HorseLegs.lowestLift(lift, 2.45)
+		check(l >= 0, "a hoof lift is never negative")
+		maxLift = math.max(maxLift, l)
+	end
+	check(maxLift < 2.45 * (1 - math.cos(math.rad(HorseLegs.GAITS.gallop.amp * 1.1))),
+		"the lowest hoof is never lifted as high as one leg's full swing")
 	-- A planted hoof keeps up with the ground: stride over the hoof's sweep (D-056).
 	for _, g in { "walk", "trot" } do
 		check(HorseLegs.GAITS[g].stride <= 7, g .. " stride is short enough that hooves don't skate")

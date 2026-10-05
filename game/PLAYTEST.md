@@ -245,6 +245,19 @@ Riding the courses (T2: Sprint Lane and Mud Splash):
 - [ ] Watching: near the course you get the cheer strip at the top and a slim board (top 3 plus your rider on a phone, no %). Walk to the barn or open a shop: the race HUD hides, and no results card or burst text appears for races you didn't watch.
 - [ ] The first race after a server start has running legs on every horse.
 
+## Riding feel and world fixes (D-056)
+- [ ] Phone: while riding, a ⬆️ Hop button sits where Roblox's jump button was (Gallop above it) and hops the horse; the Get off button is never under your right thumb.
+- [ ] Riding at normal speed the horse trots; hooves don't slide along the ground and the gallop doesn't float.
+- [ ] Ride into a water trough, a garden bed and the fountain: the horse stops at them. Ride through the training course poles and logs: they never stop you.
+- [ ] Get off next to a fence or a closed plot: you land where the horse was, not on the other side.
+- [ ] Call your horse facing a wall: it turns to find room, or says "Find an open spot".
+- [ ] Your horse's stall is empty with "🐴 … is out riding" (or "🏁 … is at the races") while it's out, with no Care prompt; it's back when you get off or the race ends.
+- [ ] Phone: 💎 is a small pill at the top right; steering with the thumbstick never opens a panel; 🐴 in the dock opens My Horses. The 💎 button and the Tack & Paint counter are gone in line, in a race, on the results card, for 2 minutes after and during a training ride.
+- [ ] Taming: "Getting to know you…" then "💖 Friends!" (a new horse arrives) or "Not yet, try again!"; the wild horse walks back into the meadow, never bolts; wild horses turn smoothly.
+- [ ] PC: holding Shift while riding gallops and doesn't switch Shift Lock on.
+- [ ] The Trail bridge sits on the ground; the Race Board's board fits its wooden frame.
+- [ ] Still on a race horse after your race: Ride or Map says "Tap Done first".
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

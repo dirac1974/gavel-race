@@ -546,6 +546,13 @@ Travel.OnServerEvent:Connect(function(player: Player, dest: any)
 	if (lastTravel[player] or 0) > os.clock() - 1.5 then return end
 	lastTravel[player] = os.clock()
 	if player:GetAttribute("Racing") then return end
+	-- Still on a race horse after your race: its results card's Done gets you off (D-056).
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	if seat and seat.Name == "Saddle" and not seat:IsDescendantOf(workspace:FindFirstChild("RideHorses") or game) then
+		Profiles.notify(player, "Tap Done first", "map_fair")
+		return
+	end
 	arrive(player, dest)
 end)
 

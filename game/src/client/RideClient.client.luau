@@ -54,6 +54,20 @@ local gui = Ui.screen("Ride", 4)
 local gallopBtn = Ui.button(gui, "💨 Gallop", UDim2.fromOffset(130, 60), UDim2.new(1, -24, 1, -210), C.orange, 22)
 gallopBtn.AnchorPoint = Vector2.new(1, 1)
 gallopBtn.Visible = false
+-- Hop (D-056): riding switches the character's jumping off (a jump would throw you out of the
+-- saddle), which hides Roblox's own jump button on phones. This takes its place and size,
+-- under Gallop, and hops the horse. Training rides show their own Jump instead.
+local hopBtn = Ui.button(gui, "⬆️ Hop", UDim2.fromOffset(70, 70), UDim2.new(1, -95, 1, -90), C.sky, 20)
+hopBtn.Visible = false
+hopBtn:SetAttribute("NoPop", true)
+local function placeHop()
+	local cam = workspace.CurrentCamera
+	local small = not cam or math.min(cam.ViewportSize.X, cam.ViewportSize.Y) <= 500
+	local size = if small then 70 else 120
+	hopBtn.Size = UDim2.fromOffset(size, size)
+	hopBtn.Position = UDim2.new(1, -(size * 1.5 - 10), 1, if small then -90 else -210)
+end
+placeHop()
 
 local riding: Model? = nil
 local galloping = false
@@ -96,18 +110,21 @@ rideBtn.Activated:Connect(function()
 end)
 gallopBtn.Activated:Connect(function() setGallop(not galloping) end)
 
--- Shift = gallop while held (PC).
-ContextActionService:BindAction("GiddyUpGallop", function(_, state)
+-- Shift = gallop while held (PC). Bound above Shift Lock's own binding, so while you ride
+-- Shift gallops instead of locking the mouse (D-056); on foot it passes through as usual.
+ContextActionService:BindActionAtPriority("GiddyUpGallop", function(_, state)
 	if not riding then return Enum.ContextActionResult.Pass end
 	if state == Enum.UserInputState.Begin then setGallop(true) elseif state == Enum.UserInputState.End then setGallop(false) end
 	return Enum.ContextActionResult.Sink
-end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3, Enum.KeyCode.ButtonR2)
+end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3, Enum.KeyCode.ButtonR2)
 
-UserInputService.JumpRequest:Connect(function()
+local function hop()
 	if not riding or TrainingState.phase == "countdown" then return end
 	local hh = riding:FindFirstChildOfClass("Humanoid")
 	if hh and hh.FloorMaterial ~= Enum.Material.Air then hh.Jump = true end
-end)
+end
+UserInputService.JumpRequest:Connect(hop)
+hopBtn.MouseButton1Down:Connect(hop)
 
 local function setCharacterJump(enabled: boolean)
 	local h = myHumanoid()
@@ -169,8 +186,14 @@ RunService.RenderStepped:Connect(function()
 	end
 	-- Courses gallop by themselves, so the Gallop button steps aside (the training ride's own
 	-- Jump button takes that corner).
-	local showGallop = riding ~= nil and UserInputService.TouchEnabled and not TrainingState.active
+	local touch = Ui.touchLayout() -- the same touch rule as the dock (D-056)
+	local showGallop = riding ~= nil and touch and not TrainingState.active
 	if gallopBtn.Visible ~= showGallop then gallopBtn.Visible = showGallop end
+	local showHop = showGallop and GameConfig.riding.hopButton and not racing
+	if hopBtn.Visible ~= showHop then
+		hopBtn.Visible = showHop
+		if showHop then placeHop() end
+	end
 	-- Hide the ride button while racing or with no horse yet.
 	rideSlot.Visible = not racing and PlayerState.data ~= nil and #PlayerState.data.horses > 0
 	if not riding then return end
@@ -209,6 +232,7 @@ RunService.RenderStepped:Connect(function(dt)
 			local fast = speed > 22
 			local anim = rig:FindFirstChild("Anim")
 			if anim then HorseLegs.apply(anim, speed * dt, dt) end -- running legs (D-051)
+			local legs = anim and HorseLegs.stateOf(anim)
 			local stand, gallop = rig:FindFirstChild("Stand"), rig:FindFirstChild("Gallop")
 			local showGallop = gallop ~= nil and (fast or stand == nil)
 			for model, visible in { [stand or false] = not showGallop, [gallop or false] = showGallop } do
@@ -222,12 +246,21 @@ RunService.RenderStepped:Connect(function(dt)
 					end
 				end
 			end
-			-- Bob in step: quicker and higher at a gallop, a gentle nod at a walk, still when stopped.
-			local hz = if fast then 2.2 else 1.6
-			phase[rig] = ((phase[rig] or 0) + dt * hz * math.min(1, speed / 8)) % 1
-			local amp = if fast then 0.45 else 0.12
-			local y = amp * math.abs(math.sin(phase[rig] * math.pi * 2)) * math.min(1, speed / 8)
-			motor.Transform = CFrame.new(0, y, 0) * CFrame.Angles(if fast then math.sin(phase[rig] * math.pi * 2) * 0.04 else 0, 0, 0)
+			if legs then
+				-- Running legs (D-056): the body bobs in step with the legs, and drops by the lowest
+				-- hoof's lift so a hoof is always on the ground (no floating gallop).
+				local ride = GameConfig.riding
+				local y = ride.bobAmp * math.abs(math.sin(legs.phase * math.pi * 2)) * legs.blend
+					- HorseLegs.lowestLift(legs, ride.legLength)
+				motor.Transform = CFrame.new(0, y, 0)
+			else
+				-- Bob in step: quicker and higher at a gallop, a gentle nod at a walk, still when stopped.
+				local hz = if fast then 2.2 else 1.6
+				phase[rig] = ((phase[rig] or 0) + dt * hz * math.min(1, speed / 8)) % 1
+				local amp = if fast then 0.45 else 0.12
+				local y = amp * math.abs(math.sin(phase[rig] * math.pi * 2)) * math.min(1, speed / 8)
+				motor.Transform = CFrame.new(0, y, 0) * CFrame.Angles(if fast then math.sin(phase[rig] * math.pi * 2) * 0.04 else 0, 0, 0)
+			end
 		end
 	end
 	for rig in phase do
