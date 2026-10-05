@@ -23,8 +23,11 @@ local PaceMeter = require(Shared:WaitForChild("PaceMeter"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ThemePack = require(Shared:WaitForChild("ThemePack"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
+local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
@@ -33,6 +36,38 @@ local DEFAULT_MAX_ZOOM = 128
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
+
+-- Race sounds (Sound.luau) on the shared clock. Each race the HUD follows gets a new cueRace,
+-- and a newer or stopped race cancels pending cues. Riders always hear their own race;
+-- spectators hear it at half volume, and only near that race's course. Only riders hear
+-- their own hoofbeats, and only while they're in the saddle.
+local SPECTATOR_HEARING_STUDS = 250 -- from the course's outer edge (D-052)
+local cueRace, cueVolume, cueRider, cueCourse = 0, 1, false, "dirt"
+local function nearCourse(courseId: string): boolean
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return false end
+	local cfg = TrackLayout.courses[courseId] or TrackLayout.churchill
+	return TrackLayout.distanceToTrack(cfg, root.Position.X, root.Position.Z) <= SPECTATOR_HEARING_STUDS
+end
+local function cue(at: number, ...)
+	if not Sound then return end
+	local id, names, volume, rider, course = cueRace, { ... }, cueVolume, cueRider, cueCourse
+	task.delay(math.max(0, at - serverNow()), function()
+		if id ~= cueRace then return end
+		if not rider and not nearCourse(course) then return end
+		for _, name in names do Sound.play(name, volume) end
+	end)
+end
+local stopGallop = nil
+local function gallop(on: boolean)
+	if stopGallop then stopGallop() end
+	stopGallop = if on and Sound then Sound.loop("gallop_loop") else nil
+end
+local function seated(): boolean
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	return humanoid ~= nil and humanoid.SeatPart ~= nil
+end
+player.CharacterAdded:Connect(function() gallop(false) end) -- a new character isn't in the saddle
 
 local function reducedMotion(): boolean
 	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
@@ -420,6 +455,7 @@ local function tap()
 		showResultIcon(labelText)
 		hint.Text = ""
 		if labelText == "Perfect" or labelText == "Great" then
+			if Sound then Sound.play("tap_good") end
 			RaceState.nudgeAt = t -- instant, luck-free nudge on your own horse (D-033)
 		end
 		if RaceState.recording then table.insert(RaceState.recording.events, { t = t, kind = "tap", label = labelText }) end
@@ -455,6 +491,10 @@ end
 
 RunService.RenderStepped:Connect(function()
 	local t = serverNow()
+	if stopGallop and not (RaceState.active and RaceState.myLane and seated()) then gallop(false) end
+	-- Meter state belongs to one race; a race the HUD followed before never runs on into this one.
+	if paceState and paceState.race ~= cueRace then paceState = nil end
+	if burstState and burstState.race ~= cueRace then burstState = nil end
 	if chanceArrow.Visible and os.clock() > arrowUntil then chanceArrow.Visible = false end
 	if RaceState.active and os.clock() - lastHud > 0.2 then
 		lastHud = os.clock()
@@ -508,6 +548,7 @@ RunService.RenderStepped:Connect(function()
 				burst.stroke.Thickness = 6 + 2 * math.abs(math.sin(t * 6)) -- pulsing gold rim (3 Hz)
 			end
 		elseif t > burstState.close then
+			if burstState.race == cueRace then cue(t, "vo_stretch") end -- "Down the stretch they come!"
 			if not burstState.tapped then feedback.Text = "Missed the Final Burst!" end
 			burst.bar.Visible, burstTitle.Visible = false, false
 			burstState = nil
@@ -522,10 +563,15 @@ remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
 end)
 
 local pendingBurstOpen = nil
+local finishAt = 0 -- when the field reaches the line (same sums as RaceService)
 local COURSE_NAME = { dirt = "Dirt course", turf = "Turf course" }
 remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen, courseId)
 	-- Two races can run at once (D-036): follow yours, or the newest when watching.
 	if not RaceState.consider(courseId or "dirt", laneList, start) then return end
+	-- The HUD follows this race now: drop the meters and pending cues of the one it followed before.
+	cueRace += 1
+	paceState, burstState = nil, nil
+	hideMeters()
 	pendingBurstOpen = burstOpen
 	lanes = laneList
 	chances = {}
@@ -549,6 +595,25 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	showResultIcon(nil)
 	speedFill.Size = UDim2.fromScale(0, 1)
 	renderBoard()
+	-- Sound cues: the bell as the gate opens and "And they're off!" just after it (so they don't
+	-- stack), "Into the far turn!" as the field enters the final far turn, your hoofbeats while you ride.
+	cueVolume, cueRider, cueCourse = if riding then 1 else 0.5, riding, courseId or "dirt"
+	gallop(false)
+	cue(start, "gate_bell")
+	cue(start + 0.25, "vo_off")
+	if riding and Sound then
+		local id = cueRace
+		task.delay(math.max(0, start - serverNow()), function()
+			if id == cueRace and seated() then gallop(true) end
+		end)
+	end
+	if burstOpen then
+		local tTop = burstOpen - GameConfig.burstAfterTurnSeconds
+		local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
+		local tFar = tTop - math.pi * TrackLayout.laneRadius(cfg, 1) / GameConfig.raceSpeedStudsPerSecond
+		finishAt = tTop + cfg.finishFromTop / GameConfig.raceSpeedStudsPerSecond
+		if tFar > start + 4 then cue(tFar, "vo_far_turn") end
+	end
 	if riding then
 		setJumping(false)
 		task.delay(math.max(0, start - serverNow() - 1), rideCamera, true)
@@ -606,7 +671,7 @@ end)
 
 remotes.PaceSchedule.OnClientEvent:Connect(function(passes, courseId)
 	if not RaceState.isFocus(courseId) then return end
-	paceState = { passes = passes, tapsByPass = {}, firstTap = {}, done = 0, recent = {}, burstOpen = pendingBurstOpen }
+	paceState = { passes = passes, tapsByPass = {}, firstTap = {}, done = 0, recent = {}, burstOpen = pendingBurstOpen, race = cueRace }
 end)
 
 local function stars(score: number): number
@@ -624,7 +689,8 @@ end)
 remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec, _name, courseId)
 	if not RaceState.isFocus(courseId) then return end
 	pace.bar.Visible = false
-	burstState = { seg = seg, open = open, close = close, spec = spec, tapped = false }
+	burstState = { seg = seg, open = open, close = close, spec = spec, tapped = false, race = cueRace }
+	cue(open, "burst_whoosh", "vo_burst")
 	feedback.Text, hint.Text = "", if riding then "One big tap in the glow. It counts double!" else ""
 	showResultIcon(nil)
 	tapArea.Visible = riding
@@ -638,6 +704,7 @@ remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText, courseI
 	feedback.Text = ""
 	hint.Text = "Stretch drive! Keep tapping to the line"
 	showResultIcon(labelText)
+	if Sound and score >= 80 then Sound.play("tap_good", 1.4) end
 	celebrate(score, labelText) -- the burst is scored on arrival; the window may still be open for others
 end)
 
@@ -674,12 +741,16 @@ end)
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	if not RaceState.isFocus(courseId) then return end
 	-- The server hit an error mid-race: clear the race screens and give control back.
+	cueRace += 1
+	gallop(false)
 	paceState, burstState = nil, nil
 	hideMeters()
 	burstBanner.Visible, results.Visible, placeBadge.Visible = false, false, false
 	if riding then
 		rideCamera(false)
 		setJumping(true)
+		RaceState.resultsPending = false
+		RaceState.ResultsShown:Fire(false) -- no results card is coming
 	end
 	riding = false
 	status.Text = "That race stopped early. Sorry! Tap RACE! to try again."
@@ -715,7 +786,7 @@ remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace)
 	if RaceState.recording then RaceState.recording.ride = rideReport end
 end)
 
-local function showResults(summary)
+local function showResults(summary, raceId: number)
 	-- Top four with ribbons, plus your own place if you finished lower.
 	local shown = {}
 	for _, row in summary do
@@ -751,6 +822,11 @@ local function showResults(summary)
 	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
 	doneBtn.Visible = true
 	results.Visible = true
+	if raceId == cueRace then cue(0, "vo_finish") end -- "What a finish!", only if the HUD still follows this race
+	if RaceState.resultsPending then -- your own card: the Hud's coin chime plays now, with it
+		RaceState.resultsPending = false
+		RaceState.ResultsShown:Fire(true)
+	end
 	placeBadge.Visible = false
 	status.Text = "Results"
 	feedback.Text, hint.Text = "", ""
@@ -765,9 +841,11 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	feedback.Text, hint.Text = "", ""
 	showResultIcon(nil)
 	status.Text = "And they're home!"
-	task.delay(GameConfig.runInSeconds, showResults, summary)
+	cue(finishAt, "finish_fanfare", "crowd_cheer") -- as the leader reaches the line
+	task.delay(GameConfig.runInSeconds, showResults, summary, cueRace)
 	rideReport = nil
 	if riding then
+		RaceState.resultsPending = true -- the Hud holds the coin chime for the results card
 		-- Riders stay on their horse for the results and replay; Done gets them off. The
 		-- server also dismounts everyone after a timeout, so restore the camera then too.
 		task.delay(GameConfig.dismountTimeoutSeconds + 0.5, function()

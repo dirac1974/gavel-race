@@ -13,6 +13,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Care = require(Shared:WaitForChild("Care"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
@@ -240,6 +242,7 @@ local function gardenCard(bedIndex: number)
 		local progress = Care.cropProgress(b, workspace:GetServerTimeNow())
 		if progress >= 1 then
 			remote("Garden"):FireServer(bedIndex, "harvest")
+			if Sound then Sound.play("harvest_pop") end
 		else
 			Ui.toast(string.format("%s growing: %d%%", seed.label, math.floor(progress * 100)), "seed_carrot", "🌱")
 		end
@@ -367,6 +370,7 @@ end
 
 -- Little hearts and sparkles over a horse when someone cares for it (everyone sees them).
 local FX = { feed = "😋", groom = "✨", treat = "❤️", pet = "❤️" }
+local FX_SOUND = { feed = "munch", groom = "brush", treat = "munch", pet = "horse_nicker" }
 gameRemotes:WaitForChild("CareFx").OnClientEvent:Connect(function(plotIndex, horseId, kind)
 	local world = workspace:FindFirstChild("World")
 	local plot = world and world:FindFirstChild("Plots") and world.Plots:FindFirstChild("Plot" .. tostring(plotIndex))
@@ -374,6 +378,7 @@ gameRemotes:WaitForChild("CareFx").OnClientEvent:Connect(function(plotIndex, hor
 	local hm = barn and barn:FindFirstChild("Horse_" .. tostring(horseId))
 	local anchor = hm and (hm.PrimaryPart or hm:FindFirstChildWhichIsA("BasePart", true))
 	if not anchor then return end
+	if Sound then Sound.play(FX_SOUND[kind] or "horse_nicker", 1, anchor) end -- heard near the horse
 	for k = 1, 5 do
 		local bb = Instance.new("BillboardGui")
 		bb.Size = UDim2.fromOffset(40, 40)
