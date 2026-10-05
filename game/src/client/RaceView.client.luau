@@ -46,7 +46,9 @@ end
 
 local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { p, t } for the legs
 
-local function place(i: number, p: number, bob: number, plan, courseId: string?)
+-- `timeScale`: how fast the race clock runs (replays in slow motion), so the legs pick the gait
+-- for the race's real speed.
+local function place(i: number, p: number, bob: number, plan, courseId: string?, timeScale: number?)
 	local horse = horseModel(courseId, i)
 	if not horse then return end
 	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
@@ -59,11 +61,26 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?)
 		local prev = lastPlaced[horse]
 		local dist = if prev then math.max(0, (p - prev.p) * plan.lengths[i]) else 0
 		local dt = if prev then math.clamp(now - prev.t, 0, 0.2) else 0
-		lastPlaced[horse] = { p = p, t = now }
-		HorseLegs.apply(horse, dist, dt)
+		if prev then
+			prev.p, prev.t = p, now
+		else
+			lastPlaced[horse] = { p = p, t = now }
+		end
+		HorseLegs.apply(horse, dist, dt, timeScale)
 	end
 end
 RaceState.placeHorse = place -- the replay uses the same placement
+
+-- Legs straight down for every horse on a course (a race or replay has ended).
+function RaceState.restHorses(courseId: string?, lanes: number)
+	for i = 1, lanes do
+		local horse = horseModel(courseId, i)
+		if horse then
+			lastPlaced[horse] = nil
+			HorseLegs.rest(horse)
+		end
+	end
+end
 
 -- Past the line, ease to a stop instead of running on.
 local function easePastLine(p: number): number
@@ -154,6 +171,7 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 		end
 		if race.done and (allStopped or t - race.doneAt > GameConfig.runInSeconds + 4) then
+			RaceState.restHorses(courseId, race.lanes)
 			races[courseId] = nil -- the horses stay where they stopped until the next race (or the replay)
 			if isFocus then RaceState.active = false end
 		end

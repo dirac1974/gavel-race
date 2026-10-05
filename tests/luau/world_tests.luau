@@ -612,4 +612,27 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(okDiag, "trot moves diagonal pairs together")
 	check(close(HorseLegs.advance(0.9, "gallop", 22 * 0.25), 0.15, 1e-9), "phase follows distance (one stride per stride length)")
 	check(HorseLegs.angle("stand", "LegFL", 0.3) == 0, "standing horses don't swing")
+	check(HorseLegs.gaitFor(16) == "walk" and HorseLegs.gaitFor(46) == "gallop", "riding walks at walk speed, gallops on Gallop")
+	-- Gait changes cross-fade: no leg jumps more than a few degrees in a frame.
+	local st = HorseLegs.newState()
+	local worst, steady, dt = 0, 0, 1 / 60
+	local last = {}
+	local speeds = {}
+	for f = 1, 240 do speeds[f] = 56 end           -- gallop
+	for f = 241, 300 do speeds[f] = 56 - (f - 240) * 0.6 end -- slow through trot
+	for f = 301, 420 do speeds[f] = 14 end          -- walk
+	for f = 1, #speeds do
+		HorseLegs.step(st, speeds[f] * dt, dt, speeds[f])
+		for _, leg in HorseLegs.LEGS do
+			local a = HorseLegs.poseAngle(st, leg)
+			if last[leg] and f > 30 then
+				local d = math.abs(a - last[leg])
+				if f <= 240 then steady = math.max(steady, d) else worst = math.max(worst, d) end
+			end
+			last[leg] = a
+		end
+	end
+	check(worst <= steady * 1.05, string.format("legs never jump when the gait changes (worst step %.1f° vs %.1f° galloping)", worst, steady))
+	for f = 1, 60 do HorseLegs.step(st, 0, dt, 0) end
+	check(math.abs(HorseLegs.poseAngle(st, "LegFL")) < 1e-6, "a horse that stops eases back to standing")
 end

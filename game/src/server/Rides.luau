@@ -188,6 +188,10 @@ local function build(player: Player, h, at: CFrame): Model
 
 	-- Running legs when the split model is there (D-051); otherwise standing and galloping poses.
 	local anim = modelFor("horse_anim_" .. h.coat)
+	if anim and not HorseLegs.has(anim) then -- the legs didn't import as separate parts
+		anim:Destroy()
+		anim = nil
+	end
 	local stand = if anim then nil else modelFor("horse_stand_" .. h.coat)
 	local gallop = if anim then nil else (modelFor("horse_gallop_" .. h.coat) or modelFor("horse_" .. h.coat)) -- new coats use horse_gallop_<coat>
 	if not anim and not stand and not gallop then stand = placeholder(h.coat) end
@@ -213,6 +217,12 @@ local function build(player: Player, h, at: CFrame): Model
 	seat.CanCollide, seat.CanTouch, seat.CanQuery = false, false, false -- only Sit() seats anyone
 	seat.Massless = true
 	seat.CFrame = at * CFrame.new(0, height * 0.6, 0.5)
+	local cloth = anim and anim:FindFirstChild("Cloth", true)
+	if cloth and cloth:IsA("BasePart") then
+		-- Running-legs horse: sit on its back, just below the top of the fitted cloth.
+		local top = at:PointToObjectSpace(cloth.Position + Vector3.new(0, cloth.Size.Y / 2, 0))
+		seat.CFrame = at * CFrame.new(0, top.Y - 0.34, top.Z)
+	end
 	seat.Parent = rig
 	local sw = Instance.new("WeldConstraint")
 	sw.Part0, sw.Part1 = root, seat

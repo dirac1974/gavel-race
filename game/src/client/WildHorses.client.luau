@@ -29,7 +29,9 @@ folder.Parent = workspace
 
 local function modelFor(coat: string): Model
 	local f = ReplicatedStorage:FindFirstChild("RaceModels")
-	local m = f and (f:FindFirstChild("horse_anim_" .. coat) or f:FindFirstChild("horse_stand_" .. coat) or f:FindFirstChild("horse_gallop_" .. coat))
+	local anim = f and f:FindFirstChild("horse_anim_" .. coat)
+	if anim and not HorseLegs.has(anim) then anim = nil end -- legs didn't import separately
+	local m = f and (anim or f:FindFirstChild("horse_stand_" .. coat) or f:FindFirstChild("horse_gallop_" .. coat))
 	if m then
 		local c = m:Clone()
 		for _, d in c:GetDescendants() do
@@ -77,8 +79,11 @@ task.spawn(function()
 end)
 
 local lastPos = setmetatable({}, { __mode = "k" })
+local LEGS_RANGE = 150 -- studs from the camera; farther horses glide (nobody can see their feet)
 RunService.Heartbeat:Connect(function(dt)
 	local t = workspace:GetServerTimeNow()
+	local camera = workspace.CurrentCamera
+	local eye = camera and camera.CFrame.Position
 	for i, h in horses do
 		if h.model.Parent and not h.still then
 			-- graze for the first half of a leg, then walk to the next spot (Market.wildPosition)
@@ -87,9 +92,9 @@ RunService.Heartbeat:Connect(function(dt)
 			local look = Vector3.new(dx, 0, dz)
 			local bob = if walk > 0 and walk < 1 then 0.12 * math.abs(math.sin(t * 6 + i)) else 0
 			h.model:PivotTo(CFrame.lookAt(pos + Vector3.new(0, bob, 0), pos + look + Vector3.new(0, bob, 0)))
-			if HorseLegs.has(h.model) then
-				local prev = lastPos[h.model]
-				lastPos[h.model] = pos
+			local prev = lastPos[h.model]
+			lastPos[h.model] = pos
+			if eye and (pos - eye).Magnitude < LEGS_RANGE and HorseLegs.has(h.model) then
 				HorseLegs.apply(h.model, if prev then (pos - prev).Magnitude else 0, dt)
 			end
 		end

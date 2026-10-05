@@ -20,6 +20,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local UiAtlas = require(Shared:WaitForChild("UiAtlas"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 
 local TrackScene = {}
 
@@ -315,6 +316,35 @@ local function placeholderHorse(i: number): Model
 	return m
 end
 
+-- Race-day saddle cloth (running-legs horses, D-051): the fitted Cloth piece in the lane's
+-- colour with the lane number on both sides, like a real race number cloth.
+local function laneCloth(horse: Model, i: number): BasePart?
+	local cloth = horse:FindFirstChild("Cloth", true)
+	if not cloth or not cloth:IsA("MeshPart") then return nil end
+	cloth.TextureID = ""
+	cloth.Material = Enum.Material.Fabric
+	cloth.Color = LANE_COLOURS[i]
+	cloth.Transparency = 0
+	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = face
+		sg.CanvasSize = Vector2.new(200, 120)
+		sg.LightInfluence = 1
+		sg.Parent = cloth
+		local l = Instance.new("TextLabel")
+		l.AnchorPoint = Vector2.new(0.5, 0.5)
+		l.Position = UDim2.fromScale(0.5, 0.62)
+		l.Size = UDim2.fromScale(0.5, 0.5)
+		l.BackgroundTransparency = 1
+		l.Font = Enum.Font.GothamBlack
+		l.TextScaled = true
+		l.Text = tostring(i)
+		l.TextColor3 = if LIGHT_LANES[i] then Color3.fromHex("1F2430") else Color3.new(1, 1, 1)
+		l.Parent = sg
+	end
+	return cloth
+end
+
 local function badge(i: number): BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "LaneBadge"
@@ -403,7 +433,12 @@ function Course:build(plan, coats: { string? }?)
 		local coat = (coats and coats[i]) or COATS[i]
 		-- Running legs first (horse_anim_<coat>, D-051); then the one-piece gallop poses (the first
 		-- five coats are uploaded as horse_<coat>, the newer ones as horse_gallop_<coat>).
-		local horse = modelFor("horse_anim_" .. coat) or modelFor("horse_gallop_" .. coat) or modelFor("horse_" .. coat)
+		local horse = modelFor("horse_anim_" .. coat)
+		if horse and not HorseLegs.has(horse) then -- the legs didn't import as separate parts
+			horse:Destroy()
+			horse = nil
+		end
+		horse = horse or modelFor("horse_gallop_" .. coat) or modelFor("horse_" .. coat)
 			or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
 		horse:PivotTo(self:laneCFrame(i, 0))
@@ -411,6 +446,14 @@ function Course:build(plan, coats: { string? }?)
 		-- The saddle is anchored inside the model, so pivoting the horse moves it, and a
 		-- seated rider (welded to it by the Seat) moves with the horse.
 		local _, size = horse:GetBoundingBox()
+		-- On a running-legs horse the jockey sits on the race cloth, a little below its top
+		-- (the same seat depth the gallop models were tuned to).
+		local cloth = laneCloth(horse, i)
+		local seatY, seatZ = horse:GetAttribute("SaddleY") or size.Y * SADDLE_HEIGHT, size.Z * SADDLE_BACK
+		if cloth then
+			local top = horse:GetPivot():PointToObjectSpace(cloth.Position + Vector3.new(0, cloth.Size.Y / 2, 0))
+			seatY, seatZ = top.Y - 0.34, top.Z
+		end
 		local saddle = Instance.new("Seat")
 		saddle.Name = "Saddle"
 		saddle.Size = Vector3.new(2, 0.4, 2)
@@ -418,7 +461,7 @@ function Course:build(plan, coats: { string? }?)
 		saddle.Anchored = true
 		saddle.CanCollide = false
 		saddle.CanTouch = false -- nobody sits by walking into it; the server seats riders
-		saddle.CFrame = horse:GetPivot() * CFrame.new(0, horse:GetAttribute("SaddleY") or size.Y * SADDLE_HEIGHT, size.Z * SADDLE_BACK)
+		saddle.CFrame = horse:GetPivot() * CFrame.new(0, seatY, seatZ)
 		saddle.Parent = horse
 		horse.Parent = horseFolder
 		self.horses[i] = horse

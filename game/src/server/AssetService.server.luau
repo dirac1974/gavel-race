@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UiImages = require(Shared:WaitForChild("UiImages"))
 local MeshAssets = require(Shared:WaitForChild("MeshAssets"))
 local ModelSpecs = require(Shared:WaitForChild("ModelSpecs"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 
 -- Used when a slot has no ModelSpecs entry (and warned about), so a new upload still shows.
 local FALLBACK = { axis = "Y", studs = 4.0, yaw = 0, collide = true }
@@ -87,6 +88,16 @@ local function normalize(container: Model, slot: string): Model
 	model:PivotTo(CFrame.new(cf.Position) * CFrame.Angles(0, yaw, 0))
 	local cf2, ext = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(cf2.Position - Vector3.new(0, ext.Y / 2, 0))
+	-- Running-legs horses (D-051): remember where each leg rests, and keep the fitted saddle
+	-- cloth hidden until a race or a rider's look shows it.
+	if HorseLegs.has(model) then
+		HorseLegs.markRest(model)
+		local cloth = model:FindFirstChild("Cloth", true)
+		if cloth and cloth:IsA("BasePart") then
+			cloth.Transparency = 1
+			cloth.CastShadow = false
+		end
+	end
 	return model
 end
 

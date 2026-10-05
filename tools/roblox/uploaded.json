@@ -98,88 +98,88 @@
   "uploadedAt": "2026-10-05T06:57:11Z"
  },
  "horse_anim_appaloosa": {
-  "assetId": 97744756796810,
+  "assetId": 102968333187443,
   "file": "Models/generated/horse_anim_appaloosa/horse_anim_appaloosa.glb",
   "kind": "Model",
-  "sha256": "a56cf6b901d73d3365a27107c4e0953efecfd07de8a76ff7493deb7c26b6ade7",
-  "uploadedAt": "2026-10-05T14:52:32Z"
+  "sha256": "96d40d6f563aef9639d97dc51b28f408b41386263fde42d3a15bfc4933a19b18",
+  "uploadedAt": "2026-10-05T15:19:53Z"
  },
  "horse_anim_bay": {
-  "assetId": 101324860196245,
+  "assetId": 127186487706767,
   "file": "Models/generated/horse_anim_bay/horse_anim_bay.glb",
   "kind": "Model",
-  "sha256": "af0e236cf338440a9de01501ac2b3db56d5eff30e3586186e00dced06f27fea5",
-  "uploadedAt": "2026-10-05T14:50:54Z"
+  "sha256": "4c9ad0ef58bfca3d905a3b706650bfc8dccb6af1218f660e8d9072a78dcad0f8",
+  "uploadedAt": "2026-10-05T15:18:24Z"
  },
  "horse_anim_black": {
-  "assetId": 92668484790160,
+  "assetId": 116954594924364,
   "file": "Models/generated/horse_anim_black/horse_anim_black.glb",
   "kind": "Model",
-  "sha256": "810eaefa9537e21bfdf167af1394862535d9677b687eeff0479918e4bf096394",
-  "uploadedAt": "2026-10-05T14:51:38Z"
+  "sha256": "753c9ce3582953f3b233addeaa23c54b583b46fbaee69350e501744989c28bb1",
+  "uploadedAt": "2026-10-05T15:19:15Z"
  },
  "horse_anim_buckskin": {
-  "assetId": 89287450165065,
+  "assetId": 126589145387850,
   "file": "Models/generated/horse_anim_buckskin/horse_anim_buckskin.glb",
   "kind": "Model",
-  "sha256": "398ab541f1f101b33e0a6199b932cb014c74f044ee5423c9c7f1c1244bf7b95b",
-  "uploadedAt": "2026-10-05T14:52:44Z"
+  "sha256": "737658b22b333678667a9030c7125e39448ea66e80656c716e0425ac68ac6ef1",
+  "uploadedAt": "2026-10-05T15:20:06Z"
  },
  "horse_anim_chestnut": {
-  "assetId": 125159639304574,
+  "assetId": 71656069854607,
   "file": "Models/generated/horse_anim_chestnut/horse_anim_chestnut.glb",
   "kind": "Model",
-  "sha256": "04e6f8abfc3af3c179189bc8cc763c899a70b045ca7dffcb2a755b7f1b9b4469",
-  "uploadedAt": "2026-10-05T14:51:09Z"
+  "sha256": "2ed415f52e56bed0ca4e62d066d2ac5ff4b69c0e5fb4a781b1ba27e46aa6f5f3",
+  "uploadedAt": "2026-10-05T15:18:43Z"
  },
  "horse_anim_chestnut_blaze": {
-  "assetId": 127714066561359,
+  "assetId": 137831810822341,
   "file": "Models/generated/horse_anim_chestnut_blaze/horse_anim_chestnut_blaze.glb",
   "kind": "Model",
-  "sha256": "3a65b5f074a58a7ba03d665ec7481c966abf926daa36a384b143bcce59dfea41",
-  "uploadedAt": "2026-10-05T14:53:53Z"
+  "sha256": "5b68ab3c4459a2710e74e851c0b86e8708e7abafabed6fb04525b95fa5292243",
+  "uploadedAt": "2026-10-05T15:20:52Z"
  },
  "horse_anim_dun": {
-  "assetId": 70935040255005,
+  "assetId": 78052343116000,
   "file": "Models/generated/horse_anim_dun/horse_anim_dun.glb",
   "kind": "Model",
-  "sha256": "9d70110425dd65ac75c57df3e8e978dd7c4087fa10e04c5caf8780bc2ceafd58",
-  "uploadedAt": "2026-10-05T14:53:02Z"
+  "sha256": "d3ce83e35ee04b7c587ae43ebb8ef9f621045ce013d0be23555e3051496cddde",
+  "uploadedAt": "2026-10-05T15:20:18Z"
  },
  "horse_anim_grey": {
-  "assetId": 105539685336659,
+  "assetId": 96123211911338,
   "file": "Models/generated/horse_anim_grey/horse_anim_grey.glb",
   "kind": "Model",
-  "sha256": "93e8178f2dbfe907cff416fab3e53b15a7343a332fed0e6ab92c91e496b5234f",
-  "uploadedAt": "2026-10-05T14:51:25Z"
+  "sha256": "2ca14391856df9074cc71a4628353f14a491023a8220c74b164467c9be4091ce",
+  "uploadedAt": "2026-10-05T15:19:03Z"
  },
  "horse_anim_palomino": {
-  "assetId": 131244615221191,
+  "assetId": 94618732910596,
   "file": "Models/generated/horse_anim_palomino/horse_anim_palomino.glb",
   "kind": "Model",
-  "sha256": "540f8899774c4821fa34d135e5b7603809a298c732e24a0b33bd271d41d9a660",
-  "uploadedAt": "2026-10-05T14:52:00Z"
+  "sha256": "9269b732c35f9337394d2077cf6bf19057effd76638c09736fe3ee0d3df10c37",
+  "uploadedAt": "2026-10-05T15:19:23Z"
  },
  "horse_anim_pinto": {
-  "assetId": 84750543342594,
+  "assetId": 138375079636535,
   "file": "Models/generated/horse_anim_pinto/horse_anim_pinto.glb",
   "kind": "Model",
-  "sha256": "67f2848e86fde35bb71a58d0ad6d6a20059e6a0c0e665f43d2881263af097072",
-  "uploadedAt": "2026-10-05T14:52:20Z"
+  "sha256": "155be194e2af73d67366ffa95035e7edb2072614700755e594bb8bca470026bb",
+  "uploadedAt": "2026-10-05T15:19:41Z"
  },
  "horse_anim_roan": {
-  "assetId": 115627164866646,
+  "assetId": 99122989050171,
   "file": "Models/generated/horse_anim_roan/horse_anim_roan.glb",
   "kind": "Model",
-  "sha256": "0d2603c882a88f7f10eefd7d42e9d5e49d37c6f92c5b5e0900080fece1b1b2bc",
-  "uploadedAt": "2026-10-05T14:53:21Z"
+  "sha256": "010074cac917b18ed3b0fece0651b016a595cd682eafc264631115ef91f047ee",
+  "uploadedAt": "2026-10-05T15:20:32Z"
  },
  "horse_anim_white": {
-  "assetId": 104229132279767,
+  "assetId": 132465176702932,
   "file": "Models/generated/horse_anim_white/horse_anim_white.glb",
   "kind": "Model",
-  "sha256": "6784cf53a3f592ab94a029e53ae11c76e70f02ce1b8e3308c78ee8d29a85c884",
-  "uploadedAt": "2026-10-05T14:53:39Z"
+  "sha256": "63f9cd7b574811f6cd4978d944312638bf2678d63a5eacaa9c6510c0695dab17",
+  "uploadedAt": "2026-10-05T15:20:39Z"
  },
  "horse_bay": {
   "assetId": 98817538977109,
