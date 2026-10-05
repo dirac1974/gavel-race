@@ -1,6 +1,6 @@
 # Audio plan: Giddy-Up
 
-Status: voice lines made and uploaded (2026-10-05); sound effects waiting on an ElevenLabs key permission (see "Blocked" below). Tone: County Fair Toy (docs/art/ART_DIRECTION.md): warm, sunny, friendly, short, nothing scary or loud. No wagering words in any prompt or line (CLAUDE.md rule 1; `tests/test_sound_assets.py` checks).
+Status: voice lines made, uploaded and approved by Roblox moderation (2026-10-05); sound effects waiting on an ElevenLabs key permission (see "Blocked" below). Tone: County Fair Toy (docs/art/ART_DIRECTION.md): warm, sunny, friendly, short, nothing scary or loud. No wagering words in any prompt or line (CLAUDE.md rule 1; `tests/test_sound_assets.py` checks).
 
 ## Pipeline
 
@@ -45,14 +45,14 @@ The key has no `user_read` permission, so `GET /v1/user/subscription` returns 40
 | job_done | P1 | reward sparkle | 1.5 s | 60 | | | not made |
 | clap | P1 | single hand clap (Clap Along) | 0.5 s | 20 | | | not made |
 | heartbeat | P1 | gentle stethoscope lub-dub (vet game, one per beat) | 0.8 s | 32 | | | not made |
-| vo_off | VO | "And they're off!" | 0.98 s | 16 | 4 | 130778732640541 | Reviewing |
-| vo_far_turn | VO | "Into the far turn!" | 1.35 s | 18 | 4 | 80734371828506 | Reviewing |
-| vo_burst | VO | "Final Burst!" | 0.98 s | 12 | 3 | 97283117250795 | Reviewing |
-| vo_stretch | VO | "Down the stretch they come!" | 1.39 s | 27 | 6 | 74640240555284 | Reviewing |
-| vo_finish | VO | "What a finish!" | 1.07 s | 14 | 3 | 115641721595924 | Reviewing |
-| vo_giddyup | VO | "Giddy-up!" | 0.88 s | 9 | 2 | 136221961883615 | Reviewing |
-| vo_welcome | VO | "Welcome to Giddy-Up!" | 1.16 s | 20 | 4 | 106737745847156 | Reviewing |
-| vo_photo | VO | "Photo finish!" | 1.02 s | 13 | 3 | 112611222026285 | Reviewing |
+| vo_off | VO | "And they're off!" | 0.98 s | 16 | 4 | 130778732640541 | Approved |
+| vo_far_turn | VO | "Into the far turn!" | 1.35 s | 18 | 4 | 80734371828506 | Approved |
+| vo_burst | VO | "Final Burst!" | 0.98 s | 12 | 3 | 97283117250795 | Approved |
+| vo_stretch | VO | "Down the stretch they come!" | 1.39 s | 27 | 6 | 74640240555284 | Approved |
+| vo_finish | VO | "What a finish!" | 1.07 s | 14 | 3 | 115641721595924 | Approved |
+| vo_giddyup | VO | "Giddy-up!" | 0.88 s | 9 | 2 | 136221961883615 | Approved |
+| vo_welcome | VO | "Welcome to Giddy-Up!" | 1.16 s | 20 | 4 | 106737745847156 | Approved |
+| vo_photo | VO | "Photo finish!" | 1.02 s | 13 | 3 | 112611222026285 | Approved |
 
 Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_v2_5` (the cheapest; the newer `eleven_v4_turbo` has no published credit rate yet), stability 0.35, speed 1.05. Every line came back clean on the first take (peaks -0.3 to -5.5 dBFS, no clipping, about 0.2 s of tail), so no re-rolls. Lines were checked by level and length only; nobody has listened yet.
 

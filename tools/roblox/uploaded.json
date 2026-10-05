@@ -416,7 +416,7 @@
   "assetId": 97283117250795,
   "file": "assets/audio/vo_burst.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "41da2375d882d31087128d84d8c2504a4c2d4176387cc7eb0c14094cd82b8cfb",
   "uploadedAt": "2026-10-05T14:49:04Z"
  },
@@ -424,7 +424,7 @@
   "assetId": 80734371828506,
   "file": "assets/audio/vo_far_turn.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "6d22789dfecffdb61f9715ecb1350d41c64027cb5f524656825404be6eff5543",
   "uploadedAt": "2026-10-05T14:49:08Z"
  },
@@ -432,7 +432,7 @@
   "assetId": 115641721595924,
   "file": "assets/audio/vo_finish.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "fafcddfd9a8902b0f0ed0b2066b556e3194358a5d79d69f0a4a4f86c0fe6c79e",
   "uploadedAt": "2026-10-05T14:49:10Z"
  },
@@ -440,7 +440,7 @@
   "assetId": 136221961883615,
   "file": "assets/audio/vo_giddyup.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "cfa0f33174167c10cb2a75d8d67035467bc08fc25fe06e54d675a0305a9a75b3",
   "uploadedAt": "2026-10-05T14:49:13Z"
  },
@@ -448,7 +448,7 @@
   "assetId": 130778732640541,
   "file": "assets/audio/vo_off.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "9d09c39b3d289432242a4c6649f38c6894db2cf7b6ae726ee2c9207d63e37b64",
   "uploadedAt": "2026-10-05T14:49:16Z"
  },
@@ -456,7 +456,7 @@
   "assetId": 112611222026285,
   "file": "assets/audio/vo_photo.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "18001756d756516a11928b1a3bac7a26cf854ef14efab47a4a54af1743118505",
   "uploadedAt": "2026-10-05T14:49:19Z"
  },
@@ -464,7 +464,7 @@
   "assetId": 74640240555284,
   "file": "assets/audio/vo_stretch.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "0f83026386c8500e23d7568105f1f3c6e551daf6e6dc6b3beaa8cca25d1dee0a",
   "uploadedAt": "2026-10-05T14:49:22Z"
  },
@@ -472,7 +472,7 @@
   "assetId": 106737745847156,
   "file": "assets/audio/vo_welcome.mp3",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "ee5653287cee1bb8979225bfd0fb4910ef9486dbbf4362006f097ff40679aec2",
   "uploadedAt": "2026-10-05T14:49:26Z"
  },
