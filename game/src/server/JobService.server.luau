@@ -23,7 +23,7 @@ local TRAIL_COOLDOWN = 10 * 60
 local trailAt: { [Player]: number } = {}
 local last: { [Player]: number } = {}
 
-Profiles.decorate = function(data, view)
+Profiles.addDecorator(function(data, view)
 	view.jobs = Jobs.view(data)
 	local now = os.time()
 	for i, b in view.garden or {} do
@@ -37,7 +37,7 @@ Profiles.decorate = function(data, view)
 			hv.rested = Training.isRested(h, now)
 		end
 	end
-end
+end)
 
 Profiles.Loaded.Event:Connect(function(player: Player)
 	local data = Profiles.get(player)

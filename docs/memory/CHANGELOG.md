@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: Stage 8 more horses: Market Corral, taming wild horses, building stalls, My Horses (D-037)
 - 2026-10-05 — feat: Stage 7 spectators: cheer bar, Clap Along with a tiny crowd boost, Fan XP, Top Fans (D-019, D-020, D-041)
 - 2026-10-04 — feat: Stage 4 Race Board: dirt and turf races at once, race cards, horse picker with today's fit (D-036)
 - 2026-10-04 — feat: Stage 6 training games and vet check-ups with the Health Passport (D-039, D-040)

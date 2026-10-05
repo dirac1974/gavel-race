@@ -55,6 +55,7 @@ Jobs.MONTHLY = {
 	{ id = "m_bond", event = "pet", target = 20, text = "Pet your horses 20 times", icon = "heart", go = "stable", reward = { stamps = 1, items = { treat = 4 } } },
 	{ id = "m_days10", event = "day", target = 10, text = "Visit your stable on 10 days", icon = "map_stable", go = "stable", reward = { stamps = 2, items = { hay = 20 } } },
 	{ id = "m_cheer10", event = "cheer", target = 10, text = "Cheer in 10 races", icon = "job_cheer", go = "track", reward = { stamps = 1, items = { treat = 3 } } },
+	{ id = "m_tame", event = "tame", target = 1, text = "Make friends with a wild horse", icon = "heart", go = "trailGate", reward = { stamps = 2, items = { apple = 4 } } },
 	{ id = "m_trail5", event = "visit_trail", target = 5, text = "Visit the flower meadow 5 times", icon = "map_trail", go = "trailGate", reward = { stamps = 1, items = { apple = 5 } } },
 } :: { Def }
 

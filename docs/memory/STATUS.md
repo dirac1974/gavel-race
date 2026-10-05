@@ -49,6 +49,11 @@ Last updated: 2026-10-04
 - `FanService`: cheers lock at the first checkpoint, claps via TapTime, crowd before each segment closes, Fan XP and strikes (2nd private note, 3rd fan play off 30 days, expire after 90) saved in the profile, Top Fans to all and your rank to you; cheer jobs.
 - `FanClient`: cheer bar, CLAP! button with beat ring and per-clap labels, Top Fans panel with Fan XP.
 
+**Stage 8 — More horses** (branch `claude/stage8-horses`, stacked on Stage 7):
+- `Market` (pure, tested): weekly stock seeded by week (same everywhere, personal purchases, no scarcity), price from bloodline (Potential) with ★ hints, buy into a stall or the pasture, 20 horses max; taming (treat, wild coats, surprise Potential, one a day); stall prices 300/800/2000/4000 up to 6; rename by word chips.
+- `MarketService`: corral horses and signs from the stock, buy/tame/build stall/swap/rename remotes with checks; market added to the profile view (`Profiles.addDecorator`).
+- `WildHorses`: deterministic wandering wild horses in the meadow (same on every client) and the gentle trust game. `HorsesClient`: My Horses panel and Market cards. Pasture horses graze in your yard.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.
