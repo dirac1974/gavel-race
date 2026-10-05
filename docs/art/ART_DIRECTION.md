@@ -1,6 +1,6 @@
 # Art direction: Gavel Derby
 
-Status: draft for the design council (Phase 1, plan only; nothing generated yet). Asset list, Meshy queue and credit estimate are in [ASSET_PLAN.md](ASSET_PLAN.md). Draft UI art: `assets/ui/` (review sheet `assets/ui/_sheet.svg`), made by `tools/ui/make_ui_svgs.py`.
+Status: council-reviewed (2026-10-04) and applied to the generated playtest assets. Review and verdicts: [ART_REVIEW.md](ART_REVIEW.md). Asset list and spend: [ASSET_PLAN.md](ASSET_PLAN.md). Studio import: [IMPORT.md](IMPORT.md). UI art lives in `assets/ui/` (review sheet `assets/ui/_sheet.svg`, PNGs in `assets/ui/png/`), made by `tools/ui/make_ui_svgs.py`.
 
 ## Style: "County Fair Toy"
 
@@ -13,17 +13,30 @@ Four pillars:
 3. **Race day, not a casino.** A fair and a sports day, not a betting hall.
 4. **Original.** Shapes, faces and patterns are our own.
 
-### Horses
+### Horses (council 1)
 
-- **Proportions:** thoroughbred anatomy, simplified. Head and hooves about 10–15% larger than real, a sturdier neck and legs, a short tidy mane and a flowing tail. Natural eyes with one highlight, no lashes. Not a pony, not a mustang, not a toy unicorn.
-- **Coats:** natural colours with white markings (blaze, star, socks), which keep faces and legs readable at a distance. The base set for the playtest is bay, chestnut, dapple grey, black (with grey highlights so it never reads as a blob or looks menacing) and palomino.
-- **Expression:** ears forward or relaxed, a soft eye, mouth closed.
-- **Scale:** about 5 studs at the withers and 8 studs nose to tail, next to a roughly 5-stud R15 avatar.
-- **Motion:** see ASSET_PLAN.md ("How the horse moves without a rig"). A good stride surges forward; mashing makes a skip-hop and a short slowdown. The horse never stumbles, falls, limps or looks winded.
+- **Proportions:** thoroughbred anatomy, simplified. Head and hooves about 10–15% larger than real, a sturdier neck and legs, a short tidy mane and a full tail.
+- **Face:** small eyes set on the sides of the head. No eyelashes, no eyebrows, no big glossy eyes. Expression comes from the ears and tail: ears forward, mouth closed, no foam, no strain.
+- **Coats:** natural colours and natural manes only, with no pastels and no flank symbols or marks. White face and leg markings are fine. The hero horse is a red bay with a short mane, never a buckskin mustang with a flowing black mane (Spirit).
+- **The playtest set:** bay, chestnut, dapple grey (reads light grey), black, palomino.
+- **No rare coats in the Phase 1 playtest** (council 3). When they come, they are natural (leopard spots, pinto, cremello), never fantasy.
+- **Hooves:** dark and high-contrast on every coat, because the beat lands on the hoof. Charcoal `#26262C` against the dirt `#C68A52`. Enforced after generation by `tools/meshy/darken_hooves.py`.
+- **Tack:** a bridle on the mesh, no saddle on the mesh. The saddle cloth is a separate Studio part carrying the lane pattern.
+- **Scale:** about 5 studs tall and 8 studs nose to tail, next to a roughly 5-stud R15 avatar.
+
+### Horse motion (council 2)
+
+The mesh is static, a mid-gallop pose (Meshy rigs only humanoids). The client moves each horse along the track by CFrame every frame and adds:
+
+- **Bob on the stride beat.** The body rises and falls once per beat. The lowest point, with a small squash (Y scale 0.96, X/Z 1.02 for about 60 ms), lands **exactly** on the beat time, with no easing past it. Out of the squash it rises smoothly. Pitch is ±3°, nose down at the landing. Amplitude is about 0.35 studs. The player's horse uses the same beat clock as the hoof ring.
+- **On each beat:** one `fx_dust_puff` from the hoof Attachments, tinted dirt `#E3B985`, and one `fx_mane_flick` from the crest Attachment, tinted to the mane colour. Each particle lives about 0.2 s.
+- **Surge** (on-beat taps): lean forward 3° and show speed-line Trails for 0.4 s.
+- **Break stride** (mashing): a skip-hop out of phase for about 0.5 s and a small slowdown. The horse never stumbles, falls, limps or looks winded.
+- **Later, not built now:** a leg cycle, splitting the legs into parts or a custom quadruped rig in Blender.
 
 ### World
 
-A dirt oval with white rails, mown-stripe turf infield, a big sky, bunting, and painted wooden posts. Track pieces that tile (rails, lane chalk, the finish line) are Roblox parts, not generated meshes, so their sizes stay exact.
+A dirt oval with white rails, mown-stripe turf infield, a big sky, bunting, and painted wooden posts. Tiling pieces (rails, lane chalk, the finish banner and line) are Roblox parts with exact sizes. The finish posts and the starting gate stall are generated meshes.
 
 ## Palette
 
@@ -35,8 +48,9 @@ World:
 | Turf | `#5DBB4A` | Infield, mown stripe A |
 | Turf dark | `#4AA23C` | Mown stripe B |
 | Dirt | `#C68A52` | Track surface |
-| Dirt dark | `#A86F3D` | Hoof prints, track edge |
+| Dirt light | `#E3B985` | Dust puffs |
 | Rail | `#FBFBF5` | Rails, posts |
+| Hoof | `#26262C` | Every hoof |
 | Barn red | `#C8463D` | Buildings only (never UI feedback) |
 
 UI core:
@@ -45,8 +59,8 @@ UI core:
 | --- | --- | --- |
 | Ink | `#1D2433` | Every outline, text stroke, dark text |
 | Paper | `#FFF7E6` | Panels, number plates |
-| Giddy-up orange | `#FF9F1C` / `#D97A00` rim / `#F28C00` pressed | Tap button, primary buttons |
-| Burst gold | `#FFD23F` / `#FFE98A` stripes | Final Burst glow, Perfect |
+| Giddy-up orange | `#FF9F1C` / `#D97A00` rim / `#F28C00` pressed | The GIDDY-UP pad |
+| Gold | `#FFD23F` / `#FFE98A` | Final Burst glow, Perfect, YOU marker, sparkles |
 | Slate | `#2A3247` | Burst meter track |
 | Teal | `#17A398` | Win chance up |
 | Plum | `#7D6B91` | Win chance down (calm, not alarm red) |
@@ -67,17 +81,17 @@ Ribbons (D-016): Blue `#2F6FDE` (1st, extra outer pleat), Red `#E0474C` (2nd), Y
 ## Silhouette and readability rules
 
 - **Silhouette test:** fill the asset solid black. If you can't name it at 40 px (3D, mid-race camera) or 32 px (UI icon), it fails.
-- **Value contrast:** the horse must differ from the track by at least 20 L* (CIELAB lightness, 0–100). Palomino is the closest to the dirt, so it relies on its cream mane and the lane badge. The player's own horse always gets a white `Highlight` outline (fill transparent) and the `you_marker`.
+- **Value contrast:** the horse must differ from the track by at least 20 L* (CIELAB lightness, 0–100). Palomino is the closest to the dirt, so it relies on its cream mane and the lane badge. The player's horse also gets a white `Highlight` outline (fill transparent) and the YOU marker.
 - **UI outline:** a 5–6 px ink outline on every UI shape at 128 px (paint-order stroke). In Roblox, use a 2–3 px `UIStroke` in Ink on all text. No outlines on 3D meshes.
-- **Sizes on a phone:** tap targets of at least 88 × 88 px (the Giddy-up button is larger; tapping anywhere also counts, per D-022). Label text at least 28 px, lane numbers at least 20 px, board rows at least 18 px.
-- **Fonts:** Fredoka One for labels and buttons, Builder Sans Bold/Black for numbers. Words and numbers are always Roblox `TextLabel`s, never baked into images (crisp and translatable). The `<text>` in the draft SVGs is for review only.
-- **Shape plus colour, always:** no state is shown by colour alone. A Machado-2009 deuteranopia/protanopia simulation of the draft sheet (2026-10-04) confirms that colour alone fails for lane 1 vs 6, Good vs Okay vs Steady, chance up vs down, and the red ribbon; their shapes, patterns and numbers keep them distinct.
-- **Screen real estate:** keep the horse visible. The beat cue and the burst meter sit in the lower third, away from the Roblox top bar. One feedback label at a time.
+- **Sizes on a phone:** the GIDDY-UP pad is about 60% of screen width (at most 520 px). Label text at least 28 px, lane numbers at least 20 px, board rows at least 18 px.
+- **Fonts:** Fredoka One for labels and the pad, Builder Sans Bold/Black for numbers. In game, words and numbers are TextLabels over the `*_blank` art (crisp and translatable). The baked text in the other variants is a placeholder.
+- **Shape plus colour, always:** no state is shown by colour alone. A Machado-2009 deuteranopia/protanopia simulation of the sheet confirms that colour alone fails for lane 1 vs 6, Good vs Okay vs Steady, chance up vs down, and the red ribbon; their shapes, patterns and numbers keep them distinct.
+- **While tapping, only the ring is prominent** (council 6). Nothing glows near it, the pad holds steady, and labels pop above the hoof and leave quickly.
 - **Sound is decoration** (D-022): every cue is on screen.
 
-## Telling the 8 lanes apart
+## Lanes and markers (council 5)
 
-Each lane has a colour from the Okabe–Ito colour-blind-safe set, a pattern and a big number. Adjacent lanes are never similar hues.
+Each lane has a fixed colour from the Okabe–Ito colour-blind-safe set, a pattern and a big number. Adjacent lanes are never similar hues. A player's cosmetic silks never recolour the lane.
 
 | Lane | Colour | Hex | Pattern | Pattern ink |
 | --- | --- | --- | --- | --- |
@@ -92,11 +106,13 @@ Each lane has a colour from the Okabe–Ito colour-blind-safe set, a pattern and
 
 Where the lane identity appears:
 
-- **Lobby board row:** a lane chip before the horse name.
-- **Badge over each horse:** a `BillboardGui` chip about 2.5 studs above the saddle, always facing the camera.
-- **Saddle cloth overlay (P1):** a thin part cut from the horse mesh, carrying the lane pattern.
-- **Starting gate plate (P1).**
+- **Lobby board rows:** `lane_N`.
+- **Badge over each horse:** a `BillboardGui` 2.5 studs above the saddle with `LightInfluence = 0`, using `lane_N_blank` plus a TextLabel.
+- **Saddle cloth part** on each horse.
+- **Gate stall plate.**
 - **Results and Top Fans rows.**
+
+**YOU marker (huge):** `you_marker_blank` plus a 96 px "YOU" TextLabel, in a BillboardGui with a constant pixel size (`UDim2.fromOffset(180, 170)`, so it stays huge at any distance). It sits about 7 studs above the saddle, with `AlwaysOnTop` and `LightInfluence = 0`, bobbing ±4 px at 1 Hz. **Silks (later)** become a second, smaller marker on the rider.
 
 Patterns are generic geometry. Never copy a real stable's registered silks or the real saddle-cloth numbering colours (1 red, 2 white, 3 blue, and so on), which call up race-day betting boards.
 
@@ -104,33 +120,47 @@ Patterns are generic geometry. Never copy a real stable's registered silks or th
 
 General:
 
-- Draw every gameplay cue from the shared server clock, as the gavel meter does, never from tween completion.
-- `GuiService.ReducedMotionEnabled` removes sparkles, confetti and camera punches. It keeps the ring and the meter, which are the gameplay.
-- No screen shake on a miss. Nothing flashes more than 3 times a second (WCAG 2.3.1). No full-screen white flashes.
+- Draw every gameplay cue from the shared server clock, never from tween completion.
+- `GuiService.ReducedMotionEnabled` removes sparkles, confetti, rays and the camera punch. It keeps the ring and the meter, which are the gameplay.
+- No screen shake on a miss. **Nothing flashes more than 3 times a second** (WCAG 2.3.1). No full-screen flashes.
 
-**Hoof ring (Giddy-up stride, D-022):**
+**Tap anywhere (council 6):** a tap anywhere on the screen, any key, or any gamepad button counts. The ring is the target.
 
-- The ring (`hoof_ring.svg`, white with an ink outline, tintable) is centred on the hoof icon. It scales **linearly** from 2.4× to 1.0× over one beat of lead (two beats in Rookie). The moment it touches the hoof rim is the beat. Linear, because easing would hide where the beat is.
-- About 2 beats a second means a ring lives for about 0.5 s. Keep at most two rings on screen: the current one, and the next one appearing.
-- **Tempo change:** the ring for the changed beat is drawn dashed (`hoof_ring_dashed.svg`) for its whole approach, so the change is previewed a beat ahead.
-- **On a tap:** the hoof stamps (scale 1.0 → 1.12 → 1.0 over 120 ms, Quad Out) and puffs dust. The label pops in above the hoof (scale 0.6 → 1.0 over 100 ms, Back Out), holds for 350 ms and fades over 150 ms. A newer label replaces the old one.
-- **Perfect:** the ring turns gold for 80 ms and four sparkles pop. **Great:** the ring turns sky blue for 80 ms.
-- **No tap:** the ring passes the hoof, shrinks to 0.8× and fades to plum over 150 ms. No sound sting, no buzz, no X.
-- **Mashing** (more than about 3 taps a second): the hoof wobbles ±6° for 300 ms with the "Steady!" wave label. It tells the rider why the tap didn't count without calling it bad. The horse visibly breaks stride.
-- **Haptics:** a short pulse at each beat contact on phones that support it.
+**GIDDY-UP pad** (`giddyup_pad`, `_pressed`, `_blank`):
 
-**Final Burst (meter and glow):**
+- Bottom centre, the affordance kids look for, but not an aim target.
+- Before each stretch and between stretches, it pulses: scale 1.00 ↔ 1.06, 1.2 s period, Sine InOut.
+- While rings are on screen, it holds steady at 85% opacity and shows the pressed frame for 80 ms on every tap, wherever the tap lands.
+- Hidden during the Final Burst (the bar takes the bottom of the screen).
 
-- The bar (`burst_bar.svg`) is 80% of screen width and about 64 px tall on a phone, sliding up from the bottom (200 ms, Quint Out) before the server opens the window. The intro has to finish before the open time, so D-022's "first target pass at least 0.4 s after opening" holds on screen as well as on the server.
-- The marker (`burst_marker.svg`) moves at **constant speed** (linear) with a short trail of three ghost copies at 30%, 20% and 10%. The score is distance, so easing would mislead.
-- The glow (`burst_glow.svg`) is gold with diagonal stripes, so it is still distinct without colour, plus a soft outer glow. It breathes from 85% to 100% opacity at 0.5 Hz, slow enough not to read as a beat. Code places it, because the target drifts in Gold and splits in two in Champion. Draw it as a 9-slice so its width can change.
-- **On a tap:** the marker freezes for 250 ms. Recommended tiers, pending council question 4:
-  - Perfect: gold rays behind the player's horse, a confetti burst, camera FOV 70 → 76 → 70 over 400 ms, and the star label at 2× size.
-  - Great: a chevron burst.
-  - Good or Okay: the label only.
-  - Miss: the plum dash, no fanfare. The horse keeps galloping happily.
+**Hoof ring (council 7):**
 
-**Win chance change:** after each stretch the number counts up or down over 400 ms, with `chance_up` (teal) or `chance_down` (plum) beside it. No red.
+- Every ring takes the **same time to close** (client config). It spawns at 3.0× the hoof radius and shrinks **linearly** to the hoof rim. Touching the rim is the beat.
+- Tempo shows as the **spacing between rings**: faster tempo means tighter rings. Several rings are on screen at once, at 100% / 70% / 45% opacity from the next ring outward.
+- Build it from `UIStroke` (constant 6 px white with a thin ink edge, so the outer rings aren't fatter). `hoof_ring.png` is the fallback.
+- It is an overlay unaffected by lighting: a ScreenGui, or a BillboardGui with `LightInfluence = 0` and `AlwaysOnTop = true`.
+- **On a tap:**
+  - The hoof stamps: scale 1.0 → 1.12 → 1.0 over 120 ms.
+  - The label pops in above the hoof (scale 0.6 → 1.0, 100 ms, Back Out), holds for 350 ms and fades over 150 ms.
+  - Perfect turns the landing ring gold for 80 ms. Great turns it sky blue for 80 ms.
+- **No tap:** the ring shrinks past the rim to 0.8× and fades to plum over 150 ms. No sound sting, no X.
+- **Mashing** (more than about 3 taps a second): the hoof wobbles ±6° for 300 ms with the "Steady!" wave label, and the horse breaks stride.
+- **Haptics:** a short pulse at each beat contact on supported phones.
+
+**Final Burst:**
+
+- **Meter:**
+  - The bar (`burst_bar`) is 80% of screen width and slides up (200 ms) before the server opens the window. The intro finishes first, so "first target pass at least 0.4 s after opening" (D-022) holds on screen too.
+  - The marker (`burst_marker`) moves at constant speed with a short three-ghost trail.
+  - The glow (`burst_glow`, gold with stripes) is placed by code as a 9-slice, and breathes from 85% to 100% opacity at 0.5 Hz.
+- **Celebration (council 4): only after the burst is scored, and only on the rider's own screen.** Never during the live window.
+  - **Perfect:** `burst_rays` behind the horse (fade in 120 ms, rotate 20°/s, fade out over 500 ms), a confetti pop, and a tiny camera punch (FOV 70 → 72 → 70 over 300 ms, off with ReducedMotion). The star label is shown at 2× size.
+  - **Great:** a chevron burst.
+  - **Good or Okay:** the label only.
+  - **Miss:** the plum dash, no fanfare.
+- **What everyone else sees:** only `lane_sparkle` on that lane's badge. Three sparkles pop one after another over 600 ms, once (no more than 3 flashes a second).
+
+**Win chance change:** the number counts over 400 ms, with `chance_up` (teal) or `chance_down` (plum). No red.
 
 ## Do and don't
 
@@ -138,8 +168,8 @@ Do:
 
 - Ride hands-and-heels: the avatar crouches and pumps along the neck in time with the stride.
 - Show surges as the horse lengthening and leaning forward, with dust and speed lines.
-- Keep horses calm, glossy and fit, with ears forward or relaxed.
-- Celebrate with ribbons, rosettes, bunting, confetti and gold stars.
+- Keep horses calm, glossy and fit, with ears forward, mouths closed, small side eyes and dark hooves.
+- Celebrate with ribbons, rosettes, bunting, confetti and gold stars, on the rider's own screen and after scoring.
 - Show Green Cash as one small token icon, and the purse as a number ("Win: 464").
 - Pair every colour cue with a shape, a pattern or a number.
 - Use original shapes, our own patterns and plain tack.
@@ -149,9 +179,12 @@ Don't:
 
 - Show a whip, crop, riding stick or spurs anywhere, including icons, animations, cosmetics or tutorials.
 - Show a horse that looks hurt, sick, scared or exhausted: no pinned ears, whites of the eye, flared nostrils, foam, sweat, visible ribs, bandages, limping, or a hanging head.
+- Give horses eyelashes, eyebrows, big glossy eyes, pastel or fantasy coats, flank symbols, wings or horns.
+- Make the hero horse a buckskin with a flowing black mane.
 - Use wagering or casino imagery: odds or tote boards, tickets, bet slips, chips, dice, cards, slot reels, roulette, coin showers, cash piles, neon casino signs or "jackpot" bursts.
 - Make look-alikes of Spirit, My Little Pony, Horse Life, Wild Horse Islands, real racecourses, racing brands, real silks or the real saddle-cloth colour scheme.
-- Use pastel rainbow manes, anime eyes, eyelashes, wings or horns on the base racehorses.
+- Put anything glowing near the hoof ring, or let the GIDDY-UP pad compete with it during taps.
+- Celebrate during the live burst window, or broadcast one rider's celebration to other screens.
 - Rely on red-versus-green, colour-only states, or sound-only cues.
 - Shake the screen or flash red on a miss, or put shaming text on screen.
 - Generate a jockey: the player's Roblox avatar is the jockey.

@@ -1,0 +1,53 @@
+# Art review log
+
+Records the design council's review of the art plan and the art lead's verdict on every generated model. Style rules: [ART_DIRECTION.md](ART_DIRECTION.md). Asset list and spend: [ASSET_PLAN.md](ASSET_PLAN.md). Studio import: [IMPORT.md](IMPORT.md).
+
+## Council review of the Phase 1 plan (2026-10-04)
+
+Phase 2 (generation) was approved with these changes. All seven points were 4/4.
+
+| # | Council decision | How the art applies it |
+| --- | --- | --- |
+| 1 | **Horse look:** chunky stylized natural horses. Small eyes on the sides of the head, no eyelashes or eyebrows, no big glossy eyes, natural coat and mane colours (no pastels), no flank symbols. Expression comes from ears and tail; ears forward, mouth closed, no foam or strain. The hero horse is never a buckskin mustang with a flowing black mane (Spirit). Hooves are dark and high-contrast on every coat, because the beat lands on the hoof. | Prompts and negatives in `tools/meshy/queue.json` carry every guardrail. The hero coat is a red bay with a short mane. Dark hooves are enforced after generation by `tools/meshy/darken_hooves.py`. |
+| 2 | **Race motion:** a fixed gallop pose with a bob for the playtest. The bottom of the bob (a small squash) lands exactly on the beat, with no easing past it. A dust puff and a mane flick play on each beat. The leg cycle comes later and isn't built now. | Motion spec in ART_DIRECTION.md. The mesh is static, so the mane flick is a particle (`fx_mane_flick`) from a crest Attachment, alongside `fx_dust_puff`. Leg cycle noted as later work. |
+| 3 | **Rare coats:** natural only, and none in the Phase 1 playtest. | The rare-coat and standing-horse slots were removed from the queue, saving 40 credits. |
+| 4 | **Final Burst celebration:** only on the rider's own screen, fired after the burst is scored, never during the live window. A tiny camera punch, off when `GuiService.ReducedMotionEnabled` is on. Never more than 3 flashes a second. Other players see only a small sparkle on that lane's badge. | `burst_rays` (own screen, after scoring) and `lane_sparkle` plus `lane_N_sparkle` (what others see). Timings are in ART_DIRECTION.md. |
+| 5 | **Lanes and markers:** lane colours fixed per lane number. "YOU" is huge. Silks come later, as a second marker on the rider. | Lane chips 1–8 unchanged. `you_marker` is now 256 px, gold with a 96 px "YOU", and shown at a constant 180 px on screen. Silks marker noted as later work. |
+| 6 | **Tapping:** tap anywhere (any key or gamepad button too), with the hoof ring as the visual target. A big pulsing "GIDDY-UP!" pad at the bottom is the affordance (kids look for a button), but it is not an aim target. While tapping, only the ring is prominent: nothing glows near it, and the ring is an overlay unaffected by lighting. | `giddyup_pad` (idle, pressed, blank). The old round tap button is gone. The ring is a ScreenGui overlay, or a BillboardGui with `LightInfluence = 0`. **Interpretation for the council to check:** the pad pulses before and between stretches, but holds steady (85% opacity, pressed frame on each tap) while rings are on screen. That way the ring is the only rhythmic thing during taps. |
+| 7 | **Ring timing:** every ring takes the same time to close, and tempo changes show through the spacing between rings. The coordinator is changing the client code for this. The art must work with several rings on screen. | The dashed tempo-change ring is gone. The ring is drawn with a constant on-screen stroke (UIStroke). Rings spawn at 3.0× the hoof radius, and opacity goes 100% / 70% / 45% from the next ring outward. The review sheet shows 2.0, 2.6 and 1.6 beats per second. |
+
+## Generation verdicts (2026-10-04)
+
+**How each model was checked:**
+
+- The Meshy thumbnail (front three-quarter view).
+- A local four-view render of the GLB: both sides, front and top, via `tools/meshy/preview_glb.py`.
+- Each model was compared against the council guardrails and the look-alike rules (Spirit, My Little Pony, Horse Life, Wild Horse Islands, real brands).
+
+The rule allowed at most one re-roll per slot.
+
+| Slot | Attempt | Credits | Verdict | Notes |
+| --- | --- | --- | --- | --- |
+| `horse_gallop` (mesh) | 1 | 30 | **Mesh PASS, texture FAIL** | Clean mid-gallop with four clearly separated legs, neck stretched, small eyes on the sides, ears forward, mouth closed, short swept mane, full tail. No saddle geometry, and the "white saddle cloth" became a smeared white and brown patch on the back that reads as a flank marking. Fixed with a 10-credit retexture instead of a 30-credit re-roll. |
+| `horse_gallop_bay` | retexture | 10 | **PASS after hoof fix** | Bare back, even red-bay coat, black points, small star, bridle kept. Hooves came out light tan (the "pale band above the hoof" wording backfired), so they were painted dark locally (`darken_hooves.py`, no credits). |
+| `horse_gallop_chestnut` | retexture | 10 | **PASS** | Copper coat, lighter mane and tail, white blaze, white hind socks, dark hooves straight from the prompt ("glossy jet-black hooves"). |
+| `horse_gallop_grey` | retexture | 10 | **PASS (note)** | Reads as light grey, close to white. The dapples are faint, the lower legs and hooves dark, the mane silver. Natural, not pastel. |
+| `horse_gallop_black` | retexture | 10 | **PASS** | Blue-black coat with grey highlights, white star, short white socks, dark hooves. Normal eyes, not menacing. |
+| `horse_gallop_palomino` | retexture | 10 | **PASS** | Golden coat, cream mane and tail, white stripe, dark hooves. Natural gold, not metallic. |
+| `finish_post` | 1 | 30 | **PASS (notes)** | Clean, simple geometry with no guardrail issues. It came out as two white poles with a crossbar, gold stars and gold streamers, and the disc reads as black-and-white plaid rather than bold checks. The finish read comes from the checker banner and ground strip. Not re-rolled. |
+| `gate_stall` | 1 | 30 | **FAIL** | Broken geometry: huge triangular fins on both sides and shards across the open frame. Kept as `gate_stall_attempt1/` for the record; don't use it. |
+| `gate_stall` | 2 (re-roll) | 30 | **PASS (notes)** | The re-prompt used solid shapes and no thin bars. Clean result: padded side walls, a white roof beam with a blank plate, two solid half doors, a grey floor. The walls are paler mint than specified, and the doors are closed half doors (fine left closed or hidden; opening them needs a Blender split). |
+| **Total** | | **170 of 200** | | 30 credits unspent. Every figure is Meshy's own `consumed_credits` from each `task.json`. |
+
+Look-alike check, all models: no buckskin and no long flowing black mane (not Spirit), no pastel coats, big eyes, eyelashes or symbols (not My Little Pony), and no fantasy coats (not Horse Life or Wild Horse Islands). No real racecourse, sponsor or silks.
+
+Hoof check, all five coats: after `darken_hooves.py`, every hoof is near-ink charcoal (`#26262C`), so it stands out against the dirt track (`#C68A52`). On the chestnut and black, the white socks add a light band above the dark hoof.
+
+## Open items for the council or David
+
+1. **No saddle on the horses.** Meshy couldn't build one, so the saddle cloth is now a separate lane-coloured part made in Studio (P0, see IMPORT.md). A simple saddle mesh could come later.
+2. **The grey reads near-white.** Accept it, or spend 10 credits on a darker dapple retexture (budget allows).
+3. **The finish post disc is plaid, not bold checks.** Accept it (the banner carries the finish read), or re-roll for 30 credits, which would reach the 200 cap.
+4. **Pad pulse interpretation** (council 6 above): confirm "steady during stretches".
+5. **The main checkout didn't ignore `Models/`.** The coordinator's note said it did, but `main` has no such rule yet. I added a self-ignoring `Models/.gitignore` (`*`) in the main checkout so the 175 MB of raw output can't be committed by accident. Merging this PR adds `Models/` to the repo `.gitignore`.
+6. **Nothing is uploaded to Roblox.** Uploading the meshes and PNGs needs David.
