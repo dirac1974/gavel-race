@@ -29,6 +29,7 @@ local ThemePack = require(Shared:WaitForChild("ThemePack"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local RaceInput = require(Shared:WaitForChild("RaceInput"))
+local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -422,12 +423,21 @@ local function watchViewport()
 end
 watchViewport()
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchViewport)
+-- Above the card: "You rode ★★☆", and under it "Good trip ★★☆" (steering, D-054). In the card's
+-- foot: places your riding gained, and places your trip gained, each only when it's a gain.
+local CARD_HEIGHT, GAIN_ROW = 5 * 40 + 12, 30
 local rideLine = label(results, UDim2.new(1, -24, 0, 30), UDim2.new(0, 12, 0, -70), "", 26)
 rideLine.ZIndex = 7
 rideLine.Font = Enum.Font.GothamBlack
 rideLine.TextColor3 = Color3.fromHex("FFD34D")
-local gainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, -38), "", 20)
+local tripLine = label(results, UDim2.new(1, -24, 0, 26), UDim2.new(0, 12, 0, -38), "", 22)
+tripLine.ZIndex = 7
+tripLine.Font = Enum.Font.GothamBlack
+tripLine.TextColor3 = Color3.fromHex("9FE07A")
+local gainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, CARD_HEIGHT - 4), "", 20)
 gainLine.ZIndex = 7
+local tripGainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, CARD_HEIGHT - 4 + GAIN_ROW), "", 20)
+tripGainLine.ZIndex = 7
 
 local function button(parent, text: string, size: UDim2, pos: UDim2, colour: Color3): TextButton
 	local b = Instance.new("TextButton")
@@ -850,6 +860,14 @@ local function armBell(s)
 	end
 end
 
+-- A tucked-in span ends: the replay draws its wind lines (S4).
+local function endTuck(s, t: number)
+	if s.tuckFrom and RaceState.recording then
+		table.insert(RaceState.recording.events, { t = t, kind = "tuck", t0 = s.tuckFrom, t1 = t })
+	end
+	s.tuckFrom = nil
+end
+
 -- Each frame while you ride with the buttons: show or hide them, the tip, the chips, the wind.
 local SPEED = GameConfig.raceSpeedStudsPerSecond
 local function updateSteer(t: number, dt: number)
@@ -904,6 +922,10 @@ local function updateSteer(t: number, dt: number)
 			local own, field = acc.own / math.max(acc.time, 1e-6), acc.field / math.max(acc.time, 1e-6)
 			if s.pressed and acc.time > 0.5 and (own < SHUD.railLane or own <= field - SHUD.belowField) then
 				showChip("Saved ground!")
+				if RaceState.recording then -- the replay's green chevrons through this turn (S4)
+					table.insert(RaceState.recording.events, { t = t, kind = "saved",
+						t0 = s.start + turn[1] / SPEED, t1 = s.start + turn[2] / SPEED })
+				end
 			end
 		end
 	end
@@ -944,6 +966,11 @@ local function updateSteer(t: number, dt: number)
 		showChip("Tucked in!")
 	end
 	wind.Visible = s.tuckedFor >= 0.3
+	if wind.Visible and not s.tuckFrom then
+		s.tuckFrom = t - s.tuckedFor
+	elseif not wind.Visible and s.tuckFrom then
+		endTuck(s, t)
+	end
 	if wind.Visible then
 		local still = reducedMotion()
 		for k, line in windLines do
@@ -1295,6 +1322,7 @@ remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smar
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace then return end
 	s.shown, s.smart = shown == true, smart ~= false
 	if s.shown and tip then s.tipAt = s.start + 1.5 end
+	if s.shown and RaceState.recording then RaceState.recording.steer = true end -- the replay draws your line
 	bindSteer(s.shown)
 	armBell(s)
 end)
@@ -1309,6 +1337,7 @@ remotes:WaitForChild("TripLocked").OnClientEvent:Connect(function(courseId)
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or s.locked then return end
 	s.locked = true
 	if not s.shown then return end
+	endTuck(s, serverNow()) -- tucked-in credit stops at the lock
 	showChip("Lanes locked!")
 	paintButtons(true)
 	s.hideAt = os.clock() + SHUD.hideAfterLockSeconds
@@ -1436,11 +1465,10 @@ RaceState.ReplayClosed.Event:Connect(function()
 	if RaceState.resultsOpen then results.Visible = true end -- back to the results card, not the lobby
 end)
 
--- (stars, gain, place, course), or with steering (D-054) (stars, gain, place, trip stars, places
--- the trip gained, course). The trip line on the results card comes in S4; it's kept here.
+-- (stars, gain, place, course), or for a rider with the steering buttons (D-054) (stars, gain,
+-- place, trip stars, places the trip gained, course): ResultsText.rideReport.
 remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace, a, b)
-	rideReport = { stars = starCount, gain = gain, place = finishPlace }
-	if typeof(a) == "number" then rideReport.tripStars, rideReport.tripGain = a, b end
+	rideReport = ResultsText.rideReport(starCount, gain, finishPlace, a, b)
 	if RaceState.recording then RaceState.recording.ride = rideReport end
 end)
 
@@ -1475,15 +1503,21 @@ local function showResults(summary, raceId: number)
 			r.icon.Visible = false
 		end
 	end
-	-- Your ride first (stars need no reading), then places your riding gained, only if it's a gain.
+	-- Your ride first (stars need no reading), your trip under it (riders with the steering
+	-- buttons), then places your riding and your trip gained, each only if it's a gain.
 	if rideReport then
-		rideLine.Text = "You rode " .. string.rep("★", rideReport.stars) .. string.rep("☆", 3 - rideReport.stars)
-		gainLine.Text = if rideReport.gain > 0
-			then string.format("Your riding gained you %d place%s!", rideReport.gain, if rideReport.gain == 1 then "" else "s")
-			else ""
+		rideLine.Text = ResultsText.rideLine(rideReport.stars)
+		tripLine.Text = ResultsText.tripLine(rideReport.tripStars)
+		gainLine.Text = ResultsText.gainLine("riding", rideReport.gain)
+		tripGainLine.Text = ResultsText.gainLine("trip", rideReport.tripGain)
 	else
-		rideLine.Text, gainLine.Text = "", ""
+		rideLine.Text, tripLine.Text, gainLine.Text, tripGainLine.Text = "", "", "", ""
 	end
+	if gainLine.Text == "" then -- the trip's gain moves up into the first row
+		gainLine.Text, tripGainLine.Text = tripGainLine.Text, ""
+	end
+	local gainRows = (if gainLine.Text ~= "" then 1 else 0) + (if tripGainLine.Text ~= "" then 1 else 0)
+	results.Size = UDim2.fromOffset(360, CARD_HEIGHT + gainRows * GAIN_ROW)
 	local hasRecording = RaceState.recording ~= nil and #RaceState.recording.frames > 10
 	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
 	doneBtn.Visible = true

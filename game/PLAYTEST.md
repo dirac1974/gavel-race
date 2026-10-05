@@ -314,6 +314,17 @@ To see the buttons on a new profile, ride 3 races first (or set `totals.races` t
 - [ ] Steering counts now (`GameConfig.steering.scale = 1`): at the lock the arrow on your place badge may move a little. Results look as before (the trip line comes in S4).
 - [ ] Output prints one `[Trip]` line per race at the lock (riders' posts, Smart Steer or not, tau, how presses were answered). A rider leaving mid-race goes to Smart Steer, with no errors.
 
+## Replays and results (steering S4, D-054)
+Plan section D, from your 4th race on (the buttons are shown):
+- [ ] **Results:** under "You rode ★★☆" comes "Good trip ★★☆" (one to three stars, never none). "Your trip gained you N places!" shows inside the card only when your trip gained places, with "Your riding gained you N places!" above it when riding did too. No line ever says you lost a place.
+- [ ] **First three races:** there's no trip line at all.
+- [ ] **Replay lanes:** "Watch the finish" and "Whole race ×3" show every horse in the lane it ran on your screen: the moves to the rail, the tuck-ins and the make-room passes after the lock. Nothing jumps or overlaps.
+- [ ] **Your line:** a gold ribbon on the track follows your horse up to the lock, green with chevrons through turns where you saw "Saved ground!". Wind lines show while you were tucked in. A bar across the track marks where lanes lock ("🔔 Lanes lock"), and "Lanes locked!" shows as you pass it in "Whole race". There's no ghost of an ideal line. Done clears the ribbon and the bar.
+- [ ] **Watching or first races:** a race watched, or ridden without the buttons, shows the lock bar but no ribbon.
+- [ ] **The camera** still follows your horse (side or behind); with Reduced Motion it stays fixed at the finish. Legs rest when the replay ends.
+- [ ] **The finish:** two horses close together in one lane at the line finish staggered (one edges half a lane over in the last moment), never through each other.
+- [ ] **Understanding** (plan section D): after 5 races, ask "What do the arrows do?" and "What does Tucked in mean?". Do kids who never touch the arrows end with "Good trip ★★☆"?
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

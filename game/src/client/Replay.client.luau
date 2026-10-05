@@ -11,6 +11,12 @@
 --   finish plays at normal speed, with a photo-finish still when it was close.
 --   Overlays: REPLAY letterbox, your tap shapes as they happened, a pulse when your burst
 --   landed, "+N" when you gained places. No tap pad, no race-again or shop prompts.
+--   Steering (D-054 S4): horses run in the lanes recorded on this screen (ReplayTrip.laneAt; older
+--   recordings use the posts). A rider who had the ◀ ▶ buttons sees their line up to the lock drawn
+--   on the track behind their horse as a gold ribbon, green with chevrons through the turns where
+--   they saved ground, wind lines while they were tucked in, and "Lanes locked!" as they pass the
+--   lock marker (a bar across the track at the far-turn entry, shown in every steering race).
+--   No ideal-line ghost: only what you did.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -20,6 +26,7 @@ local GuiService = game:GetService("GuiService")
 
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local TrackLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrackLayout"))
+local ReplayTrip = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ReplayTrip"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -105,6 +112,108 @@ local function button(str: string, pos: UDim2, size: UDim2): TextButton
 	c.Parent = b
 	return b
 end
+-- Wind lines while you were tucked in behind a horse (as in the race).
+local wind = Instance.new("Frame")
+wind.Size = UDim2.fromScale(1, 1)
+wind.BackgroundTransparency = 1
+wind.ZIndex = 2
+wind.Visible = false
+wind.Parent = gui
+local windLines = {}
+for k = 1, 6 do
+	local line = Instance.new("Frame")
+	line.Size = UDim2.fromOffset(90, 3)
+	line.BackgroundColor3 = Color3.new(1, 1, 1)
+	line.BorderSizePixel = 0
+	line.ZIndex = 2
+	line.Parent = wind
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(1, 0)
+	c.Parent = line
+	windLines[k] = line
+end
+
+-- Your line on the track (D-054 S4): flat strips just above the dirt, shown as your horse
+-- passes them; green with chevrons where you saved ground; a bar across the track at the lock.
+local GOLD, GREEN, BELL = Color3.fromHex("FFD34D"), Color3.fromHex("46C46A"), Color3.fromHex("F4EFE6")
+local RIBBON_Y = 0.14
+local tripFolder: Folder? = nil
+local function strip(parent: Instance, a: Vector3, b: Vector3, width: number, colour: Color3): Part?
+	local length = (b - a).Magnitude
+	if length < 0.05 then return nil end
+	local part = Instance.new("Part")
+	part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch, part.CastShadow = true, false, false, false, false
+	part.Material = Enum.Material.SmoothPlastic
+	part.Color = colour
+	part.Size = Vector3.new(width, 0.06, length)
+	part.CFrame = CFrame.lookAt((a + b) / 2, b)
+	part.Transparency = 1
+	part.Parent = parent
+	return part
+end
+local function clearTrip()
+	if tripFolder then tripFolder:Destroy() end
+	tripFolder = nil
+end
+-- Returns the ribbon's strips { t, parts } in time order (empty without a line to draw).
+local function buildTrip(rec): { any }
+	clearTrip()
+	local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
+	local railLength = TrackLayout.railLength(cfg, rec.plan)
+	local folder = Instance.new("Folder")
+	folder.Name = "ReplayTrip"
+	folder.Parent = workspace
+	tripFolder = folder
+	local function at(p: number, x: number): Vector3
+		local px, pz = TrackLayout.railPoint(cfg, rec.plan, p * railLength, x)
+		return Vector3.new(px, RIBBON_Y, pz)
+	end
+	local strips = {}
+	local points = ReplayTrip.ribbon(rec, 3)
+	if points then
+		for k = 2, #points do
+			local a, b = points[k - 1], points[k]
+			local pa, pb = at(a.p, a.x), at(b.p, b.x)
+			local parts = {}
+			local main = strip(folder, pa, pb, 1.4, if b.saved then GREEN else GOLD)
+			if main then table.insert(parts, main) end
+			if b.saved and k % 4 == 0 and main then -- a chevron pointing the way you went
+				local look = CFrame.lookAt(pb, pb + (pb - pa).Unit)
+				local back = look.LookVector * -1.1
+				for _, side in { -1, 1 } do
+					local arm = strip(folder, pb + back + look.RightVector * 0.9 * side + Vector3.new(0, 0.02, 0),
+						pb + Vector3.new(0, 0.02, 0), 0.35, GREEN)
+					if arm then table.insert(parts, arm) end
+				end
+			end
+			table.insert(strips, { t = b.t, parts = parts })
+		end
+	end
+	if rec.lockAt then
+		local lockP = TrackLayout.phaseA(cfg, rec.plan).lockS / railLength
+		local bar = strip(folder, at(lockP, 0.5), at(lockP, cfg.lanes + 0.5), 1.2, BELL)
+		if bar then
+			bar.Transparency = 0.15
+			local sign = Instance.new("BillboardGui")
+			sign.Size = UDim2.fromOffset(150, 34)
+			sign.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+			sign.AlwaysOnTop = true
+			local l = Instance.new("TextLabel")
+			l.Size = UDim2.fromScale(1, 1)
+			l.BackgroundTransparency = 1
+			l.Font = Enum.Font.GothamBlack
+			l.TextScaled = true
+			l.TextColor3 = Color3.new(1, 1, 1)
+			l.TextStrokeTransparency = 0.3
+			l.Text = "🔔 Lanes lock"
+			l.Parent = sign
+			sign.Adornee = bar
+			sign.Parent = bar
+		end
+	end
+	return strips
+end
+
 local doneBtn = button("Done ✕", UDim2.new(1, -150, 0.015, 0), UDim2.fromOffset(130, 44))
 local camBtn = button("Behind", UDim2.new(1, -290, 0.015, 0), UDim2.fromOffset(130, 44))
 
@@ -127,6 +236,8 @@ local function stop()
 	if not playing then return end
 	local rec = playing.rec
 	playing = nil
+	clearTrip()
+	wind.Visible = false
 	if rec and RaceState.restHorses then RaceState.restHorses(rec.course, rec.lanes) end
 	gui.Enabled = false
 	local camera = workspace.CurrentCamera
@@ -176,7 +287,10 @@ local function start(mode: string)
 		slowFrom = if won then crossT - 2 else math.huge, -- slow motion only when you won
 		eventIdx = 1, view = "side", frozenUntil = nil, lastPlace = nil, photoChecked = false,
 		subject = rec.myLane or winner or 1, -- a spectator's replay follows the winner
+		strips = buildTrip(rec), stripIdx = 1, lockShown = false,
 	}
+	-- "Watch the finish" starts after the lock: no "Lanes locked!" then.
+	playing.lockShown = rec.lockAt ~= nil and playing.clock > rec.lockAt + 0.5
 	-- skip events before the start point
 	while playing.eventIdx <= #rec.events and rec.events[playing.eventIdx].t < playing.clock do
 		playing.eventIdx += 1
@@ -220,10 +334,7 @@ local function placeAll(rec, t: number, speed: number?)
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
 		-- Recorded lane positions (D-054): per frame when steering moved them, else the posts.
-		local xa = (a.x and a.x[i]) or (rec.lane and rec.lane[i])
-		local xb = (b.x and b.x[i]) or xa
-		local x = if xa and xb then xa + (xb - xa) * f else nil
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, x)
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, ReplayTrip.laneAt(rec, a, b, f, i))
 	end
 	return progress
 end
@@ -274,6 +385,30 @@ RunService.RenderStepped:Connect(function(dt)
 			then target + pivot.RightVector * outside + Vector3.new(0, 6, 0)
 			else target - pivot.LookVector * 18 + Vector3.new(0, 7, 0)
 		camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(eye, target), math.min(1, dt * 4))
+	end
+
+	-- Your line on the track shows up to where your horse is now; wind lines while you were
+	-- tucked in; "Lanes locked!" at the lock (riders who had the steering buttons).
+	while playing.stripIdx <= #playing.strips and playing.strips[playing.stripIdx].t <= t do
+		for _, part in playing.strips[playing.stripIdx].parts do part.Transparency = 0.3 end
+		playing.stripIdx += 1
+	end
+	wind.Visible = rec.steer == true and ReplayTrip.tuckedAt(rec, t)
+	if wind.Visible then
+		local still = reducedMotion()
+		for k, line in windLines do
+			local phase = if still then 0.5 else (os.clock() * 1.2 + k * 0.37) % 1
+			local y = 0.36 + 0.07 * ((k - 1) // 2)
+			line.Position = if k % 2 == 1 then UDim2.new(0.3 - 0.25 * phase, -90, y, 0) else UDim2.new(0.7 + 0.25 * phase, 0, y, 0)
+			line.BackgroundTransparency = 0.35 + 0.6 * phase
+		end
+	end
+	if rec.steer and rec.lockAt and not playing.lockShown and t >= rec.lockAt then
+		playing.lockShown = true
+		caption.Text = "Lanes locked!"
+		task.delay(1.5, function()
+			if playing and caption.Text == "Lanes locked!" then caption.Text = "" end
+		end)
 	end
 
 	-- Overlays: your taps, the burst, places gained.

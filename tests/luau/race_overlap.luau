@@ -49,7 +49,7 @@ end
 export type Own = { overlapsBefore: number, overlapsAfter: number, apartMax: number, apartAtLock: number,
 	timeouts: number, longestPrediction: number, presses: number, predicted: number }
 export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean,
-	lineOrder: { number }, result: { number }, answers: { [string]: number }, own: Own? }
+	lineOrder: { number }, result: { number }, answers: { [string]: number }, halfSteps: number, own: Own? }
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local cfgGame = config or GameConfig
@@ -100,7 +100,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	local sampleAt = 0
 	local stats: Stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {},
-		answers = trip.answers, own = nil }
+		answers = trip.answers, halfSteps = 0, own = nil }
 	-- Messages on their way to the client { at, kind, ... } and presses on their way to the server.
 	local inbox, outbox = {}, {}
 	-- Rider 1's own screen (predict).
@@ -258,5 +258,6 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		if line[p] ~= result[p] then stats.orderOk = false end
 	end
 	stats.lineOrder, stats.result = line, result
+	stats.halfSteps = trip.halfSteps or 0
 	return stats
 end

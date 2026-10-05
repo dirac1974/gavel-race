@@ -22,7 +22,7 @@ for _, arg in process.args do
 end
 if opts.predict and opts.riders < 1 then opts.riders = 1 end
 
-local answers = {}
+local answers, halfStepRaces = {}, 0
 local totals = { races = 0, before = 0, first5 = 0, after = 0, frames = 0, beforeFrames = 0, first5Frames = 0, afterFrames = 0, lastTwo = 0, lastTwoFrames = 0, orderBad = 0 }
 local own = { races = 0, overlapsBefore = 0, overlapsAfter = 0, framesBefore = 0, framesAfter = 0, apartMax = 0, apartAtLock = 0,
 	timeouts = 0, longest = 0, presses = 0, predicted = 0 }
@@ -42,6 +42,7 @@ for _, course in { "dirt", "turf" } do
 			if s.lastTwo > 0 then totals.lastTwo += 1 end
 			totals.lastTwoFrames += s.lastTwo
 			if not s.orderOk then totals.orderBad += 1 end
+			if s.halfSteps > 0 then halfStepRaces += 1 end
 			for answer, count in s.answers do answers[answer] = (answers[answer] or 0) + count end
 			local o = s.own
 			if o then
@@ -68,8 +69,8 @@ end
 print(string.format("all: races with an overlap before the lock %d/%d, first 5 s after %d/%d, lock to line %d/%d; overlapping frames %d / %d / %d of %d",
 	totals.before, totals.races, totals.first5, totals.races, totals.after, totals.races,
 	totals.beforeFrames, totals.first5Frames, totals.afterFrames, totals.frames))
-print(string.format("in the last 2 s (holds let go): %d races, %d frames; order across the line differs from the result in %d/%d races",
-	totals.lastTwo, totals.lastTwoFrames, totals.orderBad, totals.races))
+print(string.format("in the last 2 s (holds let go): %d races, %d frames; order across the line differs from the result in %d/%d races; a half-lane step in %d races",
+	totals.lastTwo, totals.lastTwoFrames, totals.orderBad, totals.races, halfStepRaces))
 if opts.riders > 0 then
 	local parts = {}
 	for answer, count in answers do table.insert(parts, answer .. " " .. count) end

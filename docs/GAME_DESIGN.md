@@ -20,6 +20,10 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 - During the race: your place ("3rd of 8") on screen and over your horse, the side board in running order, and a race map with a race strip and a small oval (D-030, D-032).
 - Lobby shows each horse's Win Chance % and locked win purse. Live Win Chance updates three times during the race and after the burst.
 - The horses cross the line in the drawn finish order; prizes: winner gets the locked purse; 2nd 1.2B, 3rd 0.8B, 4th 0.4B. League Points: win 10, 2nd 6, 3rd 4, 4th 2, finish 1.
+- **Steering** (D-054). Posts are drawn at the gate, and every horse can change lanes from the gate to the far-turn entry.
+  - **For kids:** two big buttons, ◀ In and Out ▶ (or A/D and the arrows, or the D-pad), move your horse one lane at a time. The rail is shorter on the turns, and sitting just behind a horse in your lane ("Tucked in!") helps a little. Smart Steer does it for you until you press, and it never takes you outward. Three soft bell ticks, then "Lanes locked!" at the far turn; from there it's the slider and the Final Burst. The buttons appear from your 4th race, with a one-time tip. Chips say what worked ("Saved ground!", "Tucked in!"), and a gentle tip shows if you're wide going into a turn.
+  - **After the race:** "Good trip ★★☆" sits under "You rode ★★☆", and "Your trip gained you N places!" shows only when it did. The replay draws your line on the track up to the lock: a gold ribbon, green with chevrons through the turns where you saved ground, wind lines while you were tucked in, and a bar where lanes lock.
+  - **For grown-ups:** the best trip is worth about 2 points of a 100-point ride (a typical tap edge is about 7 times bigger), and nothing buys it. There's no penalty for getting boxed in, and the trip never sees luck: it's fixed at the far turn. Each post's built-in advantage is removed by a per-post baseline. In a rider's first 3 races, before the buttons, the trip counts as zero. `GameConfig.steering.scale = 0` makes steering cosmetic; `enabled = false` brings back fixed lanes.
 
 ## Spectating (D-019)
 

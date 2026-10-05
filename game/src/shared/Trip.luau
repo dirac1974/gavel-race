@@ -636,7 +636,10 @@ end
 -- shape's luck blend) never run through each other. Working on the shown offsets (st.view, held
 -- by viewStep), the horse behind on screen in a meeting glides to the nearest free lane it can
 -- reach across lanes clear of nearby horses (outward first); boxed in, a horse in its way moves
--- over instead (up to MAKE_WAY_DEPTH deep), else it stays held. Decided again each tick. Never
+-- over instead (up to MAKE_WAY_DEPTH deep), else it stays held. In the last moments, when holds let
+-- go so the order across the line is the result, a horse still boxed in edges half a lane over if
+-- nobody is there (S4): it may finish less than a length behind the horse ahead in its lane, and
+-- then the two finish staggered instead of through each other. Decided again each tick. Never
 -- touches the trip or tau. t = race time (seconds since the gate). Returns the lanes to show.
 function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { number }
 	local cfg, n = st.cfg, st.n
@@ -652,6 +655,8 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 	end)
 	local clear = cfg.clearFeet
 	local cross = 2 * st.race.maxGapFeetPerSecond * cfg.laneSeconds -- closing while crossing a lane
+	-- Half-lane steps start this long before the holds let go, so the step is done by then.
+	local stepping = st.geo.length / st.speed - t <= HOLD_RELEASE_SECONDS + cfg.laneSeconds
 	local function inLane(j: number, lane: number): boolean
 		return math.abs(x[j] - lane) < band or tgt[j] == lane
 	end
@@ -720,9 +725,31 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 		end
 		return false
 	end
+	-- A half-lane step for i (S4): only where no horse near it lengthwise is, or is heading, within
+	-- half a lane of the new spot.
+	local function halfStep(i: number): boolean
+		for _, dir in { 1, -1 } do
+			local spot = tgt[i] + 0.5 * dir
+			if spot >= 1 and spot <= st.lanes then
+				local ok = true
+				for j = 1, n do
+					if j ~= i and math.abs(view[j] - view[i]) < clear + cross
+						and (math.abs(x[j] - spot) < 0.5 or math.abs(tgt[j] - spot) < 0.5) then
+						ok = false
+					end
+				end
+				if ok then
+					tgt[i] = spot
+					st.halfSteps = (st.halfSteps or 0) + 1 -- counted for the overlap report
+					return true
+				end
+			end
+		end
+		return false
+	end
 	for a = 1, n do
 		local i = ord[a]
-		if x[i] == tgt[i] then
+		if x[i] == tgt[i] and tgt[i] % 1 == 0 then -- (a horse already half a lane over stays there)
 			local blocker = nil
 			for b = 1, a - 1 do -- horses ahead on screen (or level and earlier): i gives way
 				local j = ord[b]
@@ -732,8 +759,8 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 				local lane = findLane(i)
 				if lane then
 					tgt[i] = lane
-				else
-					clearLane(i, blocker, MAKE_WAY_DEPTH) -- if nothing can move, it is held until a lane opens
+				elseif not clearLane(i, blocker, MAKE_WAY_DEPTH) and stepping then
+					halfStep(i) -- if nothing can move, it is held until a lane opens (or the holds let go)
 				end
 			end
 		end
