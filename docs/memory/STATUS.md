@@ -18,9 +18,9 @@ Last updated: 2026-10-04
 1. **Debate 002 — first 10 minutes** (onboarding). Energy is decided (D-015); debate 003 is retired.
 2. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
 3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
-4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
+4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging. **Must fix before any public test:** `GavelMeter.resolveTapTime` accepts any client-claimed time up to 0.3 s before arrival, so a modified client can wait until the marker has passed the center and claim that moment, scoring 100 every window. Score at arrival minus the player's measured one-way latency instead (cap 0.3 s), and treat claimed times as advisory. Same layer covers Clap Along (D-020): flag timing spread under 12 ms over 48+ beats.
 5. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
-6. **Spectator cheering (D-019)**: spectator mode, cheer lock before window 1, Fan XP per tap with per-race and daily caps in `GameConfig.spectator`; tests that riders and their party can't cheer in their own race and that caps hold.
+6. **Spectator cheering (D-019)**: spectator mode, cheer lock before window 1, Fan XP per tap with per-race and daily caps in `GameConfig.spectator`; tests that riders and their party can't cheer in their own race and that caps hold. Then Clap Along and the crowd boost (D-020): beat schedule from the horse's stride, scoring, top-3 crowd, `c_i` in Python and Luau with parity tests.
 7. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, Diamonds, and Fan XP (check the D-019 20% rule), to `sims/economy.py`.
 8. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
 

@@ -25,7 +25,7 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 2. **Locked win purse in whole cash:** `Purse_i = round(B / q_i)`. Since `q_i · B / q_i = B`, every horse expects `B` of win cash at average play, up to rounding: whole-cash rounding moves a horse's expectation by at most `0.5 q_i` cash, a share of `0.5 q_i / B` (worst case about 1% in Rookie, under 0.2% from Silver up). An earlier version rounded to 5 cash and claimed < 0.2%; that bound was wrong for small purses (up to ~4.4% in Rookie), so D-017 switched to whole cash. Place prizes are flat: 2nd 1.2B, 3rd 0.8B, 4th 0.4B.
 3. **Gavel window score:** `s = 100 (1 − d)`, `d` = distance from meter center / half-width. Constant-speed (triangle-wave) meter, so a random tap averages 50. `S` = mean of three windows.
 4. **Skill vs. this race:** `R_i = clamp((S_i − mean S) / 50, −0.5, 1)`, mean over all lanes in the race. During the race, use only the windows played so far.
-5. **Live win chance (exponential tilt):** `p'_i = q_i · e^{κ R_i} / Σ_j q_j · e^{κ R_j}`, `κ = 1.0`.
+5. **Live win chance (exponential tilt):** `p'_i = q_i · e^{κ R_i} / Σ_j q_j · e^{κ R_j}`, `κ = 1.0`. With the crowd boost (D-020, not built yet) the exponent becomes `κ R_i + c_i`, where `c_i ∈ [0, 0.03]` comes from the lane's three best Clap Along fans; `c_i = 0` for every lane gives the formula above.
 6. **Finish order:** draw the winner from `p'`, then 2nd from the remaining horses renormalized, and so on (Harville).
 
 ### Properties
