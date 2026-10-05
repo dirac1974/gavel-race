@@ -7,3 +7,8 @@ tests/fixtures/race_math.json
 
 # Raw Meshy output (tools/meshy/meshy.py writes Models/generated/<slot>/). Never commit model binaries.
 Models/
+
+# Studio place files built from the Rojo project (rojo build), and Studio lock files
+*.rbxl
+*.rbxlx
+*.rbxl.lock

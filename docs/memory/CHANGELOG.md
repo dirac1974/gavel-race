@@ -2,6 +2,11 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — fix: solid rails; feat: chase camera and Roblox-style jockeys on bot horses (D-028)
+- 2026-10-04 — feat: continuous pace slider and speed meter, bigger Final Burst, first-person riding (D-026); Churchill Downs racecourse (D-027)
+- 2026-10-04 — feat: oval racecourse with one-lap races and smooth client-side horse motion (D-025)
+- 2026-10-04 — feat: racing players ride their horse as the jockey (D-024); fix: ground, spawn and boundary walls
+- 2026-10-04 — feat: playtest art in the game: uploads (LlamaWorks), UI atlas, AssetService, TrackScene, client art; darker dapple grey
 - 2026-10-04 — Playtest art (D-023): Meshy horses, finish post and gate stall (170 credits), 51 UI SVG/PNGs, import notes
 - 2026-10-04 — feat: client changes from the art review (fixed-time rings, GIDDY-UP pad, any key, dimmed board, own-screen burst celebration, lane sparkle)
 - 2026-10-04 — feat: Giddy-up stretches and Final Burst in the prototype (D-022); integrity logging; burst start made uniform

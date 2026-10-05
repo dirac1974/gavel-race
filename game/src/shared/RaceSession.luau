@@ -3,12 +3,13 @@
 -- no clocks of its own (callers pass times), randomness only through the rng
 -- passed in. Dependencies are injected so it runs under Lune tests.
 --
--- Segments (D-022): three Giddy-up stretches, then the Final Burst, which counts
--- double. S = weighted mean of segment scores, so the race maths is unchanged.
+-- Segments (D-026): the pace meter runs continuously through the race, scored in three
+-- back-to-back checkpoints, then the Final Burst, which counts double. S = weighted mean
+-- of segment scores, so the race maths is unchanged.
 --
--- Flow: RaceSession.new
---   stretch: openStretch(seg, start) -> scoreStretch(id, seg, taps) ... -> closeSegment(seg)
---   burst:   burstSpec() -> submitBurst(id, seg, t) ... -> closeSegment(seg)
+-- Flow: RaceSession.new -> paceSchedule(start, duration)
+--   pace:  scorePace(id, seg, taps) ... -> closeSegment(seg)   (x3, no pauses between)
+--   burst: burstSpec() -> submitBurst(id, seg, t) ... -> closeSegment(seg)
 --   -> finish()
 
 export type Rng = { NextNumber: (self: any) -> number }
@@ -28,7 +29,7 @@ export type Lane = LaneInput & {
 
 export type Prize = { id: string, place: number, cash: number, leaguePoints: number, isBot: boolean }
 
-export type StretchResult = { score: number, gapErrors: { number }, matched: number }
+export type PaceResult = { score: number, errors: { number }, matched: number }
 
 local RaceSession = {}
 RaceSession.__index = RaceSession
@@ -65,7 +66,7 @@ function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: 
 end
 
 function RaceSession.new(params: {
-	deps: { RaceMath: any, BurstMeter: any, Stride: any },
+	deps: { RaceMath: any, BurstMeter: any, PaceMeter: any },
 	config: any,
 	leagueName: string,
 	lanes: { LaneInput },
@@ -94,7 +95,8 @@ function RaceSession.new(params: {
 	self.purses = RaceMath.lockPurses(self.q, self.mathCfg)
 	self.live = table.clone(self.q)
 	self.closed = 0
-	self.beats = {} :: { [number]: { number } }
+	self.passes = nil :: any
+	self.paceStart, self.paceEnd = 0, 0
 	self.burst = nil :: any
 	self.finished = false
 	return self
@@ -115,44 +117,60 @@ function RaceSession:laneIndex(id: string): number?
 	return nil
 end
 
--- Giddy-up stretches -----------------------------------------------------------
+-- Pace meter (D-026) ------------------------------------------------------------
 
-function RaceSession:strideSpec()
-	local league, s = self.league, self.config.stride
+function RaceSession:paceSpec()
+	local p = self.config.pace
 	return {
-		beats = s.beats,
-		intervalLo = league.strideIntervalLo,
-		intervalHi = league.strideIntervalHi,
-		drift = league.strideDrift,
-		leadChange = league.leadChange,
-		half = s.halfWindowSeconds,
+		sweepSeconds = self.league.sweepSeconds,
+		speedDrift = p.speedDrift,
+		shiftMin = p.shiftMin,
+		shiftMax = p.shiftMax,
+		centerRange = p.centerRange,
 	}
 end
 
--- Beat times for stretch `seg`, first beat at `start` (server time). Shared by all lanes.
-function RaceSession:openStretch(seg: number, start: number): { number }
-	assert(seg == self.closed + 1 and self:kind(seg) == "stride", "open the current stretch")
-	assert(self.beats[seg] == nil, "stretch already open")
-	local beats = self.deps.Stride.schedule(self.rng, start, self:strideSpec())
-	self.beats[seg] = beats
-	return beats
+function RaceSession:paceCount(): number
+	local n = 0
+	for _, kind in self.config.segments do
+		if kind == "pace" then n += 1 end
+	end
+	return n
 end
 
--- Score one rider's taps (server times, already resolved) for the open stretch.
--- Once per lane per stretch; bots and unknown ids return nil.
-function RaceSession:scoreStretch(id: string, seg: number, taps: { number }): StretchResult?
+-- The marker's passes for the whole race, shared by all lanes. Call once, at the gate.
+function RaceSession:paceSchedule(start: number, duration: number)
+	assert(self.passes == nil, "pace already scheduled")
+	self.passes = self.deps.PaceMeter.schedule(self.rng, start, duration, self:paceSpec())
+	self.paceStart, self.paceEnd = start, start + duration
+	return self.passes
+end
+
+-- Time range of pace checkpoint `seg` (passes belong to the checkpoint they start in).
+function RaceSession:paceRange(seg: number): (number, number)
+	local len = (self.paceEnd - self.paceStart) / self:paceCount()
+	return self.paceStart + (seg - 1) * len, self.paceStart + seg * len
+end
+
+function RaceSession:pacePasses(seg: number)
+	local t0, t1 = self:paceRange(seg)
+	local out = {}
+	for _, p in self.passes do
+		if p.t0 >= t0 - 1e-9 and p.t0 < t1 - 1e-9 then table.insert(out, p) end
+	end
+	return out
+end
+
+-- Score one rider's taps (server times, already resolved) for pace checkpoint `seg`.
+-- Once per lane per checkpoint; bots and unknown ids return nil.
+function RaceSession:scorePace(id: string, seg: number, taps: { number }): PaceResult?
 	local i = self:laneIndex(id)
-	if not i or self.finished or seg ~= self.closed + 1 or self.beats[seg] == nil then return nil end
+	if not i or self.finished or seg ~= self.closed + 1 or self:kind(seg) ~= "pace" or self.passes == nil then return nil end
 	local lane = self.lanes[i]
 	if lane.isBot or lane.scores[seg] ~= nil then return nil end
-	local Stride, beats, half = self.deps.Stride, self.beats[seg], self.config.stride.halfWindowSeconds
-	local s = Stride.score(beats, taps, half)
+	local s, errors, matched = self.deps.PaceMeter.score(self:pacePasses(seg), taps)
 	lane.scores[seg] = s
-	local matched = 0
-	for _, m in (Stride.match(beats, taps, half)) do
-		if m then matched += 1 end
-	end
-	return { score = s, gapErrors = Stride.gapErrors(beats, taps, half), matched = matched }
+	return { score = s, errors = errors, matched = matched }
 end
 
 -- Final Burst ------------------------------------------------------------------
@@ -217,8 +235,8 @@ function RaceSession:closeSegment(seg: number): { number }
 	assert(seg == self.closed + 1, "segments must close in order")
 	local config = self.config
 	local isBurst = self:kind(seg) == "burst"
-	local botMean = if isBurst then config.botBurstMean else config.botStrideMean
-	local botSd = if isBurst then config.botBurstSd else config.botStrideSd
+	local botMean = if isBurst then config.botBurstMean else config.botPaceMean
+	local botSd = if isBurst then config.botBurstSd else config.botPaceSd
 	local played, sum = 0, 0
 	for _, lane in self.lanes do
 		if lane.isBot then

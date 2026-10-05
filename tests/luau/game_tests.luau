@@ -1,5 +1,5 @@
 --!strict
--- Tests for the pure game modules: BurstMeter, TapTime, Stride, Integrity, RaceSession.
+-- Tests for the pure game modules: BurstMeter, TapTime, Stride, PaceMeter, TrackLayout, Integrity, RaceSession.
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -8,6 +8,8 @@ local TapTime = require("../../game/src/shared/TapTime")
 local Stride = require("../../game/src/shared/Stride")
 local Integrity = require("../../game/src/shared/Integrity")
 local RaceSession = require("../../game/src/shared/RaceSession")
+local TrackLayout = require("../../game/src/shared/TrackLayout")
+local PaceMeter = require("../../game/src/shared/PaceMeter")
 
 local function makeRng(seed0: number)
 	local seed = seed0
@@ -131,8 +133,63 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(Integrity.action(2, icfg) == "warn", "second strike warns")
 	check(Integrity.action(3, icfg) == "review", "third strike goes to review")
 
+	-- TrackLayout (D-027) ------------------------------------------------------
+	local tc = TrackLayout.churchill
+	check(TrackLayout.outerRadius(tc) == tc.railRadius + tc.width, "track width")
+	for i = 2, tc.lanes do
+		check(TrackLayout.laneRadius(tc, i) > TrackLayout.laneRadius(tc, i - 1), "outer lanes have larger radii")
+	end
+	check(TrackLayout.laneRadius(tc, tc.lanes) + tc.laneWidth / 2 <= TrackLayout.outerRadius(tc), "lanes fit inside the outer rail")
+	local r1 = TrackLayout.laneRadius(tc, 1)
+	check(math.abs(TrackLayout.lapLength(tc, r1) - 5280) < 60, "lane 1 is about a mile round")
+	for i = 1, tc.lanes do -- continuous path with unit headings
+		local r = TrackLayout.laneRadius(tc, i)
+		local lap = TrackLayout.lapLength(tc, r)
+		local px, pz = TrackLayout.atDistance(tc, r, 0)
+		local steps = 3000
+		for k = 1, steps do
+			local x, z, dx, dz = TrackLayout.atDistance(tc, r, lap * k / steps)
+			check(close(dx * dx + dz * dz, 1, 1e-9), "heading is a unit vector")
+			check(math.sqrt((x - px) ^ 2 + (z - pz) ^ 2) <= lap / steps + 1e-6, "path has no jumps")
+			px, pz = x, z
+		end
+	end
+	local _, _, lineZ = TrackLayout.finishLine(tc)
+	for name, distance in TrackLayout.distances do
+		local plan = TrackLayout.plan(tc, distance)
+		check(plan.lengths[1] <= distance + 1e-6 and plan.lengths[1] > distance - 200, name .. ": lane 1 runs about the distance")
+		for i = 1, tc.lanes do
+			local x, z = TrackLayout.lanePoint(tc, plan, i, 1)
+			check(close(z, lineZ, 1e-6) and close(x, tc.centerX + TrackLayout.laneRadius(tc, i), 1e-6), name .. ": every lane finishes on the line")
+			if i > 1 then check(plan.lengths[i] >= plan.lengths[i - 1] - 1e-6, name .. ": outer lanes run at least as far") end
+		end
+		-- The gate is on a straight: every lane starts at the same z, heading along it.
+		local _, z1, dx1, dz1 = TrackLayout.lanePoint(tc, plan, 1, 0)
+		for i = 2, tc.lanes do
+			local _, zi, dxi, dzi = TrackLayout.lanePoint(tc, plan, i, 0)
+			check(close(zi, z1, 1e-6) and close(dxi, dx1, 1e-9) and close(dzi, dz1, 1e-9), name .. ": gate straight across a straight")
+		end
+	end
+	local derby = TrackLayout.plan(tc, TrackLayout.distances.Classic)
+	check(derby.gateStraight == "home" and derby.gateOffset == 0, "the Derby distance starts at the top of the stretch")
+	check(derby.laps == 1, "the Derby distance passes the line once first")
+
+	-- PaceMeter (D-026; most coverage is the Python parity in run_all) -----------
+	local pspec = { sweepSeconds = 2.4, speedDrift = 0.15, shiftMin = 2, shiftMax = 3, centerRange = 0.6 }
+	local passes = PaceMeter.schedule(makeRng(21), 100, 36, pspec)
+	check(#passes > 20 and passes[1].t0 == 100, "passes start at the gate")
+	for k = 2, #passes do
+		check(close(passes[k].t0, passes[k - 1].t1, 1e-9) and passes[k].dir == -passes[k - 1].dir, "passes are back to back, no pauses")
+	end
+	local ideal = {}
+	for k, p in passes do ideal[k] = PaceMeter.idealTime(p) end
+	check(close((PaceMeter.score(passes, ideal)), 100, 1e-6), "a tap on every target crossing scores 100")
+	local mash = {}
+	for k = 0, 36 * 8 do table.insert(mash, 100 + k / 8) end
+	check((PaceMeter.score(passes, mash)) < 2, "mashing scores about 0")
+
 	-- RaceSession ------------------------------------------------------------
-	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, Stride = Stride }
+	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter }
 	local humans = {
 		{ id = "1", name = "Ava", rating = 60, isBot = false },
 		{ id = "2", name = "Ben", rating = 55, isBot = false },
@@ -160,10 +217,12 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local function runRace(seed: number, perfect: boolean, benDrops: boolean, avaAverageOnly: boolean?)
 		local s = newSession(seed)
 		if avaAverageOnly then s:setAverageOnly("1", true) end
+		s:paceSchedule(10, 36)
 		for seg, kind in GameConfig.segments do
-			if kind == "stride" then
-				local b = s:openStretch(seg, 10 * seg)
-				if perfect then s:scoreStretch("1", seg, b) end
+			if kind == "pace" then
+				local taps = {}
+				for _, p in s:pacePasses(seg) do table.insert(taps, PaceMeter.idealTime(p)) end
+				if perfect then s:scorePace("1", seg, taps) end
 			else
 				local spec = s:burstSpec()
 				if perfect then s:submitBurst("1", seg, perfectBurstTime(spec)) end
@@ -178,23 +237,27 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local qsum = 0
 	for _, v in s0.q do qsum += v end
 	check(close(qsum, 1, 1e-12), "base chances sum to 1")
-	check(s0:segmentCount() == 4 and s0:kind(4) == "burst", "three stretches then the burst")
-	check(not pcall(function() s0:openStretch(2, 0) end), "stretches open in order")
-	local b1 = s0:openStretch(1, 5)
-	check(#b1 == GameConfig.stride.beats, "stretch has the configured beat count")
-	check(not pcall(function() s0:openStretch(1, 5) end), "a stretch opens once")
-	local res = s0:scoreStretch("1", 1, b1)
-	check(res ~= nil and close((res :: any).score, 100, 1e-9) and (res :: any).matched == #b1, "perfect stretch recorded")
-	check(s0:scoreStretch("1", 1, b1) == nil, "a stretch is scored once per rider")
-	check(s0:scoreStretch("bot:1", 1, b1) == nil, "bots can't tap")
+	check(s0:segmentCount() == 4 and s0:kind(4) == "burst" and s0:paceCount() == 3, "three pace checkpoints then the burst")
+	s0:paceSchedule(5, 36)
+	check(not pcall(function() s0:paceSchedule(5, 36) end), "the pace is scheduled once")
+	local p1 = s0:pacePasses(1)
+	local a1, b1end = s0:paceRange(1)
+	check(#p1 > 0 and close(a1, 5, 1e-9) and close(b1end, 17, 1e-9), "checkpoint 1 covers the first third")
+	local taps1 = {}
+	for _, p in p1 do table.insert(taps1, PaceMeter.idealTime(p)) end
+	local res = s0:scorePace("1", 1, taps1)
+	check(res ~= nil and close((res :: any).score, 100, 1e-6) and (res :: any).matched == #p1, "perfect checkpoint recorded")
+	check(s0:scorePace("1", 1, taps1) == nil, "a checkpoint is scored once per rider")
+	check(s0:scorePace("bot:1", 1, taps1) == nil, "bots can't tap")
 	check(s0:submitBurst("1", 1, 0.5) == nil, "no burst tap during a stretch")
 	check(not pcall(function() s0:closeSegment(2) end), "segments close in order")
 
-	-- Burst counts double: stretches all missed, perfect burst -> S = 200 / 5 = 40.
+	-- Burst counts double: pace all missed, perfect burst -> S = 200 / 5 = 40.
 	local sw = newSession(4)
+	sw:paceSchedule(10, 36)
 	for seg, kind in GameConfig.segments do
-		if kind == "stride" then
-			sw:openStretch(seg, 10 * seg)
+		if kind == "pace" then
+			-- no taps
 		else
 			local spec = sw:burstSpec()
 			check(sw:burstSpec() == spec, "burst spec is picked once and shared")
@@ -212,7 +275,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 
 	-- D-022 flag 2: average-only lanes score the segment average, not their taps.
 	local sAvg = select(1, runRace(11, true, false, true))
-	check((sAvg.lanes[1].scores[1] :: number) < 100, "average-only rider doesn't keep a perfect stretch")
+	check((sAvg.lanes[1].scores[1] :: number) < 100, "average-only rider doesn't keep a perfect checkpoint")
 	check(sAvg.live[1] < sPerfect.live[1], "average-only removes the edge")
 
 	-- Prize rules over many races.

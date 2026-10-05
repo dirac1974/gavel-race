@@ -12,11 +12,13 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 
 ## Race
 
-- 8 lanes, about 60–90 seconds, bots fill empty lanes within 20 seconds.
-- Lobby shows each horse's Win Chance % and locked win purse ("Win: 464").
-- Three **Giddy-up** stretches (break, backstretch, final stretch; D-022). In each, the rider taps on the horse's stride for about 8 beats; on-beat taps make the horse surge, mashing makes it break stride. Live Win Chance updates after each stretch. Then the **Final Burst**: one big tap on a sweeping meter right before the line, worth double (40% of the rider's score). No whip: hands-and-heels riding.
-- Server draws the finish order, then animates the race to match.
-- Prizes: winner gets the locked purse; 2nd 1.2B, 3rd 0.8B, 4th 0.4B. League Points: win 10, 2nd 6, 3rd 4, 4th 2, finish 1.
+- A Churchill Downs-style course (D-027): one-mile dirt oval, turf inside, grandstand and Twin Spires. Eight lanes; bots fill empty lanes within 20 seconds.
+- Racing players ride their own horse (D-024) in a close chase view (zoom in for first person, D-028); bot horses carry Roblox-style jockeys in lane colours.
+- Race length follows the distance: Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~2 min, Marathon ~2:21. Rookie runs Sprint and Mile.
+- The pace slider runs the whole race (D-026): tap as the marker crosses the glowing target, one tap per pass. The target moves every 2–3 passes; the speed meter fills from your last few passes.
+- In the homestretch: the **Final Burst**, one tap on a big rainbow meter, worth double (40% of the rider's score).
+- Lobby shows each horse's Win Chance % and locked win purse. Live Win Chance updates three times during the race and after the burst.
+- The horses cross the line in the drawn finish order; prizes: winner gets the locked purse; 2nd 1.2B, 3rd 0.8B, 4th 0.4B. League Points: win 10, 2nd 6, 3rd 4, 4th 2, finish 1.
 
 ## Spectating (D-019)
 

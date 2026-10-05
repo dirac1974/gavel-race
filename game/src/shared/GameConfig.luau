@@ -14,15 +14,32 @@ export type League = {
 	strideIntervalHi: number,
 	strideDrift: number,   -- each stride's interval changes by up to this fraction
 	leadChange: boolean,   -- one half-beat lead change mid-stretch
+	distances: { string }?, -- race distances this league runs (default: all)
 }
 
 local GameConfig = {}
 
 GameConfig.lanes = 8
--- Race segments (D-022): three Giddy-up stretches, then the Final Burst counting double.
-GameConfig.segments = { "stride", "stride", "stride", "burst" }
+-- Race segments (D-026): the pace meter runs continuously, scored in three back-to-back
+-- checkpoints, then the Final Burst counting double.
+GameConfig.segments = { "pace", "pace", "pace", "burst" }
 GameConfig.segmentWeights = { 1, 1, 1, 2 }
-GameConfig.windowGapSeconds = 4.0    -- running time between segments
+-- The slider (D-026). Target moves every 2-3 passes and speed drifts +-15% so a
+-- fixed-interval clicker scores below an average kid (simulated 59 vs 75; good human 93).
+GameConfig.pace = {
+	speedDrift = 0.15,
+	shiftMin = 2,
+	shiftMax = 3,
+	centerRange = 0.6,
+	speedFillPasses = 5,       -- the speed meter shows the mean of the last few passes
+}
+-- Race length (D-027): distance on the Churchill-style track at a gallop. Real times:
+-- Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~1:57, Marathon ~2:21.
+GameConfig.raceSpeedStudsPerSecond = 56
+GameConfig.burstLeadSeconds = 1.5    -- pace ends, "FINAL BURST" shows, then the burst meter
+GameConfig.burstBeforeLineSeconds = 1.0 -- the burst closes this long before the horses reach the line
+GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
+GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
 GameConfig.stride = {
 	beats = 8,                 -- per stretch, ~2 taps a second
 	halfWindowSeconds = 0.08,  -- a tap scores if within this of its beat
@@ -50,7 +67,9 @@ GameConfig.maxTapRewindSeconds = 0.3             -- cap on the per-player latenc
 GameConfig.tapJitterMarginSeconds = 0.05         -- added to measured one-way latency (D-021)
 GameConfig.missedTapScore = 0
 -- Bot scores per segment (D-011, recalibrated for D-022; tune from playtests).
-GameConfig.botStrideMean = 40
+GameConfig.botPaceMean = 60          -- D-026 slider; simulated average kid ~66-75, good player ~90
+GameConfig.botPaceSd = 15
+GameConfig.botStrideMean = 40        -- Giddy-up stretches (D-022), kept for Clap Along tuning
 GameConfig.botStrideSd = 15
 GameConfig.botBurstMean = 55
 GameConfig.botBurstSd = 15
@@ -93,6 +112,7 @@ GameConfig.scoreLabels = {
 
 GameConfig.leagues = {
 	Rookie = { name = "Rookie", T = 22, B = 20, sweepSeconds = 2.4, windowSeconds = 4.0, targetDrift = 0, twoTargetFinal = false,
+		distances = { "Sprint", "Mile" }, -- shorter races for new players (D-027)
 		strideIntervalLo = 0.60, strideIntervalHi = 0.60, strideDrift = 0, leadChange = false },
 	Bronze = { name = "Bronze", T = 18, B = 50, sweepSeconds = 2.0, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
 		strideIntervalLo = 0.55, strideIntervalHi = 0.60, strideDrift = 0.02, leadChange = false },

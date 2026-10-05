@@ -206,7 +206,46 @@ Template:
 - Status: Accepted (provisional)
 - Decided by: team (art lead plus the design council review, under D-009); assets requested by David
 - Decision: chunky, stylized, natural horses on a sunny county-fair race day. Small eyes on the sides of the head, no lashes or eyebrows, natural coats and manes, no flank symbols; ears forward, mouth closed, never strained. The hero isn't a buckskin mustang with a flowing black mane. Hooves dark and high-contrast on every coat, because the beat lands on the hoof. For the playtest the horse is one fixed gallop pose that bobs, with the bottom of the bob on the beat, plus a dust puff and mane flick; a leg cycle comes later (a real gallop's four footfalls could read as false beats). Lanes keep a fixed colour, pattern, and big number; "YOU" is huge; silks come later as a second marker. The Final Burst celebration plays on the rider's own screen after scoring (tiny camera punch, none under Reduced Motion, never more than 3 flashes a second); everyone else sees a small sparkle on that lane. Tap anywhere, with the hoof ring as the target and a GIDDY-UP pad as a reminder that holds steady while rings are on screen. Every ring closes in the same time. Rare coats will be natural (pinto, leopard, dapple), none in Phase 1.
-- Spend: 170 of a 200-credit Meshy cap (bay horse mesh, 5 coats, finish post, gate stall with one re-roll). Models live in the gitignored `Models/`; nothing uploaded to Roblox yet.
+- Spend: 180 of a 200-credit Meshy cap (bay horse mesh, 5 coats, finish post, gate stall with one re-roll, and a darker dapple grey re-roll David asked for). Models live in the gitignored `Models/`. Uploaded to Roblox under the LlamaWorks group with David's approval (2026-10-04); the playtest place must be published to that group. The finish post keeps its plaid disc for now (David: reevaluate later); the track's checkered line is built from parts.
 - Alternatives: realistic horses (blends in with Horse Life); cartoon ponies (too young for 11–13s, close to My Little Pony); celebration shown to everyone (spotlights the losers); a big button as the only target (adds aiming error, invites mashing).
 - Links: docs/art/ART_DIRECTION.md, docs/art/ART_REVIEW.md, docs/art/ASSET_PLAN.md, docs/art/IMPORT.md
+
+## D-024 — Racing players ride their horse
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("the player should be the jockey on the horse if they are participating in the race, riding him through the race")
+- Decision: at race start each racing player's avatar is seated in an invisible saddle Seat on their lane's horse and rides it to the finish; the default camera follows the rider. Jumping is disabled while riding (Space is also a tap key). About 3 s after the results, riders are dismounted beside the starting gate. Spectators and late joiners stay on the ground. Riding pose is the default sit for now; a hands-and-heels riding animation (never a whip, D-022) comes with the race presentation work.
+- Links: game/src/server/TrackScene.luau (seatRider, dismountAll), game/src/server/RaceService.server.luau, game/src/client/RaceController.client.luau
+
+## D-025 — Oval racecourse, one lap
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("it should be an oval"); team (dimensions and motion)
+- Decision: races run one lap of an eight-lane oval (two 180-stud straights, inner rail radius 50, lanes 5 studs wide; lane 1 inside, about 700 studs round, lane 8 about 920). Start and finish share the line at the near end of the home straight; the stalls clear when the countdown ends. Each client animates all horses from the server's timeline (start, expected end, live chances, finish order) so motion is smooth and identical everywhere: a shared pace to 95% of the lap by the Final Burst, the likelier winners edging ahead, then a run-in where horses cross the line in the drawn order. Spectators spawn outside the home straight by the finish line. Geometry lives in `OvalTrack` (pure, tested under Lune).
+- Alternatives: the 200-stud straight (David: too short, should be an oval); server-side tweening (steps with network updates, jittery for riders).
+- Links: game/src/shared/OvalTrack.luau, game/src/server/TrackScene.luau, game/src/client/RaceView.client.luau
+
+## D-026 — Continuous pace slider, first-person riding, bigger Final Burst
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("no pauses in the race for the clicks... I like the bar slider better than the horseshoe... a fill amount to the speed meter... make the ending boost bigger and more colorful"; "the player should have a front view as if they are on the horse")
+- Decision: riders tap a slider for the whole race, with no pauses. The marker sweeps back and forth; each pass takes one tap, scored `100 (1 - distance from the target)`; a pass with no tap or two taps scores 0, so mashing scores about 0. The glowing target moves to a new spot every 2–3 passes and each pass's speed varies by up to ±15% (David's earlier anti-macro idea), so a fixed-interval clicker scores below an average kid (simulated 59 vs 75; good player 93; random 48). A speed meter fills from the last 5 passes. Scoring is grouped into three back-to-back checkpoints for live win chances, then the Final Burst (same slider idea, one tap, counts double) on a much bigger rainbow meter with a pulsing gold rim and "FINAL BURST ×2". Riders see the race in first person from the saddle by default and can zoom out to third person. Detection (D-022) now uses tap time minus the target-crossing moment; same flag rule and ladder.
+- Supersedes: D-022's stride stretches for riders (the Stride module stays for Clap Along, D-020). The design council had rejected a plain repeating slider as auto-clicker-friendly; the moving target and speed drift address that.
+- Links: game/src/shared/PaceMeter.luau, src/pace_meter.py, game/src/client/RaceController.client.luau
+
+## D-027 — Churchill Downs racecourse; race length follows distance
+- Date: 2026-10-04
+- Status: Accepted (provisional for the distance-to-league mapping)
+- Decided by: David ("model the track layout like a famous race track... Santa Anita, or the Kentucky Derby... maybe a 2 min race is ok"); team (details)
+- Decision: the track is modelled on Churchill Downs at full scale (1 stud ≈ 1 ft): a one-mile dirt oval, 80 ft wide, quarter-mile straights, homestretch 1,234.5 ft to the finish, run counter-clockwise; turf course inside; grandstand with the Twin Spires along the homestretch, clubhouse at the first turn, infield Big Board, rose garden by the finish, barns on the backside, furlong poles and the finish pole on the inside rail. Races run at about 56 ft/s and the distance condition sets the length: Sprint 6f ~69 s (gate on the backstretch), Mile ~94 s, Classic 1¼ mi ~1:57 (gate at the top of the stretch, as in the Kentucky Derby), Marathon 1½ mi ~2:21. The gate sits straight across a straight, so outer lanes run slightly further. Rookie runs Sprint and Mile only (provisional: shorter races for new players).
+- Supersedes: D-025's small oval.
+- Links: game/src/shared/TrackLayout.luau, game/src/server/TrackScene.luau, game/src/client/RaceView.client.luau, game/default.project.json
+
+## D-028 — Chase camera, NPC jockeys, solid rails
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("during the race maybe it should be zoomed out a little, because you can't see the other nearby horses"; "npc horses should have roblox character style jockeys"; "you can walk right through the railing")
+- Decision: the riding camera starts as a close chase view (zoom 14 studs, field of view 80, Follow camera so it turns with the horse) instead of first person; riders can zoom in to first person or out. Every bot horse carries a standard Roblox R15 character as its jockey, in lane-colour silks and helmet with white breeches, seated with Roblox's default sit animation. Rails are solid, with an invisible wall from the ground to each rail so nobody walks through; players can still jump a rail.
+- Amends: D-026 (first-person default), D-024 (riders; now bots ride too).
+- Links: game/src/client/RaceController.client.luau (rideCamera), game/src/server/TrackScene.luau (addJockeys, railBlocker)
 

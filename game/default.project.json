@@ -2,18 +2,142 @@
   "name": "GavelDerby",
   "tree": {
     "$className": "DataModel",
+    "Workspace": {
+      "GroundNorth": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [1270, 1, 1257],
+          "Color": [0.365, 0.733, 0.29],
+          "Material": "Grass",
+          "TopSurface": "Smooth",
+          "BottomSurface": "Smooth",
+          "CFrame": {
+            "CFrame": {
+              "position": [25, -1, -628.5],
+              "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+            }
+          }
+        }
+      },
+      "GroundSouth": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [1270, 1, 1257],
+          "Color": [0.365, 0.733, 0.29],
+          "Material": "Grass",
+          "TopSurface": "Smooth",
+          "BottomSurface": "Smooth",
+          "CFrame": {
+            "CFrame": {
+              "position": [25, -1, 628.5],
+              "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+            }
+          }
+        }
+      },
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Size": [8, 1, 8],
+          "CFrame": {
+            "CFrame": {
+              "position": [506, -0.4, -560],
+              "orientation": [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
+            }
+          },
+          "Color": [0.984, 0.984, 0.961],
+          "Material": "SmoothPlastic",
+          "Neutral": true,
+          "Duration": 0,
+          "TopSurface": "Smooth",
+          "BottomSurface": "Smooth"
+        }
+      },
+      "Bounds": {
+        "$className": "Folder",
+        "North": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Size": [1274, 60, 2],
+            "Transparency": 1,
+            "CanCollide": true,
+            "CFrame": {
+              "CFrame": {
+                "position": [25, 29.5, -1259],
+                "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+              }
+            }
+          }
+        },
+        "South": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Size": [1274, 60, 2],
+            "Transparency": 1,
+            "CanCollide": true,
+            "CFrame": {
+              "CFrame": {
+                "position": [25, 29.5, 1259],
+                "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+              }
+            }
+          }
+        },
+        "West": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Size": [2, 60, 2520],
+            "Transparency": 1,
+            "CanCollide": true,
+            "CFrame": {
+              "CFrame": {
+                "position": [-612, 29.5, 0],
+                "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+              }
+            }
+          }
+        },
+        "East": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Size": [2, 60, 2520],
+            "Transparency": 1,
+            "CanCollide": true,
+            "CFrame": {
+              "CFrame": {
+                "position": [662, 29.5, 0],
+                "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+              }
+            }
+          }
+        }
+      }
+    },
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared",
-        "RaceMath": { "$path": "../src/RaceMath.luau" }
+        "RaceMath": {
+          "$path": "../src/RaceMath.luau"
+        }
       }
     },
     "ServerScriptService": {
-      "Server": { "$path": "src/server" }
+      "Server": {
+        "$path": "src/server"
+      }
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "Client": { "$path": "src/client" }
+        "Client": {
+          "$path": "src/client"
+        }
       }
     }
   }
