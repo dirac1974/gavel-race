@@ -430,6 +430,16 @@ Template:
 - Alternatives: bonus tiers on bigger packs (exchange rates that change with bundle size are a point in the May 2026 FTC complaint), selling fan flags or trophies, race-day cosmetics over lane colours, login Diamonds.
 - Links: game/src/shared/Style.luau, game/src/shared/DiamondProducts.luau, game/src/server/StyleService.server.luau, game/src/server/Purchases.server.luau, game/src/client/StyleShop.client.luau
 
+## D-051 — Running legs
+- Date: 2026-10-05
+- Status: Accepted
+- Decided by: David ("lets add animated legs/feet when the horse runs"); team (method)
+- Decision: the standing horse of every coat is cut into a body and four legs (tools/meshy/split_legs.py: legs below 38% of the height, split front/back by low-vertex clusters, left/right at the widest gap, the long tail stays on the body, a thin overlap above the cut hides the hip seam) and uploaded as `horse_anim_<coat>`. Each leg swings about its hip in a gait picked by speed: walk (four-beat, 18°), trot (diagonal pairs, 26°), gallop (four-beat with suspension, 36°, front legs reach further); the phase follows distance travelled so feet keep pace with the ground; legs ease back to standing when a horse stops. Race horses (live and replays) and wild horses pose their anchored legs each frame; ride horses swing legs on hip Motor6Ds that every client drives. One-piece gallop poses stay as the fallback until the split models load.
+- Review fixes: each leg's resting place is stored on it (LegRest attribute, AssetService), so a pose never drifts; gait changes cross-fade over a quarter second; legs rest when a race or replay ends; slow-motion replays pick the gait for the race's real speed; riding at 16 studs/s walks (walk < 20, trot < 36, gallop above); source normals kept (smooth shading); only overlap faces right above a leg go with it (no belly flaps); a horse whose legs didn't import separately falls back to the one-piece poses; wild horses beyond 150 studs skip the legs.
+- Saddle cloth: the split also makes a **Cloth** piece, a clean blanket shaped to the horse's back just behind the withers (a grid of rays cast onto the body). It's hidden until shown: race horses wear it in their lane colour with the lane number on both sides; ridden horses wear the rider's Tack & Paint cloth (D-050). Seats sit just below the cloth's top, so jockeys sit on the back of the bigger standing model.
+- Alternatives: Meshy rigging (humanoids only), separate per-pose models (no motion), Roblox Animation Editor rigs (needs Studio work by hand on every coat).
+- Links: tools/meshy/split_legs.py, game/src/shared/HorseLegs.luau, game/src/client/RaceView.client.luau, game/src/server/Rides.luau
+
 ## D-052 — Sound and the race announcer
 - Date: 2026-10-05
 - Status: Accepted (provisional)

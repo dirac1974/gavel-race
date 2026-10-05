@@ -124,7 +124,9 @@ end
 
 local function stop()
 	if not playing then return end
+	local rec = playing.rec
 	playing = nil
+	if rec and RaceState.restHorses then RaceState.restHorses(rec.course, rec.lanes) end
 	gui.Enabled = false
 	local camera = workspace.CurrentCamera
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -200,13 +202,13 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, _start, _c
 	end
 end)
 
-local function placeAll(rec, t: number)
+local function placeAll(rec, t: number, speed: number?)
 	local a, b, f = frameAt(rec, t)
 	local progress = {}
 	for i = 1, rec.lanes do
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course)
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed)
 	end
 	return progress
 end
@@ -230,7 +232,7 @@ RunService.RenderStepped:Connect(function(dt)
 	if playing.clock >= playing.slowFrom and playing.clock < playing.crossT then speed = 0.5 end
 	playing.clock += dt * speed
 	local t = playing.clock
-	local progress = placeAll(rec, t)
+	local progress = placeAll(rec, t, speed)
 	local me = rec.myLane
 
 	-- Camera.

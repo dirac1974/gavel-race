@@ -24,6 +24,7 @@ local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 
 local myId = tostring(Players.LocalPlayer.UserId)
 local BOB_HZ, BOB_STUDS = 1.8, 0.3
@@ -43,15 +44,43 @@ local function horseModel(courseId: string?, i: number): Model?
 	return horses and horses:FindFirstChild("Lane" .. i)
 end
 
-local function place(i: number, p: number, bob: number, plan, courseId: string?)
+local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { p, t } for the legs
+
+-- `timeScale`: how fast the race clock runs (replays in slow motion), so the legs pick the gait
+-- for the race's real speed.
+local function place(i: number, p: number, bob: number, plan, courseId: string?, timeScale: number?)
 	local horse = horseModel(courseId, i)
 	if not horse then return end
 	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
 	local x, z, dx, dz = TrackLayout.lanePoint(cfg, plan, i, p)
 	local pos = Vector3.new(x, bob, z)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
+	-- Running legs (D-051): stride with the distance covered since the last frame.
+	if HorseLegs.has(horse) then
+		local now = os.clock()
+		local prev = lastPlaced[horse]
+		local dist = if prev then math.max(0, (p - prev.p) * plan.lengths[i]) else 0
+		local dt = if prev then math.clamp(now - prev.t, 0, 0.2) else 0
+		if prev then
+			prev.p, prev.t = p, now
+		else
+			lastPlaced[horse] = { p = p, t = now }
+		end
+		HorseLegs.apply(horse, dist, dt, timeScale)
+	end
 end
 RaceState.placeHorse = place -- the replay uses the same placement
+
+-- Legs straight down for every horse on a course (a race or replay has ended).
+function RaceState.restHorses(courseId: string?, lanes: number)
+	for i = 1, lanes do
+		local horse = horseModel(courseId, i)
+		if horse then
+			lastPlaced[horse] = nil
+			HorseLegs.rest(horse)
+		end
+	end
+end
 
 -- Past the line, ease to a stop instead of running on.
 local function easePastLine(p: number): number
@@ -89,6 +118,7 @@ end)
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	local race = races[courseId or "dirt"]
 	races[courseId or "dirt"] = nil
+	if race then RaceState.restHorses(courseId or "dirt", race.lanes) end
 	if race and RaceState.focus == (courseId or "dirt") then
 		RaceState.active = false
 		RaceState.recording = nil
@@ -142,6 +172,7 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 		end
 		if race.done and (allStopped or t - race.doneAt > GameConfig.runInSeconds + 4) then
+			RaceState.restHorses(courseId, race.lanes)
 			races[courseId] = nil -- the horses stay where they stopped until the next race (or the replay)
 			if isFocus then RaceState.active = false end
 		end

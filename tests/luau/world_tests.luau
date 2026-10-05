@@ -609,4 +609,59 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(Style.hasSet(sp, "star"), "Star Set complete")
 	local migrated = Profile.migrate(sp, T0)
 	check(migrated.diamonds == sp.diamonds and migrated.style.owned.cloth_stars, "Diamonds and looks saved")
+
+	-- Running legs (D-051) ---------------------------------------------------------------
+	local HorseLegs = require("../../game/src/shared/HorseLegs")
+	check(HorseLegs.gaitFor(0) == "stand" and HorseLegs.gaitFor(8) == "walk" and HorseLegs.gaitFor(20) == "trot"
+		and HorseLegs.gaitFor(56) == "gallop", "gait by speed (race pace gallops)")
+	local maxA, okDiag = 0, true
+	for k = 0, 99 do
+		local p = k / 100
+		for _, leg in HorseLegs.LEGS do maxA = math.max(maxA, math.abs(HorseLegs.angle("gallop", leg, p))) end
+		if math.abs(HorseLegs.angle("trot", "LegFL", p) / 1.1 - HorseLegs.angle("trot", "LegBR", p) / 0.9) > 1e-9 then okDiag = false end
+	end
+	check(maxA > 30 and maxA <= 36 * 1.1 + 1e-6, "gallop swings big but never past its limit")
+	check(okDiag, "trot moves diagonal pairs together")
+	check(close(HorseLegs.advance(0.9, "gallop", 22 * 0.25), 0.15, 1e-9), "phase follows distance (one stride per stride length)")
+	check(HorseLegs.angle("stand", "LegFL", 0.3) == 0, "standing horses don't swing")
+	check(HorseLegs.gaitFor(16) == "walk" and HorseLegs.gaitFor(46) == "gallop", "riding walks at walk speed, gallops on Gallop")
+	-- Gait changes cross-fade: no leg jumps more than a few degrees in a frame.
+	local st = HorseLegs.newState()
+	local worst, steady, dt = 0, 0, 1 / 60
+	local last = {}
+	local speeds = {}
+	for f = 1, 240 do speeds[f] = 56 end           -- gallop
+	for f = 241, 300 do speeds[f] = 56 - (f - 240) * 0.6 end -- slow through trot
+	for f = 301, 420 do speeds[f] = 14 end          -- walk
+	for f = 1, #speeds do
+		HorseLegs.step(st, speeds[f] * dt, dt, speeds[f])
+		for _, leg in HorseLegs.LEGS do
+			local a = HorseLegs.poseAngle(st, leg)
+			if last[leg] and f > 30 then
+				local d = math.abs(a - last[leg])
+				if f <= 240 then steady = math.max(steady, d) else worst = math.max(worst, d) end
+			end
+			last[leg] = a
+		end
+	end
+	check(worst <= steady * 1.05, string.format("legs never jump when the gait changes (worst step %.1f° vs %.1f° galloping)", worst, steady))
+	for f = 1, 60 do HorseLegs.step(st, 0, dt, 0) end
+	check(math.abs(HorseLegs.poseAngle(st, "LegFL")) < 1e-6, "a horse that stops eases back to standing")
+	-- Gallop toggled on a ride: speed jumps 16 -> 46 (and back) in three frames, crossing two gaits.
+	for _, ramp in { { 16, 46 }, { 46, 16 } } do
+		local s2 = HorseLegs.newState()
+		local w2, last2 = 0, {}
+		for f = 1, 300 do
+			local sp = if f <= 120 then ramp[1] elseif f <= 123 then ramp[1] + (ramp[2] - ramp[1]) * (f - 120) / 3 else ramp[2]
+			HorseLegs.step(s2, sp * dt, dt, sp)
+			for _, leg in HorseLegs.LEGS do
+				local a = HorseLegs.poseAngle(s2, leg)
+				if last2[leg] and f > 30 then w2 = math.max(w2, math.abs(a - last2[leg])) end
+				last2[leg] = a
+			end
+		end
+		-- A few fast-trot frames while the fade finishes run a little quicker than a steady gallop;
+		-- a snap (the bug) was 20-42°.
+		check(w2 <= steady * 1.15, string.format("Gallop toggle %d->%d doesn't snap the legs (worst %.1f°)", ramp[1], ramp[2], w2))
+	end
 end

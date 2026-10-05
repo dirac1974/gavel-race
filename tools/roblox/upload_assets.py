@@ -78,6 +78,8 @@ MODELS = {
     **{f"horse_gallop_{c}": f"horse_gallop_{c}/horse_gallop_{c}_hoofed.glb" for c in NEW_GALLOP_COATS},
     **{f"horse_stand_{c}": f"horse_stand_{c}/horse_stand_{c}_hoofed.glb" for c in STAND_COATS},
     **{f"foal_stand_{c}": f"foal_stand_{c}/foal_stand_{c}_hoofed.glb" for c in FOAL_COATS},
+    # Standing horses cut into Body + four legs by tools/meshy/split_legs.py, for animated legs.
+    **{f"horse_anim_{c}": f"horse_anim_{c}/horse_anim_{c}.glb" for c in STAND_COATS},
     "finish_post": "finish_post/finish_post.glb",
     "gate_stall": "gate_stall/gate_stall.glb",
     **{slot: f"{slot}/{slot}.glb" for slot in PROPS},
