@@ -97,6 +97,90 @@
   "sha256": "e9450af0459dbba14d782c5f0d988cf8b57434f5096d21dd46248555c6fcfc37",
   "uploadedAt": "2026-10-05T06:57:11Z"
  },
+ "horse_anim_appaloosa": {
+  "assetId": 97744756796810,
+  "file": "Models/generated/horse_anim_appaloosa/horse_anim_appaloosa.glb",
+  "kind": "Model",
+  "sha256": "a56cf6b901d73d3365a27107c4e0953efecfd07de8a76ff7493deb7c26b6ade7",
+  "uploadedAt": "2026-10-05T14:52:32Z"
+ },
+ "horse_anim_bay": {
+  "assetId": 101324860196245,
+  "file": "Models/generated/horse_anim_bay/horse_anim_bay.glb",
+  "kind": "Model",
+  "sha256": "af0e236cf338440a9de01501ac2b3db56d5eff30e3586186e00dced06f27fea5",
+  "uploadedAt": "2026-10-05T14:50:54Z"
+ },
+ "horse_anim_black": {
+  "assetId": 92668484790160,
+  "file": "Models/generated/horse_anim_black/horse_anim_black.glb",
+  "kind": "Model",
+  "sha256": "810eaefa9537e21bfdf167af1394862535d9677b687eeff0479918e4bf096394",
+  "uploadedAt": "2026-10-05T14:51:38Z"
+ },
+ "horse_anim_buckskin": {
+  "assetId": 89287450165065,
+  "file": "Models/generated/horse_anim_buckskin/horse_anim_buckskin.glb",
+  "kind": "Model",
+  "sha256": "398ab541f1f101b33e0a6199b932cb014c74f044ee5423c9c7f1c1244bf7b95b",
+  "uploadedAt": "2026-10-05T14:52:44Z"
+ },
+ "horse_anim_chestnut": {
+  "assetId": 125159639304574,
+  "file": "Models/generated/horse_anim_chestnut/horse_anim_chestnut.glb",
+  "kind": "Model",
+  "sha256": "04e6f8abfc3af3c179189bc8cc763c899a70b045ca7dffcb2a755b7f1b9b4469",
+  "uploadedAt": "2026-10-05T14:51:09Z"
+ },
+ "horse_anim_chestnut_blaze": {
+  "assetId": 127714066561359,
+  "file": "Models/generated/horse_anim_chestnut_blaze/horse_anim_chestnut_blaze.glb",
+  "kind": "Model",
+  "sha256": "3a65b5f074a58a7ba03d665ec7481c966abf926daa36a384b143bcce59dfea41",
+  "uploadedAt": "2026-10-05T14:53:53Z"
+ },
+ "horse_anim_dun": {
+  "assetId": 70935040255005,
+  "file": "Models/generated/horse_anim_dun/horse_anim_dun.glb",
+  "kind": "Model",
+  "sha256": "9d70110425dd65ac75c57df3e8e978dd7c4087fa10e04c5caf8780bc2ceafd58",
+  "uploadedAt": "2026-10-05T14:53:02Z"
+ },
+ "horse_anim_grey": {
+  "assetId": 105539685336659,
+  "file": "Models/generated/horse_anim_grey/horse_anim_grey.glb",
+  "kind": "Model",
+  "sha256": "93e8178f2dbfe907cff416fab3e53b15a7343a332fed0e6ab92c91e496b5234f",
+  "uploadedAt": "2026-10-05T14:51:25Z"
+ },
+ "horse_anim_palomino": {
+  "assetId": 131244615221191,
+  "file": "Models/generated/horse_anim_palomino/horse_anim_palomino.glb",
+  "kind": "Model",
+  "sha256": "540f8899774c4821fa34d135e5b7603809a298c732e24a0b33bd271d41d9a660",
+  "uploadedAt": "2026-10-05T14:52:00Z"
+ },
+ "horse_anim_pinto": {
+  "assetId": 84750543342594,
+  "file": "Models/generated/horse_anim_pinto/horse_anim_pinto.glb",
+  "kind": "Model",
+  "sha256": "67f2848e86fde35bb71a58d0ad6d6a20059e6a0c0e665f43d2881263af097072",
+  "uploadedAt": "2026-10-05T14:52:20Z"
+ },
+ "horse_anim_roan": {
+  "assetId": 115627164866646,
+  "file": "Models/generated/horse_anim_roan/horse_anim_roan.glb",
+  "kind": "Model",
+  "sha256": "0d2603c882a88f7f10eefd7d42e9d5e49d37c6f92c5b5e0900080fece1b1b2bc",
+  "uploadedAt": "2026-10-05T14:53:21Z"
+ },
+ "horse_anim_white": {
+  "assetId": 104229132279767,
+  "file": "Models/generated/horse_anim_white/horse_anim_white.glb",
+  "kind": "Model",
+  "sha256": "6784cf53a3f592ab94a029e53ae11c76e70f02ce1b8e3308c78ee8d29a85c884",
+  "uploadedAt": "2026-10-05T14:53:39Z"
+ },
  "horse_bay": {
   "assetId": 98817538977109,
   "file": "Models/generated/horse_gallop_bay/horse_gallop_bay_hoofed.glb",

@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: running legs: standing horses split into body and legs, walk/trot/gallop cycles on races, rides and wild horses (D-051)
 - 2026-10-05 — docs: status after the world build; next steps
 - 2026-10-05 — feat: Stage 10 polish: first-ten-minutes tour, settings and For grown-ups, break reminder (D-045, D-049)
 - 2026-10-05 — feat: Stage 9 leagues: Cup races (the Stakes) and promotion, Practice races, league ceilings, Hall of Fame (D-013, D-046)

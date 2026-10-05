@@ -168,6 +168,14 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Setting visits to Nobody closes your gate to friends too; Friends lets friends in.
 - [ ] Break reminder on: a gentle "time for a stretch?" note after each hour of play; off by default.
 
+## Running legs (D-051)
+
+- [ ] Race horses gallop with moving legs (front and hind legs reaching in turn); legs ease to standing after the run-in; replays show the legs too.
+- [ ] Your ride horse walks with slow steps, trots at mid speed and gallops when you hold Gallop; other players see the same.
+- [ ] Wild horses in the meadow step with their legs as they wander and stand still while grazing.
+- [ ] No gaps at the hips as legs swing; the long tail doesn't swing with a hind leg.
+- [ ] If a leg model hasn't loaded yet, the old one-piece gallop pose shows instead (nothing breaks).
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

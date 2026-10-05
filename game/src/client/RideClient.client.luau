@@ -16,6 +16,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local HorseLegs = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("HorseLegs"))
 
 local player = Players.LocalPlayer
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
@@ -144,6 +145,8 @@ RunService.RenderStepped:Connect(function(dt)
 			local v = root.AssemblyLinearVelocity
 			local speed = Vector3.new(v.X, 0, v.Z).Magnitude
 			local fast = speed > 22
+			local anim = rig:FindFirstChild("Anim")
+			if anim then HorseLegs.apply(anim, speed * dt, dt) end -- running legs (D-051)
 			local stand, gallop = rig:FindFirstChild("Stand"), rig:FindFirstChild("Gallop")
 			local showGallop = gallop ~= nil and (fast or stand == nil)
 			for model, visible in { [stand or false] = not showGallop, [gallop or false] = showGallop } do

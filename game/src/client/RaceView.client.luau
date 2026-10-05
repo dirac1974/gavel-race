@@ -24,6 +24,7 @@ local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 
 local myId = tostring(Players.LocalPlayer.UserId)
 local BOB_HZ, BOB_STUDS = 1.8, 0.3
@@ -43,6 +44,8 @@ local function horseModel(courseId: string?, i: number): Model?
 	return horses and horses:FindFirstChild("Lane" .. i)
 end
 
+local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { p, t } for the legs
+
 local function place(i: number, p: number, bob: number, plan, courseId: string?)
 	local horse = horseModel(courseId, i)
 	if not horse then return end
@@ -50,6 +53,15 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?)
 	local x, z, dx, dz = TrackLayout.lanePoint(cfg, plan, i, p)
 	local pos = Vector3.new(x, bob, z)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
+	-- Running legs (D-051): stride with the distance covered since the last frame.
+	if HorseLegs.has(horse) then
+		local now = os.clock()
+		local prev = lastPlaced[horse]
+		local dist = if prev then math.max(0, (p - prev.p) * plan.lengths[i]) else 0
+		local dt = if prev then math.clamp(now - prev.t, 0, 0.2) else 0
+		lastPlaced[horse] = { p = p, t = now }
+		HorseLegs.apply(horse, dist, dt)
+	end
 end
 RaceState.placeHorse = place -- the replay uses the same placement
 

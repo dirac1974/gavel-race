@@ -554,4 +554,19 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Tour.skip(f2)
 	check(Tour.current(f2) == nil, "the tour can be skipped")
 	check(Tour.text(Tour.STEPS[2], "Comet") == "Great ride! Head to your barn and give Comet some hay.", "horse name in the text")
+
+	-- Running legs (D-051) ---------------------------------------------------------------
+	local HorseLegs = require("../../game/src/shared/HorseLegs")
+	check(HorseLegs.gaitFor(0) == "stand" and HorseLegs.gaitFor(8) == "walk" and HorseLegs.gaitFor(20) == "trot"
+		and HorseLegs.gaitFor(56) == "gallop", "gait by speed (race pace gallops)")
+	local maxA, okDiag = 0, true
+	for k = 0, 99 do
+		local p = k / 100
+		for _, leg in HorseLegs.LEGS do maxA = math.max(maxA, math.abs(HorseLegs.angle("gallop", leg, p))) end
+		if math.abs(HorseLegs.angle("trot", "LegFL", p) / 1.1 - HorseLegs.angle("trot", "LegBR", p) / 0.9) > 1e-9 then okDiag = false end
+	end
+	check(maxA > 30 and maxA <= 36 * 1.1 + 1e-6, "gallop swings big but never past its limit")
+	check(okDiag, "trot moves diagonal pairs together")
+	check(close(HorseLegs.advance(0.9, "gallop", 22 * 0.25), 0.15, 1e-9), "phase follows distance (one stride per stride length)")
+	check(HorseLegs.angle("stand", "LegFL", 0.3) == 0, "standing horses don't swing")
 end

@@ -16,6 +16,7 @@ local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Market = require(Shared:WaitForChild("Market"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local C = Ui.colors
 
@@ -28,7 +29,7 @@ folder.Parent = workspace
 
 local function modelFor(coat: string): Model
 	local f = ReplicatedStorage:FindFirstChild("RaceModels")
-	local m = f and (f:FindFirstChild("horse_stand_" .. coat) or f:FindFirstChild("horse_gallop_" .. coat))
+	local m = f and (f:FindFirstChild("horse_anim_" .. coat) or f:FindFirstChild("horse_stand_" .. coat) or f:FindFirstChild("horse_gallop_" .. coat))
 	if m then
 		local c = m:Clone()
 		for _, d in c:GetDescendants() do
@@ -75,7 +76,8 @@ task.spawn(function()
 	build()
 end)
 
-RunService.Heartbeat:Connect(function()
+local lastPos = setmetatable({}, { __mode = "k" })
+RunService.Heartbeat:Connect(function(dt)
 	local t = workspace:GetServerTimeNow()
 	for i, h in horses do
 		if h.model.Parent and not h.still then
@@ -85,6 +87,11 @@ RunService.Heartbeat:Connect(function()
 			local look = Vector3.new(dx, 0, dz)
 			local bob = if walk > 0 and walk < 1 then 0.12 * math.abs(math.sin(t * 6 + i)) else 0
 			h.model:PivotTo(CFrame.lookAt(pos + Vector3.new(0, bob, 0), pos + look + Vector3.new(0, bob, 0)))
+			if HorseLegs.has(h.model) then
+				local prev = lastPos[h.model]
+				lastPos[h.model] = pos
+				HorseLegs.apply(h.model, if prev then (pos - prev).Magnitude else 0, dt)
+			end
 		end
 	end
 end)

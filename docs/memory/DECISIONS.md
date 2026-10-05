@@ -421,3 +421,11 @@ Template:
 - Alternatives: a long text tutorial (kids don't read it), forced steps (pressure), no tour (the world is big and new players wander).
 - Links: game/src/shared/Tour.luau, game/src/server/SettingsService.server.luau, game/src/client/GrownUps.client.luau
 
+## D-051 — Running legs
+- Date: 2026-10-05
+- Status: Accepted
+- Decided by: David ("lets add animated legs/feet when the horse runs"); team (method)
+- Decision: the standing horse of every coat is cut into a body and four legs (tools/meshy/split_legs.py: legs below 38% of the height, split front/back by low-vertex clusters, left/right at the widest gap, the long tail stays on the body, a thin overlap above the cut hides the hip seam) and uploaded as `horse_anim_<coat>`. Each leg swings about its hip in a gait picked by speed: walk (four-beat, 18°), trot (diagonal pairs, 26°), gallop (four-beat with suspension, 36°, front legs reach further); the phase follows distance travelled so feet keep pace with the ground; legs ease back to standing when a horse stops. Race horses (live and replays) and wild horses pose their anchored legs each frame; ride horses swing legs on hip Motor6Ds that every client drives. One-piece gallop poses stay as the fallback until the split models load.
+- Alternatives: Meshy rigging (humanoids only), separate per-pose models (no motion), Roblox Animation Editor rigs (needs Studio work by hand on every coat).
+- Links: tools/meshy/split_legs.py, game/src/shared/HorseLegs.luau, game/src/client/RaceView.client.luau, game/src/server/Rides.luau
+

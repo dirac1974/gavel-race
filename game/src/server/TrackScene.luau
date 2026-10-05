@@ -401,8 +401,10 @@ function Course:build(plan, coats: { string? }?)
 	self.horses, self.saddles = {}, {}
 	for i = 1, LANES do
 		local coat = (coats and coats[i]) or COATS[i]
-		-- The first five coats are uploaded as horse_<coat>, the newer ones as horse_gallop_<coat>.
-		local horse = modelFor("horse_gallop_" .. coat) or modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
+		-- Running legs first (horse_anim_<coat>, D-051); then the one-piece gallop poses (the first
+		-- five coats are uploaded as horse_<coat>, the newer ones as horse_gallop_<coat>).
+		local horse = modelFor("horse_anim_" .. coat) or modelFor("horse_gallop_" .. coat) or modelFor("horse_" .. coat)
+			or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
 		horse:PivotTo(self:laneCFrame(i, 0))
 		badge(i).Parent = horse

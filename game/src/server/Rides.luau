@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local Rides = {}
@@ -102,11 +103,13 @@ local function build(player: Player, h, at: CFrame): Model
 	motor.C0 = CFrame.new(0, -ROOT_Y, 0)
 	motor.Parent = root
 
-	local stand = modelFor("horse_stand_" .. h.coat)
-	local gallop = modelFor("horse_gallop_" .. h.coat) or modelFor("horse_" .. h.coat) -- new coats use horse_gallop_<coat>
-	if not stand and not gallop then stand = placeholder(h.coat) end
+	-- Running legs when the split model is there (D-051); otherwise standing and galloping poses.
+	local anim = modelFor("horse_anim_" .. h.coat)
+	local stand = if anim then nil else modelFor("horse_stand_" .. h.coat)
+	local gallop = if anim then nil else (modelFor("horse_gallop_" .. h.coat) or modelFor("horse_" .. h.coat)) -- new coats use horse_gallop_<coat>
+	if not anim and not stand and not gallop then stand = placeholder(h.coat) end
 	local height = 4
-	for name, m in { Stand = stand, Gallop = gallop } do
+	for name, m in { Stand = stand, Gallop = gallop, Anim = anim } do
 		if m then
 			m:PivotTo(at)
 			local _, size = m:GetBoundingBox()
@@ -117,6 +120,7 @@ local function build(player: Player, h, at: CFrame): Model
 	end
 	rig:SetAttribute("HasGallop", gallop ~= nil)
 	rig:SetAttribute("HasStand", stand ~= nil)
+	if anim then HorseLegs.rig(anim, visualRoot) end
 
 	-- Saddle seat (TrackScene uses the same proportions).
 	local seat = Instance.new("Seat")
