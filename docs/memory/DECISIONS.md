@@ -448,3 +448,88 @@ Template:
 - Why: sound tells young players what's happening without reading, and on a phone their eyes are on the slider; the announcer names the race moments the HUD already shows.
 - Alternatives: no announcer (less excitement, more reading), a different voice per moment (costs more, less familiar), sound off by default (most kids never find it), spectator cues heard everywhere in the world (an announcer in the stables and on the trail).
 - Links: game/src/client/Sound.luau, game/src/client/RaceController.client.luau, tools/audio/sounds.json
+
+## D-053 — Training rides
+
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team, debate 009 (4/4 on the shape after one rebuttal round); David asked: "The training ground should be more than just the click the meter a few times. You should run around with the horse."
+- Decision: training becomes four short ride-through courses on your own horse, using the free-riding controls.
+  - **Where:** a Training Ground south of the Training Paddock (`WorldLayout.places.trainingGround`, x 650–950, z −70 to 70), reached by a gate in the paddock's south fence. It holds a training oval (160-stud straights, centre-line radius 55, 24 studs wide, ~666 studs a lap). The paddock arena holds the gymkhana.
+  - **The four courses** keep the stat names players know:
+    - **Sprint Lane** (Speed, a "breeze"): 3 laps through 18 hoops 10 studs wide; only the next one glows, with hoofprints between them. Score = 100 × hoops / 18.
+    - **Gate Break** (Acceleration, gate school): 3 breaks from a practice gate; the bell rings after a random 1.5–3.5 s; gallop to the flag 120 studs on. A break scores 100 for a reaction ≤ 0.5 s, falling to 40 at 2 s. Going early reruns that break once ("Wait for the bell!").
+    - **Hill Climb** (Stamina): follow Pip the lead pony for 2 laps over a gentle hill, staying in a ring 1–3 lengths behind as Pip weaves and changes pace (30–42 studs/s). Inside the ring your horse matches Pip's speed by itself. Score = share of time in the ring.
+    - **Mud Splash** (Grit, gymkhana): 4 puddles to splash through (7.5 each), 3 low logs to hop (12 each, clean = airborne), and 4 wide bending poles in a slow zone where the horse canters by itself (8.5 each).
+  - **Length:** each ride takes 35–50 s.
+  - **No failure states:** a missed hoop or knocked pole just doesn't count; there's no on-screen timer, and the horse never stumbles, refuses or looks hurt.
+  - **Gain:** the D-040 formula is unchanged, with quality = 0.5 + 0.5 × the server's score / 100. Rested ×1.5 stays.
+  - **Cap and cost:** the weekly cap stays 6 points per horse. **Training costs no Energy** (D-015 unchanged). After the cap the courses stay open for stars, ribbons and your ghost, with no gain ("Speed is full this week. Ride for stars!").
+  - **Rewards:**
+    - 1–3 stars (2 at a score of 60, 3 at 90);
+    - a bronze, silver or gold ribbon per course per horse (silver at 75; gold at 90 and under par);
+    - a rosette on the stall wall for each gold;
+    - the Stable Board "train" job.
+    - No bond, cash, Energy or Diamonds.
+  - **Equal physics:** horse stats don't change course speed.
+  - **Solo:** a private, see-through ghost of your best run.
+  - **With friends:** Roblox friends can "Ride together" from a shared 3-2-1, each scored alone. Course riders never collide with anyone. Shared results show stars and ribbons, never ranked times. A friend's ghost appears only if they share it (off by default). No leaderboards.
+  - **Controls:** the free-riding ones (thumbstick or WASD; Gallop button, Shift or a new R2 binding; Jump, Space or A), with a soft 4-stud hoop magnet. **Easy Rein** in Settings (off by default) steers toward the next hoop or ring, with no score penalty.
+  - **Server validation:**
+    - The client sends no score; the server samples the ride rig at 10 Hz and finds every hoop, gate, log, pole, puddle and ring event itself.
+    - It discards samples over 53 studs/s, jumps over 12 studs, and samples off the course. More than 10% discarded scores at the 0.5 floor, with no accusation. The floor is log-only for the first two weeks.
+    - Sessions are 4 s apart, at most 40 an hour. A race starting, getting off or leaving the ground ends the session with no gain and no penalty.
+  - **Quick Train:** the four 10-second games stay on the course picker for everyone, labelled "Quick train". They share the same cap with quality capped at 0.85 and move to server scoring (server seed, D-021 latency allowance).
+  - **Later:** "This week's course", a rotating Mud Splash layout with no countdown, whose ribbons can be earned whenever it returns.
+- Amends: D-040 (the meter games become Quick Train; courses are the default).
+- Alternatives: meter games plus a cosmetic warm-up lap (not what David asked; still trusts the client); one mixed course for all stats (can't train the suggested stat); seeded green-window hoops with timed scoring (near-miss feel; the speed ceiling already stops hacks); 1 Energy per session (competes with racing); bond after the cap (bond is in Race Rating, so it becomes an uncapped grind); Speed stat raising course speed (minority, Engagement).
+- Links: docs/debates/009-training-rides.md, game/src/shared/TrainingCourses.luau, game/src/shared/TrainingRide.luau, game/src/server/TrainingService.server.luau, game/src/client/TrainingRideClient.client.luau, game/src/shared/WorldLayout.luau, game/src/server/WorldScene.luau
+
+## D-054 — Race steering
+
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team, debate 010 (4/4 after one rebuttal round; drafting 3–1, Young player wanted ground only); David asked for steering "constrained to look realistic where they can affect the outcome slightly".
+- Decision:
+  - **When:** riders change lanes from the gate to the far-turn entry. Three soft bell ticks, then "Lanes locked!"; after that lanes are cosmetic, and the stretch is the slider and the Final Burst only.
+  - **How a lane change works:**
+    - One press moves one lane, with a 0.6 s glide that starts instantly on the rider's screen; at most one change per 0.6 s, one queued.
+    - **Tuck-in:** a horse alongside blocking a move toward the rail makes yours ease back (up to ~1.5 lengths) and slot in behind it. This is visual only.
+    - A blocked move outward cancels after 1 s.
+    - Horses never overlap or bump; the mover gives way; a horse held behind another is drawn there.
+  - **The trip:**
+    - Ground: 0.012 per lane off the rail per 180° of turn. Earlier turns count live; the far turn is booked from the lane held at the bell.
+    - Tucked in: 0.0012 per second while 0.5–3 lengths behind a horse in the same lane, before the lock only, capped at 0.016.
+    - **No boxed-in penalty.**
+    - τ_i = clamp(scale × (trip_i − postBaseline[course][distance][post_i] − field mean of the same), −0.02, +0.04); scale = 1.
+    - Win chance becomes p ∝ q · exp(κR + c + τ). τ is fixed at the lock and used from then on (checkpoint 2, Final Burst, stretch previews, finish). Before the lock τ = 0, so the trip never depends on luck, and Harville and the locked purses are unchanged.
+    - Size: the best trip, +0.04 (2 points of S), gives +0.44 pp win chance and gains a place in about 1 race in 15; the worst, −0.02, costs 1 point.
+  - **Smart Steer:**
+    - On by default. It rides one off the rail, heads in about 8 s before turns, tucks in when blocked, never seeks a draft and never moves out.
+    - Any input pauses it for 5 s; it then resumes but never moves the rider outward. Settings has an on/off toggle (default on).
+    - The arrows are hidden for each player's first 3 races, then introduced with a ghost-thumb tip.
+  - **Controls:**
+    - Phone: two big buttons bottom-left (◀ In, Out ▶); the default touch thumbstick is off during races, and every other touch still taps the slider.
+    - Keyboard: A/← and D/→, taken out of "any key taps".
+    - Gamepad: D-pad or a left-stick flick, taken out of "any button taps".
+  - **Server authority:**
+    - The server owns all lanes. Clients send intents (`SteerRequest(dir, seq)`), applied on the next 10 Hz tick in arrival order (ties: leader first, then the inside horse), with no rewind; the rider's own glide is predicted.
+    - Spam is rate-limited; requests after the lock are ignored; disconnects go to Smart Steer.
+    - Lane positions go out with the gaps at 10 Hz until the lock.
+  - **Bots and posts:**
+    - Bots use Smart Steer with variety (4–12 s lead before turns; 25% ride the rail) drawn after all existing random draws.
+    - Posts are drawn at random by the server (no longer humans first), never shown as a draw, and corrected by the per-post baseline.
+  - **Feedback:** "Saved ground!" at turn exits, "Tucked in!" with wind lines, a gentle tip when wide into a turn (never "lost a place"), and "Good trip ★★☆" on the results (★★★ at τ ≥ +0.015, ★★ at ≥ −0.005, otherwise ★, never zero). "Your trip gained you N places!" appears only when positive.
+  - **Replays** record each horse's lane per frame on this screen and add your line as a ribbon with green chevrons, wind lines and the lock marker; no ideal-line ghost.
+  - **Python:** `live_chances(..., extra)` and `src/trip.py` mirror `Trip.luau` exactly (D-012).
+- Tuning: in the moderator's prototype a skilled steerer gains +0.011 to +0.023 over Smart Steer, a rider who never steers with Smart Steer off loses 0.014–0.016, and the post baseline cuts post bias from up to ±0.02 to at most 0.003. Without tuck-in most lane changes were refused. All values are in `GameConfig.steering`, and the post baselines are generated into `TripBaseline.luau` by `sims/steering.py`.
+- Amends: D-026 (steering keys and buttons are no longer slider taps), D-033 (lane holds and tuck-ins on screen before the far turn; τ in the exponent from the lock), V2_PROPOSAL step 5 (exponent κR + c + τ), D-032 (lanes now mean something; the race strip keeps one row per horse).
+- Alternatives:
+  - cosmetic steering only (kids learn the input does nothing; kept as `scale = 0`);
+  - steering live through the far turn (clearance would depend on positions luck is moving);
+  - real-scale ground loss (steering would outweigh taps);
+  - a boxed-in penalty (strangers could hurt each other; invites griefing and collusion);
+  - continuous stick or tilt steering (load next to the slider);
+  - swipes (a swipe starts as a touch, so kids would swipe through their taps);
+  - post bias folded into q (changes locked purses; the baseline keeps q untouched).
+- Links: docs/debates/010-race-steering.md, src/trip.py, sims/steering.py, game/src/shared/Trip.luau, game/src/shared/TripBaseline.luau, game/src/shared/TrackLayout.luau, game/src/shared/RaceSession.luau, game/src/server/RaceService.server.luau, game/src/client/RaceController.client.luau, game/src/client/RaceView.client.luau, game/src/client/Replay.client.luau
