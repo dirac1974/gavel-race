@@ -150,21 +150,16 @@ local function lamp(parent: Instance, x: number, z: number)
 		CFrame = CFrame.new(x, GROUND_Y + 6, z) * CFrame.Angles(0, 0, math.pi / 2) }, parent)
 	local bulb = part({ Name = "Lamp", Shape = Enum.PartType.Ball, Size = Vector3.new(2.2, 2.2, 2.2), Color = Color3.fromHex("FFF1B8"),
 		Material = Enum.Material.Neon, CanCollide = false, CFrame = CFrame.new(x, GROUND_Y + 12.6, z) }, parent)
-	local light = Instance.new("PointLight")
-	light.Range = 18
-	light.Brightness = 0.8
-	light.Color = Color3.fromHex("FFE7A6")
-	light.Parent = bulb
 end
 
 -- A string of little pennant flags between two points, sagging a bit.
 local function bunting(parent: Instance, a: Vector3, b: Vector3)
-	local n = math.max(4, math.floor((b - a).Magnitude / 3))
+	local n = math.max(4, math.floor((b - a).Magnitude / 6))
 	for k = 0, n do
 		local t = k / n
 		local p = a:Lerp(b, t) - Vector3.new(0, math.sin(t * math.pi) * 2.5, 0)
 		wedge({ Name = "Pennant", Size = Vector3.new(0.1, 1.6, 1.2), Color = BUNTING[(k % #BUNTING) + 1], CanCollide = false,
-			CFrame = CFrame.lookAt(p, p + (b - a).Unit:Cross(Vector3.yAxis)) * CFrame.Angles(math.pi, 0, 0) }, parent)
+			CFrame = CFrame.lookAt(p, p + (b - a).Unit) * CFrame.Angles(math.pi, 0, 0) }, parent) -- flat side to the street
 	end
 end
 
@@ -178,7 +173,7 @@ function WorldScene.shop(parent: Instance, cf: CFrame, w: number, d: number, h: 
 	local roofH = h * 0.45
 	for _, s in { -1, 1 } do
 		wedge({ Name = "Roof", Size = Vector3.new(w + 3, roofH, d / 2 + 1.5), Color = roof,
-			CFrame = back * CFrame.new(0, GROUND_Y + h + roofH / 2, s * (d / 4 + 0.75)) * CFrame.Angles(0, if s > 0 then 0 else math.pi, 0) }, f)
+			CFrame = back * CFrame.new(0, GROUND_Y + h + roofH / 2, s * (d / 4 + 0.75)) * CFrame.Angles(0, if s > 0 then math.pi else 0, 0) }, f)
 	end
 	part({ Name = "Trim", Size = Vector3.new(w + 0.6, 0.8, d + 0.6), Color = C.white, CFrame = back * CFrame.new(0, GROUND_Y + h, 0) }, f)
 	part({ Name = "Door", Size = Vector3.new(7, 10, 0.4), Color = C.wood, CFrame = cf * CFrame.new(0, GROUND_Y + 5, -0.1) }, f)
@@ -192,7 +187,7 @@ function WorldScene.shop(parent: Instance, cf: CFrame, w: number, d: number, h: 
 	for k = 0, stripes - 1 do
 		local x = -w / 2 + (k + 0.5) * (w / stripes)
 		wedge({ Name = "Awning", Size = Vector3.new(w / stripes, 2, 5), Color = awning[(k % #awning) + 1], CanCollide = false,
-			CFrame = cf * CFrame.new(x, GROUND_Y + h * 0.78, -2.5) * CFrame.Angles(0, math.pi, 0) }, f)
+			CFrame = cf * CFrame.new(x, GROUND_Y + h * 0.78, -2.5) }, f)
 	end
 	WorldScene.sign(f, (cf * CFrame.new(0, GROUND_Y + h + 1.5, -0.8)).Position, cf.LookVector, label, emoji, math.min(w - 6, 30), 6, C.white)
 	f.Parent = parent
@@ -398,8 +393,19 @@ local function buildLane(root: Instance)
 	strip(f, WorldLayout.LANE_X, WorldLayout.LANE_Z0, WorldLayout.LANE_X, WorldLayout.LANE_Z1, WorldLayout.LANE_WIDTH, C.lane, Enum.Material.Ground)
 	WorldScene.sign(f, Vector3.new(WorldLayout.LANE_X - WorldLayout.LANE_WIDTH / 2 - 6, GROUND_Y + 10, WorldLayout.STREET_Z - WorldLayout.STREET_WIDTH / 2 - 3),
 		Vector3.new(-1, 0, 0), "Barn Lane", "🐎", 16, 4, C.woodLight)
-	for z = WorldLayout.LANE_Z0 + 20, WorldLayout.LANE_Z1 - 20, 90 do
-		for _, s in { -1, 1 } do lamp(f, WorldLayout.LANE_X + s * (WorldLayout.LANE_WIDTH / 2 + 1.5), z + 45) end
+	-- Lamps on the lane's edges at the plot boundaries (never in a gateway or the crossing).
+	local seen = {}
+	for i = 1, WorldLayout.PLOT_COUNT do
+		local p = WorldLayout.plot(i)
+		for _, dz in { -WorldLayout.PLOT_FRONT / 2, WorldLayout.PLOT_FRONT / 2 } do
+			local z = p.z + dz
+			local key = tostring(p.side) .. ":" .. tostring(z)
+			local nearStreet = math.abs(z - WorldLayout.STREET_Z) < WorldLayout.STREET_WIDTH / 2 + 4
+			if not seen[key] and not nearStreet then
+				seen[key] = true
+				lamp(f, WorldLayout.LANE_X + p.side * (WorldLayout.LANE_WIDTH / 2 - 1.5), z)
+			end
+		end
 	end
 	f.Parent = root
 	return f

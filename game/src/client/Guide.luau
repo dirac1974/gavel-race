@@ -80,7 +80,8 @@ local function recompute()
 	if ok and path.Status == Enum.PathStatus.Success then
 		for _, w in path:GetWaypoints() do table.insert(points, w.Position + Vector3.new(0, 2.6, 0)) end
 	else
-		points = { from, Vector3.new(target.X, from.Y, target.Z) } -- straight line if no path
+		local y = -0.5 + 2.6 -- ground level (prints sit 2.6 below these points)
+		points = { Vector3.new(from.X, y, from.Z), Vector3.new(target.X, y, target.Z) } -- straight line if no path
 	end
 	draw(points)
 end

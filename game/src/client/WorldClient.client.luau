@@ -26,7 +26,8 @@ local friendCache: { [number]: boolean } = {}
 local function isFriend(userId: number): boolean
 	if friendCache[userId] == nil then
 		local ok, res = pcall(function() return player:IsFriendsWith(userId) end)
-		friendCache[userId] = ok and res == true
+		if not ok then return false end -- try again next time; never cache a failed check
+		friendCache[userId] = res == true
 	end
 	return friendCache[userId]
 end
@@ -45,6 +46,18 @@ local function applyPlot(plot: Model)
 	local solid = not allowed(plot)
 	for _, w in walls:GetChildren() do
 		if w:IsA("BasePart") then w.CanCollide = solid end
+	end
+	-- Standing inside a plot that just closed to you (a new owner arrived): step out to the lane.
+	local i = plot:GetAttribute("PlotIndex")
+	local c = player.Character
+	local hrp = c and c:FindFirstChild("HumanoidRootPart")
+	if solid and i and hrp then
+		local r = WorldLayout.plotRect(i)
+		local pos = hrp.Position
+		if pos.X > r[1] and pos.X < r[3] and pos.Z > r[2] and pos.Z < r[4] then
+			local x, z = WorldLayout.plotPoint(i, -10, 0)
+			c:PivotTo(CFrame.new(x, pos.Y + 1, z))
+		end
 	end
 end
 
