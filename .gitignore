@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 tests/fixtures/race_math.json
+
+# Raw Meshy output (tools/meshy/meshy.py writes Models/generated/<slot>/). Never commit model binaries.
+Models/

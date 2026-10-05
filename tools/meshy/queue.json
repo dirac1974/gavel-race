@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "art_direction": "County Fair Toy style (docs/art/ART_DIRECTION.md), council-approved 2026-10-04 (docs/art/ART_REVIEW.md): chunky stylized natural horses, small eyes on the sides of the head, no eyelashes or eyebrows, natural coat and mane colours, no flank symbols, ears forward, mouth closed, dark high-contrast hooves on every coat. Hero horse is never a buckskin mustang with a flowing black mane. No whip, no wagering imagery, no Spirit / My Little Pony / Horse Life / Wild Horse Islands / real racing brand look-alikes. The player's avatar is the jockey: never generate a rider.",
+  "budget": {
+    "cap_credits": 200,
+    "spent_credits": 170,
+    "unspent_credits": 30,
+    "note": "Spent per Meshy consumed_credits: horse_gallop 30, five retextures 50, finish_post 30, gate_stall 30 + 30 (re-roll). Verdicts: docs/art/ART_REVIEW.md. Negatives are review notes only; the text-to-3D API has no negative prompt field."
+  },
+  "defaults": {
+    "ai_model": "latest",
+    "topology": "triangle",
+    "should_remesh": true,
+    "enable_pbr": false,
+    "texture_resolution": "2k",
+    "target_formats": [
+      "fbx",
+      "glb"
+    ],
+    "origin_at": "bottom",
+    "style_suffix": "stylized cartoon game asset, chunky readable silhouette, soft hand-painted colors, bright sunny daylight palette, single object, no base, no text, no logos"
+  },
+  "slots": [
+    {
+      "slot_id": "horse_gallop",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 8000,
+      "prompt": "full body stylized thoroughbred racehorse in a smooth mid-gallop side pose, front legs reaching forward, hind legs pushing back, all four legs clearly separated, neck stretched forward, small calm dark eyes on the sides of the head, ears pricked forward, mouth closed, glossy bay coat: reddish brown body, black lower legs, short neat black mane, full black tail streaming behind, dark charcoal hooves with a thin pale cream band just above each hoof, chunky toy-like proportions, sturdy neck and legs, large rounded hooves, simple brown bridle and reins, small flat brown racing saddle on a plain white saddle cloth, riderless",
+      "texture_prompt": "glossy healthy bay horse coat, warm reddish brown body, black mane, tail and lower legs, dark charcoal hooves with a thin pale cream band above each hoof, small dark eyes, plain white saddle cloth, simple brown leather bridle and saddle, soft hand-painted shading, bright daylight colors",
+      "negative": "no rider, no whip, no crop, no spurs, no wings, no horn, no pastel or rainbow colors, no big glossy eyes, no front-facing eyes, no eyelashes, no eyebrows, no symbols or marks on the flank, no buckskin coat, no long flowing mane, no pinned-back ears, no white of the eye showing, no flared nostrils, no open mouth, no foam or sweat, no visible ribs, no bandages, no number or text on the saddle cloth, no brand logos, no real racing silks",
+      "notes": "GENERATED 2026-10-04 (30 cr). Verdict: mesh PASS (clean mid-gallop, four separated legs, small side eyes, ears forward, mouth closed, short mane, dark hooves); texture FAIL: no saddle geometry, a smeared white/brown saddle-cloth patch on the back reads as a flank marking. Fixed by the horse_gallop_bay retexture (bare back) instead of a 30-credit re-roll. Saddle cloth = separate lane-coloured part in Studio."
+    },
+    {
+      "slot_id": "horse_gallop_bay",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, bay coat: warm reddish brown body, black mane, black tail and black lower legs, a small white star on the forehead, dark charcoal hooves with a thin pale cream band above each hoof, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos",
+      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS after hoof fix. Back is clean (no patch), coat even, bridle kept, small side eyes, ears forward. Hooves came out light tan (the 'pale band' wording), so tools/meshy/darken_hooves.py paints them dark locally (no credits). Prompt as sent kept below; later coats use 'glossy jet-black hooves on every leg'."
+    },
+    {
+      "slot_id": "horse_gallop_chestnut",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, chestnut coat: warm copper-red body, slightly lighter copper mane and tail, a white blaze down the face, two white socks on the hind legs, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos",
+      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS. Copper coat, lighter mane and tail, white blaze, white hind socks, dark hooves from the prompt."
+    },
+    {
+      "slot_id": "horse_gallop_grey",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dapple grey coat: light silver-grey body with soft round darker grey dapples, darker grey lower legs, silver-white mane and tail, dark grey muzzle, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos, no blue or purple tint",
+      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS (note): reads light grey, near white; dapples faint; dark lower legs and hooves."
+    },
+    {
+      "slot_id": "horse_gallop_black",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, black coat with a soft blue-black sheen and gentle grey highlights on the shoulders and hindquarters, black mane and tail, a white star on the forehead, four short white socks, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos, no glowing eyes, no red eyes, no spooky or demonic look",
+      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS. Blue-black with grey highlights, white star and short socks, dark hooves, normal eyes, not menacing."
+    },
+    {
+      "slot_id": "horse_gallop_palomino",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, palomino coat: rich golden body, creamy white mane and tail, a white stripe down the face, golden lower legs, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no white patch on the back, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no buckskin, no light hooves, no text, no logos, no metallic gold, no sparkles",
+      "notes": "GENERATED 2026-10-04 (10 cr). Verdict: PASS. Golden coat, cream mane and tail, white stripe, dark hooves, not metallic."
+    },
+    {
+      "slot_id": "finish_post",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a tall chunky finish line post for a cartoon countryside horse race, a thick round white painted wooden pole, topped by a large round sign disc with a bold black and white checkered pattern on both faces, a small golden star on top of the disc, three short ribbon streamers in red, yellow and sky blue tied just under the disc, friendly toy-like proportions",
+      "texture_prompt": "clean white painted wood, crisp black and white checkered disc, warm golden star, bright satin ribbon streamers, soft hand-painted shading",
+      "negative": "no clock, no screen, no numbers, no scoreboard, no brand names, no sponsor boards, no realistic metal photo-finish camera",
+      "notes": "GENERATED 2026-10-04 (30 cr). Verdict: PASS with notes. Clean simple geometry, no guardrail issues; came out as two white poles with a crossbar, gold stars and gold streamers, and the disc reads as black-and-white plaid rather than bold checks. The finish read comes from the checker banner and ground strip (Roblox parts + finish_checker tile). Not re-rolled."
+    },
+    {
+      "slot_id": "gate_stall",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a single starting gate stall for a cartoon horse race built from simple solid chunky shapes, two thick soft green padded side walls, a thick rounded white top beam joining them with a large blank light grey square sign plate on the front, two short solid white half doors at the front, a flat dark grey rubber floor, an open walk-through bay between the walls, friendly toy-like proportions",
+      "texture_prompt": "soft green padded walls, glossy white painted beam and doors, plain light grey blank plate, dark grey rubber floor, soft hand-painted shading",
+      "negative": "no thin bars, no cage, no numbers on the plate, no brand names, no sponsor logos, no rust, no realistic steel",
+      "notes": "GENERATED 2026-10-04, second and last attempt (30 cr). Verdict: PASS (notes): clean solid shapes, blank plate, padded walls paler mint than asked, closed half doors. Cloned x8 in Studio; SurfaceGui with the lane chip on the plate.",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 30,
+        "verdict": "FAIL: broken geometry, huge triangular fins on both sides and shard artifacts in the open frame (thin bars and open frames generate badly)."
+      }
+    }
+  ]
+}
