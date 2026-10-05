@@ -15,6 +15,8 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Style = require(Shared:WaitForChild("Style"))
+local DiamondProducts = require(Shared:WaitForChild("DiamondProducts"))
+local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
@@ -278,7 +280,13 @@ if not ev then
 	ev.Name = "OpenStyleShop"
 	ev.Parent = HudEvents
 end
-ev.Event:Connect(function() if gui.Enabled then close() else open() end end)
+ev.Event:Connect(function()
+	if gui.Enabled then
+		close()
+	elseif not RaceState.shopClosed(DiamondProducts.afterRaceSeconds) then
+		open()
+	end
+end)
 
 -- Your race starting closes the shop.
 player:GetAttributeChangedSignal("Racing"):Connect(function()
@@ -300,4 +308,12 @@ do
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = anchor
 	prompt.Triggered:Connect(open)
+	-- The counter's door shuts around races and training rides too (D-056).
+	task.spawn(function()
+		while true do
+			local shut = RaceState.shopClosed(DiamondProducts.afterRaceSeconds)
+			if prompt.Enabled == shut then prompt.Enabled = not shut end
+			task.wait(0.5)
+		end
+	end)
 end

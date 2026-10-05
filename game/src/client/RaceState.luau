@@ -77,6 +77,17 @@ function RaceState.busy(): boolean
 	return false
 end
 
+-- The shop's doors (the 💎 button and the Fair Street counter) stay shut around races and
+-- training rides (D-050, D-056): in line, racing, on your results card, for `afterRaceSeconds`
+-- after your race, and during a training ride. Nothing counts down; they're just not there.
+function RaceState.shopClosed(afterRaceSeconds: number): boolean
+	local p = localPlayer
+	if p:GetAttribute("InLine") or p:GetAttribute("Racing") or p:GetAttribute("TrainingRide") then return true end
+	if RaceState.resultsOpen or (RaceState.active and RaceState.myLane ~= nil) then return true end
+	local ended = p:GetAttribute("LastRaceEnd") -- the server's os.time()
+	return typeof(ended) == "number" and workspace:GetServerTimeNow() - ended < afterRaceSeconds
+end
+
 -- The lane you cheered for, if it's in the race the HUD follows.
 function RaceState.myCheer(): number?
 	if RaceState.cheeredCourse ~= nil and RaceState.cheeredCourse == RaceState.focus then return RaceState.cheeredLane end

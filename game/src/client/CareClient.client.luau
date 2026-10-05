@@ -345,6 +345,9 @@ local function attachBarn(barn: Instance)
 				local p = prompt(m, "Care", h.name)
 				p.UIOffset = Vector2.new(0, 40)
 				p.Triggered:Connect(function() horseCard(id) end)
+				-- An empty stall (the horse is out riding or at the races, D-056) has no Care prompt.
+				p.Enabled = m:GetAttribute("Away") ~= true
+				m:GetAttributeChangedSignal("Away"):Connect(function() p.Enabled = m:GetAttribute("Away") ~= true end)
 			end
 			if stall and not m:FindFirstChild("ChorePrompt") then
 				local chore = prompt(m, "Muck out", "Stall", Enum.KeyCode.F, 1.2)

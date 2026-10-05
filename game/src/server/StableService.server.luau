@@ -14,6 +14,7 @@ local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
+local GameConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("GameConfig"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Care = require(Shared:WaitForChild("Care"))
 local Style = require(Shared:WaitForChild("Style"))
@@ -378,6 +379,53 @@ local function applyCare(i: number, data, now: number)
 	end
 end
 
+-- A horse out riding or at the races isn't in its stall too (D-056): the stall is empty, with
+-- a plaque on the door ("Comet is out riding" / "Comet is at the races"), and its Care prompt
+-- is hidden (the door's Away attribute). Rides sets RidingHorse; RaceService sets RacingHorse.
+local function awayKind(player: Player, id: string): string?
+	if player:GetAttribute("RacingHorse") == id then return "races" end
+	if player:GetAttribute("RidingHorse") == id then return "riding" end
+	return nil
+end
+
+local function applyAway(i: number, player: Player, data)
+	local barn = plotModels[i]:FindFirstChild("Barn")
+	if not barn or not GameConfig.stable.awaySign then return end
+	for k = 1, math.min(data.stalls, #data.horses) do
+		local h = data.horses[k]
+		local hm = barn:FindFirstChild("Horse_" .. h.id)
+		local door = barn:FindFirstChild("Stall" .. k)
+		local away = awayKind(player, h.id)
+		if hm then
+			for _, d in hm:GetDescendants() do
+				if d:IsA("BasePart") then
+					if d:GetAttribute("BaseT") == nil then d:SetAttribute("BaseT", d.Transparency) end
+					d.Transparency = if away then 1 else d:GetAttribute("BaseT")
+				elseif d:IsA("ParticleEmitter") then
+					d.Enabled = not away
+				end
+			end
+		end
+		if door then
+			door:SetAttribute("Away", away ~= nil)
+			local old = barn:FindFirstChild("AwaySign" .. k)
+			local text = if away == "races" then h.name .. " is at the races" elseif away then h.name .. " is out riding" else nil
+			if old and old:GetAttribute("Text") ~= text then
+				old:Destroy()
+				old = nil
+			end
+			if text and not old then
+				local look = door.CFrame.LookVector
+				local plaque = WorldScene.sign(barn, (door.CFrame * CFrame.new(0, 1, -0.65)).Position, look, text,
+					if away == "races" then "🏁" else "🐴", math.max(4, door.Size.X - 1), 1.6)
+				plaque.Name = "AwaySign" .. k
+				plaque:SetAttribute("Text", text)
+				plaque.CanCollide = false
+			end
+		end
+	end
+end
+
 local function signature(data): string
 	local parts = { tostring(data.stalls), tostring(data.activeHorse), tostring(#data.horses) }
 	-- the look from the shop
@@ -412,6 +460,7 @@ local function refresh(player: Player)
 		buildGarden(i, player, data, now)
 	end
 	applyCare(i, data, now)
+	applyAway(i, player, data)
 end
 
 local function clearPlot(i: number)
@@ -471,6 +520,10 @@ end)
 
 Players.PlayerAdded:Connect(function(player: Player)
 	player.CharacterAdded:Connect(function() onCharacter(player) end)
+	-- The horse is back in its stall the moment you get off or its race ends.
+	for _, name in { "RidingHorse", "RacingHorse" } do
+		player:GetAttributeChangedSignal(name):Connect(function() refresh(player) end)
+	end
 end)
 Players.PlayerRemoving:Connect(function(player: Player)
 	local i = plotOf[player]
