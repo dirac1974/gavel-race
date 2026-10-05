@@ -13,7 +13,8 @@ local Profile = {}
 
 Profile.VERSION = 1
 Profile.START_CASH = 50
-Profile.START_ITEMS = { hay = 10, carrot = 3 }
+Profile.START_ITEMS = { hay = 10, carrot = 3, seed_carrot = 2 }
+Profile.SEEDS = { seed_carrot = true, seed_apple = true, seed_oats = true } -- garden beds accept only these
 Profile.START_STALLS = 2
 Profile.MAX_STALLS = 6
 Profile.ITEMS = { "hay", "grain", "carrot", "apple", "oats", "treat", "seed_carrot", "seed_apple", "seed_oats" }
@@ -32,7 +33,17 @@ export type Profile = {
 	totals: { races: number, wins: number, cashEarned: number },
 	settings: { visits: string },
 	flags: { [string]: boolean },
+	garden: { { seed: string, at: number } },
+	chores: { [string]: number },
 }
+
+Profile.BEDS = 3
+
+function Profile.emptyGarden(): { { seed: string, at: number } }
+	local g = {}
+	for i = 1, Profile.BEDS do g[i] = { seed = "", at = 0 } end
+	return g
+end
 
 function Profile.new(now: number): Profile
 	return {
@@ -49,6 +60,8 @@ function Profile.new(now: number): Profile
 		totals = { races = 0, wins = 0, cashEarned = 0 },
 		settings = { visits = "Friends" },
 		flags = {},
+		garden = Profile.emptyGarden(),
+		chores = {},
 	}
 end
 
@@ -88,6 +101,23 @@ function Profile.migrate(data: any, now: number): Profile
 	p.settings = if typeof(p.settings) == "table" then p.settings else {}
 	if not table.find({ "Friends", "Club", "Nobody" }, p.settings.visits) then p.settings.visits = "Friends" end
 	p.flags = if typeof(p.flags) == "table" then p.flags else {}
+	local garden = Profile.emptyGarden()
+	if typeof(p.garden) == "table" then
+		for i = 1, Profile.BEDS do
+			local b = p.garden[i]
+			if typeof(b) == "table" and typeof(b.seed) == "string" and (b.seed == "" or Profile.SEEDS[b.seed]) then
+				garden[i] = { seed = b.seed, at = tonumber(b.at) or 0 }
+			end
+		end
+	end
+	p.garden = garden
+	local chores = {}
+	if typeof(p.chores) == "table" then
+		for k, v in p.chores do
+			if tonumber(k) and tonumber(v) then chores[tostring(k)] = tonumber(v) end
+		end
+	end
+	p.chores = chores
 	return p :: Profile
 end
 
@@ -210,6 +240,12 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 		totals = table.clone(p.totals),
 		settings = table.clone(p.settings),
 		flags = table.clone(p.flags),
+		garden = (function()
+			local g = {}
+			for i, b in p.garden do g[i] = { seed = b.seed, at = b.at } end
+			return g
+		end)(),
+		chores = table.clone(p.chores),
 	}
 end
 

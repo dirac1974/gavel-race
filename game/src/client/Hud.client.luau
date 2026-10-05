@@ -158,7 +158,8 @@ local function render(data)
 				if d:IsA("TextLabel") then d.TextTransparency = if on then 0 else 0.75 end
 			end
 		end
-		restLabel.Text = if h.resting then "Resting" else ""
+		local care = math.floor((h.care or 0) * 2 + 0.5)
+		restLabel.Text = (if h.resting then "Resting " else "") .. string.rep("⭐", care)
 		if not inLine then setRaceButton("idle") end
 	else
 		horseName.Text = "No horse yet"
