@@ -71,7 +71,11 @@ function RaceState.consider(courseId: string?, laneList, start: number): boolean
 	local busy = RaceState.myCourse ~= nil and (RaceState.myCourse ~= courseId or RaceState.holdFocus)
 	local focus = mine or (not busy and RaceState.nearCourse(courseId))
 	decided[key] = focus
-	if focus then RaceState.focus = courseId end
+	if focus then
+		RaceState.focus = courseId
+	elseif RaceState.focus == courseId then
+		RaceState.focus = nil -- the last race followed on this course is over; this one isn't followed
+	end
 	if mine then RaceState.myCourse = courseId end
 	return focus
 end

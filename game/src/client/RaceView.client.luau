@@ -138,8 +138,10 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		race.offset[i], race.target[i] = 0, 0
 		if lane.id == myId then race.myLane = i end
 	end
+	local wasFocus = RaceState.focus == courseId
 	local focus = RaceState.consider(courseId, laneList, start)
 	races[courseId] = race
+	if wasFocus and not focus then RaceState.active = false end -- the race it replaces may still be pulling up
 	if focus then
 		RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 		RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
@@ -222,7 +224,7 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			local speed = if raw > 1 then math.exp(-(raw - 1) / PAST_LINE) else gateSpeed
 			local bob = BOB_STUDS * speed * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi))
 			local shown = p
-			if i == race.myLane and nudge > 0 and raw < 1 then shown = p + nudge / race.len1 end
+			if i == race.myLane and nudge > 0 then shown = p + nudge / race.len1 end
 			place(i, shown, bob, race.plan, courseId)
 			if isFocus then
 				RaceState.progress[i] = p

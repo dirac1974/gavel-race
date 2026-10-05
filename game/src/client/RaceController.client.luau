@@ -42,14 +42,8 @@ end
 -- and a newer or stopped race cancels pending cues. Riders always hear their own race;
 -- spectators hear it at half volume, and only near that race's course. Only riders hear
 -- their own hoofbeats, and only while they're in the saddle.
-local SPECTATOR_HEARING_STUDS = 250 -- from the course's outer edge (D-052)
 local cueRace, cueVolume, cueRider, cueCourse = 0, 1, false, "dirt"
-local function nearCourse(courseId: string): boolean
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return false end
-	local cfg = TrackLayout.courses[courseId] or TrackLayout.churchill
-	return TrackLayout.distanceToTrack(cfg, root.Position.X, root.Position.Z) <= SPECTATOR_HEARING_STUDS
-end
+local nearCourse = RaceState.nearCourse -- within GameConfig.raceView.spectateStuds (D-052, D-055)
 local function cue(at: number, ...)
 	if not Sound then return end
 	local id, names, volume, rider, course = cueRace, { ... }, cueVolume, cueRider, cueCourse
@@ -115,10 +109,19 @@ end
 local function watchSeat(character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid then return end
-	humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
+	local function restore()
 		if humanoid.SeatPart == nil and rideCamOn then
 			rideCamera(false)
 			setJumping(true)
+		end
+	end
+	humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
+		if humanoid.SeatPart ~= nil or not rideCamOn then return end
+		local replay = player.PlayerGui:FindFirstChild("ReplayUI")
+		if replay and replay.Enabled then
+			RaceState.ReplayClosed.Event:Once(restore) -- the replay owns the camera until it closes
+		else
+			restore()
 		end
 	end)
 end
@@ -528,7 +531,8 @@ for _, name in {
 	"W", "A", "S", "D", "Up", "Down", "Left", "Right", "I", "O", "Slash", "Tab", "Escape", "Backquote",
 	"LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt", "LeftSuper", "RightSuper",
 	"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "PageUp", "PageDown",
-	"DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Thumbstick1", "Thumbstick2", "ButtonSelect", "ButtonStart",
+	"DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Thumbstick1", "Thumbstick2", "ButtonL3", "ButtonR3",
+	"ButtonSelect", "ButtonStart",
 } do
 	local ok, code = pcall(function() return (Enum.KeyCode :: any)[name] end)
 	if ok and code then NOT_TAPS[code] = true end
@@ -622,7 +626,7 @@ RunService.RenderStepped:Connect(function()
 			end
 		elseif t > burstState.close then
 			if burstState.race == cueRace then cue(t, "vo_stretch") end -- "Down the stretch they come!"
-			if not burstState.tapped then feedback.Text = "Missed the Final Burst!" end
+			if riding and not burstState.tapped then feedback.Text = "Missed the Final Burst!" end
 			burst.bar.Visible, burstTitle.Visible = false, false
 			burstState = nil
 		end
@@ -641,7 +645,7 @@ local COURSE_NAME = { dirt = "Dirt course", turf = "Turf course" }
 remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen, courseId)
 	-- The next race on the course of your results card rebuilds its horses: the card stays
 	-- (RaceState.consider keeps the focus on it), but there's nothing left to replay.
-	if results.Visible and RaceState.holdFocus and (courseId or "dirt") == RaceState.myCourse then
+	if RaceState.resultsOpen and RaceState.holdFocus and (courseId or "dirt") == RaceState.myCourse then
 		watchBtn.Visible, fullBtn.Visible = false, false
 	end
 	-- Two races can run at once (D-036): follow yours, or the newest when watching.
@@ -872,6 +876,13 @@ remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace)
 end)
 
 local function showResults(summary, raceId: number)
+	if raceId ~= cueRace then -- the HUD has moved on to another race
+		if RaceState.resultsPending then
+			RaceState.resultsPending = false
+			RaceState.ResultsShown:Fire(false)
+		end
+		return
+	end
 	-- Top four with ribbons, plus your own place if you finished lower.
 	local shown = {}
 	for _, row in summary do

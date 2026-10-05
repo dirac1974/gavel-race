@@ -506,13 +506,6 @@ local function runRace(c, players: { Player })
 	local cfg = c.cfg
 	local plan = TrackLayout.plan(cfg, TrackLayout.distances[cond.distance])
 	local speed = GameConfig.raceSpeedStudsPerSecond
-	-- The first race after a server start waits (up to 10 s) for the horse models to load, so
-	-- no horse runs without its running legs (D-055).
-	local models = ReplicatedStorage:FindFirstChild("RaceModels")
-	local waited = 0
-	while models and not models:GetAttribute("Loaded") and waited < 10 do
-		waited += task.wait(0.25)
-	end
 	local tStart = now() + COUNTDOWN
 	local tFinish = tStart + plan.lengths[1] / speed
 	local tTop = tFinish - cfg.finishFromTop / speed -- the field enters the homestretch
@@ -730,6 +723,13 @@ local function courseLoop(c)
 			for _, p in c.queue do LobbyStatus:FireClient(p, math.ceil((c.fillDeadline or 0) - os.clock()), c.id) end
 			queueStatus(c)
 			task.wait(1)
+		end
+		-- The first race after a server start waits (up to 10 s more) for the horse models to
+		-- load, so no horse runs without its running legs (D-055). Riders stay in line meanwhile.
+		local models = ReplicatedStorage:FindFirstChild("RaceModels")
+		local waited = 0
+		while models and not models:GetAttribute("Loaded") and waited < 10 do
+			waited += task.wait(0.25)
 		end
 		local racers = {}
 		while #c.queue > 0 and #racers < GameConfig.lanes do
