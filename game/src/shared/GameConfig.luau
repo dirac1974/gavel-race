@@ -20,10 +20,11 @@ export type League = {
 local GameConfig = {}
 
 GameConfig.lanes = 8
--- Race segments (D-026): the pace meter runs continuously, scored in three back-to-back
--- checkpoints, then the Final Burst counting double.
-GameConfig.segments = { "pace", "pace", "pace", "burst" }
-GameConfig.segmentWeights = { 1, 1, 1, 2 }
+-- Race segments (D-026, D-031): the pace slider from the gate to the final turn (two
+-- checkpoints), the Final Burst entering the homestretch (counts double), then the slider
+-- again for the stretch drive.
+GameConfig.segments = { "pace", "pace", "burst", "pace" }
+GameConfig.segmentWeights = { 1, 1, 2, 1 }
 -- The slider (D-026). Target moves every 2-3 passes and speed drifts +-15% so a
 -- fixed-interval clicker scores below an average kid (simulated 59 vs 75; good human 93).
 GameConfig.pace = {
@@ -36,8 +37,10 @@ GameConfig.pace = {
 -- Race length (D-027): distance on the Churchill-style track at a gallop. Real times:
 -- Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~1:57, Marathon ~2:21.
 GameConfig.raceSpeedStudsPerSecond = 56
-GameConfig.burstLeadSeconds = 1.5    -- pace ends, "FINAL BURST" shows, then the burst meter
-GameConfig.burstBeforeLineSeconds = 1.0 -- the burst closes this long before the horses reach the line
+GameConfig.burstLeadSeconds = 1.5    -- pace pauses and "FINAL BURST" shows this long before the burst
+GameConfig.burstAfterTurnSeconds = 0.5 -- the burst opens this long after the field enters the homestretch
+GameConfig.stretchGapSeconds = 1.0   -- after the burst, the slider resumes for the stretch drive
+GameConfig.finishMarginSeconds = 1.5 -- the stretch drive's slider stops this long before the line
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
 GameConfig.stride = {

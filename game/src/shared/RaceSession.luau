@@ -3,14 +3,15 @@
 -- no clocks of its own (callers pass times), randomness only through the rng
 -- passed in. Dependencies are injected so it runs under Lune tests.
 --
--- Segments (D-026): the pace meter runs continuously through the race, scored in three
--- back-to-back checkpoints, then the Final Burst, which counts double. S = weighted mean
--- of segment scores, so the race maths is unchanged.
+-- Segments (D-026, D-031): the pace slider runs from the gate to the final turn (two
+-- checkpoints), the Final Burst comes as the field straightens into the homestretch and
+-- counts double, then the slider resumes for the stretch drive (one checkpoint).
+-- S = weighted mean of segment scores, so the race maths is unchanged.
 --
--- Flow: RaceSession.new -> paceSchedule(start, duration)
---   pace:  scorePace(id, seg, taps) ... -> closeSegment(seg)   (x3, no pauses between)
+-- Flow: RaceSession.new -> paceSchedule(spans, ranges)
+--   pace:  scorePace(id, seg, taps) ... -> closeSegment(seg)
 --   burst: burstSpec() -> submitBurst(id, seg, t) ... -> closeSegment(seg)
---   -> finish()
+--   (segments close in config order) -> finish()
 
 export type Rng = { NextNumber: (self: any) -> number }
 
@@ -96,7 +97,7 @@ function RaceSession.new(params: {
 	self.live = table.clone(self.q)
 	self.closed = 0
 	self.passes = nil :: any
-	self.paceStart, self.paceEnd = 0, 0
+	self.paceRanges = {} :: { [number]: { number } }
 	self.burst = nil :: any
 	self.finished = false
 	return self
@@ -138,18 +139,33 @@ function RaceSession:paceCount(): number
 	return n
 end
 
--- The marker's passes for the whole race, shared by all lanes. Call once, at the gate.
-function RaceSession:paceSchedule(start: number, duration: number)
+-- The marker's passes for the race, shared by all lanes. Call once, at the gate.
+-- `spans` = { {start, duration}, ... }: continuous runs of the slider (one schedule each).
+-- `ranges` = one {t0, t1} per pace segment, in segment order; a pass belongs to the
+-- checkpoint whose range contains its start.
+function RaceSession:paceSchedule(spans: { { number } }, ranges: { { number } })
 	assert(self.passes == nil, "pace already scheduled")
-	self.passes = self.deps.PaceMeter.schedule(self.rng, start, duration, self:paceSpec())
-	self.paceStart, self.paceEnd = start, start + duration
-	return self.passes
+	local passes = {}
+	for _, span in spans do
+		for _, p in self.deps.PaceMeter.schedule(self.rng, span[1], span[2], self:paceSpec()) do
+			table.insert(passes, p)
+		end
+	end
+	self.passes = passes
+	local k = 0
+	for seg, kind in self.config.segments do
+		if kind == "pace" then
+			k += 1
+			self.paceRanges[seg] = assert(ranges[k], "a range for every pace segment")
+		end
+	end
+	return passes
 end
 
--- Time range of pace checkpoint `seg` (passes belong to the checkpoint they start in).
+-- Time range of pace checkpoint `seg`.
 function RaceSession:paceRange(seg: number): (number, number)
-	local len = (self.paceEnd - self.paceStart) / self:paceCount()
-	return self.paceStart + (seg - 1) * len, self.paceStart + seg * len
+	local r = self.paceRanges[seg]
+	return r[1], r[2]
 end
 
 function RaceSession:pacePasses(seg: number)

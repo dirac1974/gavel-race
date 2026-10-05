@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: Final Burst entering the homestretch, stretch drive, no pause (D-031); race strip map (D-032)
 - 2026-10-04 — fix: horses face forward; feat: live places on the board and a place badge, minimap (D-030)
 - 2026-10-04 — The game is Giddy-Up: "Tap it. Shout it. Win it." (D-029)
 - 2026-10-04 — docs: David confirmed Rookie races Sprint and Mile (D-027)

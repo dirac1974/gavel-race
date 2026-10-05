@@ -217,7 +217,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local function runRace(seed: number, perfect: boolean, benDrops: boolean, avaAverageOnly: boolean?)
 		local s = newSession(seed)
 		if avaAverageOnly then s:setAverageOnly("1", true) end
-		s:paceSchedule(10, 36)
+		s:paceSchedule({ { 10, 36 } }, { { 10, 22 }, { 22, 34 }, { 34, 46 } })
 		for seg, kind in GameConfig.segments do
 			if kind == "pace" then
 				local taps = {}
@@ -237,9 +237,10 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local qsum = 0
 	for _, v in s0.q do qsum += v end
 	check(close(qsum, 1, 1e-12), "base chances sum to 1")
-	check(s0:segmentCount() == 4 and s0:kind(4) == "burst" and s0:paceCount() == 3, "three pace checkpoints then the burst")
-	s0:paceSchedule(5, 36)
-	check(not pcall(function() s0:paceSchedule(5, 36) end), "the pace is scheduled once")
+	check(s0:segmentCount() == 4 and s0:kind(3) == "burst" and s0:kind(4) == "pace" and s0:paceCount() == 3,
+		"two pace checkpoints, the burst, then the stretch drive")
+	s0:paceSchedule({ { 5, 36 } }, { { 5, 17 }, { 17, 29 }, { 29, 41 } })
+	check(not pcall(function() s0:paceSchedule({ { 5, 36 } }, { { 5, 17 }, { 17, 29 }, { 29, 41 } }) end), "the pace is scheduled once")
 	local p1 = s0:pacePasses(1)
 	local a1, b1end = s0:paceRange(1)
 	check(#p1 > 0 and close(a1, 5, 1e-9) and close(b1end, 17, 1e-9), "checkpoint 1 covers the first third")
@@ -249,12 +250,19 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(res ~= nil and close((res :: any).score, 100, 1e-6) and (res :: any).matched == #p1, "perfect checkpoint recorded")
 	check(s0:scorePace("1", 1, taps1) == nil, "a checkpoint is scored once per rider")
 	check(s0:scorePace("bot:1", 1, taps1) == nil, "bots can't tap")
+	local s2 = newSession(8)
+	local all = s2:paceSchedule({ { 0, 20 }, { 30, 10 } }, { { 0, 10 }, { 10, 20 }, { 30, 40 } })
+	local gapFree = true
+	for _, pp in all do
+		if pp.t0 >= 20.0001 and pp.t0 < 30 then gapFree = false end
+	end
+	check(gapFree and #s2:pacePasses(4) > 0 and s2:pacePasses(4)[1].t0 == 30, "the stretch drive is its own span after the burst")
 	check(s0:submitBurst("1", 1, 0.5) == nil, "no burst tap during a stretch")
 	check(not pcall(function() s0:closeSegment(2) end), "segments close in order")
 
 	-- Burst counts double: pace all missed, perfect burst -> S = 200 / 5 = 40.
 	local sw = newSession(4)
-	sw:paceSchedule(10, 36)
+	sw:paceSchedule({ { 10, 36 } }, { { 10, 22 }, { 22, 34 }, { 34, 46 } })
 	for seg, kind in GameConfig.segments do
 		if kind == "pace" then
 			-- no taps

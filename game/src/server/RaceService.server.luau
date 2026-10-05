@@ -2,9 +2,10 @@
 -- RaceService: Phase 1 prototype race loop.
 -- Everyone in the server races together (up to 8), bots fill the rest; racing players
 -- ride their own horse (D-024) on the Churchill-style track (D-027).
--- Each race: the pace slider runs continuously from the gate, scored in three back-to-back
--- checkpoints, then the Final Burst (one tap on a big meter, counts double) in the
--- homestretch (D-026). Race length follows the distance condition (Sprint ~69 s ... ).
+-- Each race: the pace slider from the gate to the final turn (two checkpoints), the Final
+-- Burst as the field enters the homestretch (one tap on a big meter, counts double), then
+-- the slider again for the stretch drive (D-026, D-031). Race length follows the distance
+-- condition (Sprint ~69 s ... ).
 -- All scoring and the finish draw happen here; clients only send tap times.
 -- Prototype limits: no saving (leaderstats only), no parties, starter ratings,
 -- integrity trackers live for the session only (they move to DataStore later).
@@ -42,7 +43,7 @@ local function makeRemote(name: string): RemoteEvent
 end
 
 local LobbyStatus = makeRemote("LobbyStatus")     -- server -> all: seconds until start
-local RaceStarted = makeRemote("RaceStarted")     -- server -> all: league, lanes, start, conditions, expected burst close
+local RaceStarted = makeRemote("RaceStarted")     -- server -> all: league, lanes, start, conditions, expected result time, burst open
 local PaceSchedule = makeRemote("PaceSchedule")   -- server -> all: the slider's passes for the race
 local PaceResult = makeRemote("PaceResult")       -- server -> one: checkpoint, score, label
 local BurstOpened = makeRemote("BurstOpened")     -- server -> all: seg, open, close, meter spec, name
@@ -216,19 +217,29 @@ local function runRace(players: { Player })
 	})
 	applyIntegrity(session, players)
 
-	-- Timeline (D-026, D-027): gate -> continuous pace -> "FINAL BURST" -> burst -> the line.
-	local plan = TrackLayout.plan(TrackLayout.churchill, TrackLayout.distances[cond.distance])
-	local raceSeconds = plan.lengths[1] / GameConfig.raceSpeedStudsPerSecond
+	-- Timeline (D-026, D-027, D-031): gate -> pace (2 checkpoints) -> into the homestretch:
+	-- "FINAL BURST" -> burst -> stretch drive (pace, 1 checkpoint) -> the line.
+	local cfg = TrackLayout.churchill
+	local plan = TrackLayout.plan(cfg, TrackLayout.distances[cond.distance])
+	local speed = GameConfig.raceSpeedStudsPerSecond
 	local tStart = now() + COUNTDOWN
-	local burstClose = tStart + raceSeconds - GameConfig.burstBeforeLineSeconds
-	local burstOpen = burstClose - league.windowSeconds
-	local paceEnd = burstOpen - GameConfig.burstLeadSeconds
-	-- Stop scheduling a pass early so the last one ends by paceEnd.
+	local tFinish = tStart + plan.lengths[1] / speed
+	local tTop = tFinish - cfg.finishFromTop / speed -- the field enters the homestretch
+	local burstOpen = tTop + GameConfig.burstAfterTurnSeconds
+	local burstClose = burstOpen + league.windowSeconds
+	local preEnd = burstOpen - GameConfig.burstLeadSeconds
+	local postStart = burstClose + GameConfig.stretchGapSeconds
+	local postEnd = tFinish - GameConfig.finishMarginSeconds
+	-- Stop scheduling a pass early so the last one in each span ends on time.
 	local longestPass = league.sweepSeconds / 2 * (1 + GameConfig.pace.speedDrift)
-	local passes = session:paceSchedule(tStart, paceEnd - tStart - longestPass)
+	local mid = tStart + (preEnd - tStart) / 2
+	local passes = session:paceSchedule(
+		{ { tStart, preEnd - tStart - longestPass }, { postStart, postEnd - postStart - longestPass } },
+		{ { tStart, mid }, { mid, preEnd }, { postStart, postEnd } })
+	local resultAt = postEnd + LATENCY_GRACE
 
 	TrackScene.build(plan) -- rebuilt each race: the gate moves with the distance, models appear once approved
-	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, burstClose + LATENCY_GRACE)
+	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, resultAt, burstOpen)
 	PaceSchedule:FireAllClients(passes)
 	task.delay(math.max(0, tStart - now()), TrackScene.openGate) -- and they're off
 	local isBot = {}
@@ -241,8 +252,12 @@ local function runRace(players: { Player })
 	end
 	TrackScene.addJockeys(isBot) -- Roblox-style jockeys on the bot horses
 
+	local preLast, postLast = tStart, postStart
+	for _, p in passes do
+		if p.t0 < burstOpen then preLast = math.max(preLast, p.t1) else postLast = math.max(postLast, p.t1) end
+	end
 	current = {
-		session = session, seg = 1, kind = "pace", open = tStart, close = passes[#passes].t1,
+		session = session, seg = 1, kind = "pace", open = tStart, close = preLast,
 		taps = {}, allowances = snapshotAllowances(), maxTaps = #passes * 2 + 10,
 	}
 	local errors: { [number]: { number } } = {}
@@ -250,6 +265,9 @@ local function runRace(players: { Player })
 	for seg, kind in GameConfig.segments do
 		current.seg = seg
 		if kind == "pace" then
+			if seg > 1 and GameConfig.segments[seg - 1] == "burst" then
+				current.kind, current.open, current.close = "pace", postStart, postLast -- the stretch drive
+			end
 			local segPasses = session:pacePasses(seg)
 			local lastEnd = if #segPasses > 0 then segPasses[#segPasses].t1 else select(2, session:paceRange(seg))
 			waitUntil(lastEnd + LATENCY_GRACE)
@@ -270,7 +288,8 @@ local function runRace(players: { Player })
 			current.allowances = snapshotAllowances()
 			BurstOpened:FireAllClients(seg, burstOpen, burstClose, session:burstSpec(), ThemePack.words.burst)
 			waitUntil(burstClose + LATENCY_GRACE)
-			current.kind = nil
+			current.kind = "pace" -- taps before the stretch drive opens are outside its window and dropped
+			current.open, current.close = postStart, postLast
 			local great = {}
 			for _, p in players do
 				local i = session:laneIndex(tostring(p.UserId))
