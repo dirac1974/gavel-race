@@ -99,7 +99,7 @@ def hoof_triangles(pos: np.ndarray, idx: np.ndarray) -> np.ndarray:
             adj.setdefault(v, {})[u] = d
     seen: set[int] = set()
     hoof_verts: set[int] = set()
-    legs = 0
+    comps: list[list[int]] = []
     for start in adj:
         if start in seen:
             continue
@@ -112,10 +112,14 @@ def hoof_triangles(pos: np.ndarray, idx: np.ndarray) -> np.ndarray:
                 if v not in seen:
                     seen.add(v)
                     stack.append(v)
-        ys = wpos[comp, 1]
-        if ys.min() > y0 + GROUND * h or len(comp) < 20:
+        if wpos[comp, 1].min() > y0 + GROUND * h or len(comp) < 20:
             continue
-        legs += 1
+        comps.append(comp)
+    # A long tail can hang below GROUND on a standing horse; the hooves are always the four lowest parts.
+    comps = sorted(comps, key=lambda c: wpos[c, 1].min())[:4]
+    legs = len(comps)
+    for comp in comps:
+        ys = wpos[comp, 1]
         top = [u for u in comp if wpos[u, 1] > ys.max() - 0.02 * h]
         dist = {u: 0.0 for u in top}
         heap = [(0.0, u) for u in top]

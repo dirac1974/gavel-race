@@ -68,3 +68,14 @@ def test_generated_id_modules_cover_every_upload():
         assert target.get(name) == str(rec["assetId"]), name
     assert {"horse_bay", "horse_chestnut", "horse_grey", "horse_black", "horse_palomino", "finish_post", "gate_stall"} <= set(meshes)
     assert set(images) == {p.stem for p in ATLAS.glob("ui_atlas_*.png")}
+
+
+def test_every_uploaded_model_has_a_model_spec():
+    """AssetService sizes each model from ModelSpecs: exact slot first, then the longest prefix ending in '_'."""
+    specs = dict(re.findall(r'^\t(\w+) = \{ axis = "([YZ])", studs = [\d.]+, yaw = [-\d.]+, collide = (?:true|false) \},$',
+                            (SHARED / "ModelSpecs.luau").read_text(), re.M))
+    assert {"horse_", "foal_", "finish_post", "gate_stall"} <= set(specs)
+    meshes = re.findall(r"^\t(\w+) = \d+,$", (SHARED / "MeshAssets.luau").read_text(), re.M)
+    for slot in meshes:
+        prefixes = [k for k in specs if k.endswith("_") and slot.startswith(k)]
+        assert slot in specs or prefixes, f"{slot} has no ModelSpecs entry"

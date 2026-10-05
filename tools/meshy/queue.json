@@ -2,10 +2,20 @@
   "version": 1,
   "art_direction": "County Fair Toy style (docs/art/ART_DIRECTION.md), council-approved 2026-10-04 (docs/art/ART_REVIEW.md): chunky stylized natural horses, small eyes on the sides of the head, no eyelashes or eyebrows, natural coat and mane colours, no flank symbols, ears forward, mouth closed, dark high-contrast hooves on every coat. Hero horse is never a buckskin mustang with a flowing black mane. No whip, no wagering imagery, no Spirit / My Little Pony / Horse Life / Wild Horse Islands / real racing brand look-alikes. The player's avatar is the jockey: never generate a rider.",
   "budget": {
-    "cap_credits": 200,
-    "spent_credits": 170,
-    "unspent_credits": 30,
-    "note": "Spent per Meshy consumed_credits: horse_gallop 30, five retextures 50, finish_post 30, gate_stall 30 + 30 (re-roll). Verdicts: docs/art/ART_REVIEW.md. Negatives are review notes only; the text-to-3D API has no negative prompt field."
+    "phase1": {
+      "cap_credits": 200,
+      "spent_credits": 180,
+      "note": "Playtest set (2026-10-04): horse_gallop 30, five coats 50, grey re-roll 10, finish_post 30, gate_stall 30 + 30."
+    },
+    "world": {
+      "date": "2026-10-04",
+      "start_balance": 1740,
+      "floor_balance": 450,
+      "allowed_credits": 1290,
+      "spent_credits": 1280,
+      "end_balance": 460,
+      "note": "David allowed up to 75% of the day's credits; the balance was checked before every batch and never went below 450. Spent per Meshy consumed_credits: 32 text-to-3D slots x 30 = 960, 22 retextures x 10 = 220, re-rolls 2 x 30 (pitchfork, water_trough) + 4 x 10 (pinto and roan, both poses) = 100. flower_planter (30) failed and was dropped. Verdicts: docs/art/ART_REVIEW.md."
+    }
   },
   "defaults": {
     "ai_model": "latest",
@@ -113,6 +123,636 @@
         "credits": 30,
         "verdict": "FAIL: broken geometry, huge triangular fins on both sides and shard artifacts in the open frame (thin bars and open frames generate badly)."
       }
+    },
+    {
+      "slot_id": "horse_stand",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 8000,
+      "prompt": "full body stylized thoroughbred horse standing calmly in profile, relaxed square stance, all four legs straight and clearly separated with all four hooves flat on the ground, head held up, neck gently arched, small calm dark eyes on the sides of the head, ears pricked forward, mouth closed, glossy bay coat: reddish brown body, black lower legs, short neat black mane, full black tail hanging down, glossy jet-black hooves, chunky toy-like proportions, sturdy neck and legs, large rounded hooves, simple brown leather bridle, bare back with no saddle, riderless",
+      "texture_prompt": "glossy healthy bay horse coat, warm reddish brown body, black mane, tail and lower legs, glossy jet-black hooves, small dark eyes, simple brown leather bridle, bare back with an even coat and no saddle or saddle cloth, soft hand-painted shading, bright daylight colors",
+      "negative": "no rider, no saddle, no saddle cloth, no whip, no wings, no horn, no pastel colors, no big glossy eyes, no eyelashes, no eyebrows, no flank symbols, no long flowing mane, no pinned ears, no open mouth, no head down, no rearing, no raised hoof",
+      "notes": "GENERATED 2026-10-04 (30 cr). Verdict: mesh PASS: calm square stance, four separate legs, all hooves down, head up, small side eyes, ears forward, mouth closed, bridle, bare back. Chunkier than the gallop mesh, with a thicker crest mane and slight leg feathering. The base is not uploaded; the coats are."
+    },
+    {
+      "slot_id": "horse_stand_bay",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, bay coat: warm reddish brown body, black mane, black tail and black lower legs, a small white star on the forehead, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS: bay, black points, white blaze (wider than the asked star)."
+    },
+    {
+      "slot_id": "horse_stand_chestnut",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, chestnut coat: warm copper-red body, slightly lighter copper mane and tail, a white blaze down the face, two white socks on the hind legs, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS: copper, white blaze, white hind socks."
+    },
+    {
+      "slot_id": "horse_stand_grey",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dapple grey coat: medium steel-grey body covered in clearly visible round charcoal-grey dapples on the shoulders, barrel and hindquarters, dark charcoal lower legs, light silver mane and tail, dark grey muzzle, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no blue or purple tint, no near-white body",
+      "notes": "GENERATED (10 cr). PASS: steel grey with clear dapples, dark legs."
+    },
+    {
+      "slot_id": "horse_stand_black",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, black coat with a soft blue-black sheen and gentle grey highlights on the shoulders and hindquarters, black mane and tail, a white star on the forehead, four short white socks, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no glowing eyes, no red eyes, no spooky look",
+      "notes": "GENERATED (10 cr). PASS: blue-black, star, short socks, normal eyes."
+    },
+    {
+      "slot_id": "horse_stand_palomino",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, palomino coat: rich golden body, creamy white mane and tail, a white stripe down the face, golden lower legs, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no metallic gold, no sparkles",
+      "notes": "GENERATED (10 cr). PASS: golden, cream mane and tail."
+    },
+    {
+      "slot_id": "horse_stand_pinto",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, bold tobiano pinto paint coat so the horse looks about half chocolate brown and half white: a big smooth-edged white patch crossing over the back and down both sides of the barrel, white lower legs, white chest, large rich chocolate brown patches on the head, neck, shoulders and hindquarters, brown head with a white blaze, two-tone brown and white mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 10,
+        "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, pinto paint coat: large irregular natural patches of rich chocolate brown and clean white over the body, neck and legs like a real paint horse, brown head with a white blaze, mixed brown and white mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+        "verdict": "FAIL: weak pinto: mostly brown with one small white flank patch"
+      },
+      "notes": "RE-ROLLED (10 + 10 cr). PASS on attempt 2: bold brown-and-white tobiano, white legs."
+    },
+    {
+      "slot_id": "horse_stand_appaloosa",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, leopard appaloosa coat: clean white body covered from head to tail in many small round dark brown-black leopard spots, mottled dark grey muzzle, short dark grey mane, dark grey and white tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS: white with dark leopard spots."
+    },
+    {
+      "slot_id": "horse_stand_buckskin",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, buckskin coat: warm golden tan body and face, short black mane, black tail and black lower legs, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, never used as the hero horse, short mane only",
+      "notes": "GENERATED (10 cr). PASS: golden tan, black points, short mane (a collectible, never the hero)."
+    },
+    {
+      "slot_id": "horse_stand_dun",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dun coat: sandy yellow-tan body, a thin dark brown dorsal stripe running along the spine from the mane to the tail, faint darker barring on the upper legs, dark brown lower legs, dark brown mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS (note): sandy with dark brown points and a faint dorsal stripe; close to the buckskin at a glance."
+    },
+    {
+      "slot_id": "horse_stand_roan",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, strawberry roan coat: light rosy grey body evenly sprinkled all over with tiny dark red flecks, solid dark red-brown head, solid dark red-brown lower legs, dark red-brown mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no pink pastel, no purple",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 10,
+        "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, red roan coat: body of red chestnut hairs finely mixed with white hairs so it reads as a soft rosy red-grey, solid darker chestnut head and lower legs, chestnut mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+        "verdict": "FAIL: not a roan: came out as a plain bay-chestnut with a black mane (the 'mixed hairs' wording is ignored)"
+      },
+      "notes": "RE-ROLLED (10 + 10 cr). Attempt 2 FAIL as generated (pastel pink body, fantasy bright-red mane); PASS after the local recolor.py roan fix (rosy grey flecked body, dark chestnut mane, tail and legs). The upload uses horse_stand_roan_recolored.glb."
+    },
+    {
+      "slot_id": "horse_stand_white",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, cream white coat: soft warm creamy white body, creamy white mane and tail, a pink-grey muzzle, light grey skin around the small dark eyes, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no glowing, no blue or purple tint, no unicorn look",
+      "notes": "GENERATED (10 cr). PASS: cream white, pink-grey muzzle, dark hooves."
+    },
+    {
+      "slot_id": "horse_stand_chestnut_blaze",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_stand",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized standing horse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, chestnut coat: rich deep red-chestnut body, a wide bright white blaze from the forehead down over the muzzle, four tall white socks, flaxen cream mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS: deep chestnut, wide blaze, white socks, flaxen mane and tail."
+    },
+    {
+      "slot_id": "horse_gallop_pinto",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, bold tobiano pinto paint coat so the horse looks about half chocolate brown and half white: a big smooth-edged white patch crossing over the back and down both sides of the barrel, white lower legs, white chest, large rich chocolate brown patches on the head, neck, shoulders and hindquarters, brown head with a white blaze, two-tone brown and white mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 10,
+        "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, pinto paint coat: large irregular natural patches of rich chocolate brown and clean white over the body, neck and legs like a real paint horse, brown head with a white blaze, mixed brown and white mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+        "verdict": "FAIL: weak pinto: mostly brown with one small white flank patch"
+      },
+      "notes": "RE-ROLLED (10 + 10 cr). PASS on attempt 2 (note): brown with white belly patches and white legs; less bold than the standing pinto."
+    },
+    {
+      "slot_id": "horse_gallop_appaloosa",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, leopard appaloosa coat: clean white body covered from head to tail in many small round dark brown-black leopard spots, mottled dark grey muzzle, short dark grey mane, dark grey and white tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS: white with dark leopard spots."
+    },
+    {
+      "slot_id": "horse_gallop_buckskin",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, buckskin coat: warm golden tan body and face, short black mane, black tail and black lower legs, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, never used as the hero horse, short mane only",
+      "notes": "GENERATED (10 cr). PASS: golden tan, black points."
+    },
+    {
+      "slot_id": "horse_gallop_dun",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dun coat: sandy yellow-tan body, a thin dark brown dorsal stripe running along the spine from the mane to the tail, faint darker barring on the upper legs, dark brown lower legs, dark brown mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS (note): sandy, dark brown points, dorsal stripe visible from above."
+    },
+    {
+      "slot_id": "horse_gallop_roan",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth, strawberry roan coat: light rosy grey body evenly sprinkled all over with tiny dark red flecks, solid dark red-brown head, solid dark red-brown lower legs, dark red-brown mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no pink pastel, no purple",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 10,
+        "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, red roan coat: body of red chestnut hairs finely mixed with white hairs so it reads as a soft rosy red-grey, solid darker chestnut head and lower legs, chestnut mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+        "verdict": "FAIL: not a roan: came out as a plain chestnut with a red mane (the 'mixed hairs' wording is ignored)"
+      },
+      "notes": "RE-ROLLED (10 + 10 cr). Attempt 2 FAIL as generated (pink-grey body, bright-red mane, tail and legs); PASS after the local recolor.py roan fix. The upload uses horse_gallop_roan_recolored.glb."
+    },
+    {
+      "slot_id": "horse_gallop_white",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, cream white coat: soft warm creamy white body, creamy white mane and tail, a pink-grey muzzle, light grey skin around the small dark eyes, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos, no glowing, no blue or purple tint, no unicorn look",
+      "notes": "GENERATED (10 cr). PASS: cream white, dark hooves."
+    },
+    {
+      "slot_id": "horse_gallop_chestnut_blaze",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "horse_gallop",
+      "target_polycount": 8000,
+      "text_style_prompt": "same stylized galloping racehorse, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, chestnut coat: rich deep red-chestnut body, a wide bright white blaze from the forehead down over the muzzle, four tall white socks, flaxen cream mane and tail, glossy jet-black hooves on every leg, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no light hooves, no text, no logos",
+      "notes": "GENERATED (10 cr). PASS: chestnut, flaxen mane and tail, blaze, white socks."
+    },
+    {
+      "slot_id": "foal_stand",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 6000,
+      "prompt": "full body stylized young foal standing in profile, a baby horse with long slender legs, all four legs straight and clearly separated with all four hooves flat on the ground, short compact body, short fluffy upright mane, short fluffy tail, small rounded head held up, small calm dark eyes on the sides of the head, ears pricked forward, mouth closed, soft bay coat with dark lower legs, glossy jet-black hooves, chunky toy-like proportions, no bridle, no saddle, riderless",
+      "texture_prompt": "soft fluffy bay foal coat, warm reddish brown body, dark brown lower legs, short dark fuzzy mane and tail, glossy jet-black hooves, small dark eyes, soft hand-painted shading, bright daylight colors",
+      "negative": "no rider, no saddle, no bridle, no big glossy eyes, no eyelashes, no pastel colors, no lying down, no wobbly or weak pose",
+      "notes": "GENERATED 2026-10-04 (30 cr). Verdict: mesh PASS: long legs, short fluffy mane, four hooves down, head up, small side eyes. Taller than long, so ModelSpecs sizes foals by height. The base is not uploaded."
+    },
+    {
+      "slot_id": "foal_stand_bay",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "foal_stand",
+      "target_polycount": 6000,
+      "text_style_prompt": "same stylized standing foal, keep the exact shape, pose and small side eyes, soft fluffy bay foal coat: warm reddish brown body, dark brown lower legs, short dark fuzzy mane and tail, a small white star, glossy jet-black hooves on every leg, natural colors, healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no bridle, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no light hooves, no text",
+      "notes": "GENERATED (10 cr). PASS."
+    },
+    {
+      "slot_id": "foal_stand_chestnut",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "foal_stand",
+      "target_polycount": 6000,
+      "text_style_prompt": "same stylized standing foal, keep the exact shape, pose and small side eyes, soft fluffy chestnut foal coat: warm copper-red body, slightly lighter copper fuzzy mane and tail, a thin white stripe down the face, glossy jet-black hooves on every leg, natural colors, healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no bridle, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no light hooves, no text",
+      "notes": "GENERATED (10 cr). PASS."
+    },
+    {
+      "slot_id": "foal_stand_grey",
+      "kind": "creature",
+      "priority": "P0",
+      "rig": false,
+      "retexture_of": "foal_stand",
+      "target_polycount": 6000,
+      "text_style_prompt": "same stylized standing foal, keep the exact shape, pose and small side eyes, soft fluffy grey foal coat: soft medium grey body with lighter grey patches around the eyes and muzzle, darker grey lower legs, short silver-grey fuzzy mane and tail, glossy jet-black hooves on every leg, natural colors, healthy coat, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no bridle, no flank symbols, no eyelashes, no big glossy eyes, no pastel colors, no light hooves, no text",
+      "notes": "GENERATED (10 cr). PASS (note): warm grey-fawn rather than cool grey."
+    },
+    {
+      "slot_id": "stable_barn",
+      "kind": "building",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 8000,
+      "prompt": "a small friendly two-stall horse barn building seen from the front, red painted wooden board siding with crisp white trim and white corner boards, a tall gambrel roof with dark grey shingles, a small white cupola on the roof ridge, two wide open stall bays at the front each with a white Dutch half door swung open, a white X-braced hay loft door high on the gable, a plain blank cream sign board above the stall bays, warm wooden floor, chunky toy-like proportions",
+      "texture_prompt": "barn red painted wood siding, crisp white trim and doors, dark grey shingle roof, blank cream sign board, warm honey wood floor and stall interiors, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people, no horses inside",
+      "notes": "GENERATED (30 cr). PASS (notes): red siding, white trim and X braces, two open stall bays either side of a closed white centre door, blank cream sign board; a gable roof with a dormer instead of a gambrel and cupola."
+    },
+    {
+      "slot_id": "hay_bale",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a single chunky rectangular hay bale, golden yellow straw with soft visible straw texture, two brown twine bands wrapped around it, a few loose straw tufts at the ends, rounded soft edges, toy-like proportions",
+      "texture_prompt": "golden yellow straw, warm brown twine, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no barn, no fork",
+      "notes": "GENERATED (30 cr). PASS: golden bale with twine; nearly cubic."
+    },
+    {
+      "slot_id": "water_trough",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a long low open wooden water trough for horses, about three times longer than it is wide, a simple rectangular box made of thick honey-brown wooden planks with two dark grey iron bands around it, filled almost to the top with clear sky blue water, standing on four short chunky wooden feet, no lid, no backboard, nothing on top, rounded edges, toy-like proportions",
+      "texture_prompt": "honey brown wood planks, dark grey iron bands, clear bright blue water, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no tap, no pipes, no rust",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 30,
+        "prompt": "a chunky wooden horse water trough, a long rectangular open trough made of thick honey-brown wooden planks held by dark grey iron bands, filled near the top with clear sky blue water, standing on two short sturdy wooden legs, rounded edges, toy-like proportions",
+        "verdict": "FAIL (soft): square tub with a stray plank standing up on one end like a backrest; reads as a box or seat from the side"
+      },
+      "notes": "RE-ROLLED (30 + 30 cr). PASS on attempt 2 (note): long banded trough on dark feet, but the inside is pale wood with no water; the game adds a blue water part, which also lets the fill-water chore show the level."
+    },
+    {
+      "slot_id": "feed_bucket",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky round feed bucket for horses, sky blue with a thick rounded rim and a sturdy rounded handle arching over the top, filled to the brim with golden grain and oats, toy-like proportions",
+      "texture_prompt": "glossy sky blue bucket, golden grain and oats, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no labels, no logos",
+      "notes": "GENERATED (30 cr). PASS (notes): sky blue bucket full of grain; no handle, and a small grain spill around the foot."
+    },
+    {
+      "slot_id": "grooming_brush",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky oval horse grooming brush, a smooth rounded honey-wood back with a soft brown leather strap handle across the top, a thick block of soft tan bristles underneath, toy-like proportions",
+      "texture_prompt": "honey wood back, brown leather strap, soft tan bristles, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no logos, no metal spikes",
+      "notes": "GENERATED (30 cr). PASS: rounded wooden back, strap, tan bristles."
+    },
+    {
+      "slot_id": "wheelbarrow",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky toy wheelbarrow, a deep rounded green metal tub, one big fat black rubber wheel at the front, two thick wooden handles and two short sturdy legs at the back, rounded friendly shapes, toy-like proportions",
+      "texture_prompt": "glossy grass green tub, black rubber wheel, honey wood handles, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no logos, no rust",
+      "notes": "GENERATED (30 cr). PASS."
+    },
+    {
+      "slot_id": "pitchfork",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky plastic toy pitchfork like a child's sandpit toy, standing upright on its fork end, one straight thick honey-wood handle with a rounded D-shaped grip at the top, and at the bottom a flat wide soft green plastic fork head shaped like a mitten with four short thick rounded fingers side by side, the fork head in line with the handle, friendly safe rounded shapes",
+      "texture_prompt": "honey wood handle, soft grass green fork head with rounded ball tips, soft hand-painted shading, bright daylight colors",
+      "negative": "no sharp points, no thin spikes, no metal blades, no weapon look",
+      "first_attempt": {
+        "date": "2026-10-04",
+        "credits": 30,
+        "prompt": "a chunky toy pitchfork for mucking out a stable, standing upright, a thick round honey-wood handle with a big rounded knob grip at the top, a wide rounded green head with four thick blunt rounded tines each ending in a soft round ball tip, friendly safe rounded shapes, toy-like proportions",
+        "verdict": "FAIL: reads as a scepter or mace (ball head with four little prongs on top), not a fork"
+      },
+      "notes": "RE-ROLLED (30 + 30 cr). PASS on attempt 2 (note): toy fork with four rounded tines at the bottom; the grip has odd knobs."
+    },
+    {
+      "slot_id": "noticeboard",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a rustic wooden noticeboard on two thick wooden posts, a large flat blank cream board in a chunky honey-brown wooden frame, a small pitched red shingle roof over the top, plain blank board with nothing on it, toy-like chunky proportions",
+      "texture_prompt": "honey brown wood frame and posts, plain blank cream board, red shingle roof, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no paper notes, no pins, no pictures on the board",
+      "notes": "GENERATED (30 cr). PASS: blank cream board, red roof, two posts."
+    },
+    {
+      "slot_id": "post_box",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a rustic countryside mailbox on a thick wooden post, a chunky rounded-top mailbox painted soft sky blue with a small rounded door at the front and a little red flag on the side, toy-like proportions",
+      "texture_prompt": "soft sky blue painted mailbox, honey wood post, small red flag, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no numbers, no logos",
+      "notes": "GENERATED (30 cr). PASS (note): sky blue mailbox with two little red flags and a grass tuft at the foot."
+    },
+    {
+      "slot_id": "carrot_crop",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a clump of growing carrots in a short garden row, six carrots in a mound of dark brown soil with bright orange carrot shoulders peeking out of the ground and big leafy feathery green carrot tops, chunky toy-like proportions",
+      "texture_prompt": "rich dark brown soil, bright orange carrots, fresh leafy green tops, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no pot, no rabbit",
+      "notes": "GENERATED (30 cr). PASS: carrots and leafy tops in a soil mound."
+    },
+    {
+      "slot_id": "apple_tree_small",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 4000,
+      "prompt": "a short chunky fruit tree, a thick rounded brown trunk, a big round puffy green leafy canopy dotted with shiny red apples, toy-like proportions",
+      "texture_prompt": "warm brown bark, fresh green leaves, shiny red apples, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no pot, no swing, no ground plate",
+      "notes": "GENERATED (30 cr). FAIL as generated (a brick-red canopy hid the apples); PASS after the local recolor.py canopy fix (green leaves, red apples). The upload uses apple_tree_small_recolored.glb."
+    },
+    {
+      "slot_id": "oat_crop",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a clump of ripe golden oat plants growing in a small bunch, tall golden stalks with drooping oat seed heads, a few green leaves at the base, in a little mound of brown soil, chunky stylized toy-like shapes",
+      "texture_prompt": "golden oat stalks and seed heads, a few green leaves, brown soil, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no pot",
+      "notes": "GENERATED (30 cr). PASS: golden oat stalks in a soil mound."
+    },
+    {
+      "slot_id": "garden_bed",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a raised wooden garden planter bed, a long rectangular box of thick honey-brown planks with short square corner posts, filled level with dark rich brown empty soil, nothing growing in it, toy-like chunky proportions",
+      "texture_prompt": "honey brown wood planks, dark rich brown soil, soft hand-painted shading, bright daylight colors",
+      "negative": "no plants, no text, no tools",
+      "notes": "GENERATED (30 cr). PASS: plank box of empty soil."
+    },
+    {
+      "slot_id": "saddle_rack",
+      "kind": "prop",
+      "priority": "P0",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky wooden saddle rack stand, a thick rounded horizontal wooden beam on a sturdy A-frame of thick legs at each end, a folded plain green blanket draped over the beam, toy-like proportions",
+      "texture_prompt": "honey brown wood, plain soft green blanket, soft hand-painted shading, bright daylight colors",
+      "negative": "no saddle, no text, no logos",
+      "notes": "GENERATED (30 cr). PASS: A-frame rack with a green blanket."
+    },
+    {
+      "slot_id": "feed_store",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 8000,
+      "prompt": "a friendly countryside feed and seed shop building seen from the front, barn-like shape with warm butter-yellow wooden siding and white trim, a gable roof with green shingles, a red and white striped fabric awning over a wide open shop front, stacked burlap grain sacks and hay bales by the door, a big plain blank cream sign board across the front gable, chunky toy-like proportions",
+      "texture_prompt": "butter yellow wood siding, white trim, green shingle roof, red and white striped awning, tan burlap sacks, golden hay, blank cream sign board, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people",
+      "notes": "GENERATED (30 cr). PASS (notes): yellow siding, green roof, red-and-white awning, sacks; no blank sign board (the game adds a sign part)."
+    },
+    {
+      "slot_id": "vet_clinic",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 8000,
+      "prompt": "a friendly small horse vet clinic building seen from the front, white wooden siding with soft mint green trim and a mint green roof, a big round emblem on the front gable showing a simple golden horseshoe with a red heart inside it, a wide open double door under a little porch roof, flower boxes under the windows, a plain blank cream sign board over the door, chunky toy-like proportions",
+      "texture_prompt": "clean white wood siding, soft mint green trim and roof, golden horseshoe with a red heart emblem, colorful flower boxes, blank cream sign board, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people, no red cross, no plus sign, no medical cross symbol (protected emblem)",
+      "notes": "GENERATED (30 cr). PASS: white and mint, horseshoe-with-heart emblem, no cross anywhere."
+    },
+    {
+      "slot_id": "market_corral_booth",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 6000,
+      "prompt": "a small wooden market stall shed for a countryside horse market, honey-brown plank walls, one wide open service window with a fold-down wooden counter shelf, a little blue and white striped awning over the window, a short pitched shingle roof, a plain blank cream sign board on the roof front, a short section of white wooden corral fence attached to one side, chunky toy-like proportions",
+      "texture_prompt": "honey brown planks, blue and white striped awning, white fence, grey shingle roof, blank cream sign board, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people, no ticket window look, no tickets, no prices",
+      "notes": "GENERATED (30 cr). PASS (notes): wooden booth, blue-and-white awning, open counter, a small white fence piece; a blank board sticks out sideways. The prompt avoids the word ticket (ticket windows read as betting windows)."
+    },
+    {
+      "slot_id": "training_shed",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 6000,
+      "prompt": "an open-sided wooden training shed for horses, four thick wooden posts holding a pitched red roof, no walls, a sandy floor, a few chunky orange and white traffic cones and low red and white striped wooden jump rails stacked inside, a plain blank cream sign board on the front edge of the roof, chunky toy-like proportions",
+      "texture_prompt": "honey brown wood posts, barn red roof, sandy floor, orange and white cones, red and white striped rails, blank cream sign board, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people",
+      "notes": "GENERATED (30 cr). PASS: open shed, red roof, cones, striped jump rails, blank sign."
+    },
+    {
+      "slot_id": "race_board_frame",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 6000,
+      "prompt": "a big wooden notice board for a countryside fair, a large flat blank cream board inside a thick honey-wood frame, standing on two sturdy wooden posts, a small pitched red shingle roof on top with a row of little bunting flags in red, yellow and sky blue under the roof edge, a plain blank face with nothing on it, chunky toy-like proportions",
+      "texture_prompt": "honey brown wood frame and posts, plain blank cream board, red shingle roof, red yellow and sky blue bunting, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people, no numbers, no scoreboard, no screens, no tote board look",
+      "notes": "GENERATED (30 cr). FAIL as generated (it sat on a wide red ground disc); PASS after tools/meshy/trim_base.py removed the disc. The upload uses race_board_frame_trimmed.glb."
+    },
+    {
+      "slot_id": "trail_gate_arch",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 6000,
+      "prompt": "a rustic log archway for a woodland trail entrance, two thick round log posts with a chunky log beam across the top, a plain blank wooden plank sign hanging under the beam on two short ropes, a few green leafy vines and small flowers wrapped around the posts, chunky toy-like proportions",
+      "texture_prompt": "warm brown bark logs, plain blank wooden sign, green vines, small white and yellow flowers, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no logos, no brand names, no thin wires, no broken shards, no people, no gate doors",
+      "notes": "GENERATED (30 cr). PASS: log arch, blank hanging sign, vines."
+    },
+    {
+      "slot_id": "flower_planter",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky wooden flower planter box overflowing with bright red, yellow and white flowers and green leaves, toy-like proportions",
+      "texture_prompt": "honey brown wood, bright red yellow and white flowers, fresh green leaves, soft hand-painted shading, bright daylight colors",
+      "negative": "no text",
+      "notes": "GENERATED (30 cr). FAIL, DROPPED: the flowers are dry orange shards that read as dead leaves. No budget left to re-roll."
+    },
+    {
+      "slot_id": "lantern_post",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky rustic lantern post, a thick dark green painted post with a rounded cap and a short curved arm holding a warm yellow lantern with a little peaked roof, toy-like proportions",
+      "texture_prompt": "dark green painted post, warm yellow lantern glass, black lantern frame, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no wires",
+      "notes": "GENERATED (30 cr). PASS."
+    },
+    {
+      "slot_id": "bench",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky wooden park bench with thick rounded honey-wood seat and back slats and sturdy dark green legs and armrests, toy-like proportions",
+      "texture_prompt": "honey brown wood slats, dark green painted legs, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no plaque",
+      "notes": "GENERATED (30 cr). PASS."
+    },
+    {
+      "slot_id": "picnic_table",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky wooden picnic table with two attached benches, thick rounded honey-brown planks, a red and white checked tablecloth on top, toy-like proportions",
+      "texture_prompt": "honey brown wood planks, red and white checked tablecloth, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no food piles",
+      "notes": "GENERATED (30 cr). PASS (note): round end caps on the benches can read as wheels end-on."
+    },
+    {
+      "slot_id": "trophy_cup",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky shiny golden trophy cup with two big rounded handles on a short round sky blue base, a small horseshoe shape on the front of the cup, toy-like proportions",
+      "texture_prompt": "polished warm gold cup, sky blue base, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no numbers, no coins",
+      "notes": "GENERATED (30 cr). PASS (note): pale blue cup with gold handles and a horseshoe, not all gold."
+    },
+    {
+      "slot_id": "rosette_ribbon",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a big blue rosette ribbon award, a round pleated blue ribbon rosette with a cream button in the centre and two blue ribbon tails hanging below, standing upright, toy-like chunky proportions",
+      "texture_prompt": "royal blue pleated satin, cream centre button, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no numbers",
+      "notes": "GENERATED (30 cr). PASS."
+    },
+    {
+      "slot_id": "horseshoe_decor",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a big decorative golden horseshoe standing upright with the open end pointing up, a chunky rounded U shape with small nail holes, toy-like proportions",
+      "texture_prompt": "warm polished gold, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no coins, no sparkles",
+      "notes": "GENERATED (30 cr). PASS: gold, open end up."
+    },
+    {
+      "slot_id": "log_jump",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a rustic log jump for horses, one thick round horizontal log resting on two chunky crossed log supports at each end, toy-like proportions",
+      "texture_prompt": "warm brown bark, pale cut log ends, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no poles, no thin rails",
+      "notes": "GENERATED (30 cr). PASS."
+    },
+    {
+      "slot_id": "wooden_bridge",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 4000,
+      "prompt": "a small chunky arched wooden footbridge, thick honey-brown deck planks with sturdy wooden railings on both sides, toy-like proportions",
+      "texture_prompt": "honey brown wood planks and railings, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no water, no ground",
+      "notes": "GENERATED (30 cr). PASS (note): short and wide, low arch, railings on two sides."
+    },
+    {
+      "slot_id": "hay_cart",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a chunky wooden farm cart piled high with golden hay, two big solid round wooden wheels, a short wooden pull handle at the front, toy-like proportions",
+      "texture_prompt": "honey brown wood cart, golden hay, dark brown wheels, soft hand-painted shading, bright daylight colors",
+      "negative": "no horse, no text, no thin spokes",
+      "notes": "GENERATED (30 cr). PASS (note): thin spoked wheels."
     }
   ]
 }

@@ -1,4 +1,39 @@
 {
+ "apple_tree_small": {
+  "assetId": 116681247381393,
+  "file": "Models/generated/apple_tree_small/apple_tree_small_recolored.glb",
+  "kind": "Model",
+  "sha256": "6a7556db6b2edd60a681d6de83f0cff5ed57cf3db7d4c36a298a7f442b6c288c",
+  "uploadedAt": "2026-10-05T06:50:38Z"
+ },
+ "bench": {
+  "assetId": 77113508904685,
+  "file": "Models/generated/bench/bench.glb",
+  "kind": "Model",
+  "sha256": "6c35bae70e74c8e1c614ab4664c0ad7bef1b19a81c918fa379568e837935f58b",
+  "uploadedAt": "2026-10-05T06:55:38Z"
+ },
+ "carrot_crop": {
+  "assetId": 134730626513945,
+  "file": "Models/generated/carrot_crop/carrot_crop.glb",
+  "kind": "Model",
+  "sha256": "f11766e77d55ac258b3e20549c5f7800d4810e808fa714efbcc8d292892296c0",
+  "uploadedAt": "2026-10-05T06:50:16Z"
+ },
+ "feed_bucket": {
+  "assetId": 77697719343785,
+  "file": "Models/generated/feed_bucket/feed_bucket.glb",
+  "kind": "Model",
+  "sha256": "0a9ec87ed8192e0d512c8778e6515cc084670f58982d65d4c7b8f4734697c268",
+  "uploadedAt": "2026-10-05T06:48:47Z"
+ },
+ "feed_store": {
+  "assetId": 108276584151772,
+  "file": "Models/generated/feed_store/feed_store.glb",
+  "kind": "Model",
+  "sha256": "9efc8156d677046bb036760f5bb8404e3830c082da53d69e7e7b7855a097084f",
+  "uploadedAt": "2026-10-05T06:51:30Z"
+ },
  "finish_post": {
   "assetId": 88806289427928,
   "file": "Models/generated/finish_post/finish_post.glb",
@@ -6,12 +41,61 @@
   "sha256": "61f90eaa623426fc707161bf09674ea4498c79c94cad3068767fa361710e6da5",
   "uploadedAt": "2026-10-05T03:45:10Z"
  },
+ "foal_stand_bay": {
+  "assetId": 135635594367079,
+  "file": "Models/generated/foal_stand_bay/foal_stand_bay_hoofed.glb",
+  "kind": "Model",
+  "sha256": "3698c0e2203bc53a93482e1e86c5902e3520fb08922ab095157c0654f9f3c1d7",
+  "uploadedAt": "2026-10-05T06:47:25Z"
+ },
+ "foal_stand_chestnut": {
+  "assetId": 126759600341846,
+  "file": "Models/generated/foal_stand_chestnut/foal_stand_chestnut_hoofed.glb",
+  "kind": "Model",
+  "sha256": "a7b2ed30b794a40b1d09fe8f0b64937ce13165303b3e5548896003ae183e85f7",
+  "uploadedAt": "2026-10-05T06:47:45Z"
+ },
+ "foal_stand_grey": {
+  "assetId": 101490155127570,
+  "file": "Models/generated/foal_stand_grey/foal_stand_grey_hoofed.glb",
+  "kind": "Model",
+  "sha256": "8b1b08ebb0bb134106a0d257de85acafdd7420041d28160d4083060ac91d03e8",
+  "uploadedAt": "2026-10-05T06:47:59Z"
+ },
+ "garden_bed": {
+  "assetId": 101201721278642,
+  "file": "Models/generated/garden_bed/garden_bed.glb",
+  "kind": "Model",
+  "sha256": "5206f3875c0a99779b32c12a2b780d8d801bce3e361e76cc472de5e85974dc13",
+  "uploadedAt": "2026-10-05T06:51:10Z"
+ },
  "gate_stall": {
   "assetId": 90161128848656,
   "file": "Models/generated/gate_stall/gate_stall.glb",
   "kind": "Model",
   "sha256": "b45aee76d9c3295440be86499d112d26469b717843835801e6cd803e48dde46a",
   "uploadedAt": "2026-10-05T03:45:30Z"
+ },
+ "grooming_brush": {
+  "assetId": 104327208270661,
+  "file": "Models/generated/grooming_brush/grooming_brush.glb",
+  "kind": "Model",
+  "sha256": "a5706b1738841ab0e98216f3128d999db74b6e5759ced8323571992d4c4220e3",
+  "uploadedAt": "2026-10-05T06:49:00Z"
+ },
+ "hay_bale": {
+  "assetId": 111578472092014,
+  "file": "Models/generated/hay_bale/hay_bale.glb",
+  "kind": "Model",
+  "sha256": "bda22681497348e35595b3de6ebdb3b95062679d2f881a8479db38460c1d6882",
+  "uploadedAt": "2026-10-05T06:48:22Z"
+ },
+ "hay_cart": {
+  "assetId": 129048910045425,
+  "file": "Models/generated/hay_cart/hay_cart.glb",
+  "kind": "Model",
+  "sha256": "e9450af0459dbba14d782c5f0d988cf8b57434f5096d21dd46248555c6fcfc37",
+  "uploadedAt": "2026-10-05T06:57:11Z"
  },
  "horse_bay": {
   "assetId": 98817538977109,
@@ -34,6 +118,55 @@
   "sha256": "69964bdcc14a0016f412cdd0bfe7d8328dc6f97043b945cfc8cfd45ec65e2a27",
   "uploadedAt": "2026-10-05T03:44:04Z"
  },
+ "horse_gallop_appaloosa": {
+  "assetId": 95289898025215,
+  "file": "Models/generated/horse_gallop_appaloosa/horse_gallop_appaloosa_hoofed.glb",
+  "kind": "Model",
+  "sha256": "a6f43548217f2e490a8022acd7f0cb396ef87e60b006794612410f104d44ebea",
+  "uploadedAt": "2026-10-05T06:43:33Z"
+ },
+ "horse_gallop_buckskin": {
+  "assetId": 95716562922423,
+  "file": "Models/generated/horse_gallop_buckskin/horse_gallop_buckskin_hoofed.glb",
+  "kind": "Model",
+  "sha256": "0e3d84841078b81cb217f77a5d2f057c8d4e13c13c7b98f62a797d6e448f4586",
+  "uploadedAt": "2026-10-05T06:43:45Z"
+ },
+ "horse_gallop_chestnut_blaze": {
+  "assetId": 97924227218775,
+  "file": "Models/generated/horse_gallop_chestnut_blaze/horse_gallop_chestnut_blaze_hoofed.glb",
+  "kind": "Model",
+  "sha256": "ba5037a14e2ecd5d966f3a948ef19e61ec9bde4d47f8fe04c74daa4af80c8c67",
+  "uploadedAt": "2026-10-05T06:44:36Z"
+ },
+ "horse_gallop_dun": {
+  "assetId": 99898537528318,
+  "file": "Models/generated/horse_gallop_dun/horse_gallop_dun_hoofed.glb",
+  "kind": "Model",
+  "sha256": "5797a605cbfc1f04c294fb38cdbd64223d2220fa7bd0e522b3cc6d6d0e6a5b20",
+  "uploadedAt": "2026-10-05T06:43:59Z"
+ },
+ "horse_gallop_pinto": {
+  "assetId": 118659293032382,
+  "file": "Models/generated/horse_gallop_pinto/horse_gallop_pinto_hoofed.glb",
+  "kind": "Model",
+  "sha256": "5862f50c804876fd9f9f1925afca9aaeb056107f4c82ff2d6d6141729c688855",
+  "uploadedAt": "2026-10-05T06:43:20Z"
+ },
+ "horse_gallop_roan": {
+  "assetId": 134560301708146,
+  "file": "Models/generated/horse_gallop_roan/horse_gallop_roan_recolored.glb",
+  "kind": "Model",
+  "sha256": "aa0a04f0209a8a35dd3fe5571e84ed58549967e52a77737784ad64e2f2ed7c83",
+  "uploadedAt": "2026-10-05T06:44:11Z"
+ },
+ "horse_gallop_white": {
+  "assetId": 126297620299642,
+  "file": "Models/generated/horse_gallop_white/horse_gallop_white_hoofed.glb",
+  "kind": "Model",
+  "sha256": "6d669ed74cc6a86b40c1ffd4f792eb189e6aa1296adef042f19447d933d68bbf",
+  "uploadedAt": "2026-10-05T06:44:23Z"
+ },
  "horse_grey": {
   "assetId": 78983375774009,
   "file": "Models/generated/horse_gallop_grey/horse_gallop_grey_hoofed.glb",
@@ -48,6 +181,202 @@
   "sha256": "f5822d37e79af98ec25f45b94e98917da1deaed549a9472664b6128ab3a04092",
   "uploadedAt": "2026-10-05T03:44:56Z"
  },
+ "horse_stand_appaloosa": {
+  "assetId": 129767839310948,
+  "file": "Models/generated/horse_stand_appaloosa/horse_stand_appaloosa_hoofed.glb",
+  "kind": "Model",
+  "sha256": "53691b47ca5bffdcc15d5a4bc451a9e31eeb7acd4375e5ca2a33dd7d4d7a02b7",
+  "uploadedAt": "2026-10-05T06:46:17Z"
+ },
+ "horse_stand_bay": {
+  "assetId": 73463947910456,
+  "file": "Models/generated/horse_stand_bay/horse_stand_bay_hoofed.glb",
+  "kind": "Model",
+  "sha256": "5c678a32941c163cbbac40401320d9502003797f6af9081cfb6657f0b88a4d00",
+  "uploadedAt": "2026-10-05T06:44:49Z"
+ },
+ "horse_stand_black": {
+  "assetId": 98648086407147,
+  "file": "Models/generated/horse_stand_black/horse_stand_black_hoofed.glb",
+  "kind": "Model",
+  "sha256": "3fe99026056d86a7a4bd17fa8fbeebca94a4b1a19d13a28c48ec81cb0528d425",
+  "uploadedAt": "2026-10-05T06:45:28Z"
+ },
+ "horse_stand_buckskin": {
+  "assetId": 70604458669077,
+  "file": "Models/generated/horse_stand_buckskin/horse_stand_buckskin_hoofed.glb",
+  "kind": "Model",
+  "sha256": "5482573b1954caf488d09febcd9c2d75537af206229ef5e448cbe94cc28ddb27",
+  "uploadedAt": "2026-10-05T06:46:25Z"
+ },
+ "horse_stand_chestnut": {
+  "assetId": 136017748913152,
+  "file": "Models/generated/horse_stand_chestnut/horse_stand_chestnut_hoofed.glb",
+  "kind": "Model",
+  "sha256": "735b24785b34a15fe86c85d641a71e598a5add08cc2b57154a39b4437bd31b91",
+  "uploadedAt": "2026-10-05T06:45:05Z"
+ },
+ "horse_stand_chestnut_blaze": {
+  "assetId": 95987601027037,
+  "file": "Models/generated/horse_stand_chestnut_blaze/horse_stand_chestnut_blaze_hoofed.glb",
+  "kind": "Model",
+  "sha256": "49836e6c582e7f0e81b418aac6cf7486e8fc8240db01fd243c64cb29383f3231",
+  "uploadedAt": "2026-10-05T06:47:12Z"
+ },
+ "horse_stand_dun": {
+  "assetId": 82758113605238,
+  "file": "Models/generated/horse_stand_dun/horse_stand_dun_hoofed.glb",
+  "kind": "Model",
+  "sha256": "2572b882a6b8ecc0c116de1785d572276af8e3b5e36aa7b83027bcba721e55da",
+  "uploadedAt": "2026-10-05T06:46:40Z"
+ },
+ "horse_stand_grey": {
+  "assetId": 138150348514034,
+  "file": "Models/generated/horse_stand_grey/horse_stand_grey_hoofed.glb",
+  "kind": "Model",
+  "sha256": "b2bb435fbc1ded7fd7f706a595d0be9e77020cdeb3ac00aa62246a324d746a31",
+  "uploadedAt": "2026-10-05T06:45:15Z"
+ },
+ "horse_stand_palomino": {
+  "assetId": 91123597795526,
+  "file": "Models/generated/horse_stand_palomino/horse_stand_palomino_hoofed.glb",
+  "kind": "Model",
+  "sha256": "9975f1f9d1d5b556914b8735d3b1f67cba0a15b80b8521acb85c3e45a34cc7e0",
+  "uploadedAt": "2026-10-05T06:45:44Z"
+ },
+ "horse_stand_pinto": {
+  "assetId": 84316353551609,
+  "file": "Models/generated/horse_stand_pinto/horse_stand_pinto_hoofed.glb",
+  "kind": "Model",
+  "sha256": "91217c8750c899c8c0c7fcdaba1532d0e4cad53f1800541d068bb03425c8673f",
+  "uploadedAt": "2026-10-05T06:45:58Z"
+ },
+ "horse_stand_roan": {
+  "assetId": 138919493557190,
+  "file": "Models/generated/horse_stand_roan/horse_stand_roan_recolored.glb",
+  "kind": "Model",
+  "sha256": "4b0bb59d2cf1b4045237aad7f4ec54a09b72c7bf02177051c0d69f4d0399be3e",
+  "uploadedAt": "2026-10-05T06:46:52Z"
+ },
+ "horse_stand_white": {
+  "assetId": 134759229725617,
+  "file": "Models/generated/horse_stand_white/horse_stand_white_hoofed.glb",
+  "kind": "Model",
+  "sha256": "ea1081c3f3e70ffdea933c0e2e7965330f966653eeac86334a8e5531b742663f",
+  "uploadedAt": "2026-10-05T06:47:00Z"
+ },
+ "horseshoe_decor": {
+  "assetId": 76241806849020,
+  "file": "Models/generated/horseshoe_decor/horseshoe_decor.glb",
+  "kind": "Model",
+  "sha256": "74ddab721d3505fbdd084693ac9fa075e576eb822764ee982f1e64d1d9365a1d",
+  "uploadedAt": "2026-10-05T06:56:29Z"
+ },
+ "lantern_post": {
+  "assetId": 79719899290793,
+  "file": "Models/generated/lantern_post/lantern_post.glb",
+  "kind": "Model",
+  "sha256": "01e6275aba4bf801d1fffe576880e2c696d80087de57dbd51117cec9df572c2d",
+  "uploadedAt": "2026-10-05T06:55:14Z"
+ },
+ "log_jump": {
+  "assetId": 128071509812566,
+  "file": "Models/generated/log_jump/log_jump.glb",
+  "kind": "Model",
+  "sha256": "262ce5242608ee194b43d155659cee24c9b76fa6428b6c9360a2b10666826ca6",
+  "uploadedAt": "2026-10-05T06:56:37Z"
+ },
+ "market_corral_booth": {
+  "assetId": 139727391696917,
+  "file": "Models/generated/market_corral_booth/market_corral_booth.glb",
+  "kind": "Model",
+  "sha256": "fe49bff94be58f6d823e67d9d5b264971dcd78ac480419591b1523ef5bb26c2e",
+  "uploadedAt": "2026-10-05T06:51:59Z"
+ },
+ "noticeboard": {
+  "assetId": 74680812655077,
+  "file": "Models/generated/noticeboard/noticeboard.glb",
+  "kind": "Model",
+  "sha256": "5425a1d661a9409aea05a44e8e8a3d07b8c74a9d7c652637feb23809ee125f35",
+  "uploadedAt": "2026-10-05T06:49:43Z"
+ },
+ "oat_crop": {
+  "assetId": 73035596464925,
+  "file": "Models/generated/oat_crop/oat_crop.glb",
+  "kind": "Model",
+  "sha256": "ccfb6e275f9eff95c84a4a305f9355afc64b55f8d6599799fceb2a3a3837131b",
+  "uploadedAt": "2026-10-05T06:50:58Z"
+ },
+ "picnic_table": {
+  "assetId": 87931733117619,
+  "file": "Models/generated/picnic_table/picnic_table.glb",
+  "kind": "Model",
+  "sha256": "bfaa9dd2c6810fad35671ba885394a866f0191bf94322243b840323706e49637",
+  "uploadedAt": "2026-10-05T06:55:52Z"
+ },
+ "pitchfork": {
+  "assetId": 115096225214208,
+  "file": "Models/generated/pitchfork/pitchfork.glb",
+  "kind": "Model",
+  "sha256": "33c789770ea54927ddc4fadad8543afda9379addcedfebd280943fb289e32163",
+  "uploadedAt": "2026-10-05T06:49:30Z"
+ },
+ "post_box": {
+  "assetId": 138248539444614,
+  "file": "Models/generated/post_box/post_box.glb",
+  "kind": "Model",
+  "sha256": "d818dd1e7ef91cf6f418663c9818298d7affb3c09d305ea43533a18413350c57",
+  "uploadedAt": "2026-10-05T06:49:54Z"
+ },
+ "race_board_frame": {
+  "assetId": 72220661450105,
+  "file": "Models/generated/race_board_frame/race_board_frame_trimmed.glb",
+  "kind": "Model",
+  "sha256": "d20b5ff14e8c30216ae48598d182e5b37b48f92fdee8ad4a5ea4636fddad1001",
+  "uploadedAt": "2026-10-05T06:52:20Z"
+ },
+ "rosette_ribbon": {
+  "assetId": 123127469123176,
+  "file": "Models/generated/rosette_ribbon/rosette_ribbon.glb",
+  "kind": "Model",
+  "sha256": "33e4a95d1b0b2797dd15b485cf42b7a27dd5785242c0a122bafbb347b9c05244",
+  "uploadedAt": "2026-10-05T06:56:17Z"
+ },
+ "saddle_rack": {
+  "assetId": 82900481997584,
+  "file": "Models/generated/saddle_rack/saddle_rack.glb",
+  "kind": "Model",
+  "sha256": "a4c42d4f2fe2e294c5199a0deb88ea10842a2bac666fb0cf716c9fb633995b63",
+  "uploadedAt": "2026-10-05T06:50:08Z"
+ },
+ "stable_barn": {
+  "assetId": 77273775992946,
+  "file": "Models/generated/stable_barn/stable_barn.glb",
+  "kind": "Model",
+  "sha256": "ad6eabd48d18271547f12e0a73dfac17f8be60cdfa6a98220588b53d5741b71c",
+  "uploadedAt": "2026-10-05T06:48:10Z"
+ },
+ "trail_gate_arch": {
+  "assetId": 74918735399703,
+  "file": "Models/generated/trail_gate_arch/trail_gate_arch.glb",
+  "kind": "Model",
+  "sha256": "1e8de1386397a319ed3fceb69a19785661a7a1fbbcb85a65e3f8c7b8bbef735d",
+  "uploadedAt": "2026-10-05T06:52:28Z"
+ },
+ "training_shed": {
+  "assetId": 95614575299172,
+  "file": "Models/generated/training_shed/training_shed.glb",
+  "kind": "Model",
+  "sha256": "ecef9efcaeb79dcca26973e48ff3d0105c2a0a7890e1b5039722afa4879a1433",
+  "uploadedAt": "2026-10-05T06:52:07Z"
+ },
+ "trophy_cup": {
+  "assetId": 73223294800987,
+  "file": "Models/generated/trophy_cup/trophy_cup.glb",
+  "kind": "Model",
+  "sha256": "28487909f38564629dd7adad20a396ff7679130710ce6274c8c31a431e9910e4",
+  "uploadedAt": "2026-10-05T06:56:05Z"
+ },
  "ui_atlas_1": {
   "assetId": 138919800817033,
   "file": "assets/ui/atlas/ui_atlas_1.png",
@@ -61,5 +390,47 @@
   "kind": "Decal",
   "sha256": "009513b2d9daf1bdf193dd29bffd05f2b9ccfb40d6e4e08ecd6080c204e42240",
   "uploadedAt": "2026-10-05T03:45:37Z"
+ },
+ "ui_atlas_world_1": {
+  "assetId": 70883920012717,
+  "file": "assets/ui/atlas/ui_atlas_world_1.png",
+  "kind": "Decal",
+  "sha256": "c079bf1c5d473d0d70e9d3e4621ed37c4485deb7cecfda87d763c17da7b867f5",
+  "uploadedAt": "2026-10-05T06:57:15Z"
+ },
+ "ui_atlas_world_2": {
+  "assetId": 84597027742671,
+  "file": "assets/ui/atlas/ui_atlas_world_2.png",
+  "kind": "Decal",
+  "sha256": "745d534a2803638d029411327fa9514039381ea1e99bda69e5125c69a4760df8",
+  "uploadedAt": "2026-10-05T06:57:18Z"
+ },
+ "vet_clinic": {
+  "assetId": 112190730593960,
+  "file": "Models/generated/vet_clinic/vet_clinic.glb",
+  "kind": "Model",
+  "sha256": "4cf888a5b759dd6444dcf7c76dd8d35e3f30cbfc2e546f2d526259ec0ad7d58e",
+  "uploadedAt": "2026-10-05T06:51:45Z"
+ },
+ "water_trough": {
+  "assetId": 77651926650735,
+  "file": "Models/generated/water_trough/water_trough.glb",
+  "kind": "Model",
+  "sha256": "c0f928931bc4566e1cbe813842d67ea343ac07b3315e5b12a85cef0ebac08d71",
+  "uploadedAt": "2026-10-05T06:48:34Z"
+ },
+ "wheelbarrow": {
+  "assetId": 76187646933611,
+  "file": "Models/generated/wheelbarrow/wheelbarrow.glb",
+  "kind": "Model",
+  "sha256": "15bd194e405bf96c9160e8fd2a508e257787588bf476c8666e7ed3129b561ae8",
+  "uploadedAt": "2026-10-05T06:49:12Z"
+ },
+ "wooden_bridge": {
+  "assetId": 74043771820175,
+  "file": "Models/generated/wooden_bridge/wooden_bridge.glb",
+  "kind": "Model",
+  "sha256": "6224bc39f4478117f73ce3b072839bf3df5f038a47c8e27d817c86d5bd2f6202",
+  "uploadedAt": "2026-10-05T06:56:50Z"
  }
 }
