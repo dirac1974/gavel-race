@@ -31,7 +31,7 @@ export type Profile = {
 	nextHorseId: number,
 	days: { played: number, last: number },
 	totals: { races: number, wins: number, cashEarned: number },
-	settings: { visits: string, sound: boolean?, easyRein: boolean },
+	settings: { visits: string, sound: boolean?, easyRein: boolean, shareGhost: boolean },
 	flags: { [string]: boolean },
 	garden: { { seed: string, at: number } },
 	chores: { [string]: number },
@@ -58,7 +58,8 @@ function Profile.new(now: number): Profile
 		nextHorseId = 1,
 		days = { played = 0, last = -1 },
 		totals = { races = 0, wins = 0, cashEarned = 0 },
-		settings = { visits = "Friends", easyRein = false }, -- Easy Rein (D-053): steering help on training courses
+		-- Easy Rein (D-053): steering help on training courses; shareGhost: friends may see your ghosts
+		settings = { visits = "Friends", easyRein = false, shareGhost = false },
 		flags = {},
 		garden = Profile.emptyGarden(),
 		chores = {},
@@ -136,6 +137,7 @@ function Profile.migrate(data: any, now: number): Profile
 	p.settings = if typeof(p.settings) == "table" then p.settings else {}
 	if not table.find({ "Friends", "Club", "Nobody" }, p.settings.visits) then p.settings.visits = "Friends" end
 	p.settings.easyRein = p.settings.easyRein == true
+	p.settings.shareGhost = p.settings.shareGhost == true
 	p.flags = if typeof(p.flags) == "table" then p.flags else {}
 	local garden = Profile.emptyGarden()
 	if typeof(p.garden) == "table" then

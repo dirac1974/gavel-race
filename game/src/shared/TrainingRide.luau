@@ -544,6 +544,12 @@ function TR.scoreStamina(kept: { Sample }, seed: number, lag: number, cfg: any):
 	return 100 * share, { share = share, samples = n, inRing = inside, finishT = endT }
 end
 
+-- The samples a ride is scored on (the same checks TR.run makes), e.g. for its ghost.
+function TR.keptSamples(key: string, samples: { Sample }, cfg: any): { Sample }
+	local onCourse = if key == "stamina" then nil else function(x: number, z: number): boolean return TC.onCourse(key, x, z) end
+	return (TR.validate(samples, onCourse, cfg))
+end
+
 -- Validate, score and finalize a whole ride. `seconds` is the ride time the server measured
 -- (its tracker's finish, or the time when the ride ran out).
 -- opts: Gate Break { bellSeed, allowance (or allowances by bell) }, Hill Climb { seed, lag }.

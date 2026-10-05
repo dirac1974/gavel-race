@@ -204,7 +204,7 @@ GameConfig.training = {
 	-- studs of it (logs don't collide, so a horse that doesn't hop just runs through).
 	grit = { mud = 4, logs = 3, poles = 4, logHeight = 2, pace = 28, airborne = 1.5, logWindow = 3,
 		points = { mud = 7.5, log = 12, pole = 8.5 } },
-	ghostHz = 4, ghostMaxPoints = 300, ghostQuantum = 0.5,
+	ghostHz = 4, ghostMaxPoints = 480, ghostQuantum = 0.5, -- 480 points at 4 Hz = 120 s, a whole ride
 }
 
 -- Prize ribbons for the UI (D-016). Never use racing-wager terms in UI text. -- policy-ok

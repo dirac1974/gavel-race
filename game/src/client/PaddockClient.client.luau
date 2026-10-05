@@ -6,8 +6,11 @@
 --     train" for the old games. Picking a course (here or at its picture sign's "Ride" prompt)
 --     asks TrainingRideClient to start it. GameConfig.training.mode = "meters" shows only the
 --     games, as before D-053.
---   Quick train: pick a horse and a stat, play a 10-second game, the server adds the gain
---   (still client-scored until T4; the server caps its quality).
+--   Quick train: pick a horse and a stat, play a 10-second game. The server seeds the game and
+--   scores the tap times (T4, QuickTrain); this screen draws the same game from the same rules
+--   and shows the server's score at the end.
+--   Ride together (T4): "👫 Ride together" lists friends nearby who can be invited; pick one and
+--   a course and an invite goes out (the friend must accept). No text travels with it.
 --     Sprint Lane (Speed): tap as the runner crosses each glowing zone.
 --     Gate Break (Acceleration): wait for green, then tap fast.
 --     Hill Climb (Stamina): hold to keep the marker in the moving green band.
@@ -27,6 +30,7 @@ local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Training = require(Shared:WaitForChild("Training"))
+local QuickTrain = require(Shared:WaitForChild("QuickTrain"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
@@ -78,13 +82,23 @@ end
 local function alive(gen: number): boolean
 	return gen == generation and gui.Enabled
 end
+-- A Quick train game asked for or in play: closing the card (or opening another) tells the
+-- server, which ends it with no gain.
+local quickLive = false
+local function stopQuickIfLive()
+	if not quickLive then return end
+	quickLive = false
+	gameRemotes:WaitForChild("QuickStop"):FireServer()
+end
 local function close()
+	stopQuickIfLive()
 	clear()
 	gui.Enabled = false
 end
 closeBtn.Activated:Connect(close)
 dim.Activated:Connect(close)
 local function open(t: string, s: string)
+	stopQuickIfLive()
 	clear()
 	title.Text, sub.Text = t, s
 	if not gui.Enabled then
@@ -149,10 +163,34 @@ local function label(score: number): string
 	return if score >= 90 then "Perfect!" elseif score >= 75 then "Great!" elseif score >= 50 then "Good" else "Okay"
 end
 
--- Games: each calls done(score 0..100) -----------------------------------------------------
+-- Games (T4): the server seeds each game and scores the tap times (QuickTrain); each game
+-- draws itself from the same rules on the server's clock and calls done(preview score).
+-- g = { stat, seed, startAt, events, now = seconds since the game started }
 local Games = {}
 
-function Games.speed(done)
+-- Record a tap (or a hold / let go) and send its time; returns that tap's own score if it counted.
+local function quickTap(g, kind: string): number?
+	local t = g.now()
+	if t < 0 or g.over then return nil end
+	if not QuickTrain.addEvent(g.events, t, kind) then return nil end
+	gameRemotes:WaitForChild("QuickTap"):FireServer(kind, g.startAt + t) -- the same moment the preview used
+	local res = QuickTrain.play(g.stat, g.seed, g.events, t)
+	for i = #g.events, 1, -1 do
+		if g.events[i].t == t and g.events[i].kind == kind then return res.taps[i] end
+	end
+	return nil
+end
+
+local function whenDone(g, done)
+	if g.over then return end
+	local res = QuickTrain.play(g.stat, g.seed, g.events, math.max(0, g.now()))
+	if res.done then
+		g.over = true
+		done(res.score)
+	end
+end
+
+function Games.speed(g, done)
 	local a = area(170)
 	local lane = Instance.new("Frame")
 	lane.Size = UDim2.new(1, -40, 0, 30)
@@ -161,53 +199,31 @@ function Games.speed(done)
 	Ui.corner(lane, 15)
 	lane.Parent = a
 	local zone = Instance.new("Frame")
-	zone.Size = UDim2.new(0.12, 0, 1, 10)
+	zone.Size = UDim2.new(QuickTrain.SPEED.half * 2, 0, 1, 10)
 	zone.AnchorPoint = Vector2.new(0.5, 0.5)
 	zone.BackgroundColor3 = C.gold
 	zone.BackgroundTransparency = 0.15
 	Ui.corner(zone, 8)
 	zone.Parent = lane
 	local runner = Ui.text(lane, "🐎", 34, { Size = UDim2.fromOffset(44, 44), AnchorPoint = Vector2.new(0.5, 0.5), TextScaled = true })
-	local rounds, total, round = 5, 0, 0
-	local x, dir, speed = 0, 1, 0.55
-	local center = 0.5
-	local rng = Random.new()
-	local function nextRound()
-		round += 1
-		if round > rounds then
-			done(total / rounds)
-			return false
-		end
-		center = rng:NextNumber(0.15, 0.85)
-		zone.Position = UDim2.fromScale(center, 0.5)
-		speed = 0.55 + round * 0.1
-		return true
-	end
-	nextRound()
-	local tapped = false
-	heartbeat(function(dt)
-		x += dir * speed * dt
-		if x >= 1 then x, dir = 1, -1 elseif x <= 0 then x, dir = 0, 1 end
+	local lastRound, tapsSeen = 1, 0
+	heartbeat(function()
+		local x, center, round = QuickTrain.speedView(g.seed, g.events, math.max(0, g.now()))
 		runner.Position = UDim2.fromScale(x, 0.5)
+		zone.Position = UDim2.fromScale(center, 0.5)
+		if round > lastRound then
+			if #g.events == tapsSeen then flash("Next one!", C.plum) end -- that round passed with no tap
+			lastRound, tapsSeen = round, #g.events
+		end
+		whenDone(g, done)
 	end)
 	tapper(function()
-		if tapped then return end
-		local err = math.abs(x - center) / 0.06 -- zone half-width
-		local s = math.clamp(100 * (1 - math.max(0, err - 1) * 0.5 - (if err > 1 then 0.2 else 0)), 0, 100)
-		if err <= 1 then s = 100 - err * 15 end
-		total += s
-		flash(label(s), if s >= 75 then C.green else C.orangeDark)
-		tapped = true
-		local gen = generation
-		task.delay(0.25, function()
-			if not alive(gen) then return end
-			tapped = false
-			nextRound()
-		end)
+		local s = quickTap(g, "tap")
+		if s then flash(label(s), if s >= 75 then C.green else C.orangeDark) end
 	end)
 end
 
-function Games.accel(done)
+function Games.accel(g, done)
 	local a = area(170)
 	local light = Instance.new("Frame")
 	light.Size = UDim2.fromOffset(110, 110)
@@ -218,49 +234,24 @@ function Games.accel(done)
 	Ui.stroke(light, 4)
 	light.Parent = a
 	local text = Ui.text(a, "Wait for green…", 24, { Position = UDim2.new(0, 0, 1, -34), Size = UDim2.new(1, 0, 0, 30) })
-	local rounds, total, round = 3, 0, 0
-	local greenAt: number? = nil
-	local waiting = false
-	local rng = Random.new()
-	local function startRound()
-		round += 1
-		if round > rounds then
-			done(total / rounds)
-			return
-		end
-		light.BackgroundColor3, greenAt, waiting = C.red, nil, true
-		text.Text = "Wait for green…"
-		local delayS = rng:NextNumber(1.2, 3)
-		local gen = generation
-		task.delay(delayS, function()
-			if waiting and alive(gen) then
-				greenAt = now()
-				light.BackgroundColor3 = C.green
-				text.Text = "GO!"
-			end
-		end)
-	end
-	startRound()
+	heartbeat(function()
+		local _, green, over = QuickTrain.accelView(g.seed, g.events, math.max(0, g.now()))
+		local on = green and not over and g.now() >= 0
+		light.BackgroundColor3 = if on then C.green else C.red
+		text.Text = if on then "GO!" else "Wait for green…"
+		whenDone(g, done)
+	end)
 	tapper(function()
-		if not waiting then return end
-		if not greenAt then
-			flash("Too soon!", C.red) -- that round counts as 0, gently
-			waiting = false
-			local gen = generation
-			task.delay(0.8, function() if alive(gen) then startRound() end end)
-			return
+		local s = quickTap(g, "tap")
+		if s == 0 then
+			flash("Too soon!", C.red) -- that round counts 0, gently
+		elseif s then
+			flash(label(s), if s >= 75 then C.green else C.orangeDark)
 		end
-		local rt = now() - greenAt
-		local s = math.clamp(100 - (rt - 0.22) / (0.8 - 0.22) * 70, 30, 100)
-		total += s
-		waiting = false
-		flash(string.format("%.2fs %s", rt, label(s)), if s >= 75 then C.green else C.orangeDark)
-		local gen = generation
-		task.delay(0.9, function() if alive(gen) then startRound() end end)
 	end)
 end
 
-function Games.stamina(done)
+function Games.stamina(g, done)
 	local a = area(220)
 	local track = Instance.new("Frame")
 	track.Size = UDim2.new(0, 60, 1, -30)
@@ -269,41 +260,38 @@ function Games.stamina(done)
 	Ui.corner(track, 14)
 	Ui.stroke(track, 2)
 	track.Parent = a
+	local half = QuickTrain.STAMINA.band
 	local band = Instance.new("Frame")
-	band.Size = UDim2.new(1, 0, 0.26, 0)
+	band.Size = UDim2.new(1, 0, half * 2, 0)
 	band.BackgroundColor3 = C.green
 	band.BackgroundTransparency = 0.25
 	Ui.corner(band, 10)
 	band.Parent = track
 	local marker = Ui.text(track, "🐎", 30, { Size = UDim2.new(1, 0, 0, 34), AnchorPoint = Vector2.new(0, 0.5), TextScaled = true })
-	local time = Ui.text(a, "", 20, { Position = UDim2.new(0, 10, 0, 10), Size = UDim2.new(0, 160, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
-	local holding = false
-	local y, vy = 0.5, 0      -- marker height 0 (bottom) .. 1 (top)
-	local bandC, t, inside, duration = 0.5, 0, 0, 8
-	tapper(function() holding = true end, "HOLD", function() holding = false end)
-	local finished = false
-	heartbeat(function(dt)
-		if finished then return end
-		t += dt
-		bandC = 0.5 + 0.3 * math.sin(t * 0.9) * math.sin(t * 0.37 + 1)
-		vy += (if holding then 1.6 else -1.4) * dt
-		vy = math.clamp(vy, -0.9, 0.9)
-		y = math.clamp(y + vy * dt, 0, 1)
-		if y == 0 or y == 1 then vy = 0 end
-		band.Position = UDim2.fromScale(0, 1 - bandC - 0.13)
-		marker.Position = UDim2.fromScale(0, 1 - y)
-		local inBand = math.abs(y - bandC) <= 0.13
-		if inBand then inside += dt end
-		band.BackgroundColor3 = if inBand then C.green else C.gold
-		time.Text = string.format("⏱ %.1f s", math.max(0, duration - t))
-		if t >= duration then
-			finished = true
-			done(math.clamp(inside / duration * 110, 0, 100))
+	-- pressed: the button now; sent: what the server was last told. Holding during "Get ready…"
+	-- starts the climb at GO.
+	local pressed, sent = false, false
+	tapper(function() pressed = true end, "HOLD", function() pressed = false end)
+	local cheered = false
+	heartbeat(function()
+		local t = g.now()
+		if t >= 0 and pressed ~= sent and not g.over then
+			quickTap(g, if pressed then "down" else "up")
+			sent = pressed
 		end
+		local run = QuickTrain.staminaRun(g.seed, g.events, math.max(0, t))
+		band.Position = UDim2.fromScale(0, 1 - run.band - half)
+		marker.Position = UDim2.fromScale(0, 1 - run.y)
+		band.BackgroundColor3 = if math.abs(run.y - run.band) <= half then C.green else C.gold
+		if not cheered and t >= QuickTrain.STAMINA.duration then
+			cheered = true
+			flash("All done!", C.green) -- the climb is over
+		end
+		whenDone(g, done)
 	end)
 end
 
-function Games.grit(done)
+function Games.grit(g, done)
 	local a = area(170)
 	local hit = Instance.new("Frame")
 	hit.Size = UDim2.fromOffset(70, 70)
@@ -315,43 +303,28 @@ function Games.grit(done)
 	Ui.stroke(hit, 3)
 	hit.Parent = a
 	Ui.text(hit, "🐴", 34, { Size = UDim2.fromScale(1, 1), TextScaled = true })
-	local beats, interval, travel = 8, 0.75, 1.6
-	local start = now() + 1
+	local times = QuickTrain.puddles(g.seed)
+	local travel = QuickTrain.GRIT.travel
 	local puddles = {}
-	for k = 1, beats do
+	for k = 1, #times do
 		local p = Ui.text(a, "💦", 34, { Size = UDim2.fromOffset(46, 46), AnchorPoint = Vector2.new(0.5, 0.5), TextScaled = true })
 		p.Position = UDim2.new(1, 40, 0.5, 0)
-		puddles[k] = { label = p, at = start + (k - 1) * interval + travel, scored = false }
+		puddles[k] = p
 	end
-	local total, finished = 0, false
 	heartbeat(function()
-		local t = now()
+		local t = g.now()
+		local res = QuickTrain.play("grit", g.seed, g.events, math.max(0, t))
 		local width = a.AbsoluteSize.X
-		for _, p in puddles do
-			local f = (p.at - t) / travel -- 1 when it appears, 0 at the hoof
-			p.label.Position = UDim2.new(0, 70 + f * (width - 70), 0.5, 0)
-			p.label.Visible = f <= 1.05 and f >= -0.2 and not p.scored
-			if not p.scored and t > p.at + 0.25 then
-				p.scored = true -- missed
-			end
+		for k, p in puddles do
+			local f = (times[k] - t) / travel -- 1 when it appears, 0 at the hoof
+			p.Position = UDim2.new(0, 70 + f * (width - 70), 0.5, 0)
+			p.Visible = f <= 1.05 and f >= -0.2 and not res.used[k]
 		end
-		if not finished and t > puddles[beats].at + 0.4 then
-			finished = true
-			done(total / beats)
-		end
+		whenDone(g, done)
 	end)
 	tapper(function()
-		local t = now()
-		local best, bestErr = nil, math.huge
-		for _, p in puddles do
-			if not p.scored and math.abs(t - p.at) < bestErr then best, bestErr = p, math.abs(t - p.at) end
-		end
-		if best and bestErr <= 0.25 then
-			best.scored = true
-			local s = math.clamp(100 - (bestErr - 0.04) / 0.21 * 70, 30, 100)
-			total += s
-			flash(label(s), if s >= 75 then C.green else C.orangeDark)
-		end
+		local s = quickTap(g, "tap")
+		if s then flash(label(s), if s >= 75 then C.green else C.orangeDark) end
 	end)
 end
 
@@ -429,6 +402,20 @@ local function horseRow(onPick: (any) -> ())
 	return row
 end
 
+-- A Quick train game asked for (QuickStart) and waiting for the server's seed (QuickBegin), and
+-- the server's score once it's done (QuickEnd).
+local waitingQuick = nil -- { gen, stat }
+local quickScore = nil :: number?
+
+local function showResult(score: number)
+	quickLive = false
+	clear()
+	Ui.text(body, label(score), 44, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 54) }).TextColor3 = C.orangeDark
+	Ui.text(body, string.format("Score %d", math.floor(score + 0.5)), 24, { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 30) })
+	local again = Ui.button(body, "Done", UDim2.new(0.4, 0, 0, 56), UDim2.new(0.3, 0, 0, 170), C.green, 24)
+	again.Activated:Connect(close)
+end
+
 local function playTraining(h, stat: string)
 	local game = Training.GAMES[stat]
 	local intros = {
@@ -442,17 +429,44 @@ local function playTraining(h, stat: string)
 	go.Activated:Connect(function()
 		clear()
 		local gen = generation
-		Games[stat](function(score)
-			if not alive(gen) then return end
-			clear()
-			Ui.text(body, label(score), 44, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 54) }).TextColor3 = C.orangeDark
-			Ui.text(body, string.format("Score %d", math.floor(score + 0.5)), 24, { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 30) })
-			gameRemotes:WaitForChild("Train"):FireServer(h.id, stat, score)
-			local again = Ui.button(body, "Done", UDim2.new(0.4, 0, 0, 56), UDim2.new(0.3, 0, 0, 170), C.green, 24)
-			again.Activated:Connect(close)
+		Ui.text(body, "Get ready…", 34, { Position = UDim2.new(0, 0, 0, 80), Size = UDim2.new(1, 0, 0, 44) })
+		waitingQuick, quickScore = { gen = gen, stat = stat }, nil
+		quickLive = true
+		gameRemotes:WaitForChild("QuickStart"):FireServer(h.id, stat)
+		task.delay(4, function()
+			-- no game came back: the server turned it down (its toast says why) or the message was lost
+			if waitingQuick and waitingQuick.gen == gen and alive(gen) then
+				waitingQuick = nil
+				close()
+			end
 		end)
 	end)
 end
+
+gameRemotes:WaitForChild("QuickBegin").OnClientEvent:Connect(function(stat, seed, startAt)
+	local w = waitingQuick
+	if not w or w.stat ~= stat or not alive(w.gen) or typeof(seed) ~= "number" or typeof(startAt) ~= "number" then return end
+	waitingQuick = nil
+	clear()
+	local gen = generation
+	local g = { stat = stat, seed = seed, startAt = startAt, events = {}, over = false }
+	g.now = function(): number return workspace:GetServerTimeNow() - startAt end
+	local ready = Ui.text(body, "Get ready…", 30, { Position = UDim2.new(0, 0, 0, 96), Size = UDim2.new(1, 0, 0, 40), ZIndex = 25 })
+	heartbeat(function() ready.Visible = g.now() < 0 end)
+	Games[stat](g, function(preview: number)
+		if not alive(gen) then return end
+		-- the server's score arrives a moment after the game ends; its preview is the same
+		local t0 = os.clock()
+		task.spawn(function()
+			while alive(gen) and quickScore == nil and os.clock() - t0 < 3 do task.wait(0.1) end
+			if alive(gen) then showResult(quickScore or preview) end
+		end)
+	end)
+end)
+
+gameRemotes:WaitForChild("QuickEnd").OnClientEvent:Connect(function(score)
+	if typeof(score) == "number" then quickScore = score end
+end)
 
 local function chooseStat(h)
 	local trained = h.trainedWeek or 0
@@ -536,10 +550,70 @@ local function coursePicker()
 		end)
 	end
 	if GameConfig.training.quickTrain then
-		local quick = Ui.button(body, "⚡ Quick train", UDim2.new(0.5, 0, 0, 52), UDim2.new(0.25, 0, 0, 290), C.gold, 22)
+		local quick = Ui.button(body, "⚡ Quick train", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.04, 0, 0, 290), C.gold, 22)
 		quick.Activated:Connect(quickTrainMenu)
 	end
+	local together = Ui.button(body, "👫 Ride together", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.52, 0, 0, 290), C.sky, 22)
+	together.Activated:Connect(function()
+		open("👫 Ride together", "Pick a friend nearby")
+		Ui.text(body, "Looking for friends…", 22, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 40) })
+		gameRemotes:WaitForChild("TrainFriends"):FireServer()
+	end)
 end
+
+-- The friends you can invite (from the server), then a course for the two of you.
+local function inviteCourse(friend)
+	open("👫 Ride with " .. friend.name, "Pick a course. " .. friend.name .. " will be asked to join you.")
+	local grid = Instance.new("Frame")
+	grid.BackgroundTransparency = 1
+	grid.Size = UDim2.new(1, 0, 0, 276)
+	grid.Parent = body
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.new(0.5, -8, 0, 130)
+	layout.CellPadding = UDim2.fromOffset(12, 12)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = grid
+	for i, key in TrainingCourses.ORDER do
+		local c = TrainingCourses.courses[key]
+		if GameConfig.training.courses[key] then
+			local b = Ui.button(grid, "", UDim2.new(), UDim2.new(), C.cream, 20)
+			b.LayoutOrder = i
+			Ui.text(b, c.emoji, 44, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 50) })
+			Ui.text(b, c.name, 24, { Position = UDim2.new(0, 0, 0, 60), Size = UDim2.new(1, 0, 0, 30) })
+			b.Activated:Connect(function()
+				close()
+				gameRemotes:WaitForChild("TrainInvite"):FireServer(friend.userId, key)
+			end)
+		end
+	end
+end
+
+gameRemotes:WaitForChild("TrainFriendsList").OnClientEvent:Connect(function(list, private)
+	if not gui.Enabled or title.Text ~= "👫 Ride together" then return end
+	clear()
+	if private then
+		Ui.text(body, "Your stable visits are set to Nobody, so Ride together is off. A grown-up can change it in Settings.", 20,
+			{ Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 80) })
+		return
+	end
+	if typeof(list) ~= "table" or #list == 0 then
+		Ui.text(body, "No friends nearby right now. When a Roblox friend is at the paddock or the Training Ground, they'll show here!", 20,
+			{ Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 80) })
+		return
+	end
+	local row = Instance.new("Frame")
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, 260)
+	row.Parent = body
+	local l = Instance.new("UIListLayout")
+	l.Padding = UDim.new(0, 10)
+	l.Parent = row
+	for i, f in list do
+		if i > 4 then break end
+		local b = Ui.button(row, "🐴 " .. tostring(f.name), UDim2.new(1, 0, 0, 56), UDim2.new(), C.cream, 22)
+		b.Activated:Connect(function() inviteCourse(f) end)
+	end
+end)
 
 local function trainingMenu()
 	if GameConfig.training.mode == "rides" then coursePicker() else quickTrainMenu() end
