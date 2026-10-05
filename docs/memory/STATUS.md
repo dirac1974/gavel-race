@@ -59,6 +59,11 @@ Last updated: 2026-10-04
 - `RaceService`: cards open until the first rider sets league and kind (race, Stakes, Practice); Practice pays nothing, Stakes winner gets 3B and moves up; Energy per card; Bronze adds the Classic.
 - Picker race kinds, My Horses league line, retire with Hall of Fame, board advice for open Stakes.
 
+**Stage 10 — Polish** (branch `claude/stage10-polish`, stacked on Stage 9):
+- `Tour` (pure, tested) and `SettingsService`: five-step first-ten-minutes tour driven by Progress events, skip and replay; visit setting (Friends/Nobody), break reminder, play time per week.
+- `GrownUps` client: ⚙️ Settings and For grown-ups pages, tour card with GO and Skip, optional hourly break reminder.
+- Still open for David: sound and voice (ElevenLabs credits), the Diamond store, a Studio playtest of everything.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.

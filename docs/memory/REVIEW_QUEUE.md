@@ -33,3 +33,4 @@ Provisional decisions made by the team under D-009, newest last. For each: keep,
 | D-046 | Leagues and careers: Stakes unlock by League Points and a win promotes | See docs/WORLD_DESIGN.md; values in `GameConfig` once built |
 | D-047 | Breeding (later): From Bronze, Green Cash fees only | See docs/WORLD_DESIGN.md; values in `GameConfig` once built |
 | D-048 | Promotion (Stakes) races are called Cups in the game: "Rookie Cup"; same rules | Rename the UI strings in `RacePicker`, `HorsesClient`, `Advice`, `RaceService` |
+| D-049 | First ten minutes: five-step tour (race, feed, brush, plant, Stable Board) with GO and Skip; settings can replay it | Empty `Tour.STEPS` or hide the card in `GrownUps.client.luau` |

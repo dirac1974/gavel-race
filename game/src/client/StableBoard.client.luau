@@ -251,6 +251,7 @@ end)
 local function open()
 	gui.Enabled = true
 	swapping = false
+	gameRemotes:WaitForChild("BoardOpened"):FireServer() -- the tour's last step
 	board.Position = UDim2.fromScale(0.5, 0.55)
 	TweenService:Create(board, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
 	render()

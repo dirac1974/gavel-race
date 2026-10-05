@@ -160,6 +160,14 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] My Horses: league line with points to the Cup or "🏆 Cup open!"; Retire asks once more, then the horse's plaque appears in the 🏅 Hall of Fame (you can't retire your last horse).
 - [ ] Stable Board suggests "win the Cup to move up" when it's open.
 
+## Polish (Stage 10, D-045, D-049)
+
+- [ ] New player: after naming the starter, a 🧭 card at the top says "Let's race! …" with GO (opens the race picker and hoofprints to the Race Board) and Skip.
+- [ ] Each step finishes by doing it: race → feed → brush → plant → open the Stable Board → "You're all set!".
+- [ ] ⚙️ (top right, hidden while racing): Settings (who can visit: Friends / Nobody; break reminder On/Off; "Show me around again") and For grown-ups (play time this week, how races work, no gambling, nothing for sale that changes a race, horses never come to harm, chat and parental controls).
+- [ ] Setting visits to Nobody closes your gate to friends too; Friends lets friends in.
+- [ ] Break reminder on: a gentle "time for a stretch?" note after each hour of play; off by default.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

@@ -413,3 +413,11 @@ Template:
 - Alternatives: "Stakes race" (allowed by the guard as a phrase but still betting-flavoured for kids), "Championship" (too long for buttons), "Final".
 - Links: game/src/shared/Leagues.luau, game/src/server/RaceService.server.luau, game/src/client/RacePicker.client.luau
 
+## D-049 — The first ten minutes: a guided tour you can skip
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team (young-player's first-10-minutes script from the world workshop, trimmed to five steps)
+- Decision: after the starter pick, a small card at the top of the screen walks the player through five steps, each finished by doing it (the same events the Stable Board counts): ride in a race, feed your horse, brush it, plant your carrot seeds (new players start with two), open the Stable Board. Each step has a GO button (golden hoofprints, or the race picker) and the card has Skip; Settings can show it again. Nothing is locked behind the tour; older saves that have already raced skip it.
+- Alternatives: a long text tutorial (kids don't read it), forced steps (pressure), no tour (the world is big and new players wander).
+- Links: game/src/shared/Tour.luau, game/src/server/SettingsService.server.luau, game/src/client/GrownUps.client.luau
+
