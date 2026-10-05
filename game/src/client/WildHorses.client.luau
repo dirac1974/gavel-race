@@ -103,7 +103,12 @@ RunService.Heartbeat:Connect(function(dt)
 				pos = h.returnFrom.pos:Lerp(pos, a)
 				if a >= 1 then
 					h.returnFrom = nil
-					h.prompt.Enabled = true -- back in its wander: you can make friends again (start() guards a game in progress)
+					-- Back in its wander: you can make friends again (unless a game is open).
+					local playing = false
+					for _, o in horses do
+						if o.still then playing = true end
+					end
+					h.prompt.Enabled = not playing
 				end
 			end
 			local bob = if walk > 0 and walk < 1 then 0.12 * math.abs(math.sin(t * 6 + i)) else 0

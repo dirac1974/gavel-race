@@ -668,7 +668,7 @@ Template:
     - `GameConfig.riding.hopButton = true`;
     - `HorseLegs.GAITS` and `HorseLegs.WALK_BELOW = 12`;
     - `GameConfig.riding.bobAmp = 0.15`;
-    - `GameConfig.touchLayout.gemPlacement = "topRight"` ("dock" = D-050 layout) and `movementColumn = 154`;
+    - `GameConfig.touchLayout.gemPlacement = "topRight"` ("dock" = D-050 layout) and `movementColumn = 176`;
     - `GameConfig.fans.clapOffset`, `clapSizeOnFoot`, `clapSizeRiding`;
     - `GameConfig.fans.cheerStripTop = true`;
     - `GameConfig.stable.awaySign = true`.

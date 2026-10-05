@@ -86,7 +86,7 @@ GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }
 -- buttons (Hop, Gallop).
 GameConfig.touchLayout = {
 	gemPlacement = "topRight",
-	movementColumn = 154, -- px kept free at the right edge for Hop and Gallop
+	movementColumn = 176, -- px kept free at the right edge for Hop (up to 170 px in) and Gallop
 }
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
