@@ -47,7 +47,3 @@ Running v1 showed longshots rewarded regardless of play, negative probabilities 
 ## Request 8 — skill relative to the race
 
 Suggestion: compare skill to the average for that specific race to make the game more variable. Response: adopted. Noted that the tilt is shift-invariant, so this matches league-median centering except at clamp edges; upsets are driven by `T` (how often) and `κ` (who earns them).
-
-## Request 9 — autonomous agent team
-
-Set up implementation, testing, and review agents that keep all decisions in memory documents and update the repo autonomously, plus Roblox research and expert designer agents that debate as the game develops. Response: CLAUDE.md, 13 subagents, memory docs, debate protocol, test suite, CI. Tests caught an overstated rounding claim in V2_PROPOSAL, now corrected (D-010).

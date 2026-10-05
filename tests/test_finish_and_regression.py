@@ -59,7 +59,7 @@ def test_lobby_example_base_chances():
     q = base_chances(RATINGS, CFG)
     assert q[0] == pytest.approx(0.215, abs=0.001)   # "favorite 21.5%"
     assert q[-1] == pytest.approx(0.062, abs=0.001)  # "longshot 6.2%"
-    assert lock_purses(q, CFG) == [465, 570, 705, 810, 930, 1070, 1230, 1620]
+    assert lock_purses(q, CFG) == [464, 572, 704, 809, 930, 1068, 1228, 1621]
 
 
 def test_repo_example_field_live_chances():

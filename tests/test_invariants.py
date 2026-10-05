@@ -90,11 +90,10 @@ def test_purse_expected_value_equals_B_within_tolerance(seed):
         cfg = Config(B=B)
         q = base_chances(ratings, cfg)
         for qi, purse in zip(q, lock_purses(q, cfg)):
-            assert purse % 5 == 0
-            # Rounding to the nearest 5 cash moves q * purse by at most 2.5 q.
+            # Rounding to whole cash moves q * purse by at most 0.5 q (D-017).
             # As a share of B that is 2.5 q / B: up to ~4.4% for a 35% favorite
             # in Rookie (B 20), ~0.1% in Champion. See V2_PROPOSAL, "Rounding".
-            assert abs(qi * purse - B) <= 2.5 * qi + 1e-9
+            assert abs(qi * purse - B) <= 0.5 * qi + 1e-9
 
 
 def test_window_score_bounds():

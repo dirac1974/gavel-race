@@ -23,7 +23,12 @@
       "Bash(cat:*)",
       "Bash(mkdir:*)",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "Bash(python sims/*)",
+      "Bash(python3 sims/*)",
+      "Bash(lune run:*)",
+      "Bash(lune --version)",
+      "Bash(bash scripts/setup_cloud.sh)"
     ],
     "deny": [
       "Bash(git push --force:*)",

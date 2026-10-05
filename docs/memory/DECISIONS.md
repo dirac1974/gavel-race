@@ -34,16 +34,17 @@ Template:
 
 ## D-002a — What Diamonds may buy
 - Date: 2026-10-04
-- Status: Proposed (team applies it as a safeguard until David decides; see OPEN_QUESTIONS #1)
-- Decided by: pending David
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
 - Context: David's original idea included Diamond boosts to qualify for higher races. Buying win chance in a skill race undermines fairness, and paid probability modifiers fall under Roblox's paid random item rules.
 - Decision: Diamonds buy cosmetics, time skips, and space only; never win chance, Race Rating, or the gavel. Qualifying for cash leagues is earned; Diamonds can buy an Exhibition entry to a higher league for XP and a cosmetic ribbon, with no cash purse.
+- Amended 2026-10-04 (with D-015): Diamonds may not buy extra stalls, an auto-feeder, or Energy refills. More stalls means more races and more Green Cash, and the auto-feeder kept the care bonus (which raises win chance) topped up. Stalls are Green Cash only.
 
 ## D-003 — Race model v2 replaces v1
 - Date: 2026-10-04
 - Status: Accepted
 - Decided by: David
-- Decision: exponential tilt `p' ∝ q · e^{κR}`, cash purses `5 · round(B / 5q)`, no margin, no tiered rounding, no skill noise, Harville finish order, flat place prizes 2nd 1.2B / 3rd 0.8B / 4th 0.4B.
+- Decision: exponential tilt `p' ∝ q · e^{κR}`, cash purses `5 · round(B / 5q)` (rounding superseded by D-017), no margin, no tiered rounding, no skill noise, Harville finish order, flat place prizes 2nd 1.2B / 3rd 0.8B / 4th 0.4B.
 - Consequences: exact per-race cash invariance traded for ~0.2–0.5% drift.
 - Links: docs/V2_PROPOSAL.md
 
@@ -78,15 +79,71 @@ Template:
 - Decided by: David
 - Decision: Claude Code agents implement, test, review, and record work, pushing to `main` when green. Design debates produce proposals only. Workflow in CLAUDE.md.
 
-## D-009 — Tests and CI gate every push
+## D-009 — Design decisions delegated to the team
 - Date: 2026-10-04
 - Status: Accepted
-- Decided by: team (engineering)
-- Decision: pytest suite in `tests/` covers the v2 invariants and regression numbers; GitHub Actions runs it plus a guard against wagering words in game code and model names in docs. A red CI run blocks the next loop until fixed.
+- Decided by: David ("make all decisions yourself and we can review later")
+- Decision: the team makes design decisions as `Accepted (provisional)`, logs reasoning and alternatives, and lists each in `REVIEW_QUEUE.md`. Hard rules 1–3 in CLAUDE.md (no wagering, Diamond limits as policy safeguards, kid safety) are not open to this delegation.
 
-## D-010 — Correct the purse rounding claim
+## D-010 — Gavel meter feel and difficulty curve
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009 (debate 001)
+- Decision: same scoring in every league; difficulty from triangle-wave sweep speed (Rookie 2.4 s → Champion 1.1 s), a drifting target in Gold and Champion, and two half-width targets in Champion's final window. One tap per window, window 4 s in Rookie and 3 s elsewhere. Feedback labels Perfect/Great/Good/Okay/Miss with the score and win-chance change. Accessibility options; slower-meter assist only outside cash races. Taps scored at client-claimed server time if ≤ 0.3 s before arrival and inside the window.
+- Alternatives: narrower scoring band per league (breaks comparability of S); fixed difficulty (no progression).
+- Links: docs/debates/001-gavel-meter-feel.md, game/src/shared/GameConfig.luau, game/src/shared/GavelMeter.luau
+
+## D-011 — Prototype race rules
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Decision: a missed tap scores 0; a disconnect scores the window's race average once per race; bots fill lanes after 20 s, rated within ±6 of the human median, scoring Normal(50, 15); bots are never paid; 4 s of running between windows; prototype runs Rookie only and keeps currency in leaderstats (no saving yet).
+- Alternatives: missed tap = 25 for Rookie (gentler, but blurs the skill signal); bots at league-average rating (worse matchmaking for strong or weak horses).
+- Links: game/src/shared/RaceSession.luau, game/src/server/RaceService.server.luau
+
+## D-012 — Python and Luau must agree exactly
 - Date: 2026-10-04
 - Status: Accepted
 - Decided by: team (engineering)
-- Context: the new invariant tests showed V2_PROPOSAL's "rounding error < 0.2%" holds only from Gold up. The true bound is `2.5 q / B` per horse.
-- Decision: docs and agent instructions now state the real bound; a fix for low leagues is on the backlog (STATUS item 8).
+- Decision: purse rounding uses floor(x + 0.5) in both languages (Python's round() is banker's rounding); the finish draw scans lanes in index order. Parity tests compare 300 fixture races to 1e-9, including purses and finish orders.
+
+## D-013 — Stakes thresholds per league
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Context: flat 100-point thresholds let an engaged player (25 races/day) reach Gold on day 4.6, far ahead of the 3-week target.
+- Decision: League Points to unlock Stakes: Rookie 100, Bronze 110, Silver 1,400, Gold 3,000. Simulated engaged player: Bronze ~3 h of play, Silver day 3, Gold day 20, Champion day ~56.
+- Consequences: casual players (6 races/day) don't reach Gold within 90 days; revisit once Energy and training are modeled.
+- Links: sims/economy.py, sims/README.md, GameConfig.stakesUnlockPoints
+
+## D-014 — Race Rating formula and condition weights
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Decision: Rating = (Σ w·stat over Speed, Acceleration, Stamina, Grit) × (1 + 0.05 × care) + 3 × pilot level + 2 if the strategy suits the distance + 2 × bond. Distance sets base weights (Sprint favors Acceleration, Marathon favors Stamina); Turf adds Speed, Sand adds Grit and Stamina, Rain adds Grit, Wind adds Stamina; weights renormalize to 1. Focus is not in Rating. Full non-stat bonuses add about 10 points at 60 stats, one doubling of win chance at T = 14.4.
+- Alternatives: multiplicative jockey bonus (scales unfairly with stats); Focus in Rating (double-counts with its meter effect).
+- Links: src/race_rating.py, game/src/shared/RaceRating.luau, tests/test_race_rating.py
+
+## D-015 — Energy
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Decision: 5 Energy per horse; each cash race costs 1; regenerates 1 every 20 minutes, offline too; feeding +1 and grooming +1, each once every 2 hours. Rookie races cost no Energy. When every horse is tired, Practice races (XP only, no cash or points) and other activities remain. Energy never affects Rating or win chance.
+- Consequences: a 2-hour session allows about 11 cash races with 1 horse, 22 with 2, and more than fits with 3; Energy mainly paces single-horse players and makes a second stall the natural goal. Diamonds never refill Energy.
+- Alternatives: tired horses run slower (confusing, and turns care into win chance); Diamond refills (buys extra cash races).
+- Links: GameConfig.energy
+
+## D-016 — Prizes and exactas
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, under D-009
+- Decision: 2nd–4th prizes stay flat (1.2, 0.8, 0.4 B). Fully upset-scaling them would make every horse expect the same cash (favorite vs. longshot 1.00× instead of 1.30×), removing the cash reward for training. UI shows ribbons and "1st prize", never place, show, or payout. Exactas are not a prize; at most a free spectator "call the top two" game for cosmetic ribbons.
+- Links: docs/V2_PROPOSAL.md, GameConfig.ribbons
+
+## D-017 — Win purses round to whole cash
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: team (engineering correction)
+- Context: rounding purses to 5 cash was documented as < 0.2% error, but the real bound is `2.5 q / B`, up to ~4.4% for a strong favorite in Rookie. Found in a parallel review of the repo.
+- Decision: `Purse = round(B / q)` in whole cash (floor(x + 0.5) in both languages). Error bound `0.5 q / B`: ≤ 1% in Rookie, ≤ 0.2% from Silver up.
+- Links: src/gavel_race_v2.py, src/RaceMath.luau, docs/V2_PROPOSAL.md

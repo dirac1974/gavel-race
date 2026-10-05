@@ -1,0 +1,37 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: bash scripts/policy_guard.sh
+      - run: python src/gavel_race_v2.py --races 2000
+
+  luau:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Lune
+        run: |
+          curl -sSL -o lune.zip "https://github.com/lune-org/lune/releases/download/v${LUNE_VERSION}/lune-${LUNE_VERSION}-linux-x86_64.zip"
+          unzip -q lune.zip -d "$HOME/.local/bin"
+          chmod +x "$HOME/.local/bin/lune"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        env:
+          LUNE_VERSION: "0.10.5"
+      - run: python tests/fixtures/make_fixtures.py
+      - run: lune run tests/luau/syntax_check -- $(git ls-files '*.luau')
+      - run: lune run tests/luau/run_all

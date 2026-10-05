@@ -22,7 +22,7 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 
 1. **Base win chance** from Race Ratings, floored so no horse is hopeless:
    `q_i = softmax(Rating_i / T)`, floor each `q_i` at 2.5%, renormalize. `T = 10 / ln 2 ≈ 14.4` means 10 rating points doubles a horse's chance.
-2. **Locked win purse in cash:** `Purse_i = 5 · round(B / (5 q_i))`. Since `q_i · B / q_i = B`, every horse expects `B` of win cash at average play, up to rounding: rounding to 5 cash moves a horse's expectation by at most `2.5 q_i` cash, i.e. `2.5 q_i / B` as a share. That is under 0.3% from Gold up, but up to ~1.8% in Bronze and ~4.4% in Rookie for a 35% favorite (about ±1 cash). See STATUS backlog for the rounding fix. Place prizes are flat: 2nd 1.2B, 3rd 0.8B, 4th 0.4B.
+2. **Locked win purse in whole cash:** `Purse_i = round(B / q_i)`. Since `q_i · B / q_i = B`, every horse expects `B` of win cash at average play, up to rounding: whole-cash rounding moves a horse's expectation by at most `0.5 q_i` cash, a share of `0.5 q_i / B` (worst case about 1% in Rookie, under 0.2% from Silver up). An earlier version rounded to 5 cash and claimed < 0.2%; that bound was wrong for small purses (up to ~4.4% in Rookie), so D-017 switched to whole cash. Place prizes are flat: 2nd 1.2B, 3rd 0.8B, 4th 0.4B.
 3. **Gavel window score:** `s = 100 (1 − d)`, `d` = distance from meter center / half-width. Constant-speed (triangle-wave) meter, so a random tap averages 50. `S` = mean of three windows.
 4. **Skill vs. this race:** `R_i = clamp((S_i − mean S) / 50, −0.5, 1)`, mean over all lanes in the race. During the race, use only the windows played so far.
 5. **Live win chance (exponential tilt):** `p'_i = q_i · e^{κ R_i} / Σ_j q_j · e^{κ R_j}`, `κ = 1.0`.
@@ -37,7 +37,9 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 | Equal play returns base chances | On average, if average play is exactly S = 50 | Exact whenever every lane scores the same |
 | Prices locked before the race | Yes | Yes (cash purses) |
 | Expected cash per race fixed | Exact | Within about 0.2–0.5% |
-| Rounding treats horses equally | No | Close: ±`2.5 q / B` (≤ 0.3% from Gold up; larger in Rookie and Bronze) |
+| Rounding treats horses equally | No | Close: ±`0.5 q / B` (≤ 1% in Rookie, ≤ 0.2% from Silver up) |
+
+**Known edge case (tested):** if your skill is already at the floor and a rival is already capped at R = 1, other riders scoring higher raises the race average, lowers them, and can raise your chance slightly (+0.05 points in the worst case found). Whenever no clamp binds, a rival improving never raises your chance.
 
 ### Note on race-average vs. league-average skill
 

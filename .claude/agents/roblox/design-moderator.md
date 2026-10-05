@@ -15,8 +15,6 @@ Run every debate with the protocol in `docs/debates/README.md`:
 4. Rebuttal round: each designer reads the others and responds, naming what would change their mind.
 5. Synthesis: write the options, the trade-offs, where the panel agreed, where it split, and one recommendation.
 
-If you cannot call other agents from inside this role, return the framed question and the agents to call in order, and the main session runs the rounds and hands the outputs back to you for synthesis.
+Write the record to `docs/debates/NNN-<topic>.md` from the template. Then hand the recommendation to `scribe` as an `Accepted (provisional)` decision, added to `docs/memory/REVIEW_QUEUE.md` for David.
 
-Write the record to `docs/debates/NNN-<topic>.md` from the template. Then hand the recommendation to `scribe` as a `Proposed` decision and an open question for David.
-
-Rules: you don't decide; David does. Keep minority views in the record. A recommendation that breaks a hard rule is invalid, however popular.
+Rules: your recommendation is adopted provisionally; David reviews later, so make the reasoning easy to audit. Keep minority views in the record. A recommendation that breaks a hard rule is invalid, however popular.

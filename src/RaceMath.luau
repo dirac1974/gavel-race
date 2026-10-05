@@ -3,6 +3,9 @@
 -- Server-only. Mirrors src/gavel_race_v2.py. See docs/V2_PROPOSAL.md.
 local RaceMath = {}
 
+-- Anything with a NextNumber method: Roblox's Random, or a test stub.
+export type Rng = { NextNumber: (self: any) -> number }
+
 export type Config = {
 	T: number,      -- stat temperature (22 Rookie ... 12 Champion)
 	qFloor: number, -- smallest win chance (0.025)
@@ -30,10 +33,11 @@ function RaceMath.baseChances(ratings: {number}, cfg: Config): {number}
 	return normalize(q)
 end
 
--- Step 2: locked win purses, rounded to 5 cash
+-- Step 2: locked win purses, rounded to whole cash (D-017)
 function RaceMath.lockPurses(q: {number}, cfg: Config): {number}
 	local purses = table.create(#q)
-	for i, qi in q do purses[i] = 5 * math.round(cfg.B / (5 * qi)) end
+	-- floor(x + 0.5) to match the Python reference exactly (see gavel_race_v2.py)
+	for i, qi in q do purses[i] = math.floor(cfg.B / qi + 0.5) end
 	return purses
 end
 
@@ -60,23 +64,28 @@ function RaceMath.liveChances(q: {number}, R: {number}, cfg: Config): {number}
 	return normalize(w)
 end
 
--- Step 6: finish order (Harville); returns lane indices, 1st to last
-function RaceMath.drawFinish(p: {number}, rng: Random): {number}
-	local left: {[number]: number} = {}
-	for i, v in p do left[i] = v end
-	local order = table.create(#p)
-	for _ = 1, #p do
+-- Step 6: finish order (Harville); returns lane indices, 1st to last.
+-- Lanes are scanned in index order so results match the Python reference.
+function RaceMath.drawFinish(p: {number}, rng: Rng): {number}
+	local n = #p
+	local taken = table.create(n, false)
+	local order = table.create(n)
+	for _ = 1, n do
 		local total = 0
-		for _, v in left do total += v end
+		for i = 1, n do
+			if not taken[i] then total += p[i] end
+		end
 		local x = rng:NextNumber() * total
 		local pick = -1
-		for i, v in left do
-			pick = i
-			x -= v
-			if x <= 0 then break end
+		for i = 1, n do
+			if not taken[i] then
+				pick = i
+				x -= p[i]
+				if x <= 0 then break end
+			end
 		end
 		table.insert(order, pick)
-		left[pick] = nil
+		taken[pick] = true
 	end
 	return order
 end

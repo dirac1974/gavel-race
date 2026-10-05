@@ -4,9 +4,10 @@ Last updated: 2026-10-04
 
 ## Current state
 
-- v2 race model: Python reference (`src/gavel_race_v2.py`) and Luau module (`src/RaceMath.luau`) written; Python covered by `tests/`; Luau not yet run in a Luau runtime.
-- Game design: `docs/GAME_DESIGN.md` (condensed from the planning doc). No Roblox project yet.
-- Agent team, memory docs, tests (568 passing; Luau parity skipped until `lune` is installed), CI with policy guards: set up.
+- **Race model v2**: Python reference and Luau module agree exactly (300 fixture races, purses and finish orders included).
+- **Roblox prototype (Phase 1)**: Rojo project in `game/`. Pure modules (GameConfig, ThemePack, GavelMeter, RaceSession) are tested under Lune. Server loop and client UI are written and compile, but **have not been run in Roblox Studio**.
+- **Tests**: 1,080 Python tests; 17,600+ Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
+- **Design**: debate 001 decided the gavel meter (D-010). Provisional decisions listed in REVIEW_QUEUE.md.
 
 ## In progress
 
@@ -14,16 +15,20 @@ Last updated: 2026-10-04
 
 ## Backlog (top = next)
 
-1. **Luau parity**: install `lune` in the cloud environment (setup script or GitHub release), generate JSON fixtures from Python, and test `src/RaceMath.luau` against them.
-2. **Rojo skeleton**: create `game/` Rojo project (server/client/shared), move RaceMath into shared, add a ThemePack module with horse names. No gameplay yet.
-3. **Server race loop (prototype)**: lobby of 8 with bots, three gavel windows, server-scored taps, live chance updates, finish draw, results. Phase 1 of the roadmap.
-4. **Gavel meter feel spec**: triangle-wave meter, speeds and zone widths per league, tap latency allowance. Needs debate 001 output first.
-5. **Economy simulator** (`sims/`): cohorts, faucets and sinks, time-to-league targets.
-6. **Anti-cheat checks**: tap timestamp validation, sustained S > 95 flagging, party matchmaking rule.
-7. **DataStore schema** for horses, stable, currencies, with session locking.
-8. **Purse rounding in low leagues** (found by tests): rounding to 5 cash moves a horse's expected win cash by up to `2.5 q / B`, about 4.4% for a 35% favorite in Rookie and 1.8% in Bronze. Option: round to 1 cash when B < 100. Engineering choice; log as a decision.
+1. **Debate 002 — first 10 minutes** (onboarding). Energy is decided (D-015); debate 003 is retired.
+2. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
+3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
+4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
+5. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
+6. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, and Diamonds, to `sims/economy.py`.
+7. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
 
 ## Done
 
+- 2026-10-04: merged a parallel review: whole-cash purses (D-017), policy guard in CI, `.claude/settings.json`, `docs/KICKOFF.md`, 567 extra tests.
+- 2026-10-04: Energy (D-015), prizes and exactas (D-016), Diamond limits amended (D-002a).
+- 2026-10-04: Race Rating formula (D-014) in Python and Luau; prototype races now use random conditions and starter stats.
+- 2026-10-04: Studio playtest checklist; economy simulator; Stakes thresholds (D-013).
+- 2026-10-04: gavel meter, race session, Rojo prototype, Luau tests, syntax checks, debate 001.
+- 2026-10-04: agent team, memory docs, Python tests, Luau parity, CI.
 - 2026-10-04: v2 model, Luau module, V2 proposal.
-- 2026-10-04: agent team, memory docs, tests, CI.
