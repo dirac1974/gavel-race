@@ -8,6 +8,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] Output window shows no red errors on start. `[AssetService] ... not loaded yet` warnings mean an asset is still in moderation or the place isn't group-owned; placeholders show meanwhile.
 
 ## Track and art
+- [ ] You spawn on grass beside the starting gate, facing the horses; you can't walk or fall off the edge of the world (invisible walls).
 - [ ] In front of the spawn: a dirt track with white rails, eight starting stalls, a finish post and a checkered line.
 - [ ] Eight horses (bay, chestnut, grey, black, palomino, then repeats) face down the track, each with a lane badge 1–8. Without the models, brown block horses stand in.
 - [ ] Your horse has a YOU marker above it.
