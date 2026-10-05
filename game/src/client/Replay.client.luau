@@ -19,6 +19,7 @@ local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
 
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
+local TrackLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrackLayout"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -139,7 +140,15 @@ end
 
 local function start(mode: string)
 	local rec = RaceState.recording
-	if not rec or #rec.frames < 10 or RaceState.active then return end
+	-- The race is over (its results card is up): the replay takes its horses from RaceView, even
+	-- while they're still pulling up past the line. Nothing to play: back to the card.
+	if playing then return end
+	local free = rec ~= nil and #rec.frames >= 10
+		and (not RaceState.active or (RaceState.finishFollowed ~= nil and RaceState.finishFollowed()))
+	if not free then
+		RaceState.ReplayClosed:Fire()
+		return
+	end
 	-- The final quarter starts when the leader passes 75% of the race; the finish is when
 	-- the leader reaches the line.
 	local lastT = rec.frames[#rec.frames].t
@@ -156,15 +165,17 @@ local function start(mode: string)
 			break
 		end
 	end
-	local won = false
+	local won, winner = false, nil
 	for _, row in rec.summary or {} do
 		if row.lane == rec.myLane and row.place == 1 then won = true end
+		if row.place == 1 then winner = row.lane end
 	end
 	playing = {
 		rec = rec, mode = mode, clock = if mode == "finish" then quarterT else rec.frames[1].t,
 		quarterT = quarterT, crossT = crossT, endT = math.min(lastT, crossT + 1.5),
 		slowFrom = if won then crossT - 2 else math.huge, -- slow motion only when you won
 		eventIdx = 1, view = "side", frozenUntil = nil, lastPlace = nil, photoChecked = false,
+		subject = rec.myLane or winner or 1, -- a spectator's replay follows the winner
 	}
 	-- skip events before the start point
 	while playing.eventIdx <= #rec.events and rec.events[playing.eventIdx].t < playing.clock do
@@ -238,7 +249,8 @@ RunService.RenderStepped:Connect(function(dt)
 	-- Camera.
 	local camera = workspace.CurrentCamera
 	local track = RaceState.trackFolder(rec.course)
-	local horse = me and track and track:FindFirstChild("Horses") and track.Horses:FindFirstChild("Lane" .. me)
+	local subject = playing.subject
+	local horse = track and track:FindFirstChild("Horses") and track.Horses:FindFirstChild("Lane" .. subject)
 	if camera and reducedMotion() then
 		if not RaceState.finishCam or RaceState.finishCamCourse ~= rec.course then
 			RaceState.finishCamCourse = rec.course
@@ -251,8 +263,11 @@ RunService.RenderStepped:Connect(function(dt)
 	elseif camera and horse then
 		local pivot = horse:GetPivot()
 		local target = pivot.Position + Vector3.new(0, 4, 0)
+		-- Side view from just outside the outer rail (broadcast angle), so no horse runs through it.
+		local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
+		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, subject) + 12
 		local eye = if playing.view == "side"
-			then target + pivot.RightVector * 26 + Vector3.new(0, 6, 0) -- outside of the turn, broadcast angle
+			then target + pivot.RightVector * outside + Vector3.new(0, 6, 0)
 			else target - pivot.LookVector * 18 + Vector3.new(0, 7, 0)
 		camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(eye, target), math.min(1, dt * 4))
 	end
@@ -288,7 +303,7 @@ RunService.RenderStepped:Connect(function(dt)
 			if row.place == 1 then first = row.lane elseif row.place == 2 then second = row.lane end
 		end
 		if first and second and progress[first] and progress[second]
-			and (progress[first] - progress[second]) * rec.plan.lengths[first] < HORSE_LENGTH then
+			and (progress[first] - progress[second]) * rec.plan.lengths[1] < HORSE_LENGTH then -- lane-1 feet (D-055)
 			caption.Text = "PHOTO FINISH"
 			if Sound then Sound.play("vo_photo") end
 			playing.frozenUntil = os.clock() + 2.5

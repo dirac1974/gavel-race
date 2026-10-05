@@ -65,10 +65,26 @@ def pass_index(passes: Sequence[Pass], t: float) -> Optional[int]:
     return None
 
 
-def score(passes: Sequence[Pass], taps: Sequence[float]) -> Tuple[float, List[float], int]:
+def debounce(taps: Sequence[float], bounce: float = 0.0) -> Tuple[List[float], int]:
+    """Finger bounces (D-055): drop taps within `bounce` s of the last counted tap; return (counted, ignored)."""
+    if bounce <= 0:
+        return list(taps), 0
+    kept: List[float] = []
+    last, ignored = float("-inf"), 0
+    for t in sorted(taps):
+        if t - last < bounce:
+            ignored += 1
+        else:
+            kept.append(t)
+            last = t
+    return kept, ignored
+
+
+def score(passes: Sequence[Pass], taps: Sequence[float], bounce: float = 0.0) -> Tuple[float, List[float], int]:
     """Mean pass score (missed or doubled passes count 0), timing errors, and passes hit once."""
     if not passes:
         return 0.0, [], 0
+    taps, _ = debounce(taps, bounce)
     by_pass: List[List[float]] = [[] for _ in passes]
     for t in taps:
         k = pass_index(passes, t)

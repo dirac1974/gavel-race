@@ -542,3 +542,159 @@ Template:
   - swipes (a swipe starts as a touch, so kids would swipe through their taps);
   - post bias folded into q (changes locked purses; the baseline keeps q untouched).
 - Links: docs/debates/010-race-steering.md, src/trip.py, sims/steering.py, game/src/shared/Trip.luau, game/src/shared/TripBaseline.luau, game/src/shared/TrackLayout.luau, game/src/shared/RaceSession.luau, game/src/server/RaceService.server.luau, game/src/client/RaceController.client.luau, game/src/client/RaceView.client.luau, game/src/client/Replay.client.luau
+
+## D-055 — Race feel and HUD fixes
+
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team, debate 011. It was a short round of independent openings, 4/4 on direction for every call; the moderator settled sizes and words. David asked after his play-test: "the behavior still had some quirks, review with the game design team". The QA race audit (Lune sims) supplied the findings; the pure bugs are fixed separately.
+- Decision:
+  - **Bounce taps** (amends D-026):
+    - A tap within **150 ms** of the last *counted* tap is ignored. This holds across a pass boundary too.
+    - The first tap counts, never the better of two. A real second tap later in the same pass still scores the pass 0.
+    - The server scores it in `PaceMeter.score`, mirrored in `src/pace_meter.py` (parity tests). The client applies the same rule to its labels.
+    - Ignored taps are never used as timing samples. (Tallying them in the integrity log waits for the anti-cheat tooling, STATUS backlog.)
+    - Simulated with 15% of taps bouncing: Rookie 66 → 77.5 (77 with no bounces). Mashers still score ≤ 4.2 in every league. The fixed-interval clicker stays at 59.
+  - **Gate countdown:** (the drum tick, `count_tick`, is in the sound list but silent until the sound effects are generated and uploaded)
+    - Big "3", "2", "1" at the centre over the existing 3 s before the gate, one per second on the server clock, each with a soft drum tick. The bell rings with **"GO!"**, then "And they're off!".
+    - Drum, not bell, because D-054's lane lock uses bell ticks.
+    - The camera moves into the saddle at "3". The slider shows still, with the first glow lit.
+    - Taps before the bell do nothing and show nothing (no false starts).
+    - Spectators in range see smaller numbers. Reduced Motion fades the numbers instead of popping them.
+  - **Tap feedback:**
+    - A pass that ends with no tap shows no word and no icon; the glow greys for 0.3 s and the speed meter dips as today.
+    - A tap scoring under 30 says **"Early"** or **"Late"** (tap time against the pass's ideal time) instead of "Miss".
+    - A second tap says **"One tap!"** (was "Too fast!"), with the same hint.
+    - A rider who misses the Final Burst sees **"Finish strong!"**; spectators see no burst text.
+  - **Spectator range** (amends D-041):
+    - A non-rider follows a race only within **250 studs** of that course's outer edge, the same range as race sound (D-052). Once following, they keep it until 300 studs, so nothing flickers at the edge.
+    - **Busy rule:** no race HUD, cheer strip or results card during a training ride, a care or training game, or while a full-screen panel is open (shops, My Horses, Stable Board, Map). The HUD appears when the kid is done, if still in range.
+    - A spectator gets a results card only if they followed the finish (checked when the card appears, about 2.4 s after the line).
+    - As built: following is decided when the race starts (within 250 studs); the HUD then hides while busy or beyond 300 studs and comes back when the kid is done. A kid who walks up mid-race sees the next race.
+    - Far away there is nothing: no toast and no badge. The Race Board on Fair Street is the far view (D-041).
+  - **Running-order board** (amends D-030/D-032; answers OPEN_QUESTIONS #1 provisionally):
+    - **Riders:** the board is hidden from the gate to the finish on every device; the race strip and the place badge show position.
+    - **Riders' status line:** it no longer prints the live "Win chance: N% (+d)"; the badge's up/down arrow stays (D-033).
+    - **Spectators:** rows show place, lane badge, name and a ★ on the rider they cheered, who gets the up/down arrow after cheers lock (D-019).
+      - Phones (short side ≤ 500 px): the top 3 plus their rider, at most 4 rows, shown once the cheer strip has closed.
+      - Tablets and PC: all 8 rows.
+    - **No win % or purse column anywhere.** Next to names, the pair reads like a tote board, and a live % tells a kid mid-race that they've lost. Prizes stay on the race picker card.
+  - **Tap keys** (amends D-054's carve-out):
+    - Only Space, Enter (Return and KeypadEnter), left mouse, touch, and gamepad A and R2 tap.
+    - On keyboard devices the slider shows a small "SPACE" key cap.
+    - The first other key pressed during a pass shows "Tap: SPACE or click" ("Tap: A or R2" on a gamepad), once per race.
+    - Steering keys (A/D, arrows, D-pad), C (clap), E/X (prompts), I/O, Tab and `/` are simply not taps.
+  - **Config:**
+    - `GameConfig.pace.bounceSeconds = 0.15` (0 = D-026 rule);
+    - `GameConfig.gateCountdownSeconds = 3` (replaces `COUNTDOWN` in `RaceService`);
+    - `GameConfig.hud.missedPassLabel = ""` ("Miss" = old behaviour);
+    - `GameConfig.hud.earlyLateBelow = 30`;
+    - `GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }` (also replaces `SPECTATOR_HEARING_STUDS`);
+    - `GameConfig.hud.riderBoardInRace = false` (true = David's D-030 layout);
+    - `GameConfig.hud.boardShowsChance = false`;
+    - `GameConfig.hud.spectatorBoardRowsPhone = 4`;
+    - `GameConfig.tapKeys`;
+    - `GameConfig.raceView` holds the on-screen motion fixes that came with this round (every lane timed on lane 1 so the crossing order is the result, gaps change at most 10 ft/s, horses ease out of the gate, the tap nudge is drawn but not ranked).
+- Why:
+  - Every call removes a moment where a kid did the right thing and the game said otherwise: a bounce zeroing a good tap, a start with no warning, a failure word while they look away, a stray key spending the burst, or a race popping over the barn.
+  - The board change also takes the last win percentages off the race screen (D-033, D-019).
+- Alternatives:
+  - keep two taps = 0 (punishes motor noise, not cheating);
+  - measure the 150 ms from the *last* tap (a fast masher would keep one tap per pass);
+  - a non-scoring warm-up sweep during the countdown (Engagement; taps that do nothing confuse first-timers);
+  - "Miss" only after N untapped passes (still a failure word);
+  - a 220-stud range (Young player; the busy rule covers shops and training);
+  - a "go watch" toast for far-away players (a pull every 1–2 minutes);
+  - board hidden on phones only (two layouts, and the % problem stays);
+  - keep the board as is (56% of a phone screen);
+  - a deny-list of keys (the tech lead's interim; every new binding leaks in);
+  - gap in lengths on spectators' rows (Competitive, Child safety; the strip already shows gaps).
+- Links:
+  - docs/debates/011-playtest-quirks.md
+  - game/src/shared/PaceMeter.luau
+  - src/pace_meter.py
+  - game/src/shared/GameConfig.luau
+  - game/src/server/RaceService.server.luau
+  - game/src/client/RaceController.client.luau
+  - game/src/client/RaceState.luau
+  - game/src/client/Minimap.client.luau
+  - game/src/client/FanClient.client.luau
+
+## D-056 — Riding feel and world fixes
+
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team, debate 011 (4/4 on direction; the moderator settled sizes and words). The QA riding-and-world audit (Lune sims) supplied the findings; the pure bugs are fixed separately.
+- Decision:
+  - **Hop button:**
+    - On touch, while riding outside a race, a **"⬆️ Hop"** button sits at Roblox's own jump spot and size: 70 px at (1,−95,1,−90) when the screen's short side ≤ 500 px, otherwise 120 px at (1,−170,1,−210). It uses the existing JumpRequest hop. Gallop stays above it.
+    - **Right-column rule:** on touch the bottom-right column belongs to movement buttons (Hop, Gallop). The dock fits into the width to its left (about W − 154 px on phones, scale 0.55–1 as today), so Ride/Get off is never under the jump thumb.
+    - PC and gamepad keep Space and A.
+  - **Gaits** (amends D-051):
+    - walk {stride 5, amp 24°} below **12** studs/s;
+    - trot {stride 7, amp 30°} from 12 to 36, so riding at 16 studs/s trots at 2.3 Hz;
+    - gallop {stride 18, amp 40°} above 36: 2.6 Hz riding, 3.1 Hz racing.
+    - Bob = 0.15 × |sin 2π·phase| driven by the leg phase, minus the lowest hoof's lift, so hooves stay on the ground and the rider moves with the back. Reduced Motion keeps the camera off the bob.
+    - Simulated: planted-hoof slip at riding speed falls from 73% to 38%. QA's walk at 16 studs/s would have needed 3.2 Hz "sewing-machine" legs; real trots run about 1.5 Hz and gallops 2.2–2.5 Hz.
+  - **Diamond button** (amends D-050's placement):
+    - On touch, 💎 leaves the dock for a 48 px "💎 N" pill at the top-right, below the Roblox top bar. It has no glow, pulse, badge or sound, and a tap opens Tack & Paint as before. PC keeps 💎 in the dock.
+    - On every device, both shop doors (the 💎 button and the Fair Street counter prompt) are hidden in line, while racing, on the results card, for D-050's 2 minutes after a race, and during training rides. No countdown or "back soon" text appears.
+    - On touch nothing tappable sits in the thumbstick zone (left 40% × bottom ⅔ of the screen). The cash and horse cards there are display-only, and My Horses opens from a 🐴 button in the dock's button group, outside the zone.
+  - **Cheering:**
+    - CLAP sits at **(1,−170,1,−230)** on every device, one column left of Gallop and Hop: 170×90 on foot, 120×70 while riding.
+    - The cheer bar becomes a silent strip at the top centre under the status line: 56 px tall, chips at least 48 px wide.
+    - It shows only inside D-055's spectator range and never during the busy rule.
+    - After a cheer it shrinks to one 40 px line, "📣 Your horse: 3 · Comet", in the same spot.
+    - It is never shown mid-screen.
+  - **Stall while the horse is out:**
+    - The stall is empty with a plaque on the door: "🐴 Comet is out riding" (free riding and training rides) or "🏁 Comet is at the races". Visitors see the same.
+    - Care prompts at the empty stall are hidden.
+    - The horse is back the moment you get off or its race ends.
+  - **Training props stay soft** (constrains QA fixes riding #4 and #12):
+    - Log jumps never collide with a horse. A hop over one while airborne shows a "Clean hop!" sparkle, which is what D-053 scores.
+    - Cones and poles go in a `CourseProps` collision group that the new shins collider ignores, and they wobble when touched.
+    - A horse never stops at a prop (D-053: no refusals).
+    - The Trail bridge is still sunk to ground level as QA proposed.
+  - **Gamepad gallop:** R2 (hold), as in D-053, with L3 kept. Not ButtonX, because X is the Roblox ProximityPrompt key used by the care prompts. Shift stays the PC gallop and must not toggle Shift Lock while riding.
+  - **Taming:**
+    - The client shows "Getting to know you…" with a filling heart until the server answers.
+    - Then it shows "💖 Friends!" or **"Not yet, try again!"**. Not "So close": that is near-miss wording.
+  - **Ride or Map while still seated after a race:** a "Tap Done first" notice instead of nothing.
+  - **Config:**
+    - `GameConfig.riding.hopButton = true`;
+    - `HorseLegs.GAITS` and `HorseLegs.WALK_BELOW = 12`;
+    - `GameConfig.riding.bobAmp = 0.15`;
+    - `GameConfig.hud.gemTouchPlacement = "topRight"` ("dock" = D-050 layout);
+    - `GameConfig.fans.clapOffset`, `clapSizeOnFoot`, `clapSizeRiding`;
+    - `GameConfig.fans.cheerStripTop = true`;
+    - `GameConfig.stable.awaySign = true`.
+- Why:
+  - On phones the controls must sit where Roblox kids' thumbs already go, and steering must never open a store.
+  - A horse should move like a horse at the speed it actually goes.
+  - An empty stall must never look like the horse ran away (hard rule 3).
+  - A training prop must never stop a horse (D-053).
+- Alternatives:
+  - re-enable Roblox's jump button (jumping from a seat dismounts);
+  - QA's walk {5, 24°} at riding speed (3.2 Hz legs);
+  - keep the walk and only shorten the stride (cadence or slip, one has to give);
+  - 💎 left in the dock with a smaller hit area (still in the thumbstick zone);
+  - remove the touch 💎 button entirely (Tack & Paint counter only; harder to find what you own);
+  - CLAP shrunk to 100×60 while riding (Child safety; a rhythm target needs size);
+  - the stall horse hidden with no sign (reads as a missing horse);
+  - solid log jumps (QA; a missed hop becomes a refusal);
+  - auto-hop over logs (Engagement; hides whether you hopped);
+  - gallop on ButtonX (QA; clashes with prompts);
+  - "So close, try again!" (Young player; near-miss framing).
+- Links:
+  - docs/debates/011-playtest-quirks.md
+  - game/src/client/RideClient.client.luau
+  - game/src/client/Hud.client.luau
+  - game/src/client/StyleShop.client.luau
+  - game/src/client/FanClient.client.luau
+  - game/src/shared/HorseLegs.luau
+  - game/src/server/Rides.luau
+  - game/src/server/StableService.server.luau
+  - game/src/server/WorldScene.luau
+  - game/src/shared/ModelSpecs.luau
+  - game/src/client/WildHorses.client.luau
+  - game/src/server/MarketService.server.luau

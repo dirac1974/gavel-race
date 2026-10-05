@@ -64,9 +64,31 @@ function PaceMeter.passIndex(passes: { Pass }, t: number): number?
 	return nil
 end
 
+-- Finger bounces (D-055): a tap within `bounce` seconds of the last counted tap is ignored, so
+-- a bounce never doubles a pass and the first tap counts. It is measured from the last
+-- *counted* tap, so mashing still puts two counted taps in a pass. Returns the counted taps
+-- (in time order) and how many were ignored. bounce 0 or nil keeps every tap (the D-026 rule).
+function PaceMeter.debounce(taps: { number }, bounce: number?): ({ number }, number)
+	local b = bounce or 0
+	if b <= 0 then return taps, 0 end
+	local sorted = table.clone(taps)
+	table.sort(sorted)
+	local kept, last, ignored = {}, -math.huge, 0
+	for _, t in sorted do
+		if t - last < b then
+			ignored += 1
+		else
+			table.insert(kept, t)
+			last = t
+		end
+	end
+	return kept, ignored
+end
+
 -- Mean pass score (missed or doubled passes count 0), timing errors, passes hit once.
-function PaceMeter.score(passes: { Pass }, taps: { number }): (number, { number }, number)
+function PaceMeter.score(passes: { Pass }, taps: { number }, bounce: number?): (number, { number }, number)
 	if #passes == 0 then return 0, {}, 0 end
+	taps = (PaceMeter.debounce(taps, bounce))
 	local byPass: { { number } } = {}
 	for k = 1, #passes do byPass[k] = {} end
 	for _, t in taps do
@@ -87,7 +109,8 @@ end
 
 -- How many passes got exactly one tap scoring at least `min` (80 = Great or Perfect), the
 -- same rule as score(): a doubled pass counts for nothing.
-function PaceMeter.countAtLeast(passes: { Pass }, taps: { number }, min: number): number
+function PaceMeter.countAtLeast(passes: { Pass }, taps: { number }, min: number, bounce: number?): number
+	taps = (PaceMeter.debounce(taps, bounce))
 	local byPass: { [number]: { number } } = {}
 	for _, t in taps do
 		local k = PaceMeter.passIndex(passes, t)
