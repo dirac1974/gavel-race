@@ -33,6 +33,7 @@ local function addCloth(rig: Model, item)
 	cloth.Material = Enum.Material.Fabric
 	cloth.Color = Color3.fromHex(item.color or "FBFBF5")
 	cloth.Transparency = 0
+	cloth.CastShadow = true
 	local text = PATTERN_TEXT[item.pattern or "plain"] or ""
 	if text == "" and item.pattern ~= "goldtrim" then return end
 	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do

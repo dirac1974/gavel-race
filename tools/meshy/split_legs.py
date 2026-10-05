@@ -76,6 +76,7 @@ def cloth_window(mesh: trimesh.Trimesh, body: np.ndarray, cz: np.ndarray, back: 
     tops = np.array(tops)
     back_level = float(np.nanmedian(tops[: len(tops) // 2]))
     climb = np.where(tops > back_level + NECK_RISE * H)[0]
+    climb = climb[climb >= len(tops) // 2]  # the neck is in the front half (a high croup isn't it)
     neck_z = edges[climb[0]] if len(climb) else zf
     zz = neck_z - CLOTH_GAP * span
     return zz - CLOTH_LEN * span, zz
@@ -150,7 +151,8 @@ def cloth_mesh(mesh: trimesh.Trimesh, body_faces: np.ndarray, za: float, zz: flo
     centre = verts.mean(0) - np.array([0, 0.3 * H, 0])
     if np.mean(np.einsum("ij,ij->i", cloth.face_normals, cloth.triangles_center - centre)) < 0:
         cloth.faces = cloth.faces[:, ::-1]
-    cloth.visual = trimesh.visual.TextureVisuals(uv=uv, material=mesh.visual.material)
+    material = getattr(mesh.visual, "material", None)
+    cloth.visual = trimesh.visual.TextureVisuals(uv=uv, material=material) if material is not None else trimesh.visual.TextureVisuals(uv=uv)
     return cloth
 
 

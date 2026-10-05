@@ -325,6 +325,7 @@ local function laneCloth(horse: Model, i: number): BasePart?
 	cloth.Material = Enum.Material.Fabric
 	cloth.Color = LANE_COLOURS[i]
 	cloth.Transparency = 0
+	cloth.CastShadow = true
 	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face

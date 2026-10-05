@@ -51,14 +51,15 @@ function HorseLegs.advance(phase: number, gait: string, dist: number): number
 end
 
 -- One step of the pose state (pure): s = { phase, gait, prev, mix, blend }. `speed` picks the
--- gait; a new gait fades in from the old one over 1 / MIX_RATE seconds.
+-- gait; a new gait fades in from the old one over 1 / MIX_RATE seconds, and the next change
+-- waits until that fade is done (a fast speed-up crosses walk, trot and gallop in a few frames).
 function HorseLegs.step(s, dist: number, dt: number, speed: number)
 	local gait = HorseLegs.gaitFor(speed)
 	if gait ~= "stand" then
-		if gait ~= s.gait then
+		if gait ~= s.gait and (s.mix >= 1 or s.blend <= 0) then
 			s.prev, s.mix, s.gait = if s.blend > 0 then s.gait else gait, 0, gait
 		end
-		s.phase = HorseLegs.advance(s.phase, gait, dist)
+		s.phase = HorseLegs.advance(s.phase, s.gait, dist)
 		s.blend = math.min(1, s.blend + dt * 4)
 	else
 		s.blend = math.max(0, s.blend - dt * 3) -- ease back to standing

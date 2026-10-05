@@ -95,7 +95,11 @@ RunService.Heartbeat:Connect(function(dt)
 			local prev = lastPos[h.model]
 			lastPos[h.model] = pos
 			if eye and (pos - eye).Magnitude < LEGS_RANGE and HorseLegs.has(h.model) then
+				h.legsOn = true
 				HorseLegs.apply(h.model, if prev then (pos - prev).Magnitude else 0, dt)
+			elseif h.legsOn then
+				h.legsOn = false
+				HorseLegs.rest(h.model) -- out of range: stand the legs straight, then stop posing
 			end
 		end
 	end

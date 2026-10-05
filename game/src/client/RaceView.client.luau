@@ -118,6 +118,7 @@ end)
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	local race = races[courseId or "dirt"]
 	races[courseId or "dirt"] = nil
+	if race then RaceState.restHorses(courseId or "dirt", race.lanes) end
 	if race and RaceState.focus == (courseId or "dirt") then
 		RaceState.active = false
 		RaceState.recording = nil

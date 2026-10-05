@@ -635,4 +635,21 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(worst <= steady * 1.05, string.format("legs never jump when the gait changes (worst step %.1f° vs %.1f° galloping)", worst, steady))
 	for f = 1, 60 do HorseLegs.step(st, 0, dt, 0) end
 	check(math.abs(HorseLegs.poseAngle(st, "LegFL")) < 1e-6, "a horse that stops eases back to standing")
+	-- Gallop toggled on a ride: speed jumps 16 -> 46 (and back) in three frames, crossing two gaits.
+	for _, ramp in { { 16, 46 }, { 46, 16 } } do
+		local s2 = HorseLegs.newState()
+		local w2, last2 = 0, {}
+		for f = 1, 300 do
+			local sp = if f <= 120 then ramp[1] elseif f <= 123 then ramp[1] + (ramp[2] - ramp[1]) * (f - 120) / 3 else ramp[2]
+			HorseLegs.step(s2, sp * dt, dt, sp)
+			for _, leg in HorseLegs.LEGS do
+				local a = HorseLegs.poseAngle(s2, leg)
+				if last2[leg] and f > 30 then w2 = math.max(w2, math.abs(a - last2[leg])) end
+				last2[leg] = a
+			end
+		end
+		-- A few fast-trot frames while the fade finishes run a little quicker than a steady gallop;
+		-- a snap (the bug) was 20-42°.
+		check(w2 <= steady * 1.15, string.format("Gallop toggle %d->%d doesn't snap the legs (worst %.1f°)", ramp[1], ramp[2], w2))
+	end
 end
