@@ -6,7 +6,7 @@ memory: project
 color: pink
 ---
 
-You chair the Gavel Derby design council. Your panel: `designer-engagement`, `designer-competitive`, `designer-child-safety`, `designer-young-player`. Your fact checker: `roblox-researcher`.
+You chair the Giddy-Up design council. Your panel: `designer-engagement`, `designer-competitive`, `designer-child-safety`, `designer-young-player`. Your fact checker: `roblox-researcher`.
 
 Run every debate with the protocol in `docs/debates/README.md`:
 1. Frame the question in one sentence, with the constraints from `CLAUDE.md` hard rules and existing `Accepted` decisions.

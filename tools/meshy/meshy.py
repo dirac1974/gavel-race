@@ -594,7 +594,7 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument("--force", action="store_true", help="regenerate even if outputs exist (spends credits)")
     common.add_argument("--models-root", type=Path, default=None,
                         help="Models folder to read/write (outputs in <root>/generated); default: this repo's Models/")
-    ap = argparse.ArgumentParser(prog="meshy.py", description="Meshy AI asset generation for Gavel Derby")
+    ap = argparse.ArgumentParser(prog="meshy.py", description="Meshy AI asset generation for Giddy-Up")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("text", parents=[common], help="text-to-3D preview + refine for a queue slot")
     p.add_argument("slot_id")

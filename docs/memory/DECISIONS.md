@@ -249,3 +249,11 @@ Template:
 - Amends: D-026 (first-person default), D-024 (riders; now bots ride too).
 - Links: game/src/client/RaceController.client.luau (rideCamera), game/src/server/TrackScene.luau (addJockeys, railBlocker)
 
+## D-029 — The game is called Giddy-Up
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David (name, and the published Roblox experience "Giddy-Up" under LlamaWorks); tagline chosen by David from the team's options
+- Decision: the game's name is **Giddy-Up**, tagline **"Tap it. Shout it. Win it."**, because kids shout "Giddy-up!" while they tap to urge their horse on (the design council's reason for the name in debate 007: happy, shoutable, thumbnail-friendly). "Gavel Derby" was the working title and stays only in history notes; the repository keeps its name (gavel-race).
+- Alternatives (taglines): "Say it, tap it, ride it!", "Every tap's a Giddy-Up!", "The race you can shout!".
+- Links: game/src/shared/ThemePack.luau, docs/GAME_DESIGN.md, CLAUDE.md
+

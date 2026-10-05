@@ -438,7 +438,8 @@ end)
 
 -- Server events -------------------------------------------------------------
 remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
-	status.Text = string.format("Next race in %d", seconds)
+	status.Text = string.format("%s  Next race in %d", ThemePack.gameTitle, seconds)
+	hint.Text = ThemePack.tagline
 end)
 
 remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond)

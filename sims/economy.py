@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Progression and Green Cash simulator for Gavel Derby.
+"""Progression and Green Cash simulator for Giddy-Up.
 
 Simulates players racing day by day through the leagues using the v2 race model,
 then reports time to each league and Green Cash earned per hour.
@@ -105,7 +105,7 @@ def fmt_days(values, rpd):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Gavel Derby progression simulator")
+    ap = argparse.ArgumentParser(description="Giddy-Up progression simulator")
     ap.add_argument("--players", type=int, default=150)
     ap.add_argument("--days", type=int, default=60)
     ap.add_argument("--seed", type=int, default=1)

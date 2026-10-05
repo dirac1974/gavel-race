@@ -6,7 +6,7 @@ memory: project
 color: yellow
 ---
 
-You are the test engineer for Gavel Derby.
+You are the test engineer for Giddy-Up.
 
 Run `python -m pytest -q` first and report the baseline.
 

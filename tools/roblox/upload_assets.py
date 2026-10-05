@@ -130,8 +130,8 @@ def multipart(fields: dict[str, str], path: Path, ctype: str) -> tuple[bytes, st
 
 
 def upload(path: Path, name: str, kind: str, creator: dict[str, str], key: str) -> int:
-    meta = {"assetType": kind, "displayName": f"GavelDerby_{name}",
-            "description": f"Gavel Derby playtest {'model' if kind == 'Model' else 'UI sheet'} {name}",
+    meta = {"assetType": kind, "displayName": f"GiddyUp_{name}",
+            "description": f"Giddy-Up playtest {'model' if kind == 'Model' else 'UI sheet'} {name}",
             "creationContext": {"creator": creator}}
     body, ctype = multipart({"request": json.dumps(meta)}, path, CONTENT_TYPES[path.suffix.lower()])
     op = request("POST", f"{API}/assets", key, body, ctype)
