@@ -162,6 +162,42 @@ GameConfig.energy = {
 	freeLeagues = { Rookie = true }, -- Rookie races cost no Energy
 }
 
+-- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
+-- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in
+-- TrainingCourses.luau; scoring in TrainingRide.luau.
+GameConfig.training = {
+	mode = "rides",                 -- "rides" | "meters" (paddock games only, as before D-053)
+	-- Courses that can be ridden now; the others show "Coming soon" on the picker (T3).
+	courses = { speed = true, grit = true, accel = false, stamina = false },
+	quickTrain = true,              -- show the 10-second games as "Quick train"
+	quickQualityCap = 0.85,         -- Quick train gains at most this quality (score 70)
+	sampleHz = 10,
+	maxSpeed = 53,                  -- studs/s horizontal: gallop 46 + 15%
+	maxStep = 12,                   -- studs between samples (teleport)
+	maxBadShare = 0.10,             -- more discarded than this: score at the floor
+	enforceFloor = false,           -- log-only for the first two weeks
+	sessionGapSeconds = 4,
+	maxSessionsPerHour = 40,
+	maxSessionSeconds = 120,        -- a ride still going after this ends and counts what it has
+	leaveSeconds = 2,               -- outside the course area this long ends the session (no gain)
+	countdownSeconds = 3,
+	stars = { 60, 90 },             -- 2 and 3 stars
+	ribbons = { silver = 75, gold = 90 },
+	parFactor = 1.15,               -- par = ideal time × this; gold needs under par
+	magnetStuds = 4,
+	gallop = 46, canter = 20,
+	oval = { cx = 800, cz = 0, straight = 160, radius = 55, width = 24 },
+	speed = { laps = 3, hoopsPerLap = 6, hoopWidth = 10 },
+	accel = { breaks = 3, bellMin = 1.5, bellMax = 3.5, dash = 120, fullReact = 0.5, zeroReact = 2.0, breakFloor = 40, goSpeed = 20 },
+	stamina = { laps = 2, ringNear = 8, ringFar = 24, ringHalfWidth = 6, ponyMin = 30, ponyMax = 42, grace = 3, hill = 6 },
+	-- Mud Splash is ridden at an arena lope (`pace`), and the bending poles at a canter. A log
+	-- counts when the horse is `airborne` studs above its riding height within `logWindow`
+	-- studs of it (logs don't collide, so a horse that doesn't hop just runs through).
+	grit = { mud = 4, logs = 3, poles = 4, logHeight = 2, pace = 28, airborne = 1.5, logWindow = 3,
+		points = { mud = 7.5, log = 12, pole = 8.5 } },
+	ghostHz = 4, ghostMaxPoints = 300, ghostQuantum = 0.5,
+}
+
 -- Prize ribbons for the UI (D-016). Never use racing-wager terms in UI text. -- policy-ok
 GameConfig.ribbons = { "Blue", "Red", "Yellow", "White" }
 

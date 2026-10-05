@@ -81,7 +81,15 @@ WorldLayout.places = {
 	trailGate = { x = WorldLayout.STREET_X1, z = WorldLayout.STREET_Z, fx = -1, fz = 0, label = "Trail" },
 	plaza = { x = 700, z = WorldLayout.STREET_Z, fx = -1, fz = 0, label = "Fair Street" },
 	track = { x = 525, z = -500, fx = -1, fz = 0, label = "Racetrack" },
+	-- Training Ground (D-053): the training oval, south of the paddock (x 650-950, z -70 to 70).
+	trainingGround = { x = 800, z = -70, fx = 0, fz = -1, label = "Training Ground", w = 300, d = 140 },
 } :: { [string]: Place }
+
+-- The gate in the paddock's south fence and the path from it to the Training Ground. The link
+-- rect is kept clear of trees and holds the picture signs either side of the path.
+WorldLayout.PADDOCK_SOUTH_GATE = { x = 760, width = 20 }
+WorldLayout.trainingLink = { 715, -150, 805, -70 } -- x0, z0, x1, z1
+WorldLayout.TRAINING_PATH_WIDTH = 18
 
 -- Rectangle covered by a building (for overlap checks).
 function WorldLayout.placeRect(key: string): { number }?

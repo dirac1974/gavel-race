@@ -200,6 +200,13 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		pettedToday = h.daily ~= nil and h.daily.day == day(now) and h.daily.petted,
 		record = table.clone(h.record),
 		stamps = table.clone(h.stamps),
+		-- training rides (D-053): best ribbon and best run per course
+		ribbons = table.clone((h :: any).ribbons or {}),
+		trainingBest = (function()
+			local out = {}
+			for k, b in (h :: any).trainingBest or {} do out[k] = { score = b.score, seconds = b.seconds } end
+			return out
+		end)(),
 	}
 end
 
