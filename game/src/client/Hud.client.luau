@@ -194,12 +194,28 @@ local function render(data)
 	end
 end
 
+-- The coin chime waits while you ride and until your results card is up: the prize is paid
+-- about a second before the leader reaches the line, so an early chime would give the result
+-- away (the dock, and so the cash card's pop, is hidden while you ride; see the Heartbeat below).
+local coinOwed = false
+local function playCoin()
+	if not Sound or Sound.recent("job_done", 2) then return end -- a job claim already chimed
+	Sound.play("coin")
+end
 PlayerState.watch(function(data, before)
 	render(data)
 	if before and data.cash > before.cash then
 		Ui.pop(cashCard)
-		if Sound then Sound.play("coin") end
+		if (RaceState.active and RaceState.myLane ~= nil) or RaceState.resultsPending then
+			coinOwed = true
+		else
+			playCoin()
+		end
 	end
+end)
+RaceState.ResultsShown.Event:Connect(function(shown: boolean)
+	if coinOwed and shown then playCoin() end
+	coinOwed = false
 end)
 
 raceBtn.Activated:Connect(function()

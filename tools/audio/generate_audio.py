@@ -6,14 +6,16 @@
   python tools/audio/generate_audio.py --reroll coin          # second take (at most one re-roll per sound)
 
 Writes assets/audio/<name>.mp3 (a re-roll keeps the first take in assets/audio/takes/, gitignored) and logs
-every paid call to tools/audio/ledger.json. Then upload with tools/roblox/upload_assets.py --kind Audio.
+every paid call to tools/audio/ledger.json, saved (atomically) as soon as the call returns and before any
+other request. A paid call whose outcome is unknown (network error or timeout) is logged as "uncertain" at
+its full estimate. Then upload with tools/roblox/upload_assets.py --kind Audio.
 
-Budget: --budget (default 2000 credits, David's approval of 2026-10-05). Before each call the script adds a
-conservative estimate of that call to the spend so far and stops if the total could pass the budget. The
-spend so far is the larger of the summed estimates and the measured usage (GET /v1/usage/character-stats,
-cumulative since the first run; the key has no user_read permission, so /v1/user/subscription is not
-available). Estimates: sound effects with a set duration 40 credits per second (the highest published rate),
-voice 1 credit per character (Flash v2.5 bills 0.5).
+Budget: the ledger's budget (2000 credits, David's approval of 2026-10-05). --budget can only lower it for a
+run, never raise it. Before each call the script adds a conservative estimate of that call to the spend so
+far and stops if the total could pass the budget. The spend so far is the larger of the summed estimates and
+the measured usage (GET /v1/usage/character-stats, cumulative since the first run; the key has no user_read
+permission, so /v1/user/subscription is not available). Estimates: sound effects with a set duration 40
+credits per second (the highest published rate), voice 1 credit per character (Flash v2.5 bills 0.5).
 
 Key: ELEVENLABS_API_KEY env var only; never printed or written. Standard library only.
 """
@@ -21,6 +23,7 @@ Key: ELEVENLABS_API_KEY env var only; never printed or written. Standard library
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import math
 import os
@@ -43,6 +46,20 @@ SFX_CREDITS_PER_SECOND = 40
 VOICE_CREDITS_PER_CHAR = 1
 USAGE_SINCE_MS = 1759276800000  # 2025-10-01: a fixed start, so the cumulative usage only grows
 MAX_TAKES = 2
+BUDGET_CAP = 2000  # credits David approved (2026-10-05); the ledger keeps it and --budget can't raise it
+
+
+class ApiError(RuntimeError):
+    """A request failed. maybe_charged: it may have reached ElevenLabs (network error or timeout)."""
+
+    def __init__(self, message: str, maybe_charged: bool = False):
+        super().__init__(message)
+        self.maybe_charged = maybe_charged
+
+
+def clean(text: str, key: str) -> str:
+    """Error text for the console, with the key blanked out wherever it might appear."""
+    return text.replace(key, "<key>") if key else text
 
 
 def now_iso() -> str:
@@ -62,7 +79,17 @@ def load_ledger() -> dict[str, Any]:
 
 
 def save_ledger(ledger: dict[str, Any]) -> None:
-    LEDGER.write_text(json.dumps(ledger, indent=1) + "\n")
+    tmp = LEDGER.with_name(LEDGER.name + ".tmp")
+    tmp.write_text(json.dumps(ledger, indent=1) + "\n")
+    os.replace(tmp, LEDGER)  # atomic: a crash leaves the old ledger or the new one, never half of one
+
+
+def takes_so_far(ledger: dict[str, Any]) -> dict[str, int]:
+    takes: dict[str, int] = {}
+    for c in ledger["calls"]:
+        if c.get("status", "ok") == "ok":
+            takes[c["name"]] = takes.get(c["name"], 0) + 1
+    return takes
 
 
 def call(method: str, path: str, key: str, body: dict[str, Any] | None = None) -> tuple[bytes, dict[str, str]]:
@@ -77,23 +104,29 @@ def call(method: str, path: str, key: str, body: dict[str, Any] | None = None) -
                 keep = {k.lower(): v for k, v in r.headers.items() if "cost" in k.lower() or "character" in k.lower()}
                 return r.read(), keep
         except urllib.error.HTTPError as e:
-            detail = e.read()[:300].decode("utf-8", "replace")
-            if e.code == 429 and attempt < 3:
+            try:
+                detail = e.read()[:300].decode("utf-8", "replace")
+            except (OSError, http.client.HTTPException):
+                detail = ""
+            if e.code == 429 and attempt < 3:  # rate limited: not processed, safe to retry
                 time.sleep(5 * attempt)
                 continue
-            raise RuntimeError(f"HTTP {e.code}: {detail}") from None
-    raise RuntimeError("retries exhausted")
+            raise ApiError(clean(f"HTTP {e.code}: {detail}", key)) from None
+        except (urllib.error.URLError, OSError, http.client.HTTPException) as e:  # includes timeouts
+            reason = getattr(e, "reason", None) or e
+            raise ApiError(clean(f"network error ({type(e).__name__}: {reason})", key), maybe_charged=True) from None
+    raise ApiError("retries exhausted")
 
 
 def usage_total(key: str) -> float | None:
     end = int(time.time() * 1000)
     try:
         raw, _ = call("GET", f"/v1/usage/character-stats?start_unix={USAGE_SINCE_MS}&end_unix={end}", key)
-    except RuntimeError as e:
-        print(f"  (usage stats unavailable: {e})", file=sys.stderr)
+        usage = json.loads(raw).get("usage", {})
+        return float(sum(sum(v) for v in usage.values()))
+    except (ApiError, ValueError, TypeError, AttributeError) as e:
+        print(f"  (usage stats unavailable: {clean(str(e), key)})", file=sys.stderr)
         return None
-    usage = json.loads(raw).get("usage", {})
-    return float(sum(sum(v) for v in usage.values()))
 
 
 def spent(ledger: dict[str, Any], measured: float | None) -> float:
@@ -120,18 +153,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--priority", nargs="*", help="only these priorities (P0, P1, VO)")
     ap.add_argument("--only", nargs="*", help="only these sound names")
     ap.add_argument("--reroll", nargs="*", default=[], help="make a second take of these (once each)")
-    ap.add_argument("--budget", type=float, default=2000)
+    ap.add_argument("--budget", type=float, default=BUDGET_CAP, help="lower the budget for this run (never raises it)")
     args = ap.parse_args(argv)
 
     spec = json.loads(SPEC.read_text())
+    unknown = sorted(set(args.reroll) - {s["name"] for s in spec["sounds"]})
+    if unknown:
+        print(f"--reroll: not in tools/audio/sounds.json: {', '.join(unknown)}", file=sys.stderr)
+        return 2
     items = [s for s in spec["sounds"]
              if (not args.priority or s["priority"] in args.priority) and (not args.only or s["name"] in args.only)]
     if args.reroll:
         items = [s for s in spec["sounds"] if s["name"] in args.reroll]
     ledger = load_ledger()
-    takes = {}
-    for c in ledger["calls"]:
-        takes[c["name"]] = takes.get(c["name"], 0) + 1
+    takes = takes_so_far(ledger)
 
     if args.plan:
         total = 0
@@ -147,12 +182,14 @@ def main(argv: list[str] | None = None) -> int:
         print("Set ELEVENLABS_API_KEY first; it is never stored or printed.", file=sys.stderr)
         return 2
     measured = usage_total(key)
-    if ledger["usageBaseline"] is None:
+    if ledger.get("budget") is None:
+        ledger["budget"] = BUDGET_CAP
+    if ledger.get("usageBaseline") is None:
         ledger["usageBaseline"] = measured
-        ledger["budget"] = args.budget
-        ledger["startedAt"] = now_iso()
-        save_ledger(ledger)
-    print(f"spent so far (upper bound): {spent(ledger, measured):.0f} of {args.budget:.0f}")
+        ledger.setdefault("startedAt", now_iso())
+    save_ledger(ledger)
+    budget = min(args.budget, float(ledger["budget"]))
+    print(f"spent so far (upper bound): {spent(ledger, measured):.0f} of {budget:.0f}")
 
     OUT.mkdir(parents=True, exist_ok=True)
     made = 0
@@ -168,32 +205,39 @@ def main(argv: list[str] | None = None) -> int:
             continue
         cost = estimate(s)
         so_far = spent(ledger, measured)
-        if so_far + cost > args.budget:
-            print(f"  STOP before {name}: {so_far:.0f} + {cost} could pass the {args.budget:.0f} budget")
+        if so_far + cost > budget:
+            print(f"  STOP before {name}: {so_far:.0f} + {cost} could pass the {budget:.0f} budget")
             break
+        entry: dict[str, Any] = {"name": name, "kind": s["kind"], "estimate": cost}
+        entry.update({"seconds": s["seconds"]} if s["kind"] == "sfx" else {"chars": len(s["text"])})
         try:
             audio, hdrs = generate(s, spec["voice"], key)
-        except RuntimeError as e:
+        except ApiError as e:
             print(f"  FAIL {name}: {e}", file=sys.stderr)
+            if e.maybe_charged:  # it may have been billed: count the full estimate against the budget
+                entry.update({"status": "uncertain", "at": now_iso()})
+                ledger["calls"].append(entry)
+                save_ledger(ledger)
             continue
+        # Paid: record it before anything else can fail or touch the network.
+        entry.update({"take": n + 1, "bytes": len(audio), "at": now_iso()})
+        if hdrs:
+            entry["headers"] = hdrs
+        ledger["calls"].append(entry)
+        save_ledger(ledger)
+        takes[name] = n + 1
         if mp3.exists():
             TAKES.mkdir(parents=True, exist_ok=True)
             shutil.move(str(mp3), TAKES / f"{name}.{n}.mp3")
         mp3.write_bytes(audio)
-        takes[name] = n + 1
-        entry = {"name": name, "take": n + 1, "kind": s["kind"], "estimate": cost, "bytes": len(audio), "at": now_iso()}
-        entry.update({"seconds": s["seconds"]} if s["kind"] == "sfx" else {"chars": len(s["text"])})
-        if hdrs:
-            entry["headers"] = hdrs
-        ledger["calls"].append(entry)
         measured = usage_total(key)
         if measured is not None and ledger["usageBaseline"] is not None:
             entry["usageAfter"] = measured - ledger["usageBaseline"]
-        save_ledger(ledger)
+            save_ledger(ledger)
         made += 1
         print(f"  ok   {name} take {n + 1} ({len(audio) // 1024} KB, est {cost}, measured so far "
               f"{entry.get('usageAfter', '?')})")
-    print(f"made {made}; spent so far (upper bound): {spent(ledger, measured):.0f} of {args.budget:.0f}")
+    print(f"made {made}; spent so far (upper bound): {spent(ledger, measured):.0f} of {budget:.0f}")
     return 0
 
 

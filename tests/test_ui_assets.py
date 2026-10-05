@@ -65,6 +65,9 @@ def test_generated_id_modules_cover_every_upload():
     images = dict(re.findall(r"^\t(\w+) = (\d+),$", (SHARED / "UiImages.luau").read_text(), re.M))
     sounds = dict(re.findall(r"^\t(\w+) = (\d+),$", (SHARED / "SoundAssets.luau").read_text(), re.M))
     for name, rec in state.items():
+        if rec["kind"] == "Audio" and rec.get("moderation") == "Rejected":
+            assert name not in sounds, name  # rejected sounds stay out of the game
+            continue
         target = {"Model": meshes, "Decal": images, "Audio": sounds}[rec["kind"]]
         assert target.get(name) == str(rec["assetId"]), name
     assert {"horse_bay", "horse_chestnut", "horse_grey", "horse_black", "horse_palomino", "finish_post", "gate_stall"} <= set(meshes)

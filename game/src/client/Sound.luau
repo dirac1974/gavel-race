@@ -2,10 +2,13 @@
 -- Sound: the client's sound effects and race announcer (docs/audio/AUDIO_PLAN.md).
 --   Sound.play(name, volume?, at?)  one-shot; `at` (a BasePart or Attachment) makes it positional
 --   Sound.loop(name, volume?)       starts a loop and returns its stop function
+--   Sound.stop(name)                stops a 2D one-shot that is still playing
+--   Sound.recent(name, seconds)     true if that sound started playing within the last `seconds`
 -- Ids come from the generated SoundAssets (tools/roblox/upload_assets.py). A name with no id (not
 -- uploaded yet, or 0) plays nothing, and nothing here ever errors into the caller.
 -- The Sound setting (Settings tab, PlayerState settings.sound, on by default) mutes everything,
--- including loops already running. Announcer lines (vo_*) never talk over each other.
+-- including loops already running; a loop started while muted is heard once Sound is back On.
+-- Announcer lines (vo_*) never talk over each other.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ContentProvider = game:GetService("ContentProvider")
@@ -20,12 +23,13 @@ if not okIds or type(ids) ~= "table" then ids = {} end
 local Sound = {}
 
 -- Default levels, before the caller's volume: the announcer on top, UI ticks quiet, loops under.
+-- The voice files peak near full scale (-0.3 dBFS), so the announcer sits below 1.
 local LEVEL = {
-	gallop_loop = 0.45, crowd_cheer = 0.55, gate_bell = 0.6, burst_whoosh = 0.6, tap_good = 0.35,
+	gallop_loop = 0.45, crowd_cheer = 0.55, gate_bell = 0.5, burst_whoosh = 0.6, tap_good = 0.35,
 	finish_fanfare = 0.6, ui_pop = 0.3, coin = 0.45, horse_nicker = 0.5, brush = 0.5, munch = 0.5,
 	harvest_pop = 0.5, job_done = 0.55, clap = 0.45, heartbeat = 0.6,
 }
-local VOICE_LEVEL = 0.9
+local VOICE_LEVEL = 0.7
 local DEFAULT_LEVEL = 0.5
 
 local group = Instance.new("SoundGroup")
@@ -37,14 +41,22 @@ folder.Parent = SoundService
 
 local cache: { [string]: Sound } = {}
 local voice: Sound? = nil
+local lastPlayed: { [string]: number } = {}
 
+-- PlayerState (for the Sound setting) loads in the background below; until it has, sound is on.
+-- A failed load is not remembered, so it's tried again and Sound Off always takes effect.
 local playerState = nil
-local function enabled(): boolean
-	if playerState == nil then
-		local module = script.Parent:FindFirstChild("PlayerState")
+local function loadPlayerState()
+	if playerState then return playerState end
+	local module = script.Parent:WaitForChild("PlayerState", 5)
+	if module then
 		local ok, ps = pcall(require, module)
-		playerState = if ok and type(ps) == "table" then ps else false
+		if ok and type(ps) == "table" then playerState = ps end
 	end
+	return playerState
+end
+
+local function enabled(): boolean
 	local d = playerState and playerState.data
 	return not (d and d.settings and d.settings.sound == false)
 end
@@ -80,6 +92,7 @@ function Sound.play(name: string, volume: number?, at: Instance?)
 			s.RollOffMaxDistance = 80
 			s.Ended:Once(function() s:Destroy() end)
 			s:Play()
+			lastPlayed[name] = os.clock()
 			task.delay(15, function() if s.Parent then s:Destroy() end end)
 			return
 		end
@@ -93,13 +106,25 @@ function Sound.play(name: string, volume: number?, at: Instance?)
 		s.Volume = level(name, volume)
 		s.TimePosition = 0
 		s:Play()
+		lastPlayed[name] = os.clock()
 	end)
 end
 
+function Sound.stop(name: string)
+	local s = cache[name]
+	if s then pcall(function() s:Stop() end) end
+end
+
+function Sound.recent(name: string, seconds: number): boolean
+	local t = lastPlayed[name]
+	return t ~= nil and os.clock() - t <= seconds
+end
+
+-- A loop plays even while Sound is Off: the muted group keeps it silent, and it's heard again
+-- as soon as Sound is turned back On (say, mid-race).
 function Sound.loop(name: string, volume: number?): () -> ()
 	local s: Sound? = nil
 	pcall(function()
-		if not enabled() then return end
 		s = make(name, folder)
 		if not s then return end
 		s.Looped = true
@@ -116,12 +141,14 @@ end
 
 -- The Sound setting mutes the group, so loops and sounds already playing go quiet too.
 task.spawn(function()
-	enabled()
-	if playerState then
-		local function sync() group.Volume = if enabled() then 1 else 0 end
-		pcall(function() playerState.Changed.Event:Connect(sync) end)
-		sync()
+	local ps = loadPlayerState()
+	while not ps do
+		task.wait(5)
+		ps = loadPlayerState()
 	end
+	local function sync() group.Volume = if enabled() then 1 else 0 end
+	pcall(function() ps.Changed.Event:Connect(sync) end)
+	sync()
 end)
 
 -- Load the sounds in the background so the first race line plays on time.

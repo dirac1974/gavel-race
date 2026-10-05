@@ -81,6 +81,14 @@ function TrackLayout.laneRadius(cfg: Config, i: number): number
 	return cfg.railRadius + cfg.laneOffset + (i - 0.5) * cfg.laneWidth
 end
 
+-- How far the point (x, z) is from the course's outer edge, in studs; 0 on the track or in the
+-- infield. The oval is a line segment along Z (the straights' centre line) grown by the radius.
+function TrackLayout.distanceToTrack(cfg: Config, x: number, z: number): number
+	local along = math.max(0, math.abs(z - cfg.centerZ) - cfg.straight / 2)
+	local fromAxis = math.sqrt((x - cfg.centerX) ^ 2 + along ^ 2)
+	return math.max(0, fromAxis - TrackLayout.outerRadius(cfg))
+end
+
 function TrackLayout.lapLength(cfg: Config, r: number): number
 	return 2 * cfg.straight + 2 * math.pi * r
 end

@@ -358,9 +358,9 @@ local function heartGame(done)
 	for k = 1, beats do times[k] = start + (k - 1) * interval + (if k % 2 == 0 then 0.03 else -0.02) end
 	local used, total, finished = {}, 0, false
 	local heard = 0 -- beats played as sound so far
-	heartbeat(function()
+	heartbeat(function(dt)
 		local t = now()
-		if heard < beats and t >= times[heard + 1] then
+		if heard < beats and t + dt > times[heard + 1] then -- the beat lands in this frame: play it now, not a frame late
 			heard += 1
 			if Sound then Sound.play("heartbeat") end
 		end

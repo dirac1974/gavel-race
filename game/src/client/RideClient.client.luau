@@ -69,6 +69,7 @@ local lastGiddyUp = -math.huge
 local function setGallop(on: boolean)
 	if on and not galloping and Sound and os.clock() - lastGiddyUp > 20 then -- "Giddy-up!", not on every Shift
 		lastGiddyUp = os.clock()
+		Sound.stop("ui_pop") -- the Gallop button's pop would land on top of the line
 		Sound.play("vo_giddyup", 0.8)
 	end
 	galloping = on

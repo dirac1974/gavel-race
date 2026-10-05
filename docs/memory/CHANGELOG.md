@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — fix: audio review: coin waits for the results card, race cues stay with their race, spectators hear races only near the course, quieter voice, safer credit ledger and uploads (D-052)
 - 2026-10-05 — feat: sound module, race announcer lines and Sound setting; audio upload tooling (D-052)
 - 2026-10-05 — feat: Tack & Paint Diamond store: looks only, 1:1 packs, caps, returns, calm-moment prompts, milestone Diamonds (D-050)
 - 2026-10-05 — docs: status after the world build; next steps

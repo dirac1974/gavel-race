@@ -16,7 +16,7 @@ The list (names, prompts, durations, lines) is `tools/audio/sounds.json`. The ga
 
 ## Budget
 
-David approved up to **2,000 ElevenLabs credits** (2026-10-05). The generator refuses any call whose conservative estimate could take the spend past the budget: sound effects at 40 credits per second of set duration (the highest published rate; auto-duration costs about 100 per effect, so every effect sets its duration), voice at 1 credit per character. Actual voice cost on `eleven_flash_v2_5` was 0.25 credits per character (the `character-cost` response header).
+David approved up to **2,000 ElevenLabs credits** (2026-10-05). The ledger keeps that cap; `--budget` can lower it for a run but never raise it. Each paid call is saved to the ledger (atomically) the moment it returns, before any other request, and a call lost to a network error or timeout is logged as `uncertain` at its full estimate. The generator refuses any call whose conservative estimate could take the spend past the budget: sound effects at 40 credits per second of set duration (the highest published rate; auto-duration costs about 100 per effect, so every effect sets its duration), voice at 1 credit per character. Actual voice cost on `eleven_flash_v2_5` was 0.25 credits per character (the `character-cost` response header).
 
 The key has no `user_read` permission, so `GET /v1/user/subscription` returns 401. Spend is measured instead with `GET /v1/usage/character-stats` (cumulative since 2025-10-01) and each response's `character-cost` header.
 
@@ -54,32 +54,32 @@ The key has no `user_read` permission, so `GET /v1/user/subscription` returns 40
 | vo_welcome | VO | "Welcome to Giddy-Up!" | 1.16 s | 20 | 4 | 106737745847156 | Approved |
 | vo_photo | VO | "Photo finish!" | 1.02 s | 13 | 3 | 112611222026285 | Approved |
 
-Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_v2_5` (the cheapest; the newer `eleven_v4_turbo` has no published credit rate yet), stability 0.35, speed 1.05. Every line came back clean on the first take (peaks -0.3 to -5.5 dBFS, no clipping, about 0.2 s of tail), so no re-rolls. Lines were checked by level and length only; nobody has listened yet.
+Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_v2_5` (the cheapest; the newer `eleven_v4_turbo` has no published credit rate yet), stability 0.35, speed 1.05. Every line came back clean on the first take (peaks -0.3 to -5.5 dBFS, no clipping, about 0.2 s of tail), so no re-rolls. **The voice files peak at -0.3 dBFS**, close to full scale, so `VOICE_LEVEL` in `Sound.luau` plays them at 0.7. Lines were checked by level and length only; nobody has listened yet. **Listen to every line in Studio (and on a phone) before publishing**, and tune `VOICE_LEVEL` and `LEVEL` there.
 
 ## Where each sound plays
 
 | Moment | Sound | Code |
 | --- | --- | --- |
-| Gate opens | gate_bell + vo_off | `RaceController` (RaceStarted, cued at the start time) |
-| Your race runs | gallop_loop (riders only; stops when the race ends) | `RaceController` |
+| Gate opens | gate_bell, then vo_off 0.25 s later so they don't stack | `RaceController` (RaceStarted, cued at the start time) |
+| Your race runs | gallop_loop (riders only, while in the saddle; stops when the race ends, you leave the saddle or respawn) | `RaceController` |
 | Field enters the final far turn | vo_far_turn (skipped if under 4 s after the start) | `RaceController` (same sum as RaceService's `tFar`) |
 | Final Burst opens | burst_whoosh + vo_burst | `RaceController` (BurstOpened) |
 | Great or Perfect tap; great burst | tap_good | `RaceController` |
 | Burst window closes | vo_stretch | `RaceController` |
 | Leader reaches the line | finish_fanfare + crowd_cheer | `RaceController` (RaceFinished, cued at the finish time) |
-| Results card | vo_finish | `RaceController` |
+| Results card | vo_finish (only if the screen still follows that race) | `RaceController` |
 | Photo finish in a replay | vo_photo | `Replay` |
 | Any Ui button press | ui_pop (quiet; game buttons with their own sound set `NoPop`) | `Ui.button` |
-| Green Cash goes up | coin | `Hud` |
+| Green Cash goes up | coin; held while you ride and played with your results card (the prize lands just before the leader reaches the line, so an early chime would give the result away); skipped right after job_done | `Hud` |
 | Feed / groom / treat / pet | munch / brush / munch / horse_nicker, positional at the horse | `CareClient` (CareFx) |
 | Harvest | harvest_pop | `CareClient` |
 | Job claimed | job_done | `StableBoard` |
 | Clap Along | clap | `FanClient` |
 | Vet heartbeat game | heartbeat on each beat | `PaddockClient` |
-| Start galloping on your own horse | vo_giddyup (at most every 20 s) | `RideClient` |
+| Start galloping on your own horse | vo_giddyup (at most every 20 s; cuts the Gallop button's pop) | `RideClient` |
 | Stable loaded (once per visit) | vo_welcome | `Starter` |
 
-Spectators hear race cues at half volume; only riders hear their own hoofbeats. The Settings tab has Sound On/Off (`settings.sound`, on by default); Off mutes the SoundGroup, so loops already playing stop too.
+Riders always hear their own race. Spectators hear race cues at half volume, and only when their character is within about 250 studs of that race's course (`SPECTATOR_HEARING_STUDS` in `RaceController`, measured from the course's outer edge with `TrackLayout.distanceToTrack`; the infield counts as at the track). Only riders hear their own hoofbeats. The Settings tab has Sound On/Off (`settings.sound`, on by default); Off mutes the SoundGroup, so loops already playing go quiet too, and a loop started while Off is heard once Sound is back On.
 
 ## Blocked: sound effects
 
@@ -90,4 +90,4 @@ python tools/audio/generate_audio.py --priority P0 P1
 python tools/roblox/upload_assets.py --kind Audio
 ```
 
-Roblox audio uploads are capped per 30 days: 100 for ID-verified accounts, 10 otherwise. The 8 voice lines used 8; the 15 effects need ID verification on the uploading account (or packing effects into one sheet with `Sound.PlaybackRegion`).
+Roblox audio uploads are capped per 30 days: 100 for ID-verified accounts, 10 otherwise, so `upload_assets.py --force` re-uploads sounds only with `--kind Audio`, and an upload request is never resent when it may already have gone through. Sounds that moderation marks Rejected are left out of `SoundAssets.luau`. The 8 voice lines used 8; the 15 effects need ID verification on the uploading account (or packing effects into one sheet with `Sound.PlaybackRegion`).
