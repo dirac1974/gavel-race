@@ -319,7 +319,7 @@ function TrackScene.laneCFrame(i: number, p: number): CFrame
 end
 
 -- Per race: the gate where this distance starts, and the horses in it.
-function TrackScene.build(plan)
+function TrackScene.build(plan, coats: { string? }?)
 	if not venue or not venue.Parent then
 		Lighting.ClockTime = 15
 		venue = buildVenue()
@@ -345,7 +345,8 @@ function TrackScene.build(plan)
 	horseFolder.Parent = folder
 	horses, saddles = {}, {}
 	for i = 1, LANES do
-		local horse = modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
+		local coat = (coats and coats[i]) or COATS[i]
+		local horse = modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
 		horse:PivotTo(TrackScene.laneCFrame(i, 0))
 		badge(i).Parent = horse

@@ -76,6 +76,12 @@ remotes.RaceOffsets.OnClientEvent:Connect(function(offsets)
 	for i, feet in offsets do race.target[i] = feet end
 end)
 
+remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function()
+	race = nil
+	RaceState.active = false
+	RaceState.recording = nil
+end)
+
 remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 	if not race then return end
 	RaceState.setFinal(summary)

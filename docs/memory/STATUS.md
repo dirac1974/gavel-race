@@ -13,7 +13,12 @@ Last updated: 2026-10-04
 
 ## In progress
 
-(none)
+**Stage 1 — Your horse** (branch `claude/stage1-your-horse`):
+- Pure `Horse`, `Profile`, `NameGen` modules with Lune tests (energy regen, care, rating, migration, names).
+- `Profiles` (DataStore `GiddyUp_Profiles_v1`, key `u<userId>`, session lock with 5-minute stale timeout, autosave every 60 s, release on leave, BindToClose; temporary profile when Studio has no API access) and `PlayerData` (starter pick, active horse, leaderstats).
+- Race queue: RACE! puts you in line; riders use their active horse's Rating, name and coat; results pay into the save.
+- Client UI kit (`Ui`), `PlayerState`, bottom dock HUD, starter picker with 3D horses and name chips.
+- Starting values: 50 Green Cash, 10 hay, 3 carrots, 2 stalls; starters have 45 in every stat and Potential 70–85.
 
 ## Backlog (top = next)
 
