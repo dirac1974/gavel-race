@@ -58,6 +58,22 @@ for c, rc in data.ratings do
 	check(close(r, rc.rating, 1e-9), `rating case {c}: {r} vs {rc.rating}`)
 end
 
+local Stride = require("../../game/src/shared/Stride")
+for c, sc in data.stride do
+	local beats = Stride.schedule(listRng(sc.uniforms), sc.start, sc.spec)
+	check(#beats == #sc.beats, `stride case {c}: beat count`)
+	for k = 1, #sc.beats do
+		check(close(beats[k], sc.beats[k], 1e-9), `stride case {c}: beat {k} {beats[k]} vs {sc.beats[k]}`)
+	end
+	local s = Stride.score(sc.beats, sc.taps, sc.spec.half)
+	check(close(s, sc.score, 1e-9), `stride case {c}: score {s} vs {sc.score}`)
+	local g = Stride.gapErrors(sc.beats, sc.taps, sc.spec.half)
+	check(#g == #sc.gaps, `stride case {c}: gap count {#g} vs {#sc.gaps}`)
+	for k = 1, math.min(#g, #sc.gaps) do
+		check(close(g[k], sc.gaps[k], 1e-9), `stride case {c}: gap {k}`)
+	end
+end
+
 for _, w in data.windows do
 	check(close(RaceMath.windowScore(w.d), w.s, 1e-9), `windowScore({w.d})`)
 end

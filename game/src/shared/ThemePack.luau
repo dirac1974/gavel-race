@@ -26,6 +26,9 @@ local ThemePack = {
 		winChance = "Win chance",
 		purse = "Win",
 		tap = "TAP!",
+		giddyUp = "GIDDY-UP!",
+		burst = "Final Burst",
+		tooFast = "Too fast! Follow the hoofbeat",
 	},
 }
 

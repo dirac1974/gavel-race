@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import gavel_race_v2 as m  # noqa: E402
 import race_rating as rr  # noqa: E402
+import stride as st  # noqa: E402
 
 
 class ListRng:
@@ -69,8 +70,24 @@ def main() -> None:
         strategy = rng.choice(strategies)
         ratings_cases.append({"stats": stats, "cond": cond, "care": care, "pilot": pilot, "bond": bond,
                               "strategy": strategy or "", "rating": rr.rating(stats, cond, care, pilot, strategy, bond)})
+    stride_cases = []
+    for _ in range(200):
+        lo = rng.choice([0.42, 0.46, 0.50, 0.55, 0.60])
+        spec = {"beats": 8, "intervalLo": lo, "intervalHi": lo + rng.choice([0.0, 0.05, 0.06]),
+                "drift": rng.choice([0.0, 0.02, 0.03]), "leadChange": rng.random() < 0.3, "half": 0.08}
+        uniforms = [rng.random() for _ in range(spec["beats"])]
+        start = round(rng.uniform(0, 100), 3)
+        beats = st.schedule(ListRng(uniforms), start, spec["beats"], spec["intervalLo"], spec["intervalHi"],
+                            spec["drift"], spec["leadChange"])
+        sd = rng.choice([0.005, 0.03, 0.06])
+        taps = [b + rng.gauss(-0.02, sd) for b in beats if rng.random() > 0.1]
+        taps += [rng.uniform(beats[0] - 0.3, beats[-1] + 0.3) for _ in range(rng.choice([0, 0, 1, 3]))]
+        taps.sort()
+        stride_cases.append({"spec": spec, "uniforms": uniforms, "start": start, "beats": beats, "taps": taps,
+                             "score": st.score(beats, taps, spec["half"]),
+                             "gaps": st.gap_errors(beats, taps, spec["half"])})
     out = ROOT / "tests" / "fixtures" / "race_math.json"
-    out.write_text(json.dumps({"cases": cases, "windows": windows, "ratings": ratings_cases}))
+    out.write_text(json.dumps({"cases": cases, "windows": windows, "ratings": ratings_cases, "stride": stride_cases}))
     print(f"wrote {len(cases)} cases to {out.relative_to(ROOT)}")
 
 
