@@ -119,7 +119,7 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 
 The Training Ground (T1):
 - [ ] The Training Paddock's south fence has a gate in the middle; a dirt path runs south from it under a "⭐ Training Ground" board to the training oval. No trees on the path.
-- [ ] Picture signs stand either side of the path near the oval: 💨 Sprint Lane ("Ride!"), ⛰️ Hill Climb and 🚦 Gate Break ("Coming soon"), and 💦 Mud Splash ("In the paddock ⬆"). Each reads from both sides.
+- [ ] Picture signs stand either side of the path near the oval: 💨 Sprint Lane ("Ride!"), ⛰️ Hill Climb and 🚦 Gate Break (all "Ride!"), and 💦 Mud Splash ("In the paddock ⬆"). Each reads from both sides.
 - [ ] The oval: white rails on both sides of a 24-stud dirt track, a green infield, a gap in both rails where the path comes in. You can't ride through a rail.
 - [ ] The hill on the far (south) straight is gentle: the horse rides up and over it at a gallop without leaving the ground for long or catching on anything; the rails follow it.
 - [ ] Six coloured hoops (arches three horses wide) stand on the track, one on top of the hill; your horse and rider pass under the top of every arch and never bump a post.
@@ -127,7 +127,7 @@ The Training Ground (T1):
 - [ ] The paddock arena holds the gymkhana: four mud puddles, three low logs (well under the horse's hop), four red-and-white poles in a darker "canter" lane, a white start line by the north-west corner and a 🏁 Finish arch near the south-west corner. Nothing in the arena stops your horse (poles and logs never collide). Walking from the street gate to the south gate never meets a log.
 
 Riding the courses (T2: Sprint Lane and Mud Splash):
-- [ ] The paddock's "Train" prompt opens "⭐ Training" with four picture tiles: Sprint Lane and Mud Splash say their stat; Gate Break and Hill Climb say "Coming soon" (tapping one only shows a toast). "⚡ Quick train" opens the old horse and stat games; a perfect Quick train game gains the same as a score of 70 (quality capped at 0.85).
+- [ ] The paddock's "Train" prompt opens "⭐ Training" with four picture tiles: all four say their stat (and your ribbon on that course). "⚡ Quick train" opens the old horse and stat games; a perfect Quick train game gains the same as a score of 70 (quality capped at 0.85).
 - [ ] Tapping Sprint Lane (or "Ride" at its picture sign) puts you on your active horse (it's called if you weren't riding) at the white start line on the oval's north straight, facing west. Big 3, 2, 1, then "Go!" and "Giddy-up!". The horse can't move or hop during the 3-2-1.
 - [ ] While riding: push the stick (even half-way) and the horse gallops by itself at full course speed; only the next hoop glows gold; dark hoofprints lead to it; riding through gives a ✨; three lap dots at the top: done laps gold, the lap you're on orange. No timer anywhere. Near a hoop the horse is nudged gently toward it, never steered without you.
 - [ ] After the last hoop: "🏁 To the finish line!", the start/finish line glows gold and hoofprints lead to it; the ride ends as you cross it. On Mud Splash, after the last piece the 🏁 Finish arch glows and the prints lead there.
@@ -140,6 +140,15 @@ Riding the courses (T2: Sprint Lane and Mud Splash):
 - [ ] Standing at the start for two minutes without riding ends with "Let's try that one again!": no stars, no gain, no job progress.
 - [ ] Two rides within 4 seconds: "Your horse is catching its breath". More than 40 in an hour: a kind rest note.
 - [ ] Rejoin: the tiles still show your ribbons (🥉🥈🥇) for that horse.
+
+Gate Break, Hill Climb and Easy Rein (T3):
+- [ ] Gate Break puts you in the practice gate in the oval's infield, facing the flag; two red doors close in front of you on your screen. After the 3-2-1 the horse stands by itself; "Ready…" shows; after 1.5–3.5 s the doors swing open, "GO!" (and the bell, once its sound is uploaded). Push and the horse gallops down the lane to the yellow flag. "Great start!" for a quick go, "Good start!" or "Off you go!" otherwise; never a time on screen.
+- [ ] Pushing before the bell (or edging out of the gate): "Wait for the bell!", the doors glow gold and hoofprints lead round the loop back to the gate; the horse canters back and stops by itself in the stall; that break runs once more. Early again just counts as an easy start (no fail).
+- [ ] After each flag: "Back to the gate!", canter round the loop (hoofprints), the horse stops in the stall, "Ready…" again. Three dots fill, one per break; the ride ends at the third flag (about 40 s).
+- [ ] You can ride into and out of the practice gate without ever catching on it (it never collides).
+- [ ] Hill Climb: Pip, a small palomino in a teal "Pip" cloth, stands a little ahead of you at the start line; only you see him. After "Go!" he gallops two laps, weaving and changing pace, over the hill. A glowing ring sits behind him: inside it the ring turns gold and your horse keeps Pip's pace by itself; drop back and a gallop catches you up. Out of the ring for a while: "Stay with Pip!" (gently, now and then). The ride ends when Pip finishes; two dots for his laps.
+- [ ] Settings (For grown-ups → Settings): "Easy Rein" On/Off, off at first. On: on every course the horse steers itself strongly toward the next hoop, piece, flag, gate or Pip's ring while you push forward; stars and gains are the same as without it. It stays as you set it after a rejoin.
+
 - [ ] During a ride and its end card, Explorer shows the attribute TrainingRide = true on your Player; it stays while the card is up and clears on Done, Stop or an early end (or after 90 s as a safety net).
 - [ ] Output: lines like `[Training] <id> speed: 12% of 430 samples too fast or teleported (3 stale, 0 off course) (log only)` are expected only now and then; note how often they appear on a phone and the stale count (freezes) (the floor stays log-only, `enforceFloor = false`).
 

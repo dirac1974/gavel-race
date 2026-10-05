@@ -11,6 +11,9 @@
 --   scoreSpeed      Sprint Lane: 100 × hoops ridden through, in order and forward, / 18.
 --   scoreGrit       Mud Splash: puddles splashed (7.5), logs hopped (12, clean = airborne),
 --                   poles passed on the right side (8.5).
+--   scoreAccel      Gate Break: three breaks from the practice gate; each scores by reaction
+--                   to the bell (100 within fullReact, down to breakFloor at zeroReact).
+--   scoreStamina    Hill Climb: 100 × the share of time in Pip's ring after the grace.
 --   finalize        the 0.5 floor when enforcing, stars, ribbon (gold also needs par).
 -- Samples are { t, x, y, z }: t seconds since GO, y studs above the horse's riding height.
 -- A miss never costs anything: a hoop, puddle, log or pole that isn't hit just doesn't count.
@@ -64,41 +67,56 @@ end
 -- crossing counts across that stretch. A lag-then-burst catch-up (too fast for one sample, but
 -- no teleport) is dropped and counted, yet the ride across it still counts.
 -- Returns (kept, bad share, counts { bad, stale, off }).
+-- The screener judges one sample at a time: "ok" (with the kept copy), "stale", "bad" or
+-- "off". validate() runs it over a whole ride; the server runs it live for Gate Break.
+function TR.screener(onCourse: ((number, number) -> boolean)?)
+	return { onCourse = onCourse, prev = nil :: Sample?, moving = false, staleRun = 0, lastKept = nil :: Sample?,
+		dropped = false, n = 0, bad = 0, stale = 0, off = 0 }
+end
+
+function TR.screen(sc: any, s: Sample, cfg: any): (string, Sample?)
+	sc.n += 1
+	local prev = sc.prev
+	if prev and sc.moving and sc.staleRun < TR.MAX_STALE and same(prev, s) then
+		sc.stale += 1
+		sc.staleRun += 1
+		return "stale", nil
+	end
+	sc.staleRun = 0
+	local fast = prev ~= nil and not possible(prev, s, cfg)
+	local outside = not fast and sc.onCourse ~= nil and not sc.onCourse(s.x, s.z)
+	sc.moving = prev ~= nil and not same(prev, s)
+	sc.prev = s
+	if fast then
+		sc.bad += 1
+		sc.dropped = true
+		return "bad", nil
+	elseif outside then
+		sc.off += 1
+		sc.dropped = true
+		return "off", nil
+	end
+	local gap = sc.dropped and sc.lastKept ~= nil and teleport(sc.lastKept, s, cfg)
+	local k = { t = s.t, x = s.x, y = s.y, z = s.z, gap = gap }
+	sc.lastKept = k
+	sc.dropped = false
+	return "ok", k
+end
+
+-- The share of judged samples (not stale, not off course) that were too fast or teleported.
+function TR.badShare(sc: any): number
+	local judged = sc.n - sc.stale - sc.off
+	return if judged > 0 then sc.bad / judged else 0
+end
+
 function TR.validate(samples: { Sample }, onCourse: ((number, number) -> boolean)?, cfg: any): ({ Sample }, number, any)
 	local kept: { Sample } = {}
-	local bad, stale, off = 0, 0, 0
-	local prev: Sample? = nil
-	local moving = false
-	local staleRun = 0
-	local lastKept: Sample? = nil
-	local dropped = false
+	local sc = TR.screener(onCourse)
 	for _, s in samples do
-		if prev and moving and staleRun < TR.MAX_STALE and same(prev :: Sample, s) then
-			stale += 1
-			staleRun += 1
-			continue
-		end
-		staleRun = 0
-		local fast = prev ~= nil and not possible(prev :: Sample, s, cfg)
-		local outside = not fast and onCourse ~= nil and not onCourse(s.x, s.z)
-		if fast then
-			bad += 1
-			dropped = true
-		elseif outside then
-			off += 1
-			dropped = true
-		else
-			local gap = dropped and lastKept ~= nil and teleport(lastKept :: Sample, s, cfg)
-			local k = { t = s.t, x = s.x, y = s.y, z = s.z, gap = gap }
-			table.insert(kept, k)
-			lastKept = k
-			dropped = false
-		end
-		moving = prev ~= nil and not same(prev :: Sample, s)
-		prev = s
+		local kind, k = TR.screen(sc, s, cfg)
+		if kind == "ok" then table.insert(kept, k :: Sample) end
 	end
-	local judged = #samples - stale - off
-	return kept, if judged > 0 then bad / judged else 0, { bad = bad, stale = stale, off = off }
+	return kept, TR.badShare(sc), { bad = sc.bad, stale = sc.stale, off = sc.off }
 end
 
 local function crossing(p: Sample, q: Sample, g: any): (number, number)
@@ -183,10 +201,115 @@ local function ovalStep(st: any, prev: Sample?, s: Sample, cfg: any)
 end
 
 -- Live tracker ------------------------------------------------------------------------------
-function TR.tracker(key: string)
+-- opts (Gate Break): { seed, allowance } (the bell times come from the seed; the allowance is
+-- the player's latency, taken off each reaction).
+function TR.tracker(key: string, opts: any?)
 	local c = TC.courses[key]
+	local o = opts or {}
 	return { key = key, progress = 0, lastD = c.startD or 0, last = nil :: Sample?, next = 1, finished = false, hit = {},
-		finishT = nil :: number?, minFinish = if c.kind == "arena" then TR.MIN_FINISH_SHARE * TC.idealSeconds(key) else 0 }
+		finishT = nil :: number?, minFinish = if c.kind == "arena" then TR.MIN_FINISH_SHARE * TC.idealSeconds(key) else 0,
+		-- Gate Break
+		seed = o.seed or 1, allowance = o.allowance or 0, phase = "settle", breakNo = 1, attempt = 1, arms = 0,
+		settleSince = nil :: number?, bellT = nil :: number?, results = {}, events = {} }
+end
+
+-- Gate Break --------------------------------------------------------------------------------
+-- Each break: stand still in the stall (settle) -> "Ready" (armed) -> the bell -> go -> the
+-- flag 120 studs on. Moving goStuds or leaving the stall before the bell is an early go: the
+-- break runs once more ("Wait for the bell!"), and an early go on the rerun scores breakFloor.
+-- A go counts from inside the stall only, because only a horse settled in the stall is armed.
+-- Reaction = when the horse started (from how far it moved by the first sample that shows it
+-- going) - the bell - the latency allowance. The tracker queues events for the server to send:
+-- { kind = "armed" | "early" | "go" | "flag", ... }.
+TR.DASH_SETTLE = 1.5 -- after a go, standing in the stall this long also ends the break
+
+function TR.breakScore(reaction: number, cfg: any): number
+	local ac = cfg.accel
+	if reaction <= ac.fullReact then return 100 end
+	if reaction >= ac.zeroReact then return ac.breakFloor end
+	return 100 - (100 - ac.breakFloor) * (reaction - ac.fullReact) / (ac.zeroReact - ac.fullReact)
+end
+
+local function event(tr: any, kind: string, data: any?)
+	local e = data or {}
+	e.kind, e.breakNo = kind, tr.breakNo
+	table.insert(tr.events, e)
+end
+
+local function endBreak(tr: any, t: number, cfg: any)
+	event(tr, "flag", { last = tr.breakNo >= cfg.accel.breaks })
+	tr.breakNo += 1
+	tr.attempt, tr.bellT, tr.settleSince = 1, nil, nil
+	if tr.breakNo > cfg.accel.breaks then
+		tr.finished, tr.finishT, tr.phase = true, t, "done"
+	else
+		tr.phase = "settle"
+	end
+end
+
+local function feedAccel(tr: any, prev: Sample?, s: Sample, cfg: any)
+	local c = TC.courses.accel
+	local ac = cfg.accel
+	local inBox = TC.inRect(c.stall, s.x, s.z)
+	local moved, dt = 0, 0
+	if prev then
+		moved = math.sqrt((s.x - prev.x) ^ 2 + (s.z - prev.z) ^ 2)
+		dt = s.t - prev.t
+	end
+	local slow = dt <= 0 or moved / dt < 3
+	-- when the horse set off: back from this sample by the time a gallop takes to cover `moved`
+	local function goTime(): number
+		if not prev then return s.t end
+		return math.clamp(s.t - moved / cfg.gallop, prev.t, s.t)
+	end
+	local function gone(): boolean
+		return moved >= ac.goStuds or not inBox
+	end
+	if tr.phase == "settle" or tr.phase == "dash" then
+		if tr.phase == "dash" and prev and not s.gap then
+			local dir, f = crossing(prev, s, c.flag)
+			if dir > 0 then return endBreak(tr, prev.t + (s.t - prev.t) * f, cfg) end
+		end
+		if inBox and slow then
+			tr.settleSince = tr.settleSince or (if prev then prev.t else s.t)
+			local need = if tr.phase == "dash" then TR.DASH_SETTLE else ac.settleSeconds
+			if s.t - tr.settleSince >= need then
+				if tr.phase == "dash" then
+					endBreak(tr, s.t, cfg) -- came back without the flag: the break still counts
+					if tr.finished then return end
+					tr.settleSince = s.t - ac.settleSeconds -- already settled
+				end
+				tr.arms += 1
+				tr.bellT = s.t + TC.bellDelay(tr.seed, tr.arms)
+				tr.phase = "armed"
+				event(tr, "armed", { attempt = tr.attempt, bellT = tr.bellT })
+			end
+		else
+			tr.settleSince = nil
+		end
+	elseif tr.phase == "armed" or tr.phase == "go" then
+		if gone() then
+			local goT = goTime()
+			if goT < (tr.bellT :: number) then
+				if tr.attempt == 1 then
+					event(tr, "early", { rerun = true })
+					tr.attempt, tr.phase, tr.bellT, tr.settleSince = 2, "settle", nil, nil
+				else
+					tr.results[tr.breakNo] = { score = ac.breakFloor, early = true }
+					event(tr, "early", { rerun = false, score = ac.breakFloor })
+					tr.phase = "dash"
+				end
+			else
+				local reaction = math.max(0, goT - (tr.bellT :: number) - tr.allowance)
+				local score = TR.breakScore(reaction, cfg)
+				tr.results[tr.breakNo] = { score = score, reaction = reaction }
+				event(tr, "go", { score = score, reaction = reaction })
+				tr.phase, tr.settleSince = "dash", nil
+			end
+		elseif s.t >= (tr.bellT :: number) then
+			tr.phase = "go" -- the bell has rung; waiting for the horse to go
+		end
+	end
 end
 
 -- Feed one sample; returns true once the course is finished. A sample at exactly the last
@@ -196,9 +319,13 @@ function TR.feed(tr: any, s: Sample, cfg: any): boolean
 	local c = TC.courses[tr.key]
 	local prev = tr.last
 	if tr.finished then return true end
-	if prev and same(prev, s) then return false end
+	-- (Gate Break is fed screened samples, which skip frozen ones already and keep a horse
+	-- that really stands still: it needs those to settle in the stall.)
+	if prev and c.kind ~= "gate" and same(prev, s) then return false end
 	tr.last = s
-	if c.kind == "oval" then
+	if c.kind == "gate" then
+		feedAccel(tr, prev, s, cfg)
+	elseif c.kind == "oval" then
 		if c.posts then
 			ovalStep(tr, prev, s, cfg)
 		else -- Hill Climb (T3): progress only
@@ -241,6 +368,7 @@ function TR.progressShare(tr: any): number
 	local c = TC.courses[tr.key]
 	if tr.finished then return 1 end
 	if c.kind == "arena" then return math.clamp((tr.next - 1) / #c.elements, 0, 1) end
+	if c.kind == "gate" then return math.clamp((tr.breakNo - 1) / TR.config.accel.breaks, 0, 1) end
 	return math.clamp(tr.progress / c.finish, 0, 1)
 end
 
@@ -333,22 +461,71 @@ function TR.finalize(raw: number, badShare: number, seconds: number?, ideal: num
 		badShare = badShare, seconds = seconds or 0, par = par, underPar = underPar }
 end
 
+-- Gate Break from a ride's kept samples (the server's live tracker sees the same ones).
+function TR.scoreAccel(kept: { Sample }, seed: number, allowance: number, cfg: any): (number, any)
+	local tr = TR.tracker("accel", { seed = seed, allowance = allowance })
+	for _, s in kept do TR.feed(tr, s, cfg) end
+	local total, scored, quick = 0, 0, 0
+	for b = 1, cfg.accel.breaks do
+		local r = tr.results[b]
+		if r then
+			total += r.score
+			scored += 1
+			if r.score >= 90 then quick += 1 end
+		end
+	end
+	return total / cfg.accel.breaks, { breaks = tr.results, scored = scored, quick = quick, finishT = tr.finishT }
+end
+
+-- Hill Climb: is the horse in Pip's ring at t? The ring runs ringNear..ringFar studs behind
+-- Pip round the oval, ringHalfWidth either side of Pip's line. `lag` (the player's latency,
+-- capped) is how far behind the server's clock the rider's screen shows Pip.
+function TR.inRing(seed: number, t: number, x: number, z: number, lag: number, cfg: any): (boolean, number)
+	local st = cfg.stamina
+	local pony = TC.ponyAt(seed, t - lag)
+	local d, lat = TC.ovalProject(x, z)
+	local behind = TC.wrap(pony.d - d)
+	return behind >= st.ringNear and behind <= st.ringFar and math.abs(lat - pony.lateral) <= st.ringHalfWidth, behind
+end
+
+function TR.scoreStamina(kept: { Sample }, seed: number, lag: number, cfg: any): (number, any)
+	local endT = TC.idealSeconds("stamina", seed)
+	local n, inside = 0, 0
+	for _, s in kept do
+		if s.t >= cfg.stamina.grace and s.t <= endT then
+			n += 1
+			if TR.inRing(seed, s.t, s.x, s.z, lag, cfg) then inside += 1 end
+		end
+	end
+	local share = if n > 0 then inside / n else 0
+	return 100 * share, { share = share, samples = n, inRing = inside, finishT = endT }
+end
+
 -- Validate, score and finalize a whole ride. `seconds` is the ride time the server measured
 -- (its tracker's finish, or the time when the ride ran out).
-function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?)
+-- opts: { seed, allowance } for Gate Break and Hill Climb.
+function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?, opts: any?)
+	local o = opts or {}
 	local kept, bad, counts = TR.validate(samples, function(x: number, z: number): boolean return TC.onCourse(key, x, z) end, cfg)
 	local raw, detail
 	if key == "speed" then
 		raw, detail = TR.scoreSpeed(kept, cfg)
 	elseif key == "grit" then
 		raw, detail = TR.scoreGrit(kept, cfg)
+	elseif key == "accel" then
+		raw, detail = TR.scoreAccel(kept, o.seed or 1, o.allowance or 0, cfg)
+	elseif key == "stamina" then
+		raw, detail = TR.scoreStamina(kept, o.seed or 1, o.allowance or 0, cfg)
 	else
 		return nil
 	end
 	local secs = seconds or detail.finishT or (if #samples > 0 then samples[#samples].t else 0)
 	local res = TR.finalize(raw, bad, secs, TC.idealSeconds(key), cfg)
 	res.detail, res.course, res.kept, res.counts = detail, key, #kept, counts
-	res.scored = if key == "speed" then detail.hoops else detail.mud + detail.logs + detail.poles
+	res.scored = if key == "speed" then detail.hoops
+		elseif key == "grit" then detail.mud + detail.logs + detail.poles
+		elseif key == "accel" then detail.scored
+		else detail.inRing
 	return res
 end
 

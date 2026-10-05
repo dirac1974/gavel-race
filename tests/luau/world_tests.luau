@@ -126,7 +126,7 @@ local function trainingGroundTests(check: (boolean, string) -> (), close: (numbe
 	end
 	if not (ac.stall[1] < ac.start.x and ac.start.x < ac.stall[3]) then infieldOk = false end
 	check(infieldOk, "practice gate, lane and loop inside the infield")
-	check(close(ac.flag.ax - ac.stall[3], TCfg.accel.dash, 1e-9), "the flag is the dash length from the gate")
+	check(close(ac.flag.ax - ac.doorX, TCfg.accel.dash, 1e-9), "the flag is the dash length from the gate")
 
 	-- Hill Climb: Pip is deterministic, keeps to the track and to its pace range.
 	local p1, p2 = TC.ponyAt(42, 12.3), TC.ponyAt(42, 12.3)
@@ -736,6 +736,305 @@ local function trainingJitterTests(check: (boolean, string) -> (), close: (numbe
 	gTr.next = 4
 	check(TR.timeoutCounts({ scored = 0 }, gTr) and not TR.timeoutCounts({ scored = 0 }, TR.tracker("grit"))
 		and TR.timeoutCounts({ scored = 1 }, TR.tracker("grit")), "Mud Splash timeouts: past three pieces or one scored")
+end
+
+-- Training rides T3: Gate Break, Hill Climb, Easy Rein (D-053).
+local function trainingT3Tests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local TR = require("../../game/src/shared/TrainingRide")
+	local TapTime = require("../../game/src/shared/TapTime")
+	local CFG = GameConfig.training
+	local HZ = CFG.sampleHz
+	local ac = TC.courses.accel
+	local A = CFG.accel
+	local gz = ac.start.z
+	local SEED = 4242
+
+	-- Gate Break rides from a script: each break waits for the bell (or not), gallops to the
+	-- flag and canters round the loop back into the stall. `react[b]` is the delay after the
+	-- bell before setting off (negative = early). Samples every 0.1 s on the server clock.
+	local function gateRide(react: { number }, opts: any?)
+		local o = opts or {}
+		local samples = {}
+		local t = 0
+		local x, z = ac.start.x, gz
+		local function push()
+			local sx, sz = x, z
+			if o.freeze and o.freeze(#samples) and #samples > 0 then
+				local last = samples[#samples]
+				sx, sz = last.x, last.z
+			end
+			table.insert(samples, { t = t, x = sx, y = 0, z = sz })
+			t = math.floor((t + 1 / HZ) * 1000 + 0.5) / 1000
+		end
+		local function stand(seconds: number)
+			local n = math.floor(seconds * HZ + 0.5)
+			for _ = 1, n do push() end
+		end
+		local function gallopTo(tx: number, speed: number)
+			while math.abs(tx - x) > 1e-6 do
+				local step = math.min(speed / HZ, math.abs(tx - x))
+				x += if tx > x then step else -step
+				push()
+			end
+		end
+		local function loopBack()
+			local pts = ac.route.points
+			local k = 1
+			-- from the flag, follow the loop (canter) back to the start
+			while k < #pts and pts[k].x < x - 0.5 do k += 1 end
+			for i = k, #pts do
+				local px, pz = pts[i].x, pts[i].z
+				local dx, dz = px - x, pz - z
+				local len = math.sqrt(dx * dx + dz * dz)
+				local steps = math.max(1, math.ceil(len / (CFG.canter / HZ)))
+				for _ = 1, steps do
+					x += dx / steps
+					z += dz / steps
+					push()
+				end
+			end
+			x, z = ac.start.x, gz
+			push()
+		end
+		local tr = TR.tracker("accel", { seed = SEED, allowance = o.allowance or 0 })
+		local sc = TR.screener(nil) -- fed as the server feeds it: screened samples
+		local function feed(i: number)
+			local kind, k = TR.screen(sc, samples[i], CFG)
+			if kind == "ok" then TR.feed(tr, k, CFG) end
+		end
+		local b, attempt = 1, 1
+		local guard = 0
+		while b <= #react and guard < 20 do
+			guard += 1
+			-- stand in the stall until armed
+			local armedAt = nil
+			local feedFrom = #samples + 1
+			local waits = 0
+			while not armedAt and waits < 100 do
+				waits += 1
+				stand(0.1)
+				for i = feedFrom, #samples do feed(i) end
+				feedFrom = #samples + 1
+				for _, e in tr.events do
+					if e.kind == "armed" then armedAt = e.bellT end
+				end
+				table.clear(tr.events)
+			end
+			if not armedAt then break end
+			local bellT = armedAt :: number
+			local r = react[b]
+			if r < 0 and attempt == 1 and o.rerunReact then
+				-- go early, then come back for the rerun
+				while t < bellT + r do stand(0.1) end
+				gallopTo(x + 30, CFG.gallop)
+				gallopTo(ac.start.x, CFG.canter)
+				attempt = 2
+				react[b] = o.rerunReact[b]
+			else
+				while t < bellT + r do stand(0.1) end
+				gallopTo(ac.flag.ax + 6, CFG.gallop)
+				loopBack()
+				b += 1
+				attempt = 1
+			end
+			for i = feedFrom, #samples do feed(i) end
+			table.clear(tr.events)
+		end
+		return samples, tr
+	end
+
+	-- Bell times come from the seed.
+	local bellsOk = true
+	for n = 1, 50 do
+		local d = TC.bellDelay(SEED, n)
+		if d < A.bellMin or d > A.bellMax or d ~= TC.bellDelay(SEED, n) then bellsOk = false end
+	end
+	check(bellsOk and TC.bellDelay(SEED, 1) ~= TC.bellDelay(SEED, 2) and TC.bellDelay(1, 1) ~= TC.bellDelay(2, 1),
+		"bell delays: 1.5-3.5 s, the same for a seed, different per break and seed")
+
+	-- Reaction scores.
+	check(TR.breakScore(0.3, CFG) == 100 and TR.breakScore(A.fullReact, CFG) == 100 and TR.breakScore(A.zeroReact, CFG) == A.breakFloor
+		and TR.breakScore(5, CFG) == A.breakFloor and close(TR.breakScore(1.25, CFG), 70, 1e-9), "break score: 100 to 0.5 s, 40 at 2 s and after")
+	local samples, tr = gateRide({ 0.2, 0.3, 0.4 })
+	local raw, detail = TR.scoreAccel(TR.validate(samples, function(x, z) return TC.onCourse("accel", x, z) end, CFG), SEED, 0, CFG)
+	check(tr.finished and detail.scored == 3 and raw == 100 and detail.quick == 3, string.format("three quick starts score 100 (%.1f)", raw))
+	check(detail.finishT ~= nil and detail.finishT > 30 and detail.finishT < TC.parSeconds("accel"), string.format("Gate Break under par (%.1f s)", detail.finishT or -1))
+	local res = TR.run("accel", samples, CFG, tr.finishT, { seed = SEED, allowance = 0 })
+	check(res.score == 100 and res.ribbon == "gold" and res.stars == 3 and res.scored == 3, "a quick Gate Break: gold")
+	local slowS = gateRide({ 1.25, 1.25, 3 })
+	local slowRaw, slowD = TR.scoreAccel(TR.validate(slowS, nil, CFG), SEED, 0, CFG)
+	-- (a scripted start lands on the 0.1 s sample grid, so a reaction reads within 0.1 s of it)
+	local r1 = slowD.breaks[1].reaction
+	check(r1 >= 1.15 - 1e-9 and r1 <= 1.35 + 1e-9 and close(slowD.breaks[1].score, TR.breakScore(r1, CFG), 1e-9)
+		and slowD.breaks[3].score == A.breakFloor and slowRaw < 70, string.format("slow starts score less, no fail (reaction %.2f s)", r1))
+
+	-- The latency allowance comes off each reaction, capped at 0.3 s.
+	local lagS = gateRide({ 0.75, 0.75, 0.75 })
+	local noAllow = TR.scoreAccel(TR.validate(lagS, nil, CFG), SEED, 0, CFG)
+	local allowance = TapTime.rewindAllowance(2 * 0.12, GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
+	local withAllow, wd = TR.scoreAccel(TR.validate(lagS, nil, CFG), SEED, allowance, CFG)
+	local _, nd = TR.scoreAccel(TR.validate(lagS, nil, CFG), SEED, 0, CFG)
+	local shifted = true
+	for b = 1, A.breaks do
+		if not close(nd.breaks[b].reaction - wd.breaks[b].reaction, allowance, 1e-9) then shifted = false end
+	end
+	check(withAllow > noAllow and shifted, string.format("the latency allowance comes off every reaction (%.0f -> %.0f)", noAllow, withAllow))
+	check(TapTime.rewindAllowance(2 * 2, GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds) == 0.3, "allowance capped at 0.3 s")
+
+	-- Going early reruns the break once; early again scores the floor.
+	local earlyS, earlyTr = gateRide({ -0.6, 0.3, 0.3 }, { rerunReact = { 0.3 } })
+	local earlyRaw, earlyD = TR.scoreAccel(TR.validate(earlyS, nil, CFG), SEED, 0, CFG)
+	check(earlyTr.finished and earlyD.scored == 3 and earlyRaw == 100, "an early go reruns the break, and the rerun counts")
+	local early2S = gateRide({ -0.6, 0.3, 0.3 }, { rerunReact = { -0.4 } })
+	local _, early2D = TR.scoreAccel(TR.validate(early2S, nil, CFG), SEED, 0, CFG)
+	check(early2D.breaks[1].early == true and early2D.breaks[1].score == A.breakFloor and early2D.scored == 3, "early twice: that break scores 40")
+	local evTr = TR.tracker("accel", { seed = SEED })
+	local kinds = {}
+	for _, s in TR.validate(earlyS, nil, CFG) do
+		TR.feed(evTr, s, CFG)
+		for _, e in evTr.events do table.insert(kinds, e.kind) end
+		table.clear(evTr.events)
+	end
+	check(kinds[1] == "armed" and kinds[2] == "early" and kinds[3] == "armed" and kinds[4] == "go" and kinds[5] == "flag",
+		"events: Ready, Wait for the bell!, Ready, go, flag")
+
+	-- A start only counts from inside the stall: a horse waiting outside is never readied.
+	local outside = {}
+	for k = 0, 80 do table.insert(outside, { t = k / HZ, x = ac.start.x, y = 0, z = gz + 10 }) end
+	local outTr = TR.tracker("accel", { seed = SEED })
+	for _, s in outside do TR.feed(outTr, s, CFG) end
+	check(outTr.arms == 0 and outTr.results[1] == nil and outTr.phase == "settle", "no Ready outside the stall")
+	-- Drifting out of the stall before the bell is an early go.
+	local drift = {}
+	for k = 0, 8 do table.insert(drift, { t = k / HZ, x = ac.start.x, y = 0, z = gz }) end
+	for k = 1, 12 do table.insert(drift, { t = (8 + k) / HZ, x = ac.start.x, y = 0, z = gz + k * 0.45 }) end
+	local driftTr = TR.tracker("accel", { seed = SEED })
+	local sawEarly = false
+	for _, s in drift do
+		TR.feed(driftTr, s, CFG)
+		for _, e in driftTr.events do if e.kind == "early" then sawEarly = true end end
+		table.clear(driftTr.events)
+	end
+	check(sawEarly and driftTr.attempt == 2, "leaving the stall slowly before the bell is early too")
+
+	-- Network freezes (the Sprint Lane fix): frozen samples around the bell and on the dash.
+	local frozenS = gateRide({ 0.2, 0.3, 0.4 }, { freeze = function(i: number): boolean return i % 9 == 4 end })
+	local fk, fbad, fcounts = TR.validate(frozenS, nil, CFG)
+	local fraw, fd = TR.scoreAccel(fk, SEED, 0, CFG)
+	check(fcounts.stale > 10 and fbad <= CFG.maxBadShare and fd.scored == 3 and fraw >= 95,
+		string.format("freezes don't spoil Gate Break (%.0f, %d stale, %.2f bad)", fraw, fcounts.stale, fbad))
+	-- The live screener and a replay see the same kept samples.
+	local sc = TR.screener(nil)
+	local live = TR.tracker("accel", { seed = SEED })
+	for _, s in frozenS do
+		local kind, k = TR.screen(sc, s, CFG)
+		if kind == "ok" then TR.feed(live, k, CFG) end
+	end
+	local liveTotal = 0
+	for b = 1, A.breaks do liveTotal += (live.results[b] and live.results[b].score or 0) end
+	check(close(liveTotal / A.breaks, fraw, 1e-9) and close(TR.badShare(sc), fbad, 1e-12), "live screening matches the replay")
+	check(TR.progressShare(TR.tracker("accel")) == 0, "Gate Break progress starts at 0")
+
+	-- Hill Climb: ring scoring against ponyAt.
+	local ST = CFG.stamina
+	local endT = TC.idealSeconds("stamina", SEED)
+	local function follow(behind: number, latFn: ((number, any) -> number)?, delay: number?)
+		local out = {}
+		local k = 0
+		while k / HZ <= endT + 0.5 do
+			local t = k / HZ
+			local pony = TC.ponyAt(SEED, t - (delay or 0))
+			local lat = if latFn then latFn(t, pony) else pony.lateral
+			local x, z = TC.ovalPoint(pony.d - behind, lat)
+			table.insert(out, { t = t, x = x, y = 0, z = z })
+			k += 1
+		end
+		return out
+	end
+	local perfectH = follow(16)
+	local hraw, hd = TR.scoreStamina(TR.validate(perfectH, nil, CFG), SEED, 0, CFG)
+	check(hraw == 100 and hd.samples > 300, "staying in the middle of Pip's ring scores 100")
+	local hres = TR.run("stamina", perfectH, CFG, endT, { seed = SEED, allowance = 0 })
+	check(hres.score == 100 and hres.ribbon == "gold" and hres.badShare == 0, "a perfect Hill Climb: gold")
+	local lagRaw = TR.scoreStamina(TR.validate(follow(30), nil, CFG), SEED, 0, CFG)
+	check(lagRaw == 0, "lagging 30 studs behind Pip is outside the ring")
+	local closeRaw = TR.scoreStamina(TR.validate(follow(5), nil, CFG), SEED, 0, CFG)
+	check(closeRaw == 0, "too close behind Pip is outside the ring too")
+	local straightRaw = TR.scoreStamina(TR.validate(follow(16, function() return 0 end), nil, CFG), SEED, 0, CFG)
+	local wideRaw = TR.scoreStamina(TR.validate(follow(16, function(_, pony) return -pony.lateral end), nil, CFG), SEED, 0, CFG)
+	check(straightRaw > 50 and straightRaw < 100 and wideRaw < straightRaw,
+		string.format("weaving with Pip beats riding straight (%.0f), which beats weaving the wrong way (%.0f)", straightRaw, wideRaw))
+	local graceRaw = TR.scoreStamina(TR.validate(follow(16, function(t, pony) return if t < ST.grace then 11 else pony.lateral end), nil, CFG), SEED, 0, CFG)
+	check(graceRaw == 100, "the first 3 s don't count")
+	-- The rider's screen shows Pip a little late; the allowance makes up for it.
+	local laggy = follow(16, nil, 0.3)
+	local lagNo = TR.scoreStamina(TR.validate(laggy, nil, CFG), SEED, 0, CFG)
+	local lagYes = TR.scoreStamina(TR.validate(laggy, nil, CFG), SEED, 0.3, CFG)
+	check(lagYes == 100 and lagNo < lagYes, string.format("Pip's clock allowance (%.0f -> %.0f)", lagNo, lagYes))
+	-- Freezes don't spoil it.
+	local frozenH = follow(16)
+	for i = 30, #frozenH, 23 do
+		frozenH[i] = { t = frozenH[i].t, x = frozenH[i - 1].x, y = 0, z = frozenH[i - 1].z }
+	end
+	local fh = TR.scoreStamina(TR.validate(frozenH, nil, CFG), SEED, 0, CFG)
+	check(fh == 100, "freezes are skipped, not counted out of the ring")
+
+	-- Server and client agree on Pip: no hidden state, any order, any seed.
+	local agree = true
+	for _, seed in { 1, SEED, 99999 } do
+		local forward = {}
+		for k = 0, 400 do forward[k] = TC.ponyAt(seed, k * 0.1) end
+		for k = 400, 0, -7 do
+			local p2 = TC.ponyAt(seed, k * 0.1)
+			if p2.x ~= forward[k].x or p2.z ~= forward[k].z or p2.speed ~= forward[k].speed then agree = false end
+		end
+		local inA = TR.inRing(seed, 12.3, forward[123].x, forward[123].z, 0, CFG)
+		local inB = TR.inRing(seed, 12.3, forward[123].x, forward[123].z, 0, CFG)
+		if inA ~= inB then agree = false end
+	end
+	check(agree, "ponyAt gives the same Pip on server and client, in any order")
+
+	-- Ideal times stay 35-50 s with Gate Break's settle.
+	check(TC.idealSeconds("accel") >= 35 and TC.idealSeconds("accel") <= 50, string.format("Gate Break ideal %.1f s", TC.idealSeconds("accel")))
+
+	-- Easy Rein aims: a point ahead on the track, or along a route without jumping lanes.
+	local ox, oz = TC.ovalCarrot(800, -55, 14, 3)
+	local od, ol = TC.ovalProject(ox, oz)
+	check(close(TC.wrap(od - TC.ovalProject(800, -55)), 14, 1e-6) and close(ol, 3, 1e-6), "oval aim: 14 studs on, at the lateral asked")
+	local gr = TC.courses.grit
+	local lane2 = gr.laneZ(2)
+	local cx, cz, hint = TC.routeCarrot(gr.route, gr.laneX[1] + 40, gr.laneZ(1), 1, 12)
+	check(math.abs(cz - gr.laneZ(1)) < 0.5 and cx > gr.laneX[1] + 40 and hint >= 1, "route aim stays in your lane, ahead of you")
+	local _, cz2 = TC.routeCarrot(gr.route, gr.laneX[1] + 40, gr.laneZ(1) + 9, hint, 12)
+	check(math.abs(cz2 - lane2) > 5, "a lane next door is never mistaken for yours")
+	local ax, az = TC.routeCarrot(ac.route, ac.flag.ax - 30, gz, 1, 12)
+	check(close(az, gz, 1e-6) and close(ax, ac.flag.ax - 18, 1e-6), "Gate Break aim runs down the lane")
+
+	-- The practice gate never stops a horse (#38 gave ride rigs a shins collider): WorldScene
+	-- puts every part of it in CourseProps with collisions off. (A source check: WorldScene
+	-- needs Roblox to run.)
+	local fs = require("@lune/fs")
+	local scene = fs.readFile("game/src/server/WorldScene.luau")
+	local a = string.find(scene, "Gate Break: the practice gate", 1, true)
+	local b = a and string.find(scene, "FlagLine", a, true)
+	local block = if a and b then string.sub(scene, a, b) else ""
+	check(string.find(block, "\"gate_stall\"", 1, true) ~= nil and string.find(block, "CollisionGroups.set(gate, CollisionGroups.PROPS)", 1, true) ~= nil
+		and string.find(block, "d.CanCollide, d.CanQuery, d.CanTouch = false, false, false", 1, true) ~= nil,
+		"the practice gate is CourseProps with collisions off")
+	local groups = fs.readFile("game/src/server/CollisionGroups.luau")
+	check(string.find(groups, "collidable(CollisionGroups.PROPS, CollisionGroups.TRAINING, false)", 1, true) ~= nil
+		and string.find(groups, "collidable(CollisionGroups.PROPS, CollisionGroups.RIDE, false)", 1, true) ~= nil,
+		"CourseProps never collides with ride horses")
+
+	-- Easy Rein setting: off by default, repaired to a boolean.
+	local P = Profile.new(20000 * 86400)
+	check(P.settings.easyRein == false, "Easy Rein is off by default")
+	local junk = Profile.migrate({ settings = { visits = "Friends", easyRein = "yes" } }, 20000 * 86400)
+	local on = Profile.migrate({ settings = { visits = "Friends", easyRein = true } }, 20000 * 86400)
+	local old = Profile.migrate({ settings = { visits = "Friends" } }, 20000 * 86400)
+	check(junk.settings.easyRein == false and on.settings.easyRein == true and old.settings.easyRein == false, "Easy Rein repaired on load")
+	check(Profile.view(on, 20000 * 86400, GameConfig.energy).settings.easyRein == true, "the owner sees Easy Rein")
 end
 
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
@@ -1414,5 +1713,6 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	trainingGroundTests(check, close)
 	trainingRideTests(check, close)
 	trainingJitterTests(check, close)
+	trainingT3Tests(check, close)
 
 end
