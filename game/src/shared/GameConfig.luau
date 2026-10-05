@@ -26,7 +26,8 @@ GameConfig.leaguePoints = { 10, 6, 4, 2 }        -- 1st..4th; everyone else gets
 GameConfig.finishPoints = 1
 -- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py)
 GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 1400, Gold = 3000 }
-GameConfig.maxTapRewindSeconds = 0.3             -- D-010 latency allowance
+GameConfig.maxTapRewindSeconds = 0.3             -- cap on the per-player latency allowance (D-021)
+GameConfig.tapJitterMarginSeconds = 0.05         -- added to measured one-way latency (D-021)
 GameConfig.missedTapScore = 0
 GameConfig.botScoreMean = 50
 GameConfig.botScoreSd = 15

@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — fix: tap-time allowance follows measured latency (D-021)
 - 2026-10-04 — Clap Along crowd boost (D-020); gavel tap-time exploit added to the anti-cheat backlog
 - 2026-10-04 — Spectator cheering (D-019), research on prediction games, hard rule 1 clarified
 - 2026-10-04 — Merge local PR #1 history with cloud history; fix stale docs (D-013 thresholds, D-010 meter, whole-cash purse example); CI runs v1; D-018

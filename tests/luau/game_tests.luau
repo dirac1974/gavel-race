@@ -47,6 +47,25 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(GavelMeter.resolveTapTime(10.5, 10.2, 9, 12, 0.3) == 10.2, "future claim falls back to arrival")
 	check(GavelMeter.resolveTapTime(12.1, 12.2, 9, 12, 0.3) == nil, "tap after the window is rejected")
 
+	-- D-021: the allowance follows measured latency, not a flat 0.3 s
+	check(close(GavelMeter.rewindAllowance(0.1, 0.05, 0.3), 0.1, 1e-12), "allowance = one-way latency + margin")
+	check(close(GavelMeter.rewindAllowance(0, 0.05, 0.3), 0.05, 1e-12), "zero ping (Studio) leaves just the margin")
+	check(close(GavelMeter.rewindAllowance(-1, 0.05, 0.3), 0.05, 1e-12), "negative ping treated as zero")
+	check(close(GavelMeter.rewindAllowance(2.0, 0.05, 0.3), 0.3, 1e-12), "allowance is capped")
+	local lowPing = GavelMeter.rewindAllowance(0.03, 0.05, 0.3) -- 65 ms
+	check(GavelMeter.resolveTapTime(10.2, 10.25, 9, 12, lowPing) == 10.2, "honest claim inside the allowance is used")
+	check(GavelMeter.resolveTapTime(10.0, 10.25, 9, 12, lowPing) == 10.25, "claim 250 ms back is refused on a 30 ms ping")
+
+	-- The old exploit: wait until the marker passes the center, then claim that moment.
+	-- With a 65 ms allowance, a tap sent 250 ms after center is scored where the marker is.
+	local rookie = { sweepSeconds = 2.4, targetDrift = 0, twoTargets = false }
+	local center = 2.4 / 4
+	local sent = center + 0.25
+	local t = GavelMeter.resolveTapTime(center, sent, 0, 4, lowPing) :: number
+	check(GavelMeter.score(t, rookie) < 60, "rewind exploit no longer scores a perfect tap")
+	local tOld = GavelMeter.resolveTapTime(center, sent, 0, 4, 0.3) :: number
+	check(close(GavelMeter.score(tOld, rookie), 100, 1e-9), "flat 0.3 s allowance would have scored 100 (documents the hole)")
+
 	-- RaceSession ----------------------------------------------------------
 	local deps = { RaceMath = RaceMath, GavelMeter = GavelMeter }
 	local humans = {
