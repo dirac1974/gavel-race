@@ -13,7 +13,8 @@ local Profile = {}
 
 Profile.VERSION = 1
 Profile.START_CASH = 50
-Profile.START_ITEMS = { hay = 10, carrot = 3 }
+Profile.START_ITEMS = { hay = 10, carrot = 3, seed_carrot = 2 }
+Profile.SEEDS = { seed_carrot = true, seed_apple = true, seed_oats = true } -- garden beds accept only these
 Profile.START_STALLS = 2
 Profile.MAX_STALLS = 6
 Profile.ITEMS = { "hay", "grain", "carrot", "apple", "oats", "treat", "seed_carrot", "seed_apple", "seed_oats" }
@@ -104,7 +105,7 @@ function Profile.migrate(data: any, now: number): Profile
 	if typeof(p.garden) == "table" then
 		for i = 1, Profile.BEDS do
 			local b = p.garden[i]
-			if typeof(b) == "table" and typeof(b.seed) == "string" then
+			if typeof(b) == "table" and typeof(b.seed) == "string" and (b.seed == "" or Profile.SEEDS[b.seed]) then
 				garden[i] = { seed = b.seed, at = tonumber(b.at) or 0 }
 			end
 		end

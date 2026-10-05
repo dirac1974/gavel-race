@@ -72,6 +72,10 @@ end
 closeBtn.Activated:Connect(closeCard)
 dim.Activated:Connect(closeCard)
 local function openCard(text: string, height: number?)
+	if onClose then
+		onClose()
+		onClose = nil
+	end
 	body:ClearAllChildren()
 	title.Text = text
 	card.Size = UDim2.fromOffset(560, height or 380)
@@ -274,7 +278,7 @@ local function shopCard()
 	grid.Position = UDim2.new(0, 0, 0, 34)
 	grid.Parent = body
 	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.new(1 / 3, -8, 0, 118)
+	layout.CellSize = UDim2.new(1 / 3, -10, 0, 118)
 	layout.CellPadding = UDim2.fromOffset(12, 10)
 	layout.Parent = grid
 	local labels = {}
@@ -291,10 +295,7 @@ local function shopCard()
 	end
 	local sell = Ui.button(body, "Sell crops", UDim2.fromOffset(170, 44), UDim2.new(0.5, -85, 1, -50), C.teal, 20)
 	sell.Activated:Connect(function()
-		for item in Care.SELL do
-			local n = count(item)
-			if n > 5 then remote("Shop"):FireServer("sell", item, n - 5) end -- keep 5 of each for treats
-		end
+		remote("Shop"):FireServer("sellAll", "crops", 5) -- keeps 5 of each for treats
 	end)
 	local function refresh()
 		if not gui.Enabled then return end
@@ -323,18 +324,23 @@ end
 
 local function attachBarn(barn: Instance)
 	if barn:GetAttribute("Owner") ~= player.UserId then return end
+	-- Stall k holds the k-th horse (StableService); both prompts hang on its half door, which
+	-- is where a kid stands (the horse itself is too far into the barn to reach).
+	local d = PlayerState.data
 	for _, m in barn:GetChildren() do
-		if m:IsA("Model") and string.sub(m.Name, 1, 6) == "Horse_" then
-			local id = string.sub(m.Name, 7)
-			local h = PlayerState.horse(id)
-			local anchor = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true)
-			if anchor and not anchor:FindFirstChild("CarePrompt") then
-				prompt(anchor, "Care", h and h.name or "Horse").Triggered:Connect(function() horseCard(id) end)
-			end
-		elseif m:IsA("BasePart") and string.sub(m.Name, 1, 5) == "Stall" then
+		if m:IsA("BasePart") and string.sub(m.Name, 1, 5) == "Stall" then
 			local stall = tonumber(string.sub(m.Name, 6))
 			if stall and not m:FindFirstChild("CarePrompt") then
-				prompt(m, "Muck out", "Stall", Enum.KeyCode.F, 1.2).Triggered:Connect(function()
+				local h = d and d.horses[stall]
+				if h then
+					local id = h.id
+					local p = prompt(m, "Care", h.name)
+					p.UIOffset = Vector2.new(0, 40)
+					p.Triggered:Connect(function() horseCard(id) end)
+				end
+				local chore = prompt(m, "Muck out", "Stall", Enum.KeyCode.F, 1.2)
+				chore.Name = "ChorePrompt"
+				chore.Triggered:Connect(function()
 					remote("Chore"):FireServer(stall)
 				end)
 			end

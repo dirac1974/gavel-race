@@ -91,7 +91,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 
 	-- Profile ------------------------------------------------------------------------
 	local p = Profile.new(T0)
-	check(p.cash == Profile.START_CASH and Profile.itemCount(p, "hay") == 10 and #p.horses == 0, "new profile")
+	check(p.cash == Profile.START_CASH and Profile.itemCount(p, "hay") == 10 and Profile.itemCount(p, "seed_carrot") == 2 and #p.horses == 0, "new profile")
 	check(Profile.touchDay(p, T0) and not Profile.touchDay(p, T0 + 60) and p.days.played == 1, "first visit of the day counts once")
 	check(Profile.touchDay(p, T0 + 3 * 86400) and p.days.played == 2, "a missed day never resets the count")
 	check(Profile.spendCash(p, 20) and p.cash == 30 and not Profile.spendCash(p, 31) and p.cash == 30, "can't overspend")
@@ -254,6 +254,12 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	cp.items.apple = 3
 	check(Care.sell(cp, "apple", 3) and cp.cash == 16 and cp.items.apple == nil, "sell apples")
 	check(not Care.sell(cp, "hay", 1), "hay isn't bought back")
+	cp.items.carrot, cp.items.oats = 8, 2
+	local cashS = cp.cash
+	check(Care.sellAll(cp, 5) and cp.items.carrot == 5 and cp.items.oats == 2 and cp.cash == cashS + 3, "sell all keeps 5 of each")
+	check(not Care.sellAll(cp, 5), "nothing left to sell")
+	local bad = Profile.migrate({ garden = { { seed = "seed_moon", at = 5 }, { seed = "seed_oats", at = 7 } } }, T0)
+	check(bad.garden[1].seed == "" and bad.garden[2].seed == "seed_oats", "unknown seeds are cleared on load")
 
 	-- Garden and chores survive migration.
 	cp.garden[2] = { seed = "seed_oats", at = T0 }
