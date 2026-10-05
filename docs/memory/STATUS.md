@@ -54,6 +54,11 @@ Last updated: 2026-10-04
 - `MarketService`: corral horses and signs from the stock, buy/tame/build stall/swap/rename remotes with checks; market added to the profile view (`Profiles.addDecorator`).
 - `WildHorses`: deterministic wandering wild horses in the meadow (same on every client) and the gentle trust game. `HorsesClient`: My Horses panel and Market cards. Pasture horses graze in your yard.
 
+**Stage 9 — Leagues** (branch `claude/stage9-leagues`, stacked on Stage 8):
+- `Leagues` (pure, tested): Rookie → Champion, Stakes unlock at D-013 points or over the league ceiling (Rookie 58, Bronze 68, Silver 78, Gold 88 best base Rating), Stakes win promotes and resets points, entry rules (own league, Practice always), Hall of Fame plaques on retiring.
+- `RaceService`: cards open until the first rider sets league and kind (race, Stakes, Practice); Practice pays nothing, Stakes winner gets 3B and moves up; Energy per card; Bronze adds the Classic.
+- Picker race kinds, My Horses league line, retire with Hall of Fame, board advice for open Stakes.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.

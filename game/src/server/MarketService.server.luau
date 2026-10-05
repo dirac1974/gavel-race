@@ -22,6 +22,8 @@ local Tame = Profiles.remote("Tame")               -- client -> server: wild coa
 local BuyStall = Profiles.remote("BuyStall")       -- client -> server
 local SwapStall = Profiles.remote("SwapStall")     -- client -> server: stalled id, pasture id
 local Rename = Profiles.remote("RenameHorse")      -- client -> server: horse id, first word, second word
+local Retire = Profiles.remote("RetireHorse")      -- client -> server: horse id (player's choice, D-046)
+local Leagues = require(Shared:WaitForChild("Leagues"))
 
 local last: { [Player]: number } = {}
 local function busy(player: Player, gap: number?): boolean
@@ -146,6 +148,21 @@ Rename.OnServerEvent:Connect(function(player: Player, id: any, first: any, secon
 	local ok, msg = Market.rename(data, id, if typeof(first) == "string" then first else nil, if typeof(second) == "string" then second else nil)
 	Profiles.notify(player, msg, "heart")
 	if ok then Profiles.changed(player) end
+end)
+
+Retire.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player, 1) or typeof(id) ~= "string" then return end
+	local data = Profiles.get(player)
+	if not data or player:GetAttribute("Racing") then return end
+	if #data.horses <= 1 then
+		Profiles.notify(player, "Keep at least one horse in your stable!", "heart")
+		return
+	end
+	local plaque = Leagues.retire(data, id, os.time())
+	if plaque then
+		Profiles.notify(player, string.format("%s retires a legend: %d races, %d wins. See the Hall of Fame!", plaque.name, plaque.races, plaque.wins), "trophy")
+		Profiles.changed(player)
+	end
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player) last[player] = nil end)

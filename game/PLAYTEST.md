@@ -149,6 +149,17 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Up to three pasture horses graze in your front yard.
 - [ ] 20 horses at most: the market and taming say your stable is full.
 
+## Leagues (Stage 9, D-013, D-046)
+
+- [ ] An empty course card says "Open · your horse's league"; the first rider's horse sets its league (and Race / 🏆 Stakes / 🎈 Practice).
+- [ ] Below the horses: Race, Stakes ("🏆 64 pts" until unlocked) and Practice; Practice works for tired horses and pays nothing; Bronze races and up cost 1 Energy.
+- [ ] A horse with 100 League Points (Rookie) can enter the Rookie Stakes; winning it pays 3× the league's purse and shows "🏆 … moves up to Bronze!"; its points start again.
+- [ ] A horse whose best Rating passes its league ceiling (Rookie 58) sees "too strong for Rookie races now"; its Stakes opens; Practice stays open.
+- [ ] Joining a card claimed by another league says "That race is for Bronze horses".
+- [ ] Bronze cards can be Sprint, Mile or Classic; Silver and up every distance.
+- [ ] My Horses: league line with points to Stakes or "🏆 Stakes open!"; Retire asks once more, then the horse's plaque appears in the 🏅 Hall of Fame (you can't retire your last horse).
+- [ ] Stable Board suggests "win the Stakes to move up" when it's open.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

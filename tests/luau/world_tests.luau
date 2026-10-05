@@ -343,6 +343,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(tipA.go == "stable" and string.find(tipA.next, "hay") ~= nil, "unfed: a meal is next")
 	local tipB = Advice.forHorse({ name = "Comet", fed = true, groomed = true, resting = false, stats = {} }, { garden = {} }, T0)
 	check(tipB.go == "raceBoard", "cared for and rested: race next")
+	local tipS = Advice.forHorse({ name = "Comet", league = "Rookie", fed = true, groomed = true, resting = false, stakesOpen = true, stats = {} }, { garden = {} }, T0)
+	check(string.find(tipS.next, "Stakes") ~= nil and tipS.go == "raceBoard", "Stakes open: win it to move up")
 	local tipC = Advice.forHorse({ name = "Comet", fed = true, groomed = true, resting = true, stats = {} }, { garden = {} }, T0)
 	local guilt = false
 	for _, tip in { tipA, tipB, tipC } do
@@ -501,4 +503,32 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(not Market.canTame(fp, T0) and not Market.buy(fp, stockA[3].id, T0), "stable full at 20 horses")
 	check(Market.rename(fp, fp.horses[1].id, "Sunny", "Moon") and fp.horses[1].name == "Sunny Moon" and not Market.rename(fp, fp.horses[1].id, "Bad", nil),
 		"rename with word chips only")
+
+	-- Leagues (Stage 9) ---------------------------------------------------------------------
+	local Leagues = require("../../game/src/shared/Leagues")
+	check(Leagues.UNLOCK.Rookie == GameConfig.stakesUnlockPoints.Rookie and Leagues.UNLOCK.Gold == GameConfig.stakesUnlockPoints.Gold,
+		"Stakes thresholds match D-013")
+	local lh = Horse.starter("h30", "Rocket", "bay", rng, T0)
+	check(Leagues.pointsToStakes(lh) == 100 and not Leagues.stakesOpen(lh, 50), "Stakes closed at first")
+	check(Leagues.canEnter(lh, { league = "Rookie" }, 50) and not Leagues.canEnter(lh, { league = "Bronze" }, 50), "own league only")
+	check(not Leagues.canEnter(lh, { league = "Rookie", stakes = true }, 50), "no Stakes before the points")
+	lh.points = 100
+	check(Leagues.stakesOpen(lh, 50) and Leagues.canEnter(lh, { league = "Rookie", stakes = true }, 50), "Stakes open at 100 points")
+	local strong = Horse.starter("h31", "Mighty", "grey", rng, T0)
+	check(Leagues.stakesOpen(strong, 60) and not Leagues.canEnter(strong, { league = "Rookie" }, 60)
+		and Leagues.canEnter(strong, { league = "Rookie", practice = true }, 60), "over-strong: Stakes open, regular closed, Practice open")
+	check(Leagues.promote(lh) == "Bronze" and lh.league == "Bronze" and lh.points == 0, "a Stakes win promotes and resets points")
+	local champ = Horse.starter("h32", "Star", "black", rng, T0)
+	champ.league = "Champion"
+	check(Leagues.promote(champ) == nil and not Leagues.stakesOpen(champ, 99) and Leagues.pointsToStakes(champ) == nil, "Champion is the top")
+	local rp = Profile.new(T0)
+	local r1 = Horse.starter(Profile.newHorseId(rp), "Old Timer", "bay", rng, T0)
+	local r2 = Horse.starter(Profile.newHorseId(rp), "Young One", "grey", rng, T0)
+	Profile.addHorse(rp, r1)
+	Profile.addHorse(rp, r2)
+	r1.record.races, r1.record.wins = 40, 9
+	local plaque = Leagues.retire(rp, r1.id, T0)
+	check(plaque and plaque.wins == 9 and #rp.horses == 1 and rp.activeHorse == r2.id and rp.hallOfFame[1].name == "Old Timer",
+		"retiring keeps a Hall of Fame plaque")
+	check(Leagues.retire(rp, "nope", T0) == nil, "only your horses retire")
 end

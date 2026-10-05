@@ -34,8 +34,9 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local FanService = require(script.Parent:WaitForChild("FanService"))
+local Leagues = require(Shared:WaitForChild("Leagues"))
 
-local LEAGUE = "Rookie" -- every horse is Rookie until leagues arrive (Stage 9)
+local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = 3
 local LATENCY_GRACE = 0.35 -- wait after a segment closes for late packets
 local COURSE_ORDER = { "dirt", "turf" }
@@ -107,12 +108,39 @@ end
 Players.PlayerAdded:Connect(setupPlayer)
 for _, p in Players:GetPlayers() do setupPlayer(p) end
 
-local function newCard(c)
-	local league = GameConfig.leagues[LEAGUE]
+-- A card is open (league nil) until its first rider joins: their horse's league and the race
+-- kind they picked (regular, Stakes or Practice) set it (D-046).
+local function pickDistance(c, leagueName: string): string
+	local league = GameConfig.leagues[leagueName] or GameConfig.leagues[DEFAULT_LEAGUE]
 	local distances = league.distances or DISTANCES
-	local distance = distances[((c.nextDistance - 1) % #distances) + 1]
+	return distances[((c.nextDistance - 1) % #distances) + 1]
+end
+
+local function newCard(c)
+	c.card = { league = nil, stakes = false, practice = false, distance = pickDistance(c, DEFAULT_LEAGUE),
+		surface = c.surface, weather = WEATHERS[math.random(1, #WEATHERS)] }
 	c.nextDistance += 1
-	c.card = { league = LEAGUE, distance = distance, surface = c.surface, weather = WEATHERS[math.random(1, #WEATHERS)] }
+end
+
+local function claimCard(c, leagueName: string, kind: string)
+	c.card.league = leagueName
+	c.card.stakes = kind == "stakes"
+	c.card.practice = kind == "practice"
+	c.card.distance = pickDistance(c, leagueName)
+end
+
+-- A horse's strength for the league ceiling: its best base Rating over every condition,
+-- without care or bond (so caring for a horse never closes races to it).
+local function bestRating(h): number
+	local best = 0
+	for d in RaceRating.DISTANCE_WEIGHTS do
+		for s in RaceRating.SURFACE_SHIFT do
+			for w in RaceRating.WEATHER_SHIFT do
+				best = math.max(best, RaceRating.rating(h.stats, { distance = d, surface = s, weather = w }, 0, 0, nil, 0))
+			end
+		end
+	end
+	return best
 end
 
 local function cardsView()
@@ -123,6 +151,9 @@ local function cardsView()
 		table.insert(out, {
 			course = id,
 			league = card.league,
+			open = card.league == nil,
+			stakes = card.stakes,
+			practice = card.practice,
 			distance = card.distance,
 			surface = card.surface,
 			weather = card.weather,
@@ -145,8 +176,10 @@ local function updateBoard(view)
 	for _, card in view do
 		local status = if card.racing then "racing now" elseif card.seconds then string.format("starts in %ds", card.seconds)
 			elseif card.riders > 0 then "filling" else "open"
+		local kind = if card.stakes then "🏆 Stakes" elseif card.practice then "Practice" else (card.league or "Open")
 		table.insert(lines, string.format("%s %s · %s %s · %d/%d · %s", if card.course == "dirt" then "🟤" else "🟢",
-			card.surface or "", card.league or "", card.distance or "", card.riders, card.lanes, status))
+			card.surface or "", if card.stakes or card.practice then (card.league or "") .. " " .. kind else kind,
+			card.distance or "", card.riders, card.lanes, status))
 	end
 	info.Text = table.concat(lines, "\n")
 end
@@ -168,7 +201,12 @@ local function leaveLine(player: Player)
 	inLine[player] = nil
 	local i = table.find(c.queue, player)
 	if i then table.remove(c.queue, i) end
-	if #c.queue == 0 then c.fillDeadline = nil end
+	if #c.queue == 0 then
+		c.fillDeadline = nil
+		if not c.current and c.card then -- nobody waiting: the card is open again
+			c.card.league, c.card.stakes, c.card.practice = nil, false, false
+		end
+	end
 	QueueStatus:FireClient(player, false, #c.queue, nil, c.id)
 	queueStatus(c)
 end
@@ -218,20 +256,45 @@ end)
 
 -- Joining ----------------------------------------------------------------------------
 -- Can this player ride? Their chosen horse if it's stalled, else the active one.
-local function rideable(player: Player, horseId: string?)
+-- Energy cost of a card for a horse: Practice and Rookie races are free (D-015).
+local function costOf(card, h): number
+	if card.practice or GameConfig.energy.freeLeagues[card.league or h.league] then return 0 end
+	return GameConfig.energy.costPerCashRace
+end
+
+-- Can this player ride on this card? Their chosen horse if it's stalled, else the active one.
+-- `card` is the course's card with the league and kind it would have once they join.
+local function rideable(player: Player, horseId: string?, card)
 	local data = Profiles.get(player)
 	if not data then return nil, "Your stable is still loading" end
 	local h = nil
 	if horseId and Profile.isStalled(data, horseId) then h = Profile.horse(data, horseId) end
 	h = h or Profile.activeHorse(data)
 	if not h then return nil, "Pick your first horse to race" end
-	local league = GameConfig.leagues[LEAGUE]
-	local cost = if GameConfig.energy.freeLeagues[league.name] then 0 else GameConfig.energy.costPerCashRace
-	if cost > 0 and Horse.syncEnergy(h, os.time(), GameConfig.energy) < cost then
-		return nil, h.name .. " is resting. Care for your horse while it naps!"
+	if card then
+		local ok, why = Leagues.canEnter(h, card, bestRating(h))
+		if not ok then return nil, why end
+		local cost = costOf(card, h)
+		if cost > 0 and Horse.syncEnergy(h, os.time(), GameConfig.energy) < cost then
+			return nil, h.name .. " is resting. Try a Practice race, or care for your horse while it naps!"
+		end
 	end
 	return h, nil
 end
+
+-- Each horse in the owner's view: its Stakes status, for the picker and the board.
+Profiles.addDecorator(function(data, view)
+	for i, hv in view.horses or {} do
+		local h = data.horses[i]
+		if h then
+			local best = bestRating(h)
+			hv.stakesOpen = Leagues.stakesOpen(h, best)
+			hv.pointsToStakes = Leagues.pointsToStakes(h)
+			hv.overCeiling = Leagues.overCeiling(h, best)
+		end
+	end
+	view.hallOfFame = data.hallOfFame or {}
+end)
 
 -- With no course picked: join riders already waiting, else a free course, else the shorter line.
 local function bestCourse()
@@ -247,7 +310,7 @@ local function bestCourse()
 end
 
 local lastJoin: { [Player]: number } = {}
-JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any, horseId: any)
+JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any, horseId: any, kind: any)
 	if os.clock() - (lastJoin[player] or 0) < 0.5 then return end
 	lastJoin[player] = os.clock()
 	if want == false then
@@ -261,7 +324,18 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 		Profiles.notify(player, "Both races are full. Try again after these races!", "flag_ready")
 		return
 	end
-	local h, why = rideable(player, if typeof(horseId) == "string" then horseId else nil)
+	kind = if kind == "stakes" or kind == "practice" then kind else "race"
+	-- An open card takes this rider's league and kind; a claimed card must match.
+	local wanted = c.card
+	local claiming = c.card.league == nil and #c.queue == 0 and not c.current
+	if claiming then
+		local data = Profiles.get(player)
+		local pick = data and ((typeof(horseId) == "string" and Profile.isStalled(data, horseId) and Profile.horse(data, horseId)) or Profile.activeHorse(data))
+		wanted = table.clone(c.card)
+		wanted.league = if pick then pick.league else DEFAULT_LEAGUE
+		wanted.stakes, wanted.practice = kind == "stakes", kind == "practice"
+	end
+	local h, why = rideable(player, if typeof(horseId) == "string" then horseId else nil, wanted)
 	if not h then
 		Profiles.notify(player, why, "zzz_resting")
 		if not inLine[player] then QueueStatus:FireClient(player, false, 0, nil, c.id) end
@@ -276,6 +350,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 		return
 	end
 	leaveLine(player)
+	if claiming then claimCard(c, wanted.league, kind) end
 	table.insert(c.queue, player)
 	inLine[player] = c
 	chosen[player] = h.id
@@ -353,16 +428,17 @@ end
 
 local function runRace(c, players: { Player })
 	local rng = Random.new()
-	local league = GameConfig.leagues[LEAGUE]
-	local cond = table.clone(c.card)
-	cond.league = nil
+	local card = table.clone(c.card)
+	local leagueName = card.league or DEFAULT_LEAGUE
+	local league = GameConfig.leagues[leagueName]
+	local cond = { distance = card.distance, surface = card.surface, weather = card.weather }
 	local humans = {}
 	local horseOf: { [number]: string } = {}
 	local coatOf: { [string]: string } = {}
 	local riders = {}
-	local cost = if GameConfig.energy.freeLeagues[league.name] then 0 else GameConfig.energy.costPerCashRace
 	for _, p in players do
-		local h = rideable(p, chosen[p])
+		local h = rideable(p, chosen[p], card)
+		local cost = if h then costOf(card, h) else 0
 		local data = Profiles.get(p)
 		if h and data and not riding[p] and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
 			local rating = Horse.rating(h, cond, os.time(), RaceRating)
@@ -385,7 +461,7 @@ local function runRace(c, players: { Player })
 	local session = RaceSession.new({
 		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape },
 		config = GameConfig,
-		leagueName = LEAGUE,
+		leagueName = leagueName,
 		lanes = lanes,
 		rng = rng,
 	})
@@ -417,7 +493,8 @@ local function runRace(c, players: { Player })
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
 	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
-	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
+	local title = if card.stakes then leagueName .. " Stakes" elseif card.practice then "Practice" else leagueName
+	RaceStarted:FireAllClients(title, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
 	PaceSchedule:FireAllClients(passes, c.id)
 	FanService.start(c.id, session, players, tStart, tFinish) -- cheers and Clap Along (D-019, D-020)
 	task.delay(math.max(0, tStart - now()), function() c.scene:openGate() end) -- and they're off
@@ -538,12 +615,29 @@ local function runRace(c, players: { Player })
 	for _, prize in result.prizes do
 		local laneIdx = session:laneIndex(prize.id)
 		local lane = session.lanes[laneIdx]
-		table.insert(summary, { name = lane.name, place = prize.place, cash = prize.cash, isBot = prize.isBot, id = prize.id, lane = laneIdx })
+		-- Practice pays nothing and earns no points; a Stakes win pays 3B (D-046).
+		local cash, points = prize.cash, prize.leaguePoints
+		if card.practice then
+			cash, points = 0, 0
+		elseif card.stakes and prize.place == 1 and not prize.isBot then
+			cash = Leagues.STAKES_PURSE * league.B
+		end
+		table.insert(summary, { name = lane.name, place = prize.place, cash = cash, isBot = prize.isBot, id = prize.id, lane = laneIdx })
 		if not prize.isBot then
 			local player = Players:GetPlayerByUserId(tonumber(prize.id))
 			local data = player and Profiles.get(player)
 			if data and horseOf[player.UserId] then
-				Profile.recordRace(data, horseOf[player.UserId], prize.place, prize.cash, prize.leaguePoints, os.time())
+				Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+				if card.stakes and prize.place == 1 then
+					local h = Profile.horse(data, horseOf[player.UserId])
+					local nxt = h and Leagues.promote(h)
+					if nxt then
+						task.delay(GameConfig.runInSeconds + 1, function()
+							Profiles.notify(player, string.format("🏆 %s won the %s Stakes and moves up to %s!", h.name, leagueName, nxt), "trophy")
+						end)
+						Progress.record(player, "promote", 1)
+					end
+				end
 				Profiles.changed(player)
 			end
 		end

@@ -27,6 +27,7 @@ local WEATHER_EMOJI = { Sunny = "☀️", Rain = "🌧️", Wind = "🌬️" }
 local cards = {}
 local pickedCourse: string? = nil
 local pickedHorse: string? = nil
+local pickedKind = "race" -- "race" | "stakes" | "practice" (D-046)
 
 local gui = Ui.screen("RacePicker", 11)
 gui.Enabled = false
@@ -79,7 +80,32 @@ hl.FillDirection = Enum.FillDirection.Horizontal
 hl.Padding = UDim.new(0, 10)
 hl.Parent = horseRow
 
-local joinBtn = Ui.button(panel, "Join!", UDim2.fromOffset(260, 62), UDim2.new(0.5, -130, 1, -78), C.orange, 30)
+local renderCards, renderHorses, renderKinds -- defined below; the buttons call them
+local joinBtn = Ui.button(panel, "Join!", UDim2.fromOffset(260, 62), UDim2.new(1, -276, 1, -78), C.orange, 30)
+
+-- Race kind for an open card: a regular race, the Stakes (when the horse has the points, or
+-- is too strong for its league), or Practice (free, no prizes, open to tired horses too).
+local kindRow = Instance.new("Frame")
+kindRow.BackgroundTransparency = 1
+kindRow.Size = UDim2.new(0, 420, 0, 50)
+kindRow.Position = UDim2.new(0, 16, 1, -72)
+kindRow.Parent = panel
+local kl = Instance.new("UIListLayout")
+kl.FillDirection = Enum.FillDirection.Horizontal
+kl.Padding = UDim.new(0, 8)
+kl.Parent = kindRow
+local kindButtons = {}
+local kindAllowed: { [string]: boolean } = { race = true, stakes = false, practice = true }
+for _, k in { { "race", "🏁 Race" }, { "stakes", "🏆 Stakes" }, { "practice", "🎈 Practice" } } do
+	local b = Ui.button(kindRow, k[2], UDim2.fromOffset(130, 46), UDim2.new(), C.white, 18)
+	kindButtons[k[1]] = b
+	b.Activated:Connect(function()
+		if not kindAllowed[k[1]] then return end
+		pickedKind = k[1]
+		renderKinds()
+		renderHorses()
+	end)
+end
 
 -- How well a horse suits these conditions: today's Rating minus its average Rating over
 -- every distance, surface and weather (D-014). Positive = a good day for it.
@@ -114,7 +140,29 @@ local function cardFor(course: string)
 	return nil
 end
 
-local renderCards, renderHorses
+renderKinds = function()
+	local card = pickedCourse and cardFor(pickedCourse)
+	local h = pickedHorse and PlayerState.horse(pickedHorse)
+	local open = card == nil or card.open
+	for kind, b in kindButtons do
+		local allowed = true
+		if not open then
+			allowed = (kind == "stakes" and card.stakes) or (kind == "practice" and card.practice) or (kind == "race" and not card.stakes and not card.practice)
+		elseif h then
+			if kind == "stakes" then allowed = h.stakesOpen == true end
+			if kind == "race" then allowed = not h.overCeiling end
+		end
+		if not open and allowed then pickedKind = kind end
+		if open and not allowed and pickedKind == kind then pickedKind = "practice" end
+		b.BackgroundColor3 = if pickedKind == kind and allowed then C.gold elseif allowed then C.white else C.shade
+		kindAllowed[kind] = allowed
+	end
+	if h and h.pointsToStakes and h.pointsToStakes > 0 then
+		kindButtons.stakes.Text = string.format("🏆 %d pts", h.pointsToStakes)
+	else
+		kindButtons.stakes.Text = "🏆 Stakes"
+	end
+end
 
 local function raceCard(c)
 	local selected = c.course == pickedCourse
@@ -126,7 +174,9 @@ local function raceCard(c)
 		stroke.Color = C.orangeDark
 	end
 	Ui.icon(card, "league_" .. string.lower(c.league or "rookie"), "🎀", UDim2.fromOffset(44, 44), UDim2.new(0, 10, 0, 10))
-	Ui.text(card, string.format("%s %s", c.league or "", if c.course == "dirt" then "· Dirt course" else "· Turf course"), 20,
+	local kindText = if c.open then "Open · your horse's league" elseif c.stakes then "🏆 " .. (c.league or "") .. " Stakes"
+		elseif c.practice then "🎈 Practice" else (c.league or "")
+	Ui.text(card, string.format("%s %s", kindText, if c.course == "dirt" then "· Dirt" else "· Turf"), 20,
 		{ Position = UDim2.new(0, 60, 0, 8), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	Ui.text(card, string.format("%s %s   %s %s   %s", DIST_EMOJI[c.distance] or "🏇", DIST_TEXT[c.distance] or (c.distance or ""),
 		SURF_EMOJI[c.surface] or "", c.surface or "", WEATHER_EMOJI[c.weather] or ""), 18,
@@ -154,7 +204,8 @@ local function raceCard(c)
 		elseif c.riders > 0 then "Filling up…"
 		else "Open · be the first!"
 	Ui.text(card, status, 18, { Position = UDim2.new(0, 10, 0, 104), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.text(card, "🎀 Ribbons and Green Cash · Rookie races are free", 14,
+	Ui.text(card, if c.stakes then "🏆 Win to move up a league!" elseif c.practice then "🎈 Just for fun: no Energy, no prizes"
+		else "🎀 Ribbons and Green Cash", 14,
 		{ Position = UDim2.new(0, 10, 0, 130), Size = UDim2.new(1, -20, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
 	local hit = Instance.new("TextButton")
 	hit.BackgroundTransparency = 1
@@ -171,7 +222,9 @@ end
 
 local function horseCard(h, card)
 	local selected = h.id == pickedHorse
-	local tired = h.resting and h.energy < GameConfig.energy.costPerCashRace and not GameConfig.energy.freeLeagues[(card and card.league) or "Rookie"]
+	local practice = pickedKind == "practice" or (card ~= nil and card.practice)
+	local tired = not practice and h.resting and h.energy < GameConfig.energy.costPerCashRace
+		and not GameConfig.energy.freeLeagues[(card and card.league) or h.league or "Rookie"]
 	local b = Ui.button(horseRow, "", UDim2.fromOffset(200, 96), UDim2.new(), if selected then C.gold elseif tired then C.shade else C.white, 18)
 	local dot = Instance.new("Frame")
 	dot.Size = UDim2.fromOffset(40, 40)
@@ -220,6 +273,7 @@ renderCards = function(force: boolean?)
 	lastCardsKey = key
 	for _, ch in cardRow:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
 	for _, c in cards do raceCard(c) end
+	renderKinds()
 	joinBtn.Text = if pickedCourse then "Join!" else "Pick a race"
 	joinBtn.BackgroundColor3 = if pickedCourse then C.orange else C.shade
 end
@@ -230,6 +284,7 @@ renderHorses = function()
 	for _, h in (PlayerState.data and PlayerState.data.horses) or {} do
 		if h.stalled then horseCard(h, card) end
 	end
+	renderKinds()
 end
 
 local function open()
@@ -263,7 +318,9 @@ closeBtn.Activated:Connect(close)
 dim.Activated:Connect(close)
 joinBtn.Activated:Connect(function()
 	if not pickedCourse then return end
-	raceRemotes:WaitForChild("JoinRace"):FireServer(true, pickedCourse, pickedHorse)
+	local card = cardFor(pickedCourse)
+	local kind = if card and not card.open then (if card.stakes then "stakes" elseif card.practice then "practice" else "race") else pickedKind
+	raceRemotes:WaitForChild("JoinRace"):FireServer(true, pickedCourse, pickedHorse, kind)
 	close()
 end)
 
