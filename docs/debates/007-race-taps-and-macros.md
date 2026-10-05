@@ -67,11 +67,12 @@ Keep the glow centred so Rookies lock in "tap in the glow"; a random start costs
 4. **Detection (David's delta idea):** compare each tap gap to the matching beat gap. Flag when the spread is under 12 ms over 300+ beats across 5+ races on 2+ separate days. Log only for the first month to measure real kids before any penalty.
 5. **Rider ladder:** flag 1 logged only. Flag 2: a private, neutral note with a one-tap "Ask for a check", and until a check clears them or 7 days pass, that rider's cash-race taps count as the race average (removes the edge without punishing). Flag 3: a person reviews the logs, then cash races are paused 7 days (30 on a repeat); Practice, Friend Races, care, and training stay open. No Green Cash or items taken back, strikes expire after 90 days, never public, nobody removed from boards. The Ban API only for proven modified clients.
 6. **Name:** Giddy-up (David's choice).
+7. **Final Burst** (Engagement's minority view, adopted by David as "more crucial"): one random-start meter tap right after the last stretch, counting double in `S` (40%).
 
 ## Minority view
 
 - Child safety: nothing should change at flag 2 before a person has reviewed the logs.
-- Engagement: keep one random-start meter tap as a final burst for the shareable "Perfect!" moment; test it.
+- Engagement: keep one random-start meter tap as a final burst for the shareable "Perfect!" moment. Adopted by David (item 7), weighted double.
 - Name: Child safety prefers "Kick"; Competitive prefers "Stride".
 
 ## Decision
