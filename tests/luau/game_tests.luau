@@ -398,6 +398,19 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	for i = 1, 8 do if not close(preview[i], closed[i], 1e-12) then previewOk = false end end
 	check(previewOk, "stretch-drive preview equals the closed segment")
 
+	-- D-020: a full Clap Along crowd lifts a lane a little (12.5% → about 12.8% when equal).
+	local sc = newSession(31)
+	local sc2 = newSession(31)
+	sc:paceSchedule({ { 10, 36 } }, { { 10, 22 }, { 22, 34 }, { 34, 46 } })
+	sc2:paceSchedule({ { 10, 36 } }, { { 10, 22 }, { 22, 34 }, { 34, 46 } })
+	sc2:setCrowd(1, 0.03)
+	sc:closeSegment(1)
+	sc2:closeSegment(1)
+	local ratio = sc2.live[1] / sc.live[1]
+	check(ratio > 1 and ratio < 1.04, "crowd boost is small and positive")
+	sc2:setCrowd(2, 5)
+	check(sc2.crowd[2] == 0.03, "crowd boost capped at 0.03")
+
 	-- Determinism: same seed, same result.
 	local _, r1 = runRace(42, true, false)
 	local _, r2 = runRace(42, true, false)

@@ -126,6 +126,16 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] The Race Board on Fair Street lists both courses with riders and status, updating each second.
 - [ ] Replay of a turf race shows the turf horses; a race starting on the other course doesn't stop your replay.
 
+## Spectators (Stage 7, D-019, D-020, D-041)
+
+- [ ] Not riding when a race starts: a "Cheer for a horse!" bar with eight lane chips (number, colour, horse name) appears above the dock.
+- [ ] Tap one before the first checkpoint: toast "Cheering for …", the bar shrinks to "Your horse: 3 · …", and a big 👏 CLAP! button appears above the jump button. After the first checkpoint, new cheers aren't allowed.
+- [ ] The ring round CLAP! pulses on the hoofbeat; clapping on it shows Perfect / Great / Good; mashing doesn't help (extra claps count against).
+- [ ] After the race: a ⭐ Top Fans panel (top five: name, horse, score) separate from the results, your own rank, and "+N Fan XP · Fan level N".
+- [ ] Riders never see the cheer bar in their own race; two races at once: the bar follows the race you're watching.
+- [ ] A full crowd only nudges a horse (12.5% → about 12.8%); nothing shows per-fan boosts.
+- [ ] Stable Board: "Cheer for a horse in a race" can appear as a daily job; GO leads to the racetrack.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

@@ -111,6 +111,7 @@ function RaceSession.new(params: {
 			if lane.isBot then self.botScores[seg][i] = math.clamp(gauss(self.rng, mean, sd), 0, 100) end
 		end
 	end
+	self.crowd = {} :: { [number]: number } -- Clap Along boost per lane (D-020), 0..0.03
 	self.closed = 0
 	self.passes = nil :: any
 	self.paceRanges = {} :: { [number]: { number } }
@@ -285,7 +286,7 @@ function RaceSession:closeSegment(seg: number): { number }
 	end
 	self.closed = seg
 	local RaceMath = self.deps.RaceMath
-	self.live = RaceMath.liveChances(self.q, RaceMath.skills(self:scoresSoFar(), self.mathCfg), self.mathCfg)
+	self.live = RaceMath.liveChances(self.q, self:tilts(self:scoresSoFar()), self.mathCfg)
 	return self.live
 end
 
@@ -318,7 +319,7 @@ function RaceSession:previewLive(seg: number, partial: { [number]: number }): { 
 		S[i] = total / wsum
 	end
 	local RaceMath = self.deps.RaceMath
-	return RaceMath.liveChances(self.q, RaceMath.skills(S, self.mathCfg), self.mathCfg)
+	return RaceMath.liveChances(self.q, self:tilts(S), self.mathCfg)
 end
 
 -- On-screen offsets (feet ahead of the pace) for blend weight w (RaceShape).
@@ -328,10 +329,24 @@ end
 
 -- Where lane `i` would have finished riding at the race average (R = 0), all else the same.
 -- Positive gain = their riding won them places (D-033 "Your ride" card).
+-- Skills R from scores, plus each lane's crowd boost as κR + c (D-020): R + c / κ.
+function RaceSession:tilts(S: { number }): { number }
+	local R = self.deps.RaceMath.skills(S, self.mathCfg)
+	for i, c in self.crowd do
+		if R[i] then R[i] += c / self.mathCfg.kappa end
+	end
+	return R
+end
+
+-- Set lane i's crowd boost (Fans.boost of its crowd), used from the next segment close.
+function RaceSession:setCrowd(i: number, c: number)
+	self.crowd[i] = math.clamp(c, 0, 0.03)
+end
+
 function RaceSession:ridingGain(i: number): number
 	local RaceMath, RaceShape = self.deps.RaceMath, self.deps.RaceShape
-	local R = RaceMath.skills(self:scoresSoFar(), self.mathCfg)
-	R[i] = 0
+	local R = self:tilts(self:scoresSoFar())
+	R[i] = (self.crowd[i] or 0) / self.mathCfg.kappa -- riding at the race average, crowd unchanged
 	local liveAvg = RaceMath.liveChances(self.q, R, self.mathCfg)
 	return RaceShape.placeIn(self.luck, liveAvg, i) - RaceShape.placeIn(self.luck, self.live, i)
 end
