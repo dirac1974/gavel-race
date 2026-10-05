@@ -20,8 +20,9 @@ Last updated: 2026-10-04
 3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
 4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
 5. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
-6. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, and Diamonds, to `sims/economy.py`.
-7. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
+6. **Spectator cheering (D-019)**: spectator mode, cheer lock before window 1, Fan XP per tap with per-race and daily caps in `GameConfig.spectator`; tests that riders and their party can't cheer in their own race and that caps hold.
+7. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, Diamonds, and Fan XP (check the D-019 20% rule), to `sims/economy.py`.
+8. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
 
 ## Done
 

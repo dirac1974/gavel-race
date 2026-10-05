@@ -138,6 +138,7 @@ Template:
 - Status: Accepted (provisional)
 - Decided by: team, under D-009
 - Decision: 2nd–4th prizes stay flat (1.2, 0.8, 0.4 B). Fully upset-scaling them would make every horse expect the same cash (favorite vs. longshot 1.00× instead of 1.30×), removing the cash reward for training. UI shows ribbons and "1st prize", never place, show, or payout. Exactas are not a prize; at most a free spectator "call the top two" game for cosmetic ribbons.
+- Amended 2026-10-04: the spectator idea is replaced by cheering (D-019); no top-two or order picks.
 - Links: docs/V2_PROPOSAL.md, GameConfig.ribbons
 
 ## D-017 — Win purses round to whole cash
@@ -155,3 +156,13 @@ Template:
 - Context: two sessions (cloud and local) built the repo in parallel; their histories were merged on 2026-10-04. The local one recorded this rule as its D-009 and the rounding correction as its D-010 (now D-017); those numbers were reused here, so this entry keeps the CI rule.
 - Decision: GitHub Actions (`.github/workflows/test.yml`) runs pytest, the policy guard, the v2 and v1 models, Luau syntax checks, and Luau parity under Lune on every push and pull request. Parity fixtures are generated at test time, never committed (floats differ in the last digit across platforms). A red run blocks the next build loop until fixed.
 - Links: .github/workflows/test.yml, scripts/policy_guard.sh, tests/fixtures/make_fixtures.py
+
+## D-019 — Spectator cheering
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: David (direction: free, something to root for, prizes much smaller than racing); team (details, under D-009)
+- Context: Roblox has banned simulated gambling since 2023 even with free, unbuyable currency, so being unbuyable is not the safe line; staking nothing and earning nothing of value is. A free winner pick with a flat reward makes the favorite always the best pick; scaling the reward by long shot reproduces betting odds and conflicts with hard rule 1. Research: docs/research/2026-10-04-spectator-predictions.md
+- Decision: before the first gavel window, a spectator cheers for one rider. Fan XP comes from that rider's gavel taps: Perfect 3, Great 2, Good 1, Okay or Miss 0, plus a flat 2 if the rider wins (max 11 per race, 100 per day). Race Rating doesn't affect tap scores, so the favorite isn't automatically the best choice. Free (no Energy, no currency). Riders and their party can't cheer in their own race. Fan XP only unlocks cosmetics through Fan levels (badges, stand flags, titles); it never becomes Green Cash, League Points, horse or jockey XP, and is never tradeable. Never scaled by win chance; nothing in the lobby shows XP per horse. Spectators see live win chances only after cheers lock. UI words: Cheer, Your rider, Fan XP.
+- Size rule: spectating stays much smaller than racing. A cheered race is worth at most 20% of the progress a rider earns from the same race; economy-analyst checks this once rider XP and cosmetic unlock rates are defined.
+- Alternatives: flat XP for a correct winner pick (favorite always best); XP scaled by long shot (betting odds in all but name); "Race Reader" with win chances hidden until picks lock (teaches Race Rating, but picking the top-rated horse becomes the best move again).
+- Links: CLAUDE.md hard rule 1, docs/GAME_DESIGN.md (Spectating), D-016

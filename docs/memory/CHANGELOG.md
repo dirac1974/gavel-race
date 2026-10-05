@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — Spectator cheering (D-019), research on prediction games, hard rule 1 clarified
 - 2026-10-04 — Merge local PR #1 history with cloud history; fix stale docs (D-013 thresholds, D-010 meter, whole-cash purse example); CI runs v1; D-018
 - 2026-10-04 — Merge parallel review: whole-cash purses (D-017), policy guard, Claude Code permissions, KICKOFF prompts, extra tests
 - 2026-10-04 — Energy (D-015), prizes and exactas (D-016), Diamond limits amended

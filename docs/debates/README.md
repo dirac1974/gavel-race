@@ -50,4 +50,4 @@ Date: YYYY-MM-DD · Status: Proposed | Decided (D-NNN)
 3. ~~003 — Energy system~~: decided directly as D-015; reopen only if playtests show problems.
 4. **004 — Breeding and rarity**: what is inherited, mutation odds, how foals grow, keeping it free of paid randomness.
 5. **005 — Diamond store v1 catalog**: exact items and prices within D-002a.
-6. **006 — Social layer**: stable clubs, Derby Day, spectating, visiting stables.
+6. **006 — Social layer**: stable clubs, Derby Day, spectating (cheering decided in D-019), visiting stables.
