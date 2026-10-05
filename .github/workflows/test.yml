@@ -28,7 +28,8 @@ jobs:
           python-version: "3.12"
       - name: Install Lune
         run: |
-          curl -sSL -o lune.zip "https://github.com/lune-org/lune/releases/download/v${LUNE_VERSION}/lune-${LUNE_VERSION}-linux-x86_64.zip"
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o lune.zip "https://github.com/lune-org/lune/releases/download/v${LUNE_VERSION}/lune-${LUNE_VERSION}-linux-x86_64.zip"
           unzip -q lune.zip -d "$HOME/.local/bin"
           chmod +x "$HOME/.local/bin/lune"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
