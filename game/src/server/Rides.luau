@@ -103,7 +103,7 @@ local function build(player: Player, h, at: CFrame): Model
 	motor.Parent = root
 
 	local stand = modelFor("horse_stand_" .. h.coat)
-	local gallop = modelFor("horse_" .. h.coat)
+	local gallop = modelFor("horse_gallop_" .. h.coat) or modelFor("horse_" .. h.coat) -- new coats use horse_gallop_<coat>
 	if not stand and not gallop then stand = placeholder(h.coat) end
 	local height = 4
 	for name, m in { Stand = stand, Gallop = gallop } do

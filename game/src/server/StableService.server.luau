@@ -102,7 +102,7 @@ end
 
 -- The barn and everything that depends on the owner's profile, rebuilt when it changes.
 local function horseModel(coat: string): Model
-	local m = WorldScene.model("horse_stand_" .. coat) or WorldScene.model("horse_" .. coat)
+	local m = WorldScene.model("horse_stand_" .. coat) or WorldScene.model("horse_gallop_" .. coat) or WorldScene.model("horse_" .. coat)
 	if m then return m end
 	m = Instance.new("Model")
 	local colour = ({ bay = "8B4A2B", chestnut = "B5562B", grey = "B9BCC2", black = "2B2B30", palomino = "E3C16F" })[coat] or "8B4A2B"
@@ -178,12 +178,26 @@ local function buildBarn(i: number, owner: Player, data)
 			CFrame = plotCF(i, front - 6, propA, GROUND_Y + 1.5) }, barn)
 	end
 	local trough = WorldScene.placeModel(barn, "water_trough", plotCF(i, front - 6, propB, GROUND_Y))
-	if not trough then
+	if trough then
+		local cf, size = trough:GetBoundingBox()
+		part({ Name = "Water", Size = Vector3.new(size.X * 0.8, 0.2, size.Z * 0.6), Color = C.water, Material = Enum.Material.Glass,
+			Transparency = 0.25, CanCollide = false, CFrame = cf * CFrame.new(0, size.Y * 0.32, 0) }, barn)
+	else
 		part({ Name = "Trough", Size = Vector3.new(6, 2, 2.6), Color = C.wood, Material = Enum.Material.Wood,
 			CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1) }, barn)
 		part({ Name = "Water", Size = Vector3.new(5.4, 0.2, 2), Color = C.water, Material = Enum.Material.Glass, Transparency = 0.25,
 			CanCollide = false, CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1.9) }, barn)
 	end
+	-- Barnyard bits from the uploaded art (skipped until it loads): a horseshoe over the barn,
+	-- a feed bucket and brush by the first stall, a wheelbarrow and pitchfork round the side,
+	-- a saddle rack, and the post box at the gate (friends' carrot gifts, D-042).
+	WorldScene.placeModel(barn, "horseshoe_decor", plotCF(i, front - 0.8, 0, GROUND_Y + BARN_H + 1.5))
+	WorldScene.placeModel(barn, "feed_bucket", plotCF(i, front - 3, -width / 2 + 6, GROUND_Y))
+	WorldScene.placeModel(barn, "grooming_brush", plotCF(i, front - 3, -width / 2 + 9, GROUND_Y))
+	WorldScene.placeModel(barn, "wheelbarrow", plotCF(i, front - 14, propA - 6, GROUND_Y))
+	WorldScene.placeModel(barn, "pitchfork", plotCF(i, front - 14, propA - 11, GROUND_Y))
+	WorldScene.placeModel(barn, "saddle_rack", plotCF(i, front - 4, width / 2 - 6, GROUND_Y))
+	WorldScene.placeModel(barn, "post_box", plotCF(i, 3, GATE_W / 2 + 3, GROUND_Y))
 	-- The Stable Board noticeboard by the gate (D-043).
 	local nbCF = plotCF(i, 9, -GATE_W / 2 - 9, GROUND_Y)
 	local nb = WorldScene.placeModel(barn, "noticeboard", nbCF)

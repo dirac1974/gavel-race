@@ -401,7 +401,8 @@ function Course:build(plan, coats: { string? }?)
 	self.horses, self.saddles = {}, {}
 	for i = 1, LANES do
 		local coat = (coats and coats[i]) or COATS[i]
-		local horse = modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
+		-- The first five coats are uploaded as horse_<coat>, the newer ones as horse_gallop_<coat>.
+		local horse = modelFor("horse_gallop_" .. coat) or modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
 		horse:PivotTo(self:laneCFrame(i, 0))
 		badge(i).Parent = horse
