@@ -13,6 +13,29 @@ local Care = require(Shared:WaitForChild("Care"))
 local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Style = require(Shared:WaitForChild("Style"))
+
+-- Every monthly job claimed: a milestone gift of Diamonds, once per month (D-050).
+local function monthlyGift(player: Player, data)
+	local jobs = data.jobs
+	if not jobs then return end
+	local pay = tonumber(jobs.giftDue) or 0 -- months finished at rollover
+	jobs.giftDue = nil
+	if typeof(jobs.monthly) == "table" and #jobs.monthly > 0 and jobs.giftMonth ~= jobs.monthlyPeriod then
+		local all = true
+		for _, j in jobs.monthly do
+			if not j.claimed then all = false end
+		end
+		if all then
+			jobs.giftMonth = jobs.monthlyPeriod
+			pay += 1
+		end
+	end
+	if pay == 0 then return end
+	Style.earn(data, Style.EARN_MONTHLY_RIBBON * pay)
+	Profiles.notify(player, string.format("Every monthly job done! +%d 💎", Style.EARN_MONTHLY_RIBBON * pay), "diamond")
+	Profiles.changed(player)
+end
 local Profile = require(Shared:WaitForChild("Profile"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
@@ -44,6 +67,7 @@ Profiles.Loaded.Event:Connect(function(player: Player)
 	if not data then return end
 	local now = os.time()
 	local auto = Jobs.refresh(data, player.UserId, now)
+	monthlyGift(player, data)
 	if auto > 0 then
 		Profiles.notify(player, string.format("Welcome back! %d finished job%s added to your stable", auto, if auto == 1 then " was" else "s were"), "gift")
 	end
@@ -69,6 +93,7 @@ JobClaim.OnServerEvent:Connect(function(player: Player, kind: any, index: any)
 	if not data then return end
 	if index == "all" then
 		local n = Jobs.claimAllIn(data, player.UserId, kind, os.time())
+		monthlyGift(player, data)
 		if n > 0 then
 			Profiles.notify(player, string.format("%d reward%s collected!", n, if n == 1 then "" else "s"), "gift")
 			Profiles.changed(player)
@@ -77,6 +102,7 @@ JobClaim.OnServerEvent:Connect(function(player: Player, kind: any, index: any)
 	end
 	if typeof(index) ~= "number" then return end
 	local ok, def = Jobs.claim(data, player.UserId, kind, index, os.time())
+	monthlyGift(player, data)
 	if ok and def then
 		Profiles.notify(player, "Reward collected!", "gift")
 		Profiles.changed(player)
@@ -119,6 +145,7 @@ local function newDayCheck(player: Player)
 	if not data then return end
 	local now = os.time()
 	local auto = Jobs.refresh(data, player.UserId, now)
+	monthlyGift(player, data)
 	if auto > 0 then Profiles.notify(player, "New day! Yesterday's finished jobs were added to your stable", "gift") end
 	local today = now // 86400
 	if data.jobs.dayCounted ~= today then

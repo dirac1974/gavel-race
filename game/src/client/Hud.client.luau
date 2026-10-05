@@ -41,6 +41,7 @@ local OpenMap = localEvent("OpenMap")
 local OpenBoard = localEvent("OpenBoard")
 local OpenRacePicker = localEvent("OpenRacePicker")
 local OpenHorses = localEvent("OpenHorses")
+local OpenStyleShop = localEvent("OpenStyleShop")
 
 -- Dock --------------------------------------------------------------------------
 local dock = Instance.new("Frame")
@@ -82,12 +83,15 @@ local function slot(width: number, order: number): Frame
 end
 
 -- Green Cash
-local cashSlot = slot(150, 1)
+local cashSlot = slot(230, 1)
 local cashCard = Ui.card(cashSlot, UDim2.new(1, 0, 0, 56), UDim2.new(0, 0, 1, -60), C.paper)
-Ui.icon(cashCard, "cash", "💵", UDim2.fromOffset(40, 40), UDim2.new(0, 8, 0.5, -20))
-local cashText = Ui.text(cashCard, "0", 28, { Size = UDim2.new(1, -56, 1, 0), Position = UDim2.new(0, 52, 0, 0) })
+Ui.icon(cashCard, "cash", "💵", UDim2.fromOffset(36, 36), UDim2.new(0, 8, 0.5, -18))
+local cashText = Ui.text(cashCard, "0", 26, { Size = UDim2.new(0.5, -50, 1, 0), Position = UDim2.new(0, 48, 0, 0) })
 cashText.TextXAlignment = Enum.TextXAlignment.Left
 cashText.TextColor3 = C.cash
+-- Diamonds: tap to open the Tack & Paint shop (never opens by itself, D-050).
+local gemBtn = Ui.button(cashCard, "💎 0", UDim2.new(0.5, -10, 1, -12), UDim2.new(0.5, 4, 0, 6), C.sky, 20)
+gemBtn.Activated:Connect(function() OpenStyleShop:Fire() end)
 
 -- Active horse
 local horseSlot = slot(230, 2)
@@ -168,6 +172,7 @@ end
 local function render(data)
 	if not data then return end
 	cashText.Text = tostring(data.cash)
+	gemBtn.Text = "💎 " .. tostring(data.diamonds or 0)
 	local h = PlayerState.activeHorse()
 	if h then
 		horseName.Text = h.name

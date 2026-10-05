@@ -24,7 +24,7 @@ Last updated: 2026-10-05
 5. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
 6. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
 7. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
-8. **Diamond store** (D-044, waits for David's sign-off on D-002a).
+8. ~~Diamond store~~: built (D-050). David to create the three developer products and paste their ids into `DiamondProducts.luau`.
 9. **Cross-server Cup finals and Derby Day** (D-036 later).
 10. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
 11. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.
@@ -32,7 +32,7 @@ Last updated: 2026-10-05
 
 ## Done
 
-- 2026-10-05: sound (D-050): `Sound.luau` with race cues, UI pops, care and job sounds, Sound On/Off setting; 8 announcer lines generated (29 ElevenLabs credits) and uploaded to Roblox (all approved); sound effects waiting on the key permission.
+- 2026-10-05: sound (D-052): `Sound.luau` with race cues, UI pops, care and job sounds, Sound On/Off setting; 8 announcer lines generated (29 ElevenLabs credits) and uploaded to Roblox (all approved); sound effects waiting on the key permission.
 - 2026-10-05: world build merged (PRs #17–#27): saving and owning horses, the world (Fair Street, Barn Lane, riding, map), care and food, two courses with the Race Board, Stable Board jobs, training and the vet, spectators (cheer, Clap Along, Fan XP), more horses (market, taming, stalls), leagues (Cups, Practice, Hall of Fame), polish (tour, settings, For grown-ups). Art pass (#20): 51 Meshy models and 66 icons uploaded; Meshy balance 460.
 - 2026-10-04: Stage 1 your horse (PR #17): saved profiles, starter pick, race queue, dock HUD.
 - 2026-10-04: world design (D-035 to D-047) from the design council's world workshop; build stages planned.

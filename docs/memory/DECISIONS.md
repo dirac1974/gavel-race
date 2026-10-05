@@ -336,7 +336,7 @@ Template:
 - Date: 2026-10-04
 - Status: Accepted (provisional)
 - Decided by: team, world workshop (child safety draft; engagement agreed)
-- Decision: Free check-ups with a heartbeat tapping game (+1 bond a day), Health Passport stamps (one reveals Potential), cool-down hose after races; nothing to cure or buy. David's "sick horse to the vet" conflicts with hard rule 3, so it is not built.
+- Decision: Free check-ups with a heartbeat tapping game (+1 bond a day), Health Passport stamps (one reveals Potential), cool-down hose after races; nothing to cure or buy. David's "sick horse to the vet" conflicts with hard rule 3, so it is not built (David confirmed 2026-10-05: skip sick horses).
 - Alternatives: Sickness from neglect (hard rule 3), sore legs after hard races (teaches that racing hurts horses).
 - Links: docs/WORLD_DESIGN.md
 
@@ -421,7 +421,16 @@ Template:
 - Alternatives: a long text tutorial (kids don't read it), forced steps (pressure), no tour (the world is big and new players wander).
 - Links: game/src/shared/Tour.luau, game/src/server/SettingsService.server.luau, game/src/client/GrownUps.client.luau
 
-## D-050 — Sound and the race announcer
+## D-050 — The Diamond store: Tack & Paint
+- Date: 2026-10-05
+- Status: Accepted (provisional); David approved building the store ("yes do diamond store")
+- Decided by: team (child-safety and engagement/young-player consults; moderator sided with child safety where they disagreed)
+- Decision: Diamonds are bought with Robux through three developer products, **1 Diamond = 1 Robux in every pack** (50, 100, 250; no bigger-pack bonus). They buy looks only, in the **Tack & Paint** shop on Fair Street or from the 💎 button in the dock: saddle cloths and helmets (worn when riding around the world; races keep lane colours), barn paint sets (walls, roof, trim), gold name plates, yard decor in fixed spots (bench, lanterns, saddle rack, picnic table, hay cart, bridge); prices in steps of 25. **Never sold:** horses, coats, stats, speed, Green Cash, food, seeds, stalls, Energy, race entries, job rerolls, fan gear (earned with Fan levels), trophies and rosettes (they look like real wins), anything random; no Derby Pass yet (its season clock pressures kids). Free Diamonds only from milestones: 25 per league promotion and 25 for finishing every monthly job; never for Fan levels (Fan XP includes backing the winner, so it stays cosmetic, hard rule 1), logging in, streaks or race places. Our own caps on top of Roblox parental controls: 250 Robux in any 24 hours, 1,000 in any 30 days (rolling). Any look can be returned within 24 hours for all its Diamonds. The server refuses Diamond prompts while in line, racing, on the results screen and for 2 minutes after a race, past the caps, or when PolicyService can't be read. The shop opens only by a tap: no pop-ups, offers, timers, "limited", "best value" or rotating stock; visitors see no prices. Receipts are recorded and saved before PurchaseGranted. The Star Set (stars cloth, star helmet, star flag) puts a gold star on your name plates.
+- Amends: D-002a and D-044 (no Exhibition entries, no Diamond rerolls, no time skips for now, Derby Pass later).
+- Alternatives: bonus tiers on bigger packs (exchange rates that change with bundle size are a point in the May 2026 FTC complaint), selling fan flags or trophies, race-day cosmetics over lane colours, login Diamonds.
+- Links: game/src/shared/Style.luau, game/src/shared/DiamondProducts.luau, game/src/server/StyleService.server.luau, game/src/server/Purchases.server.luau, game/src/client/StyleShop.client.luau
+
+## D-052 — Sound and the race announcer
 - Date: 2026-10-05
 - Status: Accepted (provisional)
 - Decided by: team (audio lead, small call)
