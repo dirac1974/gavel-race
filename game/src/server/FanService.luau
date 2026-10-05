@@ -64,11 +64,9 @@ local function fanData(player: Player)
 end
 
 local function activeStrikes(f, t: number): number
-	local n = 0
-	for _, at in f.strikes do
-		if t - at < STRIKE_EXPIRY then n += 1 end
-	end
-	return n
+	local last = f.strikes[#f.strikes]
+	if not last or t - last >= STRIKE_EXPIRY then return 0 end
+	return #f.strikes
 end
 
 function FanService.start(courseId: string, session, riders: { Player }, tStart: number, tEnd: number)
@@ -92,6 +90,7 @@ function FanService.beforeClose(courseId: string, seg: number)
 	for _, b in r.beats do
 		if b <= t then table.insert(beatsSoFar, b) end
 	end
+	table.clear(r.session.crowd) -- rebuilt from the fans who still count (a flagged fan's boost ends now)
 	local byLane: { [number]: { number } } = {}
 	for player, lane in r.cheers do
 		if player.Parent and not r.flagged[player] then
@@ -147,6 +146,8 @@ function FanService.finish(courseId: string, winnerLane: number)
 			f.xp += xp
 			f.dayXp += xp
 			if e.flagged then -- one strike per race at most
+				local last = f.strikes[#f.strikes]
+				if last and t - last >= STRIKE_EXPIRY then table.clear(f.strikes) end -- 90 days without a flag
 				table.insert(f.strikes, t)
 				local n = activeStrikes(f, t)
 				if n == 2 then
@@ -169,8 +170,12 @@ end
 Cheer.OnServerEvent:Connect(function(player: Player, courseId: any, lane: any)
 	local r = typeof(courseId) == "string" and races[courseId]
 	if not r or typeof(lane) ~= "number" or not r.cheerOpen then return end
-	if r.riders[player] or r.cheers[player] then return end
-	if not r.session.lanes[lane] then return end
+	if r.riders[player] or r.cheers[player] or player:GetAttribute("Racing") then return end
+	for otherId, other in races do
+		if otherId ~= courseId and (other.cheers[player] or other.riders[player]) then return end
+	end
+	local laneData = r.session.lanes[lane]
+	if not laneData or laneData.isBot then return end -- bots never have fans (D-020)
 	local f = fanData(player)
 	if f and f.banUntil > os.time() then
 		FanStatus:FireClient(player, courseId, nil, "Fan play is resting for now. You can still ride!")
@@ -191,7 +196,7 @@ ClapTap.OnServerEvent:Connect(function(player: Player, courseId: any, claimed: a
 		list = {}
 		r.claps[player] = list
 	end
-	if #list < MAX_CLAPS then table.insert(list, t) end
+	if #list < math.min(MAX_CLAPS, 2 * #r.beats) then table.insert(list, t) end
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
