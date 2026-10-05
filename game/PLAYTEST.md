@@ -204,6 +204,19 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Slow motion only when you won; "PHOTO FINISH" when 1st and 2nd were close.
 - [ ] Starting a new race while a replay plays cancels it.
 
+## Race quirk fixes and race feel (D-055)
+- [ ] The horse that crosses the line first is the winner on the results card, every race. Riding in lane 1, you are not always out in front.
+- [ ] No horse slows down, stops or slides backwards at the checkpoints or the Final Burst. Legs stay in a gallop the whole race.
+- [ ] Horses ease out of the gate, and the stalls clear as the bell rings.
+- [ ] "3", "2", "1", then "GO!" with the bell. The camera is in the saddle from "3". Taps before the bell do nothing. (The drum tick is silent until the sound effects are uploaded.)
+- [ ] A quick double tap (a finger bounce) still scores; a real second tap later in the pass says "One tap!". A pass you don't tap shows no word, only a grey glow; a very early or late tap says "Early" or "Late".
+- [ ] Only Space, Enter, click, touch, gamepad A or R2 tap. W, the arrow keys, I and O don't; the first other key shows "Tap: SPACE or click" once.
+- [ ] Riding: no running-order board, no win %; the race map, place badge and badge arrow show where you are. The place badge doesn't flicker after a Great tap.
+- [ ] Phone (Device emulator, 844×390 and 667×375): the Final Burst bar is fully visible (board, map and badge step aside); the race map and badge are smaller and don't cover the slider; the results card and its replay buttons are on screen and not under the dock.
+- [ ] Results: "Watch the finish" works straight away (even while horses are pulling up). Done, or the next race on that course, gives you back the normal camera and jumping.
+- [ ] Watching: near the course you get the cheer strip at the top and a slim board (top 3 plus your rider on a phone, no %). Walk to the barn or open a shop: the race HUD hides, and no results card or burst text appears for races you didn't watch.
+- [ ] The first race after a server start has running legs on every horse.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.
