@@ -51,6 +51,18 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] leaderstats Green Cash and League Points increase by the right amounts.
 - [ ] A new lobby starts about 5 seconds after the results.
 
+## Race shape and replay (D-033, D-034)
+
+- [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.
+- [ ] A Great or Perfect pace tap visibly nudges your horse straight away.
+- [ ] The arrow by the place badge flashes up or down when your chance moves; no percentages anywhere.
+- [ ] Results card: "You rode" stars; "Your riding gained you N places!" only when positive.
+- [ ] You stay in the saddle on the results card; Done puts you on the apron and restores the camera; after 60 s the server dismounts you anyway.
+- [ ] "Watch the finish" starts around the far turn at real speed; "Whole race ×3" runs fast then slows for the final quarter.
+- [ ] Replay shows REPLAY, letterbox, your tap labels and "+N"; Behind toggles the camera; Done returns to the results card.
+- [ ] Slow motion only when you won; "PHOTO FINISH" when 1st and 2nd were close.
+- [ ] Starting a new race while a replay plays cancels it.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

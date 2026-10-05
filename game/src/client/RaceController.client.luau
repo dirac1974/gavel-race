@@ -242,6 +242,15 @@ placeText.TextColor3 = Color3.fromHex("FFD34D")
 placeText.ZIndex = 7
 local placeOf = label(placeBadge, UDim2.new(1, 0, 0.3, 0), UDim2.fromScale(0, 0.68), "", 16)
 placeOf.ZIndex = 7
+local chanceArrow = Instance.new("ImageLabel")
+chanceArrow.AnchorPoint = Vector2.new(1, 0.5)
+chanceArrow.Position = UDim2.new(0, -6, 0.5, 0)
+chanceArrow.Size = UDim2.fromOffset(40, 40)
+chanceArrow.BackgroundTransparency = 1
+chanceArrow.ZIndex = 7
+chanceArrow.Visible = false
+chanceArrow.Parent = placeBadge
+local arrowUntil = 0
 
 -- Tap-result shapes above the feedback text (Perfect is a star, a miss is a flat dash).
 local feedbackIcon = Instance.new("ImageLabel")
@@ -287,6 +296,32 @@ results.ZIndex = 6
 results.Visible = false
 results.Parent = gui
 round(results, UDim.new(0, 16))
+local rideLine = label(results, UDim2.new(1, -24, 0, 30), UDim2.new(0, 12, 0, -70), "", 26)
+rideLine.ZIndex = 7
+rideLine.Font = Enum.Font.GothamBlack
+rideLine.TextColor3 = Color3.fromHex("FFD34D")
+local gainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, -38), "", 20)
+gainLine.ZIndex = 7
+
+local function button(parent, text: string, size: UDim2, pos: UDim2, colour: Color3): TextButton
+	local b = Instance.new("TextButton")
+	b.Size, b.Position = size, pos
+	b.BackgroundColor3 = colour
+	b.Text = text
+	b.Font = Enum.Font.GothamBlack
+	b.TextScaled = true
+	b.TextColor3 = Color3.fromHex("1F2430")
+	b.ZIndex = 8
+	b.AutoButtonColor = true
+	b.Parent = parent
+	round(b, UDim.new(0, 12))
+	return b
+end
+-- Replay (D-034): the same small buttons after every race; never auto-played.
+local watchBtn = button(results, "↺ Watch the finish", UDim2.new(0.62, 0, 0, 40), UDim2.new(0, 10, 1, 8), Color3.fromHex("FFD34D"))
+local fullBtn = button(results, "Whole race ×3", UDim2.new(0.34, 0, 0, 40), UDim2.new(0.64, 0, 1, 8), Color3.fromHex("BFD7FF"))
+local doneBtn = button(results, "Done ✕", UDim2.new(0, 110, 0, 36), UDim2.new(1, -110, 0, -110), Color3.new(1, 1, 1))
+
 local resultRows = {}
 for i = 1, 5 do
 	local icon = Instance.new("ImageLabel")
@@ -384,6 +419,10 @@ local function tap()
 		feedback.Text = labelText
 		showResultIcon(labelText)
 		hint.Text = ""
+		if labelText == "Perfect" or labelText == "Great" then
+			RaceState.nudgeAt = t -- instant, luck-free nudge on your own horse (D-033)
+		end
+		if RaceState.recording then table.insert(RaceState.recording.events, { t = t, kind = "tap", label = labelText }) end
 	else
 		feedback.Text = "Too fast!"
 		showResultIcon("Too fast")
@@ -416,6 +455,7 @@ end
 
 RunService.RenderStepped:Connect(function()
 	local t = serverNow()
+	if chanceArrow.Visible and os.clock() > arrowUntil then chanceArrow.Visible = false end
 	if RaceState.active and os.clock() - lastHud > 0.2 then
 		lastHud = os.clock()
 		renderBoard()
@@ -559,7 +599,14 @@ remotes.PaceSchedule.OnClientEvent:Connect(function(passes)
 	paceState = { passes = passes, tapsByPass = {}, firstTap = {}, done = 0, recent = {}, burstOpen = pendingBurstOpen }
 end)
 
+local function stars(score: number): number
+	return if score >= 85 then 3 elseif score >= 65 then 2 elseif score >= 40 then 1 else 0
+end
+
 remotes.PaceResult.OnClientEvent:Connect(function(seg, score, labelText)
+	if RaceState.recording then
+		table.insert(RaceState.recording.events, { t = serverNow(), kind = "checkpoint", stars = stars(score) })
+	end
 	hint.Text = string.format("Checkpoint %d: %s %d", seg, labelText, math.round(score))
 end)
 
@@ -572,6 +619,9 @@ remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec)
 end)
 
 remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText)
+	if RaceState.recording then
+		table.insert(RaceState.recording.events, { t = serverNow(), kind = "burst", label = labelText, score = score })
+	end
 	feedback.Text = ""
 	hint.Text = "Stretch drive! Keep tapping to the line"
 	showResultIcon(labelText)
@@ -593,6 +643,11 @@ remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
 	chances = live
 	renderBoard()
 	for i, lane in lanes do
+		if lane.id == myId and before[i] and math.abs(live[i] - before[i]) > 0.003 then
+			if UiArt.set(chanceArrow, if live[i] > before[i] then "chance_up" else "chance_down") then
+				arrowUntil = os.clock() + 2
+			end
+		end
 		if lane.id == myId then
 			local delta = math.round((live[i] - (before[i] or 0)) * 100)
 			local sign = delta >= 0 and "+" or ""
@@ -603,6 +658,31 @@ end)
 
 remotes.IntegrityNote.OnClientEvent:Connect(function(text)
 	hint.Text = text -- private; the "Ask for a check" button needs review tooling (not built)
+end)
+
+local rideReport = nil -- { stars, gain, place }
+local function closeResults()
+	results.Visible = false
+	remotes.Dismount:FireServer()
+	rideCamera(false)
+	setJumping(true)
+end
+doneBtn.Activated:Connect(closeResults)
+watchBtn.Activated:Connect(function()
+	results.Visible = false
+	RaceState.ReplayRequested:Fire("finish")
+end)
+fullBtn.Activated:Connect(function()
+	results.Visible = false
+	RaceState.ReplayRequested:Fire("full")
+end)
+RaceState.ReplayClosed.Event:Connect(function()
+	results.Visible = true -- back to the results card, not the lobby
+end)
+
+remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace)
+	rideReport = { stars = starCount, gain = gain, place = finishPlace }
+	if RaceState.recording then RaceState.recording.ride = rideReport end
 end)
 
 local function showResults(summary)
@@ -628,6 +708,18 @@ local function showResults(summary)
 			r.icon.Visible = false
 		end
 	end
+	-- Your ride first (stars need no reading), then places your riding gained, only if it's a gain.
+	if rideReport then
+		rideLine.Text = "You rode " .. string.rep("★", rideReport.stars) .. string.rep("☆", 3 - rideReport.stars)
+		gainLine.Text = if rideReport.gain > 0
+			then string.format("Your riding gained you %d place%s!", rideReport.gain, if rideReport.gain == 1 then "" else "s")
+			else ""
+	else
+		rideLine.Text, gainLine.Text = "", ""
+	end
+	local hasRecording = RaceState.recording ~= nil and #RaceState.recording.frames > 10
+	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
+	doneBtn.Visible = true
 	results.Visible = true
 	placeBadge.Visible = false
 	status.Text = "Results"
@@ -643,10 +735,15 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 	showResultIcon(nil)
 	status.Text = "And they're home!"
 	task.delay(GameConfig.runInSeconds, showResults, summary)
+	rideReport = nil
 	if riding then
-		task.delay(GameConfig.runInSeconds + 3.2, function()
-			rideCamera(false)
-			setJumping(true)
+		-- Riders stay on their horse for the results and replay; Done gets them off. The
+		-- server also dismounts everyone after a timeout, so restore the camera then too.
+		task.delay(GameConfig.dismountTimeoutSeconds + 0.5, function()
+			if not RaceState.active then
+				rideCamera(false)
+				setJumping(true)
+			end
 		end)
 	end
 	riding = false

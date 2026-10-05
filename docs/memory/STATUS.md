@@ -8,6 +8,7 @@ Last updated: 2026-10-04
 - **Roblox prototype (Phase 1)**: Rojo project in `game/` with three Giddy-up stretches and a Final Burst (D-022). Pure modules (GameConfig, ThemePack, Stride, BurstMeter, TapTime, Integrity, RaceRating, RaceSession) are tested under Lune; stride scoring has a Python mirror with parity tests. Server loop and client UI are written and compile, but **have not been run in Roblox Studio** (see `game/PLAYTEST.md`).
 - **Tests**: 1,109 Python tests; 17,600+ Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
 - **Art**: playtest art (D-023) is uploaded and wired in; the place must be published to the LlamaWorks group to load it.
+- **Race shape (D-033)**: secret luck at the gate gives the same Harville odds as an exponential race; luck shows from the far turn, so comebacks happen on screen while taps still count. Replays of the finish or the whole race (D-034).
 - **Design**: debate 007 replaced the gavel meter with Giddy-up stretches and the Final Burst (D-022). Provisional decisions listed in REVIEW_QUEUE.md.
 
 ## In progress
@@ -23,10 +24,13 @@ Last updated: 2026-10-04
 5. **Race presentation**: Churchill Downs-style course at full scale (D-027) with one-mile oval, turf course, grandstand and Twin Spires; smooth client-side gallop along each distance's race plan; riders in the saddle with a first-person view (D-024, D-026). Still to do: a hands-and-heels riding animation, beat-synced dust puffs and mane flicks, saddle cloths in lane colours, a leg cycle before launch, and a real wire instead of the kid-friendly checkered strip if testers prefer.
 6. **Spectator cheering (D-019)**: spectator mode, cheer lock before window 1, Fan XP per tap with per-race and daily caps in `GameConfig.spectator`; tests that riders and their party can't cheer in their own race and that caps hold. Then Clap Along and the crowd boost (D-020): reuse `Stride` for beats and scoring, crowd = best fan + assists, `c_i` in Python and Luau with parity tests, Top Fans board.
 7. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, Diamonds, and Fan XP (check the D-019 20% rule) and recalibrate bot scores for stride stretches, to `sims/economy.py`.
-8. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
+8. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau. Rested horses train 50% faster inside the weekly cap (D-033).
+9. **Running styles** (debate 008 research): show each horse's style before the gate (Rookie all Stalkers), front-runner/stalker/closer skill-offset shapes up to the far turn; tune to about 55/33/10% of wins.
+10. **"How races work"**: a 20 s animation for kids and a parents page explaining that chance comes from the horse, taps move it, and luck shows late.
 
 ## Done
 
+- 2026-10-04: exponential race and race shape (D-033), stretch-drive previews, ride report, replays (D-034); debate 008.
 - 2026-10-04: continuous pace slider with speed meter and a big rainbow Final Burst (D-026); first-person riding; Churchill Downs racecourse with distance-based race length (D-027).
 - 2026-10-04: playtest art uploaded to Roblox (LlamaWorks group): 5 horse coats incl. a darker dapple grey, finish post, gate stall, 2 UI atlas sheets; `AssetService`, `TrackScene`, and client art wiring with placeholder fallbacks.
 - 2026-10-04: Giddy-up stretches and the Final Burst (D-022): Stride, BurstMeter (uniform random start), TapTime, Integrity (log only), RaceSession segments with burst weight 2, server loop, client hoof ring and tap-anywhere input, bots recalibrated, Python stride mirror with parity tests, playtest checklist.

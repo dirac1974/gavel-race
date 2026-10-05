@@ -13,6 +13,12 @@ local RaceState = {
 	order = {},          -- place -> lane
 }
 
+-- Replay requests from the results panel (RaceController) to the replay player (Replay).
+RaceState.ReplayRequested = Instance.new("BindableEvent") -- arg: "finish" | "full"
+RaceState.ReplayClosed = Instance.new("BindableEvent")
+RaceState.recording = nil  -- { start, plan, lanes, frames = { {t, p1..pn} }, events = { {t, kind, ...} }, summary }
+RaceState.myLane = nil
+
 local SUFFIX = { "st", "nd", "rd" }
 
 function RaceState.ordinal(n: number): string
