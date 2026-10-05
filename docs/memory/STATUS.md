@@ -18,7 +18,7 @@ Last updated: 2026-10-04
 1. **Debate 002 — first 10 minutes** (onboarding). Energy is decided (D-015); debate 003 is retired.
 2. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
 3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
-4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging. The tap-time rewind exploit is fixed (D-021); remaining risk is scripted perfect timing on the deterministic meter, so flag sustained S > 95 and near-zero timing spread. Same layer covers Clap Along (D-020): flag timing spread under 12 ms over 48+ beats.
+4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging. The tap-time rewind exploit is fixed (D-021); remaining risk is scripted perfect timing on the deterministic meter, so flag sustained S > 95 and near-zero timing spread. Same layer covers Clap Along (D-020): flag timing spread under 12 ms over 48+ beats, with strikes saved in the profile (needs item 2).
 5. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
 6. **Spectator cheering (D-019)**: spectator mode, cheer lock before window 1, Fan XP per tap with per-race and daily caps in `GameConfig.spectator`; tests that riders and their party can't cheer in their own race and that caps hold. Then Clap Along and the crowd boost (D-020): beat schedule from the horse's stride, scoring, crowd = best fan + assists, `c_i` in Python and Luau with parity tests, Top Fans board.
 7. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, Diamonds, and Fan XP (check the D-019 20% rule), to `sims/economy.py`.
