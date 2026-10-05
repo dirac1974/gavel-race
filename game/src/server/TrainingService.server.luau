@@ -16,9 +16,10 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local Train = Profiles.remote("Train")         -- client -> server: horseId, stat, score
 local VetVisit = Profiles.remote("VetVisit")   -- client -> server: horseId, score
-local SESSION_GAP = 6                          -- seconds between sessions (each game takes longer)
+local SESSION_GAP = 4                          -- seconds between sessions (each game takes longer)
 
-local last: { [Player]: number } = {}
+local lastTrain: { [Player]: number } = {}
+local lastVet: { [Player]: number } = {}
 
 local function near(player: Player, key: string, radius: number): boolean
 	local c = player.Character
@@ -42,15 +43,18 @@ local function horseFor(player: Player, horseId: any)
 end
 
 Train.OnServerEvent:Connect(function(player: Player, horseId: any, stat: any, score: any)
-	if os.clock() - (last[player] or 0) < SESSION_GAP then return end
 	if typeof(stat) ~= "string" or typeof(score) ~= "number" then return end
+	if os.clock() - (lastTrain[player] or 0) < SESSION_GAP then
+		Profiles.notify(player, "Your horse is catching its breath. Try again in a moment!", "heart")
+		return
+	end
 	local h = horseFor(player, horseId)
 	if not h then return end
 	if not near(player, "paddock", 30) then
 		Profiles.notify(player, "Training happens at the Training Paddock on Fair Street", "map_fair")
 		return
 	end
-	last[player] = os.clock()
+	lastTrain[player] = os.clock()
 	local ok, _, msg = Training.train(h, stat, score, os.time())
 	Profiles.notify(player, msg, if ok then "stat_" .. stat else "heart")
 	if ok then
@@ -60,7 +64,7 @@ Train.OnServerEvent:Connect(function(player: Player, horseId: any, stat: any, sc
 end)
 
 VetVisit.OnServerEvent:Connect(function(player: Player, horseId: any, score: any)
-	if os.clock() - (last[player] or 0) < 2 then return end
+	if os.clock() - (lastVet[player] or 0) < 2 then return end
 	if typeof(score) ~= "number" then return end
 	local h = horseFor(player, horseId)
 	if not h then return end
@@ -68,13 +72,15 @@ VetVisit.OnServerEvent:Connect(function(player: Player, horseId: any, score: any
 		Profiles.notify(player, "Check-ups happen at the Vet on Fair Street", "map_vet")
 		return
 	end
-	last[player] = os.clock()
-	local ok, msg, stamp = Training.checkup(h, score, os.time())
+	lastVet[player] = os.clock()
+	local ok, msg, stamp, counted = Training.checkup(h, score, os.time())
 	Profiles.notify(player, msg, if stamp then "stamp_" .. stamp else "stethoscope")
 	if ok then
-		Progress.record(player, "checkup", 1)
+		if counted then Progress.record(player, "checkup", 1) end
 		Profiles.changed(player)
 	end
 end)
 
-Players.PlayerRemoving:Connect(function(player: Player) last[player] = nil end)
+Players.PlayerRemoving:Connect(function(player: Player)
+	lastTrain[player], lastVet[player] = nil, nil
+end)

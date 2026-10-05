@@ -13,7 +13,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
@@ -57,10 +57,15 @@ body.Position = UDim2.new(0, 16, 0, 82)
 body.Parent = card
 local closeBtn = Ui.button(card, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
 local cleanup: { () -> () } = {}
+local generation = 0 -- bumps on every clear, so delayed callbacks from a closed game do nothing
 local function clear()
+	generation += 1
 	for _, f in cleanup do f() end
 	table.clear(cleanup)
 	body:ClearAllChildren()
+end
+local function alive(gen: number): boolean
+	return gen == generation and gui.Enabled
 end
 local function close()
 	clear()
@@ -82,14 +87,24 @@ local function now(): number
 	return os.clock()
 end
 
--- A big TAP button (and Space / any click in the game area) for the timing games.
-local function tapper(onTap: () -> (), label: string?): TextButton
+-- A big TAP button, plus Space / gamepad A bound above everything else and sunk, so the
+-- character never hops and typing in chat never counts. onRelease is for the hold game.
+local function tapper(onTap: () -> (), label: string?, onRelease: (() -> ())?): TextButton
 	local b = Ui.button(body, label or "TAP!", UDim2.new(0.6, 0, 0, 64), UDim2.new(0.2, 0, 1, -70), C.orange, 30)
 	b.MouseButton1Down:Connect(onTap)
-	local conn = UserInputService.InputBegan:Connect(function(input, processed)
-		if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then onTap() end
-	end)
-	table.insert(cleanup, function() conn:Disconnect() end)
+	if onRelease then
+		b.MouseButton1Up:Connect(onRelease)
+		b.MouseLeave:Connect(onRelease)
+	end
+	ContextActionService:BindActionAtPriority("PaddockTap", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			onTap()
+		elseif state == Enum.UserInputState.End and onRelease then
+			onRelease()
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+	table.insert(cleanup, function() ContextActionService:UnbindAction("PaddockTap") end)
 	return b
 end
 
@@ -171,7 +186,9 @@ function Games.speed(done)
 		total += s
 		flash(label(s), if s >= 75 then C.green else C.orangeDark)
 		tapped = true
+		local gen = generation
 		task.delay(0.25, function()
+			if not alive(gen) then return end
 			tapped = false
 			nextRound()
 		end)
@@ -202,8 +219,9 @@ function Games.accel(done)
 		light.BackgroundColor3, greenAt, waiting = C.red, nil, true
 		text.Text = "Wait for green…"
 		local delayS = rng:NextNumber(1.2, 3)
+		local gen = generation
 		task.delay(delayS, function()
-			if waiting and gui.Enabled then
+			if waiting and alive(gen) then
 				greenAt = now()
 				light.BackgroundColor3 = C.green
 				text.Text = "GO!"
@@ -216,7 +234,8 @@ function Games.accel(done)
 		if not greenAt then
 			flash("Too soon!", C.red) -- that round counts as 0, gently
 			waiting = false
-			task.delay(0.8, startRound)
+			local gen = generation
+			task.delay(0.8, function() if alive(gen) then startRound() end end)
 			return
 		end
 		local rt = now() - greenAt
@@ -224,7 +243,8 @@ function Games.accel(done)
 		total += s
 		waiting = false
 		flash(string.format("%.2fs %s", rt, label(s)), if s >= 75 then C.green else C.orangeDark)
-		task.delay(0.9, startRound)
+		local gen = generation
+		task.delay(0.9, function() if alive(gen) then startRound() end end)
 	end)
 end
 
@@ -248,14 +268,7 @@ function Games.stamina(done)
 	local holding = false
 	local y, vy = 0.5, 0      -- marker height 0 (bottom) .. 1 (top)
 	local bandC, t, inside, duration = 0.5, 0, 0, 8
-	local hold = tapper(function() holding = true end, "HOLD")
-	hold.MouseButton1Up:Connect(function() holding = false end)
-	local c1 = UserInputService.InputEnded:Connect(function(input)
-		if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			holding = false
-		end
-	end)
-	table.insert(cleanup, function() c1:Disconnect() end)
+	tapper(function() holding = true end, "HOLD", function() holding = false end)
 	local finished = false
 	heartbeat(function(dt)
 		if finished then return end
@@ -411,7 +424,9 @@ local function playTraining(h, stat: string)
 	local go = Ui.button(body, "Ready? GO!", UDim2.new(0.5, 0, 0, 70), UDim2.new(0.25, 0, 0.4, 0), C.orange, 30)
 	go.Activated:Connect(function()
 		clear()
+		local gen = generation
 		Games[stat](function(score)
+			if not alive(gen) then return end
 			clear()
 			Ui.text(body, label(score), 44, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 54) }).TextColor3 = C.orangeDark
 			Ui.text(body, string.format("Score %d", math.floor(score + 0.5)), 24, { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 30) })
@@ -491,9 +506,11 @@ local function vetMenu()
 		local go = Ui.button(body, "🩺 Start", UDim2.new(0.4, 0, 0, 60), UDim2.new(0.3, 0, 0, 220), C.green, 26)
 		go.Activated:Connect(function()
 			clear()
+			local gen = generation
 			heartGame(function(score)
+				if not alive(gen) then return end
 				gameRemotes:WaitForChild("VetVisit"):FireServer(h.id, score)
-				task.delay(0.6, close)
+				task.delay(0.6, function() if gui.Enabled then close() end end)
 			end)
 		end)
 	end)
@@ -519,3 +536,8 @@ local pad = WorldLayout.places.paddock
 promptAt("TrainPrompt", pad.x, pad.z + 6, "Train", "Training Paddock", trainingMenu)
 local vet = WorldLayout.places.vet
 promptAt("VetPrompt", vet.x, vet.z + 6, "Check-up", "Vet", vetMenu)
+
+-- Your queued race starting closes the paddock card (the race HUD needs the screen and keys).
+game:GetService("Players").LocalPlayer:GetAttributeChangedSignal("Racing"):Connect(function()
+	if game:GetService("Players").LocalPlayer:GetAttribute("Racing") and gui.Enabled then close() end
+end)
