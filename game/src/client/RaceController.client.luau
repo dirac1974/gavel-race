@@ -559,7 +559,7 @@ remotes.IntegrityNote.OnClientEvent:Connect(function(text)
 	hint.Text = text -- private; the "Ask for a check" button needs review tooling (not built)
 end)
 
-remotes.RaceFinished.OnClientEvent:Connect(function(summary)
+local function showResults(summary)
 	-- Top four with ribbons, plus your own place if you finished lower.
 	local shown = {}
 	for _, row in summary do
@@ -583,11 +583,21 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 		end
 	end
 	results.Visible = true
-	task.delay(3.5, setJumping, true) -- the server dismounts riders 3 s after results
 	status.Text = "Results"
 	feedback.Text = ""
 	showResultIcon(nil)
 	segmentName.Text, hint.Text = "", ""
 	hideAll()
 	active = nil
+end
+
+remotes.RaceFinished.OnClientEvent:Connect(function(summary)
+	-- The horses run home first (RaceView), then the results; riders are dismounted 3 s later.
+	hideAll()
+	active = nil
+	segmentName.Text, hint.Text, feedback.Text = "", "", ""
+	showResultIcon(nil)
+	status.Text = "And they're home!"
+	task.delay(GameConfig.runInSeconds, showResults, summary)
+	task.delay(GameConfig.runInSeconds + 3.5, setJumping, true)
 end)

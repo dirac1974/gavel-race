@@ -12,7 +12,7 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 
 ## Race
 
-- 8 lanes, about 60–90 seconds, bots fill empty lanes within 20 seconds.
+- 8 lanes on an oval, one lap (D-025), about 60–90 seconds; bots fill empty lanes within 20 seconds. Racing players ride their own horse (D-024).
 - Lobby shows each horse's Win Chance % and locked win purse ("Win: 464").
 - Three **Giddy-up** stretches (break, backstretch, final stretch; D-022). In each, the rider taps on the horse's stride for about 8 beats; on-beat taps make the horse surge, mashing makes it break stride. Live Win Chance updates after each stretch. Then the **Final Burst**: one big tap on a sweeping meter right before the line, worth double (40% of the rider's score). No whip: hands-and-heels riding.
 - Server draws the finish order, then animates the race to match.

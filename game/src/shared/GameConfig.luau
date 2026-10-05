@@ -23,6 +23,7 @@ GameConfig.lanes = 8
 GameConfig.segments = { "stride", "stride", "stride", "burst" }
 GameConfig.segmentWeights = { 1, 1, 1, 2 }
 GameConfig.windowGapSeconds = 4.0    -- running time between segments
+GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
 GameConfig.stride = {
 	beats = 8,                 -- per stretch, ~2 taps a second
 	halfWindowSeconds = 0.08,  -- a tap scores if within this of its beat

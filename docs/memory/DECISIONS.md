@@ -217,3 +217,11 @@ Template:
 - Decision: at race start each racing player's avatar is seated in an invisible saddle Seat on their lane's horse and rides it to the finish; the default camera follows the rider. Jumping is disabled while riding (Space is also a tap key). About 3 s after the results, riders are dismounted beside the starting gate. Spectators and late joiners stay on the ground. Riding pose is the default sit for now; a hands-and-heels riding animation (never a whip, D-022) comes with the race presentation work.
 - Links: game/src/server/TrackScene.luau (seatRider, dismountAll), game/src/server/RaceService.server.luau, game/src/client/RaceController.client.luau
 
+## D-025 — Oval racecourse, one lap
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("it should be an oval"); team (dimensions and motion)
+- Decision: races run one lap of an eight-lane oval (two 180-stud straights, inner rail radius 50, lanes 5 studs wide; lane 1 inside, about 700 studs round, lane 8 about 920). Start and finish share the line at the near end of the home straight; the stalls clear when the countdown ends. Each client animates all horses from the server's timeline (start, expected end, live chances, finish order) so motion is smooth and identical everywhere: a shared pace to 95% of the lap by the Final Burst, the likelier winners edging ahead, then a run-in where horses cross the line in the drawn order. Spectators spawn outside the home straight by the finish line. Geometry lives in `OvalTrack` (pure, tested under Lune).
+- Alternatives: the 200-stud straight (David: too short, should be an oval); server-side tweening (steps with network updates, jittery for riders).
+- Links: game/src/shared/OvalTrack.luau, game/src/server/TrackScene.luau, game/src/client/RaceView.client.luau
+

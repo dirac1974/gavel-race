@@ -8,6 +8,7 @@ local TapTime = require("../../game/src/shared/TapTime")
 local Stride = require("../../game/src/shared/Stride")
 local Integrity = require("../../game/src/shared/Integrity")
 local RaceSession = require("../../game/src/shared/RaceSession")
+local OvalTrack = require("../../game/src/shared/OvalTrack")
 
 local function makeRng(seed0: number)
 	local seed = seed0
@@ -130,6 +131,35 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(Integrity.action(1, icfg) == "log", "first strike is logged only")
 	check(Integrity.action(2, icfg) == "warn", "second strike warns")
 	check(Integrity.action(3, icfg) == "review", "third strike goes to review")
+
+	-- OvalTrack (D-025) --------------------------------------------------------
+	local oc = OvalTrack.default
+	check(OvalTrack.width(oc) == 2 * oc.margin + oc.lanes * oc.laneWidth, "track width")
+	for i = 2, oc.lanes do
+		check(OvalTrack.laneRadius(oc, i) > OvalTrack.laneRadius(oc, i - 1), "outer lanes have larger radii")
+	end
+	check(OvalTrack.laneRadius(oc, oc.lanes) < OvalTrack.outerRadius(oc), "outer lane inside the outer rail")
+	for i = 1, oc.lanes do
+		local r = OvalTrack.laneRadius(oc, i)
+		local lap = OvalTrack.lapLength(oc, r)
+		local x0, z0 = OvalTrack.lanePoint(oc, i, 0)
+		local x1, z1 = OvalTrack.lanePoint(oc, i, 1)
+		check(close(x0, x1, 1e-9) and close(z0, z1, 1e-9), "one lap ends where it started")
+		local _, _, lineZ = OvalTrack.startLine(oc)
+		check(close(z0, lineZ, 1e-9) and close(x0, oc.centerX + r, 1e-9), "lane starts on the start line")
+		-- Continuous path, unit headings, and every point at the lane's radius from a turn centre
+		-- or on a straight.
+		local px, pz = x0, z0
+		local steps = 2000
+		for k = 1, steps do
+			local x, z, dx, dz = OvalTrack.atDistance(oc, r, lap * k / steps)
+			check(close(dx * dx + dz * dz, 1, 1e-9), "heading is a unit vector")
+			check(math.sqrt((x - px) ^ 2 + (z - pz) ^ 2) <= lap / steps + 1e-6, "path has no jumps")
+			px, pz = x, z
+		end
+		local _, _, dx0, dz0 = OvalTrack.lanePoint(oc, i, 0)
+		check(close(dx0, 0, 1e-12) and close(dz0, -1, 1e-12), "horses leave the gate heading down the home straight")
+	end
 
 	-- RaceSession ------------------------------------------------------------
 	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, Stride = Stride }

@@ -185,6 +185,22 @@ local function lanesSummary(session)
 	return out
 end
 
+-- How long the race runs from the gate to the Final Burst closing, so clients can pace
+-- the horses round the lap (stretch tempos are picked later, so this uses the midpoint).
+local function expectedDuration(league): number
+	local d, s = 0, GameConfig.stride
+	for _, kind in GameConfig.segments do
+		d += GameConfig.windowGapSeconds
+		if kind == "stride" then
+			d += s.leadInSeconds + (s.beats - 1) * (league.strideIntervalLo + league.strideIntervalHi) / 2
+				+ s.halfWindowSeconds + LATENCY_GRACE
+		else
+			d += league.windowSeconds + LATENCY_GRACE
+		end
+	end
+	return d
+end
+
 local function waitUntil(t: number)
 	task.wait(math.max(0, t - now()))
 end
@@ -216,7 +232,8 @@ local function runRace(players: { Player })
 	local strideCfg = GameConfig.stride
 	current = { session = session, seg = nil, kind = nil, taps = {}, allowances = {} }
 	local t = now() + COUNTDOWN
-	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), t, cond)
+	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), t, cond, t + expectedDuration(league))
+	task.delay(math.max(0, t - now()), TrackScene.openGate) -- and they're off
 	-- Racing players ride their own horse as the jockey.
 	for i, lane in session.lanes do
 		if not lane.isBot then
@@ -265,18 +282,16 @@ local function runRace(players: { Player })
 		end
 		local live = session:closeSegment(seg)
 		LiveChances:FireAllClients(seg, live)
-		TrackScene.afterSegment(seg, #GameConfig.segments, live, GameConfig.windowGapSeconds - 0.5)
 		t = current.close + LATENCY_GRACE
 	end
 	current.seg = nil
 
-	local result = session:finish()
-	TrackScene.finish(result.order, 2)
-	task.wait(2) -- run to the line
+	local result = session:finish() -- clients run the horses home in this order, then show results
 	local summary = {}
 	for _, prize in result.prizes do
 		local lane = session.lanes[session:laneIndex(prize.id)]
-		table.insert(summary, { name = lane.name, place = prize.place, cash = prize.cash, isBot = prize.isBot, id = prize.id })
+		table.insert(summary, { name = lane.name, place = prize.place, cash = prize.cash, isBot = prize.isBot, id = prize.id,
+			lane = session:laneIndex(prize.id) })
 		if not prize.isBot then
 			local player = Players:GetPlayerByUserId(tonumber(prize.id))
 			local stats = player and player:FindFirstChild("leaderstats")
@@ -288,7 +303,7 @@ local function runRace(players: { Player })
 	end
 	RaceFinished:FireAllClients(summary)
 	recordIntegrity(players, gaps, matched)
-	task.delay(3, TrackScene.dismountAll) -- results first, then back beside the gate
+	task.delay(GameConfig.runInSeconds + 3, TrackScene.dismountAll) -- run-in, results, then off the horse
 	current = nil
 end
 

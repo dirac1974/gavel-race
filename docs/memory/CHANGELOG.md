@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: oval racecourse with one-lap races and smooth client-side horse motion (D-025)
 - 2026-10-04 — feat: racing players ride their horse as the jockey (D-024); fix: ground, spawn and boundary walls
 - 2026-10-04 — feat: playtest art in the game: uploads (LlamaWorks), UI atlas, AssetService, TrackScene, client art; darker dapple grey
 - 2026-10-04 — Playtest art (D-023): Meshy horses, finish post and gate stall (170 credits), 51 UI SVG/PNGs, import notes

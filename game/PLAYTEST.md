@@ -8,15 +8,15 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] Output window shows no red errors on start. `[AssetService] ... not loaded yet` warnings mean an asset is still in moderation or the place isn't group-owned; placeholders show meanwhile.
 
 ## Track and art
-- [ ] You spawn on grass beside the starting gate, facing the horses; you can't walk or fall off the edge of the world (invisible walls).
-- [ ] In front of the spawn: a dirt track with white rails, eight starting stalls, a finish post and a checkered line.
-- [ ] Eight horses (bay, chestnut, grey, black, palomino, then repeats) face down the track, each with a lane badge 1–8. Without the models, brown block horses stand in.
+- [ ] You spawn on grass outside the home straight, beside the finish line, facing the track; invisible walls stop you leaving the field.
+- [ ] An eight-lane dirt oval: two straights and two smooth turns, white inner and outer rails, a checkered start/finish line with the finish post outside it.
+- [ ] Eight horses (bay, chestnut, grey, black, palomino, then repeats) stand in starting stalls at the line, each with a lane badge 1–8. Without the models, brown block horses stand in.
 - [ ] Your horse has a YOU marker above it.
 - [ ] When the race starts you're seated on your horse as its jockey and the camera rides along; Space or tapping doesn't throw you off.
 - [ ] Your rider sits on the horse's back (not floating or sunk in). If not, note roughly how far off; `SADDLE_HEIGHT` and `SADDLE_BACK` in `TrackScene.luau` tune it.
-- [ ] About 3 s after the results you're back on the grass beside the gate and can jump again. Players who join mid-race stay on the grass.
-- [ ] After each segment the horses move up the track, with the likelier winners slightly ahead; at the end they run to the line in finish order.
-- [ ] The hoof, rings, GIDDY-UP pad, burst meter, tap-result shapes, board lane badges and result ribbons show the drawn art (placeholders until the UI sheets clear moderation).
+- [ ] When the countdown ends the stalls disappear and the horses gallop (with a bob) round the oval, smoothly; the likelier winners edge ahead as chances change.
+- [ ] After the Final Burst the horses cross the line one by one in the finish order, then the results panel shows. About 3 s later you're back on the grass by the finish line and can jump again. Players who join mid-race stay on the grass.
+- [ ] The hoof, rings, GIDDY-UP pad, burst meter, tap-result shapes, board lane badges and result ribbons show the drawn art.
 
 ## Lobby
 - [ ] "Next race in N" counts down from 20 (or starts at once with 8 players).
