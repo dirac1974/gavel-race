@@ -278,6 +278,23 @@ local function build(player: Player, h, at: CFrame): Model
 	label.TextStrokeTransparency = 0.3
 	label.Text = h.name
 	label.Parent = tag
+	tag.PlayerToHideFrom = player -- others see the name; the rider doesn't have it hanging mid-view
+
+	-- Shins (D-056): the root is 2.6 studs off the ground, so on its own the horse walked onto
+	-- troughs, garden beds and the fountain. This invisible block from 1 to 2.5 studs up stops it
+	-- at anything a horse couldn't step over (curbs under a stud still pass). It's in the horse's
+	-- collision group (RideHorses, or TrainingRiders on a course), which ignores CourseProps, so
+	-- training props never stop a horse (D-053).
+	local shins = Instance.new("Part")
+	shins.Name = "Shins"
+	shins.Size = Vector3.new(2.2, 1.5, 5.6)
+	shins.Transparency = 1
+	shins.CanCollide, shins.CanTouch, shins.CanQuery, shins.Massless = true, false, false, true
+	shins.CFrame = root.CFrame * CFrame.new(0, 1.75 - ROOT_Y, 0)
+	shins.Parent = rig
+	local shinWeld = Instance.new("WeldConstraint")
+	shinWeld.Part0, shinWeld.Part1 = root, shins
+	shinWeld.Parent = shins
 
 	setGroup(rig, Rides.GROUP)
 	rig.Parent = folder
@@ -327,10 +344,18 @@ local function watchCharacter(player: Player, character: Model)
 	end)
 end
 
+-- Shift (PC gallop) never toggles Shift Lock while you ride (D-056); it comes back after.
+local StarterPlayer = game:GetService("StarterPlayer")
+local function allowShiftLock(player: Player, on: boolean)
+	pcall(function() player.DevEnableMouseLock = on and StarterPlayer.EnableMouseLockOption end)
+end
+
 -- Off the horse and send it home. Safe to call any time.
 function Rides.dismount(player: Player)
 	local rig = active[player]
 	active[player] = nil
+	player:SetAttribute("RidingHorse", nil) -- the stall shows the horse again (StableService)
+	allowShiftLock(player, true)
 	takeOffHelmet(player.Character)
 	restoreRider(player)
 	if not rig then return end
@@ -340,8 +365,10 @@ function Rides.dismount(player: Player)
 		local weld = seat:FindFirstChild("SeatWeld")
 		if weld then weld:Destroy() end
 		occupant.Sit = false
-		local hrp = occupant.Parent and occupant.Parent:FindFirstChild("HumanoidRootPart")
-		if hrp then occupant.Parent:PivotTo(hrp.CFrame * CFrame.new(3.5, 1, 0)) end
+		-- Stand where the horse stood (it's gone a moment later): never through a fence or into
+		-- a closed plot beside you (D-056).
+		local root = rig.PrimaryPart
+		if root and occupant.Parent then occupant.Parent:PivotTo(root.CFrame * CFrame.new(0, 3.5 - ROOT_Y, 0)) end
 	end
 	rig:Destroy()
 end
@@ -364,13 +391,36 @@ function Rides.call(player: Player): (boolean, string?)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local hrp = character and character:FindFirstChild("HumanoidRootPart")
 	if not humanoid or not hrp or humanoid.Health <= 0 then return false, nil end
-	if humanoid.SeatPart then return false, nil end
+	if humanoid.SeatPart then
+		-- Still on a race horse after your race: its results card's Done gets you off.
+		return false, if humanoid.SeatPart.Name == "Saddle" then "Tap Done first" else nil
+	end
 	local look = hrp.CFrame.LookVector * Vector3.new(1, 0, 1)
 	if look.Magnitude < 0.1 then look = Vector3.new(0, 0, -1) end
 	local base = Vector3.new(hrp.Position.X, hrp.Position.Y - humanoid.HipHeight - hrp.Size.Y / 2, hrp.Position.Z)
-	local at = CFrame.lookAt(base, base + look.Unit)
+	-- Room for the horse (D-056): a step ahead of you, or to either side, or behind, but never
+	-- inside a wall or fence. The check follows the horse's collision rules (course riders and
+	-- props don't count); seating moves you onto it wherever it stands.
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { character, folder }
+	params.RespectCanCollide = true
+	params.CollisionGroup = Rides.GROUP
+	local at = nil
+	for _, turn in { 0, math.pi / 2, -math.pi / 2, math.pi } do
+		local try = CFrame.lookAt(base, base + look.Unit) * CFrame.Angles(0, turn, 0) * CFrame.new(0, 0, -3)
+		local body = workspace:GetPartBoundsInBox(try * CFrame.new(0, ROOT_Y, 0), ROOT_SIZE, params)
+		local legs = workspace:GetPartBoundsInBox(try * CFrame.new(0, 1.75, 0), Vector3.new(2.2, 1.5, 5.6), params)
+		if #body == 0 and #legs == 0 then
+			at = try
+			break
+		end
+	end
+	if not at then return false, "Find an open spot to call your horse" end
 	local rig = build(player, h, at)
 	active[player] = rig
+	player:SetAttribute("RidingHorse", h.id) -- its stall shows "out riding" (StableService)
+	allowShiftLock(player, false)
 	-- The rider joins the horse's collision group while riding.
 	riderGroup[player] = Rides.GROUP
 	setGroup(character, Rides.GROUP)

@@ -80,6 +80,11 @@ end)
 
 local lastPos = setmetatable({}, { __mode = "k" })
 local LEGS_RANGE = 150 -- studs from the camera; farther horses glide (nobody can see their feet)
+local TURN_RATE = 3     -- the heading eases toward the next spot (no spinning on the spot, D-056)
+local RETURN_SPEED = 12   -- studs/s: after a taming game the horse walks back into its wander...
+local function yawOf(dx: number, dz: number): number
+	return math.atan2(-dx, -dz) -- CFrame.Angles(0, yaw, 0) looks along (-sin yaw, 0, -cos yaw)
+end
 RunService.Heartbeat:Connect(function(dt)
 	local t = workspace:GetServerTimeNow()
 	local camera = workspace.CurrentCamera
@@ -89,9 +94,25 @@ RunService.Heartbeat:Connect(function(dt)
 			-- graze for the first half of a leg, then walk to the next spot (Market.wildPosition)
 			local x, z, dx, dz, walk = Market.wildPosition(WorldLayout.meadow, i, t)
 			local pos = Vector3.new(x, GROUND_Y, z)
-			local look = Vector3.new(dx, 0, dz)
+			local want = yawOf(dx, dz)
+			h.yaw = h.yaw or want
+			h.yaw += ((want - h.yaw + math.pi) % (2 * math.pi) - math.pi) * math.min(1, dt * TURN_RATE)
+			if h.returnFrom then -- ease from where the taming game left it back to its wander
+				local a = math.clamp((os.clock() - h.returnFrom.t0) / h.returnFrom.seconds, 0, 1)
+				a = a * a * (3 - 2 * a)
+				pos = h.returnFrom.pos:Lerp(pos, a)
+				if a >= 1 then
+					h.returnFrom = nil
+					-- Back in its wander: you can make friends again (unless a game is open).
+					local playing = false
+					for _, o in horses do
+						if o.still then playing = true end
+					end
+					h.prompt.Enabled = not playing
+				end
+			end
 			local bob = if walk > 0 and walk < 1 then 0.12 * math.abs(math.sin(t * 6 + i)) else 0
-			h.model:PivotTo(CFrame.lookAt(pos + Vector3.new(0, bob, 0), pos + look + Vector3.new(0, bob, 0)))
+			h.model:PivotTo(CFrame.new(pos + Vector3.new(0, bob, 0)) * CFrame.Angles(0, h.yaw, 0))
 			local prev = lastPos[h.model]
 			lastPos[h.model] = pos
 			if eye and (pos - eye).Magnitude < LEGS_RANGE and HorseLegs.has(h.model) then
@@ -140,22 +161,56 @@ fill.Parent = trust
 local tapBtn = Ui.button(card, "🥕 Offer", UDim2.fromOffset(200, 60), UDim2.new(0.5, -100, 1, -76), C.gold, 26)
 local closeBtn = Ui.button(card, "✕", UDim2.fromOffset(40, 40), UDim2.new(1, -50, 0, 10), C.white, 20)
 
+local answer: (boolean) -> () -- defined below
 local session = nil -- { horse, phase, phaseUntil, good, bad, conns }
 local NEED = 3
+local waiting = 0 -- counts sends; the server's answer closes the newest
+
+-- The server's answer to a won game: a new friend, or not this time (never "so close", D-056).
+answer = function(ok: boolean)
+	waiting += 1
+	if session then return end
+	title.Text = if ok then "💖 Friends!" else "Not yet, try again!"
+	if ok then Ui.pop(heart) end
+	task.delay(1.4, function() if not session then gui.Enabled = false end end)
+end
+task.spawn(function() gameRemotes:WaitForChild("TameResult").OnClientEvent:Connect(answer) end)
 
 local function setPrompts(on: boolean)
-	for _, h in horses do h.prompt.Enabled = on end
+	for _, h in horses do h.prompt.Enabled = on and not h.returnFrom end -- not while walking back
+end
+
+-- The horse walks back into its wander from where it stood still.
+local function release(h)
+	h.still = false
+	local from = Vector3.new(h.model:GetPivot().Position.X, GROUND_Y, h.model:GetPivot().Position.Z)
+	local x, z = Market.wildPosition(WorldLayout.meadow, h.index, workspace:GetServerTimeNow())
+	local dist = (Vector3.new(x, GROUND_Y, z) - from).Magnitude
+	-- ...at a walk, never a bolt (at least 1.2 s; it may have wandered on while you played).
+	h.returnFrom = { pos = from, t0 = os.clock(), seconds = math.max(1.2, dist / RETURN_SPEED) }
+	h.prompt.Enabled = false
 end
 
 local function finish(score: number)
 	if not session then return end
 	local s = session
 	session = nil
-	s.horse.still = false
+	release(s.horse)
 	setPrompts(true)
 	for _, c in s.conns do c:Disconnect() end
-	gameRemotes:WaitForChild("Tame"):FireServer(s.horse.index, score)
-	task.delay(0.8, function() gui.Enabled = false end)
+	-- The server decides (it checks you were next to the horse when the game began): a win waits
+	-- for its answer before celebrating (D-056); a lost game just closes.
+	if score <= 0 then -- it trotted off: nothing for the server to check
+		task.delay(0.8, function() if not session then gui.Enabled = false end end)
+		return
+	end
+	gameRemotes:WaitForChild("Tame"):FireServer(s.horse.index, score, s.startedAt)
+	waiting += 1
+	local mine = waiting
+	title.Text = "Getting to know you…"
+	task.delay(6, function() -- no answer: never leave the card hanging
+		if waiting == mine then answer(false) end
+	end)
 end
 
 local function tap()
@@ -166,7 +221,7 @@ local function tap()
 		fill.Size = UDim2.fromScale(session.good / NEED, 1)
 		Ui.pop(heart)
 		if session.good >= NEED then
-			title.Text = "💖 Friends!"
+			title.Text = "💖 It trusts you!"
 			finish(100 - session.bad * 20)
 		end
 	elseif session.phase == "startle" then
@@ -181,7 +236,7 @@ end
 tapBtn.MouseButton1Down:Connect(tap)
 closeBtn.Activated:Connect(function()
 	if session then
-		session.horse.still = false
+		release(session.horse)
 		for _, c in session.conns do c:Disconnect() end
 		session = nil
 	end
@@ -190,17 +245,19 @@ closeBtn.Activated:Connect(function()
 end)
 
 local function start(h)
-	if session then return end
+	if session or h.returnFrom then return end
 	local d = PlayerState.data
 	if d and d.market and not d.market.canTame then
 		Ui.toast("You made a new friend today, or need a treat (carrot, apple or sugar cube).", "heart", "🥕")
 		return
 	end
 	h.still = true
+	if HorseLegs.has(h.model) then HorseLegs.rest(h.model) end -- stands still, not frozen mid-stride
 	setPrompts(false)
 	title.Text = "Make friends with the wild " .. (string.gsub(h.coat, "_", " "))
 	fill.Size = UDim2.fromScale(0, 1)
-	session = { horse = h, phase = "wait", phaseUntil = os.clock() + 1.2, good = 0, bad = 0, conns = {} }
+	session = { horse = h, phase = "wait", phaseUntil = os.clock() + 1.2, good = 0, bad = 0, conns = {},
+		startedAt = workspace:GetServerTimeNow() }
 	gui.Enabled = true
 	local rng = Random.new()
 	table.insert(session.conns, RunService.RenderStepped:Connect(function()

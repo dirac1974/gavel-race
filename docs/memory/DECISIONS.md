@@ -494,6 +494,16 @@ Template:
   - **Network freezes and dropped samples (fixed after review, 2026-10-05):** a position that doesn't change right after movement is a frozen replica and is skipped, so the catch-up is measured over the whole freeze. A too-fast catch-up is dropped and counted, but only a teleport (over `maxStep`) stops crossings counting across it. Progress round the oval clamps an over-large jump instead of throwing it away, and snaps back onto each hoop ridden through. Tested with single and back-to-back freezes, 1% random 100–200 ms freezes on 100 rides, freezes that wobble a hair and freezes on the run-in: a perfect ride scores 18/18 and ends at the line every time. Off-course samples don't score and don't count toward the floor.
   - **Collisions:** players on foot are in a `Walkers` group that collides like Default except with `TrainingRiders`, so course riders never collide with anyone.
   - **Controls:** in a course a part-pushed stick still rides at full course speed (only its direction counts, above a 0.2 deadzone).
+- Implementation notes (T3, 2026-10-05, provisional, roblox-engineer):
+  - **Gate Break flow:** a break readies ("Ready…") once the horse has stood still in the stall for 0.5 s (`accel.settleSeconds`). A go is the horse getting 2 studs (`accel.goStuds`, about goSpeed × one 0.1 s sample) from where it was readied, or leaving the stall; its start is worked back from that distance at a gallop, never before the break was readied, so a frozen replica at a standing start doesn't make it look slow. The server rings the bell on time and the bell comes from a server-only seed that is never sent (Pip's seed is the shared one), and no event carries the bell time. The stall box is the stall plus a little room round it (11 × 8 studs).
+  - **Latency allowances (corrected after review):** Gate Break: the bell goes out and the go comes back, so the round trip plus the race's jitter margin (`TrainingRide.bellAllowance`), measured when each bell rings, capped at 0.3 s. Hill Climb: the rider's screen runs the countdown and Pip on the server's clock (TrainBegin carries the go time; `workspace:GetServerTimeNow()`), and the server sees the rider one trip late, so one way plus the margin (`TrainingRide.lagAllowance`), from the ride's median ping.
+  - **Back to the gate:** between breaks the horse canters (the ideal time already assumed it) and stops by itself in the middle of the stall, so kids don't overshoot an 8-stud stall; the hold lets go after 3 s if the server hasn't readied it. A stick still pushed from riding in has to be let go once before the horse can leave the stall, so nobody is launched into an early go. After the go, settling back in the stall without reaching the flag still ends the break (no getting stuck).
+  - **Early twice** counts as an easy start (breakFloor 40): the doors open and "Off you go! Ride to the flag!"; there is no fail.
+  - **Hill Climb ring** is measured round the oval (8–24 studs behind Pip, 6 either side of his line), so it never drifts; the ride ends when Pip finishes his two laps. Time off the track (the infield too) counts as out of the ring; only frozen and too-fast samples are left out. Behind the ring by any amount the horse gallops to catch up; ahead of it, it eases to 70% of Pip's pace.
+  - **Pip** is the uploaded palomino with running legs at 0.85 scale (`horse_anim_palomino`), with the fitted Cloth tinted teal and "Pip" on it, seen only by his rider (riding friends come with Ride together, T4). No new models.
+  - **The practice gate never collides** (CourseProps, CanCollide off), now that ride rigs have a shins collider.
+  - **Easy Rein** steers 75% (15% when you pull more than 90° away, so you can still turn round) toward a point a little ahead on the course (on the track at the next hoop's line, along the gymkhana or gate route, at Pip's line), only while the stick is pushed, so the rider still chooses to go. No score change.
+  - **Ideal times:** Gate Break includes the 0.5 s settle per break: 40.3 s with average bells. Its par (gold) uses the bell waits that ride really had, so gold never depends on bell luck.
 - Links: docs/debates/009-training-rides.md, game/src/shared/TrainingCourses.luau, game/src/shared/TrainingRide.luau, game/src/server/TrainingService.server.luau, game/src/client/TrainingRideClient.client.luau, game/src/shared/WorldLayout.luau, game/src/server/WorldScene.luau
 
 ## D-054 — Race steering
@@ -651,6 +661,7 @@ Template:
     - gallop {stride 18, amp 40°} above 36: 2.6 Hz riding, 3.1 Hz racing.
     - Bob = 0.15 × |sin 2π·phase| driven by the leg phase, minus the lowest hoof's lift, so hooves stay on the ground and the rider moves with the back. Reduced Motion keeps the camera off the bob.
     - Simulated: planted-hoof slip at riding speed falls from 73% to 38%. QA's walk at 16 studs/s would have needed 3.2 Hz "sewing-machine" legs; real trots run about 1.5 Hz and gallops 2.2–2.5 Hz.
+    - As built: the bob moves the horse's body only; the saddle stays on the rig's root, so the rider doesn't bob (the body's 0.15 rise never reaches the rider). Moving the rider with the back waits for a Studio check.
   - **Diamond button** (amends D-050's placement):
     - On touch, 💎 leaves the dock for a 48 px "💎 N" pill at the top-right, below the Roblox top bar. It has no glow, pulse, badge or sound, and a tap opens Tack & Paint as before. PC keeps 💎 in the dock.
     - On every device, both shop doors (the 💎 button and the Fair Street counter prompt) are hidden in line, while racing, on the results card, for D-050's 2 minutes after a race, and during training rides. No countdown or "back soon" text appears.
@@ -675,11 +686,12 @@ Template:
     - The client shows "Getting to know you…" with a filling heart until the server answers.
     - Then it shows "💖 Friends!" or **"Not yet, try again!"**. Not "So close": that is near-miss wording.
   - **Ride or Map while still seated after a race:** a "Tap Done first" notice instead of nothing.
+  - **Bug fixes that came with it (QA riding audit):** taming checks where the horse stood when the game began (it silently failed about half the time); a 1–2.5-stud "shins" collider stops the ride horse at troughs, beds and the fountain (it ignores CourseProps); getting off puts you where the horse stood; calling the horse checks for room (four headings) or says "Find an open spot"; your own horse's name tag is hidden from you; Shift gallop sits above Shift Lock while riding; the Trail bridge is sunk to the ground; the Race Board fits its frame; touch layout follows the last input (`Ui.touchLayout()`).
   - **Config:**
     - `GameConfig.riding.hopButton = true`;
     - `HorseLegs.GAITS` and `HorseLegs.WALK_BELOW = 12`;
     - `GameConfig.riding.bobAmp = 0.15`;
-    - `GameConfig.hud.gemTouchPlacement = "topRight"` ("dock" = D-050 layout);
+    - `GameConfig.touchLayout.gemPlacement = "topRight"` ("dock" = D-050 layout) and `movementColumn = 176`;
     - `GameConfig.fans.clapOffset`, `clapSizeOnFoot`, `clapSizeRiding`;
     - `GameConfig.fans.cheerStripTop = true`;
     - `GameConfig.stable.awaySign = true`.

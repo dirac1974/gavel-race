@@ -81,6 +81,21 @@ GameConfig.hud = {
 GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }
 -- Cheering on screen (D-056): CLAP one column left of the movement buttons (Gallop, Hop); the
 -- cheer strip sits at the top centre under the status line, never mid-screen.
+-- Touch screens (D-056): the 💎 button leaves the dock for a quiet pill at the top right
+-- ("dock" = the D-050 layout), and the dock leaves the bottom-right column to the movement
+-- buttons (Hop, Gallop).
+GameConfig.touchLayout = {
+	gemPlacement = "topRight",
+	movementColumn = 176, -- px kept free at the right edge for Hop (up to 170 px in) and Gallop
+}
+-- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
+GameConfig.stable = { awaySign = true }
+-- Riding your own horse (D-056).
+GameConfig.riding = {
+	hopButton = true,   -- touch: a Hop button at Roblox's own jump spot while you ride
+	bobAmp = 0.15,      -- body bob, in step with the legs (hooves stay on the ground)
+	legLength = 2.45,   -- hip to hoof, for the hoof-lift correction
+}
 GameConfig.fans = {
 	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
 	clapSizeOnFoot = { 170, 90 },
@@ -159,7 +174,7 @@ GameConfig.energy = {
 GameConfig.training = {
 	mode = "rides",                 -- "rides" | "meters" (paddock games only, as before D-053)
 	-- Courses that can be ridden now; the others show "Coming soon" on the picker (T3).
-	courses = { speed = true, grit = true, accel = false, stamina = false },
+	courses = { speed = true, grit = true, accel = true, stamina = true },
 	quickTrain = true,              -- show the 10-second games as "Quick train"
 	quickQualityCap = 0.85,         -- Quick train gains at most this quality (score 70)
 	sampleHz = 10,
@@ -179,7 +194,10 @@ GameConfig.training = {
 	gallop = 46, canter = 20,
 	oval = { cx = 800, cz = 0, straight = 160, radius = 55, width = 24 },
 	speed = { laps = 3, hoopsPerLap = 6, hoopWidth = 10 },
-	accel = { breaks = 3, bellMin = 1.5, bellMax = 3.5, dash = 120, fullReact = 0.5, zeroReact = 2.0, breakFloor = 40, goSpeed = 20 },
+	-- Gate Break: standing still in the stall for settleSeconds readies a break; moving goStuds
+	-- (or leaving the stall) is a go, early if it's before the bell.
+	accel = { breaks = 3, bellMin = 1.5, bellMax = 3.5, dash = 120, fullReact = 0.5, zeroReact = 2.0, breakFloor = 40, goSpeed = 20,
+		settleSeconds = 0.5, goStuds = 2 },
 	stamina = { laps = 2, ringNear = 8, ringFar = 24, ringHalfWidth = 6, ponyMin = 30, ponyMax = 42, grace = 3, hill = 6 },
 	-- Mud Splash is ridden at an arena lope (`pace`), and the bending poles at a canter. A log
 	-- counts when the horse is `airborne` studs above its riding height within `logWindow`

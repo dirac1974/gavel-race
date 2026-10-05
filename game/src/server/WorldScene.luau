@@ -286,14 +286,17 @@ local function buildPlaces(root: Instance)
 		local cf = placeCF("raceBoard")
 		local m = Instance.new("Model")
 		m.Name = "RaceBoard"
-		if not placeModel(m, "race_board_frame", cf * CFrame.Angles(0, math.pi, 0)) then
+		local frame = placeModel(m, "race_board_frame", cf * CFrame.Angles(0, math.pi, 0))
+		if not frame then
 			for _, x in { -18, 18 } do
 				part({ Name = "Post", Size = Vector3.new(2, 22, 2), Color = C.wood, Material = Enum.Material.Wood, CFrame = cf * CFrame.new(x, GROUND_Y + 11, 3) }, m)
 			end
 			part({ Name = "RoofBoard", Size = Vector3.new(42, 1.5, 7), Color = C.roofRed, CFrame = cf * CFrame.new(0, GROUND_Y + 22.5, 3) }, m)
 		end
-		local board = part({ Name = "Board", Size = Vector3.new(34, 15, 1), Color = Color3.fromHex("2B3A2F"),
-			CFrame = cf * CFrame.new(0, GROUND_Y + 12, 3) }, m)
+		-- The uploaded frame is 24.4 studs wide: the board fits inside it (same shape, so the cards
+		-- keep their layout); the 34-stud board is for the fallback posts.
+		local board = part({ Name = "Board", Size = if frame then Vector3.new(20, 8.8, 1) else Vector3.new(34, 15, 1),
+			Color = Color3.fromHex("2B3A2F"), CFrame = cf * CFrame.new(0, GROUND_Y + 12, 3) }, m)
 		local sg = Instance.new("SurfaceGui")
 		sg.Name = "Cards"
 		sg.Face = Enum.NormalId.Front
@@ -455,7 +458,8 @@ local function buildTrail(root: Instance)
 	do
 		local a, b = pts[3], pts[4]
 		local mid = Vector3.new((a.x + b.x) / 2, GROUND_Y, (a.z + b.z) / 2)
-		WorldScene.placeModel(f, "wooden_bridge", CFrame.lookAt(mid, mid + Vector3.new(b.x - a.x, 0, b.z - a.z)))
+		-- The deck sits 3.4 studs up on flat ground: sunk to ground level, so you ride over it, not through it (D-056).
+		WorldScene.placeModel(f, "wooden_bridge", CFrame.lookAt(mid, mid + Vector3.new(b.x - a.x, 0, b.z - a.z)) * CFrame.new(0, -3.1, 0))
 	end
 	local m = WorldLayout.meadow
 	for k = 0, 2 do
@@ -654,12 +658,22 @@ local function buildOval(f: Instance)
 		local flagX = flag.ax
 		strip(f, c.stall[1] - 6, gz, flagX + 10, gz, 10, DIRT, Enum.Material.Ground, 0.1)
 		local pos = Vector3.new(c.start.x, GROUND_Y, gz)
-		if not WorldScene.placeModel(f, "gate_stall", CFrame.lookAt(pos, pos + Vector3.new(1, 0, 0)) * CFrame.new(0, 0, 1)) then
+		local gate = WorldScene.placeModel(f, "gate_stall", CFrame.lookAt(pos, pos + Vector3.new(1, 0, 0)) * CFrame.new(0, 0, 1))
+		if not gate then
+			gate = Instance.new("Model")
 			for _, s in { -1, 1 } do
-				part({ Name = "StallSide", Size = Vector3.new(8, 6, 0.6), Color = C.white, CFrame = CFrame.new(c.start.x, GROUND_Y + 3, gz + s * 3) }, f)
+				part({ Name = "StallSide", Size = Vector3.new(8, 6, 0.6), Color = C.white, CFrame = CFrame.new(c.start.x, GROUND_Y + 3, gz + s * 3) }, gate)
 			end
-			part({ Name = "StallTop", Size = Vector3.new(8, 0.8, 6.6), Color = C.red, CFrame = CFrame.new(c.start.x, GROUND_Y + 6.4, gz) }, f)
+			part({ Name = "StallTop", Size = Vector3.new(8, 0.8, 6.6), Color = C.red, CFrame = CFrame.new(c.start.x, GROUND_Y + 6.4, gz) }, gate)
+			gate.Parent = f
 		end
+		-- The practice gate never stops a horse (D-053): no collisions, CourseProps. (Race gates
+		-- are a different model and race horses aren't ride rigs.)
+		gate.Name = "PracticeGate"
+		for _, d in gate:GetDescendants() do
+			if d:IsA("BasePart") then d.CanCollide, d.CanQuery, d.CanTouch = false, false, false end
+		end
+		CollisionGroups.set(gate, CollisionGroups.PROPS)
 		ghostPart({ Name = "FlagLine", Size = Vector3.new(0.8, 0.2, flag.bz - flag.az), Color = C.white,
 			CFrame = CFrame.new(flagX, GROUND_Y + 0.14, gz) }, f)
 		prop({ Name = "FlagPole", Size = Vector3.new(0.5, 9, 0.5), Color = C.white, CFrame = CFrame.new(flagX, GROUND_Y + 4.5, flag.az - 1.5) }, f)

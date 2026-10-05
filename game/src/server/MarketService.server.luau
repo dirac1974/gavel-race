@@ -18,7 +18,8 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
 
 local MarketBuy = Profiles.remote("MarketBuy")     -- client -> server: listing id
-local Tame = Profiles.remote("Tame")               -- client -> server: wild horse index, game score
+local Tame = Profiles.remote("Tame")               -- client -> server: wild horse index, game score, start time
+local TameResult = Profiles.remote("TameResult")   -- server -> client: true when a new friend is coming home
 local BuyStall = Profiles.remote("BuyStall")       -- client -> server
 local SwapStall = Profiles.remote("SwapStall")     -- client -> server: stalled id, pasture id
 local Rename = Profiles.remote("RenameHorse")      -- client -> server: horse id, first word, second word
@@ -104,25 +105,39 @@ MarketBuy.OnServerEvent:Connect(function(player: Player, id: any)
 	if ok then Profiles.changed(player) end
 end)
 
-Tame.OnServerEvent:Connect(function(player: Player, index: any, score: any)
+Tame.OnServerEvent:Connect(function(player: Player, index: any, score: any, startedAt: any)
 	if typeof(index) ~= "number" or typeof(score) ~= "number" then return end
 	local coat = Market.WILD_COATS[index]
 	if not coat then return end
 	if busy(player, 3, "tame") then
 		Profiles.notify(player, "Easy does it: try again in a moment", "heart")
+		TameResult:FireClient(player, false)
 		return
 	end
 	local data = Profiles.get(player)
-	if not data then return end
-	-- The wild horse is where every client draws it: the tamer must be next to it.
-	local x, z = Market.wildPosition(WorldLayout.meadow, index, workspace:GetServerTimeNow())
-	if not near(player, x, z, 30) then return end
+	if not data then
+		TameResult:FireClient(player, false)
+		return
+	end
+	-- The wild horse is where every client drew it when the game began (it stands still on the
+	-- tamer's screen while they play, D-056): the tamer must be next to that spot. A start time
+	-- more than 30 s old (or in the future) is clamped, so it can't be used to reach far-off horses.
+	local now = workspace:GetServerTimeNow()
+	local at = if typeof(startedAt) == "number" and startedAt == startedAt then math.clamp(startedAt, now - 30, now) else now
+	local x, z = Market.wildPosition(WorldLayout.meadow, index, at)
+	if not near(player, x, z, 30) then
+		Profiles.notify(player, "Get a little closer to the wild horse, then try again", "heart")
+		TameResult:FireClient(player, false)
+		return
+	end
 	if score < 50 then
 		Profiles.notify(player, "The wild horse trotted off. Try again, gently!", "heart")
+		TameResult:FireClient(player, false)
 		return
 	end
 	local ok, msg = Market.tame(data, coat, Random.new(), os.time())
 	Profiles.notify(player, msg, "heart")
+	TameResult:FireClient(player, ok == true)
 	if ok then
 		Progress.record(player, "tame", 1)
 		Profiles.changed(player)

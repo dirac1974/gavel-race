@@ -540,6 +540,7 @@ local function runRace(c, players: { Player })
 			if p then
 				riding[p] = c
 				p:SetAttribute("Racing", true)
+				p:SetAttribute("RacingHorse", horseOf[p.UserId]) -- its stall shows "at the races" (D-056)
 				Rides.dismount(p) -- off your own horse before the race horse
 				TrackScene.dismount(p.Character) -- and off the other course's horse after its race
 				c.scene:seatRider(i, p.Character)
@@ -705,6 +706,7 @@ local function runRace(c, players: { Player })
 	end)
 	for _, p in players do
 		p:SetAttribute("Racing", nil)
+		p:SetAttribute("RacingHorse", nil)
 		p:SetAttribute("LastRaceEnd", os.time()) -- no Diamond prompts for a while after (D-050)
 		if riding[p] == c then riding[p] = nil end
 	end
@@ -760,6 +762,7 @@ local function courseLoop(c)
 				if #c.queue == 0 then openCard(c) end
 				for _, p in racers do
 					p:SetAttribute("Racing", nil)
+					p:SetAttribute("RacingHorse", nil)
 					if riding[p] == c then riding[p] = nil end
 				end
 			end
