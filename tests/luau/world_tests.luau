@@ -1,10 +1,12 @@
 --!strict
--- Tests for the world modules: Horse, Profile, NameGen (Stage 1).
+-- Tests for the world modules: Horse, Profile, NameGen (Stage 1), WorldLayout (Stage 2).
 local Horse = require("../../game/src/shared/Horse")
 local Profile = require("../../game/src/shared/Profile")
 local NameGen = require("../../game/src/shared/NameGen")
 local RaceRating = require("../../game/src/shared/RaceRating")
 local GameConfig = require("../../game/src/shared/GameConfig")
+local WorldLayout = require("../../game/src/shared/WorldLayout")
+local TrackLayout = require("../../game/src/shared/TrackLayout")
 
 local function makeRng(seed0: number)
 	local seed = seed0
@@ -133,4 +135,62 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		for j = i + 1, #f do if f[i] == f[j] then distinct = false end end
 	end
 	check(distinct, "offer gives distinct chips")
+
+	-- WorldLayout (Stage 2) ----------------------------------------------------------
+	local W = WorldLayout
+	local street = { W.STREET_X0, W.STREET_Z - W.STREET_WIDTH / 2, W.STREET_X1, W.STREET_Z + W.STREET_WIDTH / 2 }
+	local lane = { W.LANE_X - W.LANE_WIDTH / 2, W.LANE_Z0, W.LANE_X + W.LANE_WIDTH / 2, W.LANE_Z1 }
+	-- Everything on the grandstand side stays clear of the racecourse and grandstand (x < 640).
+	local course = { -1000, -2000, 640, 2000 }
+	local plotsOk = true
+	for i = 1, W.PLOT_COUNT do
+		local r = W.plotRect(i)
+		if not W.inBounds(r) or W.overlaps(r, street) or W.overlaps(r, lane) or W.overlaps(r, course) then plotsOk = false end
+		for j = i + 1, W.PLOT_COUNT do
+			if W.overlaps(r, W.plotRect(j)) then plotsOk = false end
+		end
+		for key in W.places do
+			local pr = W.placeRect(key)
+			if pr and W.overlaps(r, pr) then plotsOk = false end
+		end
+		-- the plot's front edge touches the lane
+		local p = W.plot(i)
+		if math.abs(math.abs(p.x - W.LANE_X) - W.LANE_WIDTH / 2) > 1e-9 then plotsOk = false end
+	end
+	check(plotsOk, "20 plots in bounds, on the lane, clear of streets, buildings and each other")
+	local placesOk = true
+	local keys = {}
+	for key in W.places do table.insert(keys, key) end
+	for a = 1, #keys do
+		local ra = W.placeRect(keys[a])
+		if ra then
+			if not W.inBounds(ra) or W.overlaps(ra, street) or W.overlaps(ra, course) then placesOk = false end
+			for b = a + 1, #keys do
+				local rb = W.placeRect(keys[b])
+				if rb and W.overlaps(ra, rb) then placesOk = false end
+			end
+		end
+	end
+	check(placesOk, "Fair Street buildings clear of the street, the course and each other")
+	-- The tunnel lines up with the grandstand: the street meets the stand's back wall.
+	local cfg = TrackLayout.churchill
+	local _, _, lineZ = TrackLayout.finishLine(cfg)
+	check(W.STREET_Z > lineZ - 300 and W.STREET_Z < lineZ + 600, "Fair Street meets the grandstand")
+	-- Every map destination has an arrival point in bounds; the stable needs a plot.
+	local arriveOk = true
+	for _, dest in W.MAP do
+		local x, z = W.arrival(dest, 3)
+		if x < W.BOUNDS.x0 or x > W.BOUNDS.x1 or z < W.BOUNDS.z0 or z > W.BOUNDS.z1 then arriveOk = false end
+		if not W.MAP_LABELS[dest] or not W.MAP_EMOJI[dest] then arriveOk = false end
+	end
+	local sx, sz = W.arrival("stable", 3)
+	local r3 = W.plotRect(3)
+	check(arriveOk and sx >= r3[1] and sx <= r3[3] and sz >= r3[2] and sz <= r3[4], "map arrivals, stable arrival inside your plot")
+	-- Within about a 20-second gallop (48 studs/s) of the grandstand tunnel.
+	local far = 0
+	for i = 1, W.PLOT_COUNT do
+		local p = W.plot(i)
+		far = math.max(far, math.sqrt((p.x - W.STREET_X0) ^ 2 + (p.z - W.STREET_Z) ^ 2))
+	end
+	check(far / 48 <= 20, "every plot within a 20 s gallop of the grandstand")
 end

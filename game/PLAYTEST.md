@@ -65,6 +65,19 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Leave and rejoin (with API access on): your horse, cash and wins are still there; the picker doesn't reopen.
 - [ ] Two Studio test clients: each has their own horse; one leaving doesn't affect the other's save.
 
+## The world (Stage 2, D-035, D-042)
+
+- [ ] After picking a horse you spawn inside your own fenced plot on Barn Lane, facing your barn; your horse stands in a stall with its name over the half door (⭐ = active horse).
+- [ ] Barn: one bay per stall (2 to start), red walls, white trim, hay bale, water trough, three empty garden beds. The gate sign reads "<your name>'s Stable"; empty plots say "Free stable".
+- [ ] Gate 1: a tunnel through the grandstand joins the homestretch apron to Fair Street (signs at both ends).
+- [ ] Fair Street: plaza with a fountain, lamps and bunting; Race Board (prompt "Join the next race" puts you in line), Feed & Seed, Vet, Training Paddock (cones and jumps), Market Corral, Trail Gate at the far end.
+- [ ] The Trail: a dirt loop through woods to a flower meadow and back.
+- [ ] Map button: five pictures; each one takes you there (My Stable needs a horse). Works while riding (horse comes too); not while in a race.
+- [ ] Ride: the dock's Ride button brings your horse and seats you; thumbstick or WASD steers; Shift or the Gallop button gallops; Space hops; Get off sends the horse home. Other players see your horse switch between standing and galloping with a bob.
+- [ ] Pressing RACE! while riding: at the gate you're moved onto your race horse and your own horse goes home.
+- [ ] Privacy (needs two accounts): a stranger can't walk into your plot (invisible wall at the fence); a friend can. Your own plot always lets you in.
+- [ ] Lighting: soft haze, warm colours, no harsh glare. Frame rate on a phone stays smooth around Fair Street.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

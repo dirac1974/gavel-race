@@ -13,12 +13,12 @@ Last updated: 2026-10-04
 
 ## In progress
 
-**Stage 1 — Your horse** (branch `claude/stage1-your-horse`):
-- Pure `Horse`, `Profile`, `NameGen` modules with Lune tests (energy regen, care, rating, migration, names).
-- `Profiles` (DataStore `GiddyUp_Profiles_v1`, key `u<userId>`, session lock with 5-minute stale timeout, autosave every 60 s, release on leave, BindToClose; temporary profile when Studio has no API access) and `PlayerData` (starter pick, active horse, leaderstats).
-- Race queue: RACE! puts you in line; riders use their active horse's Rating, name and coat; results pay into the save.
-- Client UI kit (`Ui`), `PlayerState`, bottom dock HUD, starter picker with 3D horses and name chips.
-- Starting values: 50 Green Cash, 10 hay, 3 carrots, 2 stalls; starters have 45 in every stat and Potential 70–85.
+**Stage 2 — The world** (branch `claude/stage2-world`):
+- `WorldLayout` (pure, tested): Fair Street on z = -324 through a tunnel in the grandstand (Gate 1), Barn Lane on x = 1220 with 20 plots (90 × 118), the Trail loop and meadow east of the lane; ground and bounds extended to x = 1900.
+- `WorldScene`: builds the street (fountain, lamps, bunting), Race Board, Feed & Seed, Vet, Training Paddock, Market Corral, Trail Gate, Trail, trees and lighting; uploaded models replace part-built ones when they load.
+- `StableService`: plot per player, barn with one bay per stall and stalled horses, spawn at your gate, Map travel (`Travel` remote), visit setting published on the plot.
+- `Rides`/`RideClient`: ride your active horse anywhere (Humanoid rig owned by the rider; walk 16, gallop 46; stand/gallop models switched by speed, bob via Motor6D).
+- `WorldClient`: privacy walls solid for players who aren't allowed in (default Friends), Map panel, Race Board prompt. `Guide`: pathfinding hoofprints for GO buttons (used from Stage 5).
 
 ## Backlog (top = next)
 
@@ -39,6 +39,7 @@ World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). 
 
 ## Done
 
+- 2026-10-04: Stage 1 your horse (PR #17): saved profiles, starter pick, race queue, dock HUD.
 - 2026-10-04: world design (D-035 to D-047) from the design council's world workshop; build stages planned.
 - 2026-10-04: exponential race and race shape (D-033), stretch-drive previews, ride report, replays (D-034); debate 008.
 - 2026-10-04: continuous pace slider with speed meter and a big rainbow Final Burst (D-026); first-person riding; Churchill Downs racecourse with distance-based race length (D-027).

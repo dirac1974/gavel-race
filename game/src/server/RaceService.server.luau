@@ -32,6 +32,7 @@ local Profile = require(Shared:WaitForChild("Profile"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Rides = require(script.Parent:WaitForChild("Rides"))
 
 local LEAGUE = "Rookie" -- prototype: one league
 local COUNTDOWN = 3
@@ -335,6 +336,7 @@ local function runRace(players: { Player })
 			local p = Players:GetPlayerByUserId(tonumber(lane.id))
 			if p then
 				p:SetAttribute("Racing", true)
+				Rides.dismount(p) -- off your own horse before the race horse
 				TrackScene.seatRider(i, p.Character)
 			end
 		end

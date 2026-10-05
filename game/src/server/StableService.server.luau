@@ -1,0 +1,314 @@
+--!nonstrict
+-- StableService (D-035, D-037, D-042): gives each player a plot on Barn Lane, builds their
+-- barn with one stall per stall slot and their stalled horses standing in them, spawns them
+-- at their gate, and handles Map fast-travel. Plots stay fenced; the owner's visit setting
+-- (default Friends) is published on the plot so each client can close the gate locally for
+-- players who aren't allowed in (WorldClient). Visitors never change anything.
+-- STATUS: written without Studio access; verify in Studio before relying on it.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local Profile = require(Shared:WaitForChild("Profile"))
+local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
+local Rides = require(script.Parent:WaitForChild("Rides"))
+
+local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
+local GROUND_Y = WorldScene.GROUND_Y
+local C = WorldScene.colors
+local part, wedge = WorldScene.part, WorldScene.wedge
+
+local STALL_MAX_W = 14
+local BARN_D = 24
+local BARN_H = 15
+local GATE_W = 14
+
+local world = WorldScene.build()
+local plotsFolder = Instance.new("Folder")
+plotsFolder.Name = "Plots"
+plotsFolder.Parent = world
+
+local owners: { [number]: Player } = {}      -- plot index -> owner
+local plotOf: { [Player]: number } = {}
+local plotModels: { [number]: Model } = {}
+local signatures: { [number]: string } = {}
+
+local function plotCF(i: number, inward: number, across: number, y: number?): CFrame
+	-- A frame inside plot i: `inward` studs from the lane, `across` to the right looking in,
+	-- facing out toward the lane.
+	local x, z = WorldLayout.plotPoint(i, inward, across)
+	local ox, oz = WorldLayout.plotPoint(i, inward - 10, across)
+	local pos = Vector3.new(x, y or 0, z)
+	return CFrame.lookAt(pos, Vector3.new(ox, y or 0, oz))
+end
+
+-- The fenced shell every plot has, owned or not.
+local function buildShell(i: number): Model
+	local m = Instance.new("Model")
+	m.Name = "Plot" .. i
+	m:SetAttribute("PlotIndex", i)
+	local F, D = WorldLayout.PLOT_FRONT, WorldLayout.PLOT_DEPTH
+	local centre = plotCF(i, D / 2, 0)
+	part({ Name = "Lawn", Size = Vector3.new(F - 1, 0.2, D - 1), Color = C.plotGrass, Material = Enum.Material.Grass,
+		CFrame = centre * CFrame.new(0, GROUND_Y + 0.04, 0) }, m)
+	-- Fence: front with a gate gap, two sides, back. Points are (inward, across).
+	local h = F / 2
+	local function fenceIA(a0: number, c0: number, a1: number, c1: number)
+		local x0, z0 = WorldLayout.plotPoint(i, a0, c0)
+		local x1, z1 = WorldLayout.plotPoint(i, a1, c1)
+		WorldScene.fence(m, x0, z0, x1, z1)
+	end
+	-- Neighbouring plots share a side: only the lower-numbered plot builds the shared fence.
+	local function neighbourOn(across: number): number?
+		local x, z = WorldLayout.plotPoint(i, D / 2, across * 1.05)
+		for j = 1, WorldLayout.PLOT_COUNT do
+			local r = WorldLayout.plotRect(j)
+			if j ~= i and x >= r[1] and x <= r[3] and z >= r[2] and z <= r[4] then return j end
+		end
+		return nil
+	end
+	fenceIA(1, -h, 1, -GATE_W / 2)
+	fenceIA(1, GATE_W / 2, 1, h)
+	local right, left = neighbourOn(h), neighbourOn(-h)
+	if not right or right > i then fenceIA(1, h, D, h) end
+	fenceIA(D, h, D, -h)
+	if not left or left > i then fenceIA(D, -h, 1, -h) end
+	-- Privacy walls (D-042): invisible and passable on the server; each client turns them
+	-- solid for itself when the owner's setting doesn't let it in.
+	local walls = Instance.new("Folder")
+	walls.Name = "PrivacyWalls"
+	walls.Parent = m
+	local function wall(a: number, c: number, len: number, alongAcross: boolean)
+		local cf = plotCF(i, a, c, GROUND_Y + 8)
+		local size = if alongAcross then Vector3.new(len, 16, 1) else Vector3.new(1, 16, len)
+		part({ Name = "Wall", Size = size, Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false, CFrame = cf }, walls)
+	end
+	wall(0.5, 0, F, true)          -- front, across the gate too
+	wall(D, 0, F, true)            -- back
+	wall(D / 2, -h, D, false)      -- left
+	wall(D / 2, h, D, false)       -- right
+	-- Name sign by the gate.
+	local signPos = (plotCF(i, -1, GATE_W / 2 + 6, GROUND_Y + 6)).Position
+	local x, z = WorldLayout.plot(i).fx, WorldLayout.plot(i).fz
+	local _, label = WorldScene.sign(m, signPos, Vector3.new(x, 0, z), "Free stable", "🏡", 14, 3.5, C.woodLight)
+	label.Name = "OwnerLabel"
+	m.Parent = plotsFolder
+	return m
+end
+
+-- The barn and everything that depends on the owner's profile, rebuilt when it changes.
+local function horseModel(coat: string): Model
+	local m = WorldScene.model("horse_stand_" .. coat) or WorldScene.model("horse_" .. coat)
+	if m then return m end
+	m = Instance.new("Model")
+	local colour = ({ bay = "8B4A2B", chestnut = "B5562B", grey = "B9BCC2", black = "2B2B30", palomino = "E3C16F" })[coat] or "8B4A2B"
+	part({ Name = "Body", Size = Vector3.new(2, 3.2, 6.5), Color = Color3.fromHex(colour), CFrame = CFrame.new(0, 3.6, 0) }, m)
+	part({ Name = "Head", Size = Vector3.new(1.4, 1.6, 2.4), Color = Color3.fromHex(colour), CFrame = CFrame.new(0, 5.8, -3.8) }, m)
+	for _, xz in { { -0.6, -2.4 }, { 0.6, -2.4 }, { -0.6, 2.4 }, { 0.6, 2.4 } } do
+		part({ Name = "Leg", Size = Vector3.new(0.6, 2.2, 0.6), Color = Color3.fromHex(colour), CFrame = CFrame.new(xz[1], 1.1, xz[2]) }, m)
+	end
+	m.WorldPivot = CFrame.new()
+	return m
+end
+
+local function buildBarn(i: number, owner: Player, data)
+	local shell = plotModels[i]
+	local old = shell:FindFirstChild("Barn")
+	if old then old:Destroy() end
+	local barn = Instance.new("Model")
+	barn.Name = "Barn"
+	local stalls = data.stalls
+	-- Bays narrow a little for big barns so the barn always fits the plot front.
+	local stallW = math.min(STALL_MAX_W, (WorldLayout.PLOT_FRONT - 24) / stalls)
+	local width = stalls * stallW + 8
+	local back = WorldLayout.PLOT_DEPTH - 6
+	local front = back - BARN_D
+	local mid = plotCF(i, (front + back) / 2, 0)
+	-- Back and side walls, roof; the front is open stall bays with half doors.
+	part({ Name = "BackWall", Size = Vector3.new(width, BARN_H, 1.2), Color = C.red, Material = Enum.Material.WoodPlanks,
+		CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H / 2, BARN_D / 2) }, barn) -- local +Z is away from the lane
+	for _, s in { -1, 1 } do
+		part({ Name = "SideWall", Size = Vector3.new(1.2, BARN_H, BARN_D), Color = C.red, Material = Enum.Material.WoodPlanks,
+			CFrame = mid * CFrame.new(s * width / 2, GROUND_Y + BARN_H / 2, 0) }, barn)
+	end
+	local roofH = 7
+	for _, s in { -1, 1 } do
+		wedge({ Name = "Roof", Size = Vector3.new(width + 3, roofH, BARN_D / 2 + 2), Color = C.roofRed,
+			CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H + roofH / 2, s * (BARN_D / 4 + 1)) * CFrame.Angles(0, if s > 0 then math.pi else 0, 0) }, barn)
+	end
+	part({ Name = "Trim", Size = Vector3.new(width + 0.8, 1, BARN_D + 0.8), Color = C.white, CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H, 0) }, barn)
+	part({ Name = "Floor", Size = Vector3.new(width, 0.3, BARN_D), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
+		CFrame = mid * CFrame.new(0, GROUND_Y + 0.15, 0) }, barn)
+	-- Stall bays.
+	for k = 1, stalls do
+		local across = -width / 2 + 4 + (k - 0.5) * stallW
+		local bay = plotCF(i, front + 0.6, across)
+		if k > 1 then
+			part({ Name = "Divider", Size = Vector3.new(0.8, BARN_H - 2, BARN_D - 1), Color = C.white,
+				CFrame = plotCF(i, (front + back) / 2, across - stallW / 2, GROUND_Y + (BARN_H - 2) / 2) }, barn)
+		end
+		-- Dutch half door (lower half), crossed brace.
+		part({ Name = "HalfDoor", Size = Vector3.new(stallW - 2, 4.4, 0.6), Color = C.white,
+			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn)
+		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = C.red,
+			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
+		local h = data.horses[k]
+		if h then
+			local hm = horseModel(h.coat)
+			hm.Name = "Horse_" .. h.id
+			hm:PivotTo(plotCF(i, front + BARN_D / 2 + 1, across, GROUND_Y))
+			for _, d in hm:GetDescendants() do
+				if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
+			end
+			hm.Parent = barn
+			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
+				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" else nil, stallW - 3, 2.2, C.white)
+			nameLabel.Name = "HorseName"
+		end
+	end
+	-- Props: hay and a water trough by the barn, three garden beds (Stage 3) along the side.
+	-- In front of the barn, inside the plot whatever the barn's size.
+	local propA, propB = WorldLayout.PLOT_FRONT / 2 - 10, -(WorldLayout.PLOT_FRONT / 2 - 10)
+	local hay = WorldScene.placeModel(barn, "hay_bale", plotCF(i, front - 6, propA, GROUND_Y))
+	if not hay then
+		part({ Name = "HayBale", Size = Vector3.new(4, 3, 3), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
+			CFrame = plotCF(i, front - 6, propA, GROUND_Y + 1.5) }, barn)
+	end
+	local trough = WorldScene.placeModel(barn, "water_trough", plotCF(i, front - 6, propB, GROUND_Y))
+	if not trough then
+		part({ Name = "Trough", Size = Vector3.new(6, 2, 2.6), Color = C.wood, Material = Enum.Material.Wood,
+			CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1) }, barn)
+		part({ Name = "Water", Size = Vector3.new(5.4, 0.2, 2), Color = C.water, Material = Enum.Material.Glass, Transparency = 0.25,
+			CanCollide = false, CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1.9) }, barn)
+	end
+	for k = 1, 3 do
+		local bed = plotCF(i, 26 + (k - 1) * 14, -WorldLayout.PLOT_FRONT / 2 + 10, GROUND_Y)
+		if not WorldScene.placeModel(barn, "garden_bed", bed) then
+			part({ Name = "GardenBed", Size = Vector3.new(10, 1.6, 8), Color = C.wood, Material = Enum.Material.WoodPlanks,
+				CFrame = bed * CFrame.new(0, 0.8, 0) }, barn)
+			part({ Name = "Soil", Size = Vector3.new(9, 0.3, 7), Color = Color3.fromHex("6B4A2E"), Material = Enum.Material.Ground,
+				CFrame = bed * CFrame.new(0, 1.6, 0) }, barn)
+		end
+	end
+	barn:SetAttribute("Owner", owner.UserId)
+	barn.Parent = shell
+end
+
+local function signature(data): string
+	local parts = { tostring(data.stalls), tostring(data.activeHorse) }
+	for _, h in data.horses do table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name) end
+	return table.concat(parts, "|")
+end
+
+local function refresh(player: Player)
+	local i = plotOf[player]
+	local data = Profiles.get(player)
+	if not i or not data then return end
+	local shell = plotModels[i]
+	shell:SetAttribute("OwnerId", player.UserId)
+	shell:SetAttribute("Visits", data.settings.visits)
+	local label = shell:FindFirstChild("OwnerLabel", true)
+	if label then label.Text = "🏡 " .. player.DisplayName .. "'s Stable" end
+	local sig = signature(data)
+	if signatures[i] ~= sig then
+		signatures[i] = sig
+		buildBarn(i, player, data)
+	end
+end
+
+local function clearPlot(i: number)
+	local shell = plotModels[i]
+	local barn = shell:FindFirstChild("Barn")
+	if barn then barn:Destroy() end
+	shell:SetAttribute("OwnerId", nil)
+	shell:SetAttribute("Visits", nil)
+	local label = shell:FindFirstChild("OwnerLabel", true)
+	if label then label.Text = "🏡 Free stable" end
+	signatures[i] = nil
+end
+
+local function assign(player: Player): number?
+	if plotOf[player] then return plotOf[player] end
+	for i = 1, WorldLayout.PLOT_COUNT do
+		if not owners[i] then
+			owners[i] = player
+			plotOf[player] = i
+			player:SetAttribute("PlotIndex", i)
+			return i
+		end
+	end
+	return nil
+end
+
+local function arrive(player: Player, dest: string)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local x, z, lx, lz = WorldLayout.arrival(dest, plotOf[player])
+	local ground = Vector3.new(x, GROUND_Y, z)
+	local facing = CFrame.lookAt(ground, Vector3.new(lx, GROUND_Y, lz))
+	if Rides.travel(player, facing) then return end -- riding: you and your horse travel together
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then return end -- sitting on something else (e.g. a race horse)
+	character:PivotTo(facing + Vector3.new(0, 3.5, 0))
+end
+
+local function onCharacter(player: Player)
+	-- Spawn at your own gate once your stable is ready; new players arrive on Fair Street.
+	local data = Profiles.whenLoaded(player, 30)
+	if not player.Parent then return end
+	task.wait(0.1)
+	if data and #data.horses > 0 and plotOf[player] then arrive(player, "stable") else arrive(player, "plaza") end
+end
+
+Profiles.Loaded.Event:Connect(function(player: Player)
+	if assign(player) then refresh(player) end
+end)
+Profiles.Changed.Event:Connect(function(player: Player)
+	refresh(player)
+end)
+
+Players.PlayerAdded:Connect(function(player: Player)
+	player.CharacterAdded:Connect(function() onCharacter(player) end)
+end)
+Players.PlayerRemoving:Connect(function(player: Player)
+	local i = plotOf[player]
+	if i then
+		owners[i] = nil
+		plotOf[player] = nil
+		clearPlot(i)
+	end
+end)
+
+-- Map fast-travel (D-035): only between races, never while riding in one.
+local lastTravel: { [Player]: number } = {}
+Travel.OnServerEvent:Connect(function(player: Player, dest: any)
+	if typeof(dest) ~= "string" or not table.find(WorldLayout.MAP, dest) then return end
+	if (lastTravel[player] or 0) > os.clock() - 1.5 then return end
+	lastTravel[player] = os.clock()
+	if player:GetAttribute("Racing") then return end
+	arrive(player, dest)
+end)
+
+for i = 1, WorldLayout.PLOT_COUNT do plotModels[i] = buildShell(i) end
+Rides.start()
+for _, p in Players:GetPlayers() do
+	if Profiles.get(p) and assign(p) then refresh(p) end
+	p.CharacterAdded:Connect(function() onCharacter(p) end)
+	if p.Character then task.spawn(onCharacter, p) end
+end
+
+-- Uploaded models replace part-built buildings, props and horses once they load.
+task.spawn(function()
+	local folder = ReplicatedStorage:WaitForChild("RaceModels", 60)
+	if not folder then return end
+	if not folder:GetAttribute("Loaded") then folder:GetAttributeChangedSignal("Loaded"):Wait() end
+	WorldScene.rebuildPlaces()
+	for player, i in plotOf do
+		signatures[i] = nil
+		refresh(player)
+	end
+end)

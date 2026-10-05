@@ -35,6 +35,7 @@ local function localEvent(name: string): BindableEvent
 	return e
 end
 local OpenStarter = localEvent("OpenStarter")
+local OpenMap = localEvent("OpenMap")
 
 -- Dock --------------------------------------------------------------------------
 local dock = Instance.new("Frame")
@@ -45,6 +46,20 @@ dock.Size = UDim2.new(0, 0, 0, 78)
 dock.AutomaticSize = Enum.AutomaticSize.X
 dock.BackgroundTransparency = 1
 dock.Parent = gui
+local dockScale = Instance.new("UIScale")
+dockScale.Parent = dock
+local function fitDock()
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+	local width = math.max(1, dock.AbsoluteSize.X / dockScale.Scale)
+	dockScale.Scale = math.clamp((cam.ViewportSize.X - 24) / width, 0.55, 1)
+end
+dock:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitDock)
+task.spawn(function()
+	while not workspace.CurrentCamera do task.wait(0.1) end
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitDock)
+	fitDock()
+end)
 local layout = Instance.new("UIListLayout")
 layout.FillDirection = Enum.FillDirection.Horizontal
 layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
@@ -102,8 +117,14 @@ end
 local restLabel = Ui.text(hoofRow, "", 16, { Size = UDim2.new(0, 70, 1, 0), LayoutOrder = 99, TextXAlignment = Enum.TextXAlignment.Left })
 restLabel.TextColor3 = C.plum
 
+-- Map (D-035)
+local mapSlot = slot(70, 3)
+local mapBtn = Ui.button(mapSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.sky, 20)
+Ui.icon(mapBtn, "map", "🗺️", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
+mapBtn.Activated:Connect(function() OpenMap:Fire() end)
+
 -- Race button
-local raceSlot = slot(170, 3)
+local raceSlot = slot(170, 4)
 local raceBtn = Ui.button(raceSlot, "🏁 RACE!", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.orange, 30)
 local leaveBtn = Ui.button(raceSlot, "✕", UDim2.fromOffset(34, 34), UDim2.new(1, -20, 1, -88), C.white, 18)
 leaveBtn.Visible = false
