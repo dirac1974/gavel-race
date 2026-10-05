@@ -12,3 +12,4 @@ Provisional decisions made by the team under D-009, newest last. For each: keep,
 | D-015 | Energy: 5 per horse, 1 per cash race, +1 per 20 min, care top-ups, Rookie free, Practice races when tired | Edit `GameConfig.energy` |
 | D-016 | Flat 2nd–4th prizes, ribbons in UI, no exacta prizes | Edit `GameConfig.placePrizes`, `GameConfig.ribbons` |
 | D-002a (amended) | Diamonds can't buy stalls, auto-feeder, or Energy refills | Edit D-002a and the Diamond catalog |
+| D-019 | Spectator cheering: free, cheer one rider before window 1, Fan XP from their taps (3/2/1/0) plus flat 2 for a win, max 11 per race and 100 per day, cosmetics only, ≤ 20% of a rider's progress per race | Edit `GameConfig.spectator` once built; remove the spectator UI |
