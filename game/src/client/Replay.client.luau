@@ -152,7 +152,10 @@ local function start(mode: string)
 			break
 		end
 	end
-	local won = rec.summary ~= nil and RaceState.myLane ~= nil and RaceState.place[RaceState.myLane] == 1
+	local won = false
+	for _, row in rec.summary or {} do
+		if row.lane == rec.myLane and row.place == 1 then won = true end
+	end
 	playing = {
 		rec = rec, mode = mode, clock = if mode == "finish" then quarterT else rec.frames[1].t,
 		quarterT = quarterT, crossT = crossT, endT = math.min(lastT, crossT + 1.5),
@@ -179,8 +182,13 @@ camBtn.Activated:Connect(function()
 	playing.view = if playing.view == "side" then "behind" else "side"
 	camBtn.Text = if playing.view == "side" then "Behind" else "Side"
 end)
-remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList)
-	-- A new race of yours always wins; someone else's race on the other course doesn't stop it.
+remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, _start, _cond, _resultAt, _burstOpen, courseId)
+	-- A new race of yours always wins, and so does a new race on the course you're replaying
+	-- (its horses are about to move); a race on the other course doesn't stop it.
+	if playing and (courseId or "dirt") == (playing.rec.course or "dirt") then
+		stop()
+		return
+	end
 	local myId = tostring(player.UserId)
 	for _, lane in laneList do
 		if lane.id == myId then
@@ -221,7 +229,7 @@ RunService.RenderStepped:Connect(function(dt)
 	playing.clock += dt * speed
 	local t = playing.clock
 	local progress = placeAll(rec, t)
-	local me = RaceState.myLane
+	local me = rec.myLane
 
 	-- Camera.
 	local camera = workspace.CurrentCamera

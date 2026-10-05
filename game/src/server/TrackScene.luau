@@ -513,6 +513,13 @@ function Course:seatRider(i: number, character: Model?): boolean
 	local saddle = self.saddles[i]
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not saddle or not humanoid or humanoid.Health <= 0 then return false end
+	-- Still sitting somewhere (the other course's horse after its race): get off first.
+	local old = humanoid.SeatPart
+	if old then
+		local weld = old:FindFirstChild("SeatWeld")
+		if weld then weld:Destroy() end
+		humanoid.Sit = false
+	end
 	character:PivotTo(saddle.CFrame + Vector3.new(0, 3, 0))
 	saddle:Sit(humanoid)
 	return true

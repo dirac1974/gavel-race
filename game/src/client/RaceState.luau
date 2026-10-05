@@ -24,6 +24,7 @@ RaceState.myLane = nil
 -- `consider` when a race starts; the first answer for that race sticks.
 local myId = tostring(game:GetService("Players").LocalPlayer.UserId)
 RaceState.focus = nil      -- course id ("dirt" | "turf") the HUD follows
+RaceState.myCourse = nil   -- the course of your own race, kept until you're off its horse
 local decided: { [string]: boolean } = {}
 
 function RaceState.consider(courseId: string?, laneList, start: number): boolean
@@ -33,11 +34,19 @@ function RaceState.consider(courseId: string?, laneList, start: number): boolean
 	for _, lane in laneList do
 		if lane.id == myId then mine = true end
 	end
-	local ridingElsewhere = RaceState.active and RaceState.myLane ~= nil and RaceState.focus ~= courseId
-	local focus = mine or not ridingElsewhere
+	-- Your own race (still racing, on its results card or replay, or still in its saddle)
+	-- keeps the focus; other races are only watched when you have none.
+	local busyElsewhere = RaceState.myCourse ~= nil and RaceState.myCourse ~= courseId
+	local focus = mine or not busyElsewhere
 	decided[key] = focus
 	if focus then RaceState.focus = courseId end
+	if mine then RaceState.myCourse = courseId end
 	return focus
+end
+
+-- Done with your race: watching other races can take the focus again.
+function RaceState.releaseMyRace()
+	RaceState.myCourse = nil
 end
 
 function RaceState.isFocus(courseId: string?): boolean
