@@ -79,11 +79,15 @@ local watching = nil -- { course, lanes, cheered, beats, cheerOpen, finished }
 local function showChips(laneList)
 	for _, ch in chips:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
 	for i, lane in laneList do
-		local b = Ui.button(chips, "", UDim2.fromOffset(72, 54), UDim2.new(), LANE[i], 14)
+		local b = Ui.button(chips, "", UDim2.fromOffset(72, 54), UDim2.new(), if lane.isBot then C.shade else LANE[i], 14)
 		Ui.text(b, tostring(i), 22, { Size = UDim2.new(1, 0, 0, 24), TextColor3 = if i == 3 or i == 2 or i == 6 then C.ink else C.white })
 		local name = Ui.text(b, lane.name, 11, { Position = UDim2.new(0, 2, 0, 26), Size = UDim2.new(1, -4, 0, 26) })
 		name.TextColor3 = if i == 3 or i == 2 or i == 6 then C.ink else C.white
 		b.Activated:Connect(function()
+			if lane.isBot then
+				Ui.toast("Cheer for a rider! Practice horses don't have fans.", "job_cheer", "📣")
+				return
+			end
 			if watching and watching.cheerOpen and not watching.cheered then
 				remotes:WaitForChild("Cheer"):FireServer(watching.course, i)
 			end
@@ -101,7 +105,14 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, _co
 		end
 	end
 	if not RaceState.consider(courseId, laneList, start) then return end
+	if watching and watching.cheered and not watching.finished then return end -- keep clapping for your horse
+	local anyRider = false
+	for _, lane in laneList do
+		if not lane.isBot then anyRider = true end
+	end
+	if not anyRider then return end -- nothing to cheer in an all-bot race
 	watching = { course = courseId, lanes = laneList, cheered = nil, beats = nil, cheerOpen = true, finished = false }
+	bar.Size = UDim2.fromOffset(640, 96)
 	barTitle.Text = "📣 Cheer for a horse!"
 	showChips(laneList)
 	bar.Visible = true
@@ -207,10 +218,12 @@ mine.TextColor3 = C.orangeDark
 local xpLine = Ui.text(panel, "", 16, { Position = UDim2.new(0, 16, 1, -34), Size = UDim2.new(1, -32, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 xpLine.TextColor3 = C.plum
 local hideAt = 0
+local boardCourse = nil
 
 remotes:WaitForChild("TopFans").OnClientEvent:Connect(function(courseId, board, rank, xp, level, levelUp)
 	if board then
 		if not (watching and watching.course == courseId) then return end
+		boardCourse = courseId
 		for k, r in rows do
 			local e = board[k]
 			r.Text = if e then string.format("%d. %s 📣 %s · %d", k, e.name, e.horse, e.score) else ""
@@ -220,7 +233,12 @@ remotes:WaitForChild("TopFans").OnClientEvent:Connect(function(courseId, board, 
 		panel.Visible = true
 		hideAt = os.clock() + 9
 	else
-		-- Your own line: rank (if you clapped) and Fan XP.
+		-- Your own line: rank (if you clapped) and Fan XP; a stale board from another race is cleared.
+		if boardCourse ~= courseId then
+			for _, r in rows do r.Text = "" end
+			boardCourse = courseId
+		end
+		if not rank and not (xp and xp > 0) then return end
 		mine.Text = if rank then string.format("You: #%d", rank) else ""
 		if xp and xp > 0 then
 			xpLine.Text = string.format("+%d Fan XP · Fan level %d", xp, level or 1)
