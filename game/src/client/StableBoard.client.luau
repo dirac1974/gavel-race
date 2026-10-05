@@ -204,9 +204,7 @@ local function ribbon(kind: string, label: string, list, y: number)
 	more.Activated:Connect(function()
 		-- Claim everything ready in this set, or list the jobs in a toast.
 		if claimable > 0 then
-			for i, j in list do
-				if not j.claimed and j.progress >= j.target then gameRemotes:WaitForChild("JobClaim"):FireServer(kind, i) end
-			end
+			gameRemotes:WaitForChild("JobClaim"):FireServer(kind, "all")
 		else
 			for _, j in list do
 				if not j.claimed then Ui.toast(string.format("%s (%d/%d)", j.text, j.progress, j.target), j.icon, "⭐") end

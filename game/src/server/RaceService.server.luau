@@ -474,6 +474,7 @@ local function runRace(c, players: { Player })
 	local errors: { [number]: { number } } = {}
 	local matched: { [number]: number } = {}
 	local greatTaps: { [number]: number } = {}  -- Great or Perfect pace taps, for Stable Board jobs
+	local greatBurst: { [number]: boolean } = {} -- tapped a Great or Perfect Final Burst
 	for seg, kind in GameConfig.segments do
 		cur.seg = seg
 		if kind == "pace" then
@@ -514,7 +515,10 @@ local function runRace(c, players: { Player })
 			for _, p in players do
 				local i = session:laneIndex(tostring(p.UserId))
 				local s = i and session.lanes[i].scores[seg]
-				if s and s >= 80 then table.insert(great, tostring(p.UserId)) end
+				if s and s >= 80 then
+					table.insert(great, tostring(p.UserId))
+					greatBurst[p.UserId] = true
+				end
 			end
 			if #great > 0 then BurstSparkle:FireAllClients(great, c.id) end
 		end
@@ -558,10 +562,7 @@ local function runRace(c, players: { Player })
 	for _, p in players do
 		Progress.record(p, "race", 1)
 		Progress.record(p, "great_tap", greatTaps[p.UserId] or 0)
-		local i = session:laneIndex(tostring(p.UserId))
-		for seg, kind in GameConfig.segments do
-			if kind == "burst" and i and (session.lanes[i].scores[seg] or 0) >= 80 then Progress.record(p, "burst_great", 1) end
-		end
+		if greatBurst[p.UserId] then Progress.record(p, "burst_great", 1) end
 	end
 	-- Riders stay on their horse for the results and replay; they press Done to get off.
 	task.delay(GameConfig.dismountTimeoutSeconds, function()

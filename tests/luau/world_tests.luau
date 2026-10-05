@@ -91,7 +91,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 
 	-- Profile ------------------------------------------------------------------------
 	local p = Profile.new(T0)
-	check(p.cash == Profile.START_CASH and Profile.itemCount(p, "hay") == 10 and #p.horses == 0, "new profile")
+	check(p.cash == Profile.START_CASH and Profile.itemCount(p, "hay") == 10 and Profile.itemCount(p, "seed_carrot") == 2 and #p.horses == 0, "new profile")
 	check(Profile.touchDay(p, T0) and not Profile.touchDay(p, T0 + 60) and p.days.played == 1, "first visit of the day counts once")
 	check(Profile.touchDay(p, T0 + 3 * 86400) and p.days.played == 2, "a missed day never resets the count")
 	check(Profile.spendCash(p, 20) and p.cash == 30 and not Profile.spendCash(p, 31) and p.cash == 30, "can't overspend")
@@ -225,6 +225,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Care.pet(cp, ch, T0 + 86400)
 	local ok2 = Care.pet(cp, ch, T0 + 86400 + 60)
 	check(ch.bond == b1 + 1 and ok2, "petting: bond once a day, always allowed")
+	local _, _, counted3 = Care.pet(cp, ch, T0 + 86400 + 120)
+	check(counted3 == false, "only the first pets of the day count toward jobs")
 
 	-- Garden: plant, grow offline, harvest, never wither.
 	cp.items.seed_carrot = 1
@@ -254,6 +256,12 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	cp.items.apple = 3
 	check(Care.sell(cp, "apple", 3) and cp.cash == 16 and cp.items.apple == nil, "sell apples")
 	check(not Care.sell(cp, "hay", 1), "hay isn't bought back")
+	cp.items.carrot, cp.items.oats = 8, 2
+	local cashS = cp.cash
+	check(Care.sellAll(cp, 5) and cp.items.carrot == 5 and cp.items.oats == 2 and cp.cash == cashS + 3, "sell all keeps 5 of each")
+	check(not Care.sellAll(cp, 5), "nothing left to sell")
+	local bad = Profile.migrate({ garden = { { seed = "seed_moon", at = 5 }, { seed = "seed_oats", at = 7 } } }, T0)
+	check(bad.garden[1].seed == "" and bad.garden[2].seed == "seed_oats", "unknown seeds are cleared on load")
 
 	-- Garden and chores survive migration.
 	cp.garden[2] = { seed = "seed_oats", at = T0 }
@@ -316,6 +324,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		Jobs.claim(jp, 12345, "daily", i, T0 + 86400)
 	end
 	check(Jobs.allDoneToday(jp), "all done today")
+	-- A server whose clock is behind can't roll the jobs back.
+	local before2 = jp.jobs.daily[1].id
+	Jobs.refresh(jp, 12345, T0)
+	check(jp.jobs.daily[1].id == before2 and jp.jobs.daily[1].claimed, "jobs only roll forward")
+	-- Claim all in one set.
+	local wk = jp.jobs.weekly
+	for i = 1, 2 do
+		local d = Jobs.def(wk[i].id)
+		Jobs.record(jp, 12345, d.event, d.target, T0 + 86400)
+	end
+	check(Jobs.claimAllIn(jp, 12345, "weekly", T0 + 86400) >= 2, "claim all in a set")
 	local jv = Jobs.view(jp)
 	check(#jv.daily == 3 and jv.daily[1].text ~= nil and jv.rerollUsed, "jobs view for the board")
 
