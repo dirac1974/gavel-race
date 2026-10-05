@@ -89,6 +89,13 @@ for c, pc in data.pace do
 	for k = 1, math.min(#errs, #pc.errors) do
 		check(close(errs[k], pc.errors[k], 1e-9), `pace case {c}: error {k}`)
 	end
+	-- Finger bounces ignored (D-055)
+	local bs, berrs, bsingle = PaceMeter.score(pc.passes, pc.bounceTaps, 0.15)
+	check(close(bs, pc.bounceScore, 1e-9), `pace case {c}: bounce score {bs} vs {pc.bounceScore}`)
+	check(bsingle == pc.bounceSingle and #berrs == #pc.bounceErrors, `pace case {c}: bounce one-tap passes`)
+	for k = 1, math.min(#berrs, #pc.bounceErrors) do
+		check(close(berrs[k], pc.bounceErrors[k], 1e-9), `pace case {c}: bounce error {k}`)
+	end
 end
 
 for _, w in data.windows do

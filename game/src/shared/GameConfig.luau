@@ -33,6 +33,7 @@ GameConfig.pace = {
 	shiftMax = 3,
 	centerRange = 0.6,
 	speedFillPasses = 5,       -- the speed meter shows the mean of the last few passes
+	bounceSeconds = 0.15,      -- a tap this soon after the last counted tap is a finger bounce: ignored (D-055; 0 = D-026)
 }
 -- Race length (D-027): distance on the Churchill-style track at a gallop. Real times:
 -- Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~1:57, Marathon ~2:21.
@@ -55,6 +56,40 @@ GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own scr
 GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
+-- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
+-- clock), so the order on screen is the race order in every lane.
+GameConfig.raceView = {
+	maxGapFeetPerSecond = 10, -- a horse gains or loses ground on the pace at most this fast...
+	catchUpMarginSeconds = 0.3, -- ...unless it must go faster to reach its place by the line
+	gateEaseSeconds = 0.6,    -- horses reach full gallop out of the gate over about this long
+	nudgeRiseSeconds = 0.15,  -- a good tap's nudge on your own horse eases in...
+	nudgeFallSeconds = 0.6,   -- ...and back out
+	settleSeconds = 0.6,      -- after the line, legs ease to standing before the race ends
+}
+GameConfig.gateCountdownSeconds = 3 -- "3, 2, 1" over the gate, then "GO!" with the bell (D-055)
+-- Race screen (D-055).
+GameConfig.hud = {
+	missedPassLabel = "",        -- a pass with no tap shows no word ("Miss" = before D-055)
+	earlyLateBelow = 30,         -- a tap scoring under this says "Early" or "Late"
+	riderBoardInRace = false,    -- riders see the running-order board in the race (true = D-030)
+	boardShowsChance = false,    -- win % and purse on the board, and the rider's live win chance line
+	spectatorBoardRowsPhone = 4, -- spectators on phones: the top 3 plus their cheered rider
+}
+-- Watching a race you're not in (D-055): the race HUD, cheer strip and results card appear only
+-- within rangeStuds of the course's outer edge (the same range as race sound, D-052), stay until
+-- keepStuds, and never over a training ride, a care or training game, or a full-screen panel.
+GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }
+-- Cheering on screen (D-056): CLAP one column left of the movement buttons (Gallop, Hop); the
+-- cheer strip sits at the top centre under the status line, never mid-screen.
+GameConfig.fans = {
+	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
+	clapSizeOnFoot = { 170, 90 },
+	clapSizeRiding = { 120, 70 },
+	cheerStripTop = true,
+}
+-- The only keys and buttons that tap the slider and the Final Burst (D-055), besides a click or
+-- touch. Steering, camera, clap, prompt and menu keys are not taps.
+GameConfig.tapKeys = { "Space", "Return", "KeypadEnter", "ButtonA", "ButtonR2" }
 GameConfig.stride = {
 	beats = 8,                 -- per stretch, ~2 taps a second
 	halfWindowSeconds = 0.08,  -- a tap scores if within this of its beat
