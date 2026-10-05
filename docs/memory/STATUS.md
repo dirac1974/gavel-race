@@ -17,19 +17,24 @@ Last updated: 2026-10-04
 
 ## Backlog (top = next)
 
-1. **Debate 002 — first 10 minutes** (onboarding): first stretch, first burst, first win. Energy is decided (D-015); debate 003 is retired.
-2. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
-3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
-4. **Anti-cheat**: `Integrity` (D-022) already tracks tap-gap vs beat-gap spread per player in log-only mode. Still to build: save trackers and strikes in the profile (needs item 2), the review tool and "Ask for a check" button, turning off `logOnly` after a month of real data, and reusing Integrity for Clap Along (D-020: 48+ beats). Don't flag on high scores alone.
-5. **Race presentation**: Churchill Downs-style course at full scale (D-027) with one-mile oval, turf course, grandstand and Twin Spires; smooth client-side gallop along each distance's race plan; riders in the saddle with a first-person view (D-024, D-026). Still to do: a hands-and-heels riding animation, beat-synced dust puffs and mane flicks, saddle cloths in lane colours, a leg cycle before launch, and a real wire instead of the kid-friendly checkered strip if testers prefer.
-6. **Spectator cheering (D-019)**: spectator mode, cheer lock before window 1, Fan XP per tap with per-race and daily caps in `GameConfig.spectator`; tests that riders and their party can't cheer in their own race and that caps hold. Then Clap Along and the crowd boost (D-020): reuse `Stride` for beats and scoring, crowd = best fan + assists, `c_i` in Python and Luau with parity tests, Top Fans board.
-7. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, Diamonds, and Fan XP (check the D-019 20% rule) and recalibrate bot scores for stride stretches, to `sims/economy.py`.
-8. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau. Rested horses train 50% faster inside the weekly cap (D-033).
-9. **Running styles** (debate 008 research): show each horse's style before the gate (Rookie all Stalkers), front-runner/stalker/closer skill-offset shapes up to the far turn; tune to about 55/33/10% of wins.
-10. **"How races work"**: a 20 s animation for kids and a parents page explaining that chance comes from the horse, taps move it, and luck shows late.
+World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.
+
+1. **Stage 1 — Your horse**: Profile and DataStore (session lock, autosave, migrations), horse records, wallet and items, starter pick and naming, races use your active horse and pay into your save, HUD.
+2. **Stage 2 — The world**: Fair Street, Barn Row plots, your barn with stalls and horses, Map fast-travel, hoofprints, riding your horse around.
+3. **Stage 3 — Care and food**: feed, groom, pet, garden, Feed & Seed, chores; care and bond in Rating; Energy top-ups.
+4. **Stage 4 — Race Board**: league cards, horse picker, queue, dirt and turf races at once, Friend Races.
+5. **Stage 5 — Stable Board**: horse status, next step, daily/weekly/monthly jobs, auto-claim, GO hoofprints.
+6. **Stage 6 — Training and vet**: four training games, Potential, weekly cap, rested bonus; heartbeat check-up and Health Passport.
+7. **Stage 7 — Spectators**: cheer cards, Clap Along, Fan XP, Top Fans (D-019, D-020).
+8. **Stage 8 — More horses**: Market Corral, the Trail, taming, pasture, stall purchases.
+9. **Stage 9 — Leagues**: League Points, Stakes, promotion, Bronze and up, Hall of Fame.
+10. **Stage 10 — Polish**: first 10 minutes, For grown-ups, sound, art pass, mobile pass, performance.
+11. Older items still open: anti-cheat tooling (save trackers once Stage 1 lands), economy sim v2 (Energy, training, sinks, jobs ≤ 10% of race income), running styles (debate 008 research), "How races work" animation, race presentation extras (riding animation, dust, saddle cloths).
+12. **Art (parallel)**: Meshy models for barns, stalls, Fair Street, crops, props, more coats (budget in memory).
 
 ## Done
 
+- 2026-10-04: world design (D-035 to D-047) from the design council's world workshop; build stages planned.
 - 2026-10-04: exponential race and race shape (D-033), stretch-drive previews, ride report, replays (D-034); debate 008.
 - 2026-10-04: continuous pace slider with speed meter and a big rainbow Final Burst (D-026); first-person riding; Churchill Downs racecourse with distance-based race length (D-027).
 - 2026-10-04: playtest art uploaded to Roblox (LlamaWorks group): 5 horse coats incl. a darker dapple grey, finish post, gate stall, 2 UI atlas sheets; `AssetService`, `TrackScene`, and client art wiring with placeholder fallbacks.

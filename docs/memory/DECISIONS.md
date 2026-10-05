@@ -299,3 +299,107 @@ Template:
 - Decision: after every race the results card offers "↺ Watch the finish" (final quarter at real speed, from when the leader passes 75%) and "Whole race ×3" (3x until the final quarter, then real speed); never autoplayed. Riders stay in the saddle until they press Done (server dismounts everyone after 60 s). Playback uses only what this screen recorded (10 frames a second) and ends on the official result: no re-simulation, no ghost horses. Side-on camera on your horse with a Behind toggle; Reduced Motion gets a fixed finish-line camera. REPLAY banner, letterbox and warm tint, no tap pad, no prompts. Overlays: your tap results, checkpoint stars, burst pulse, "+N" where you gained places in the final quarter. Half speed over the last 2 s only when you won; a photo-finish still when 1st and 2nd were under a length apart. A new race cancels any replay.
 - Alternatives: autoplay (pressure to watch), server-side re-simulation (could show things not shown live), slow motion on narrow losses (replays the near miss).
 - Links: game/src/client/Replay.client.luau, game/src/client/RaceController.client.luau (results buttons), game/src/client/RaceState.luau
+
+## D-035 — One server, one small world
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (young player draft; research brief (competitors 16–30 players; Roblox has no plot feature, build our own))
+- Decision: 20-player servers; racecourse, Fair Street (Race Board, Feed & Seed, Vet, Training Paddock, Market Corral, Trail Gate), Barn Row (one plot per player, loaded from the save), the Trail; all within ~20 s ride of the grandstand; ride your horse everywhere, Map fast-travel with five pictures, GO hoofprints.
+- Alternatives: Private stable servers (teleports split friends), backside barns across the track (long rides, crossing the track during races).
+- Links: docs/WORLD_DESIGN.md
+
+## D-036 — Racing in a shared world
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (competitive and young player critiques)
+- Decision: Two courses (dirt and turf) run a race each, so two run at once; one card per league on the Race Board and a Race button anywhere; a league posts within 30 s of its first rider, bots fill after 20 s; picker shows each horse's Energy and today's fit as Rating; Rookie free, cash races 1 Energy; cash fields never mix leagues, Rating band ±12 widening to ±20; friends and party members never share a cash race (Friend Races instead); each lane counts at least 25 in the race average.
+- Alternatives: Strict one-track queue (2–4 min waits with mixed leagues), several races drawn per client on one course (riders replicate to everyone), teleport per race (breaks the shared world).
+- Links: docs/WORLD_DESIGN.md
+
+## D-037 — Owning horses
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (engagement draft; child safety; competitive)
+- Decision: Pick 1 of 3 starters (coats differ, stats equal), name by tapping suggestions; 2 stalls to start, buy up to 6, free pasture for extras; one active horse follows you and is preselected; new horses from the Market Corral (weekly restock, rare stock returns), taming on the Trail, events, breeding later; never for Robux or Diamonds, no trading; no ageing; retiring is the player's choice with a Hall of Fame plaque.
+- Alternatives: Diamond horses (pay-to-win through stats), loot-box horses (paid random items), ageing horses (loss).
+- Links: docs/WORLD_DESIGN.md
+
+## D-038 — Care and food
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (engagement draft; child safety critique)
+- Decision: Feeding and grooming each fill half of today's care (full care = +5% Rating until rollover, then back to baseline, never below); each also +1 Energy once per 2 h; petting and treats add bond; garden beds grow offline and never wither; Feed & Seed sells hay, grain, seeds and treats; chores always give hay; starter hay for new players; rest speeds training.
+- Alternatives: Hunger and thirst meters that drain (guilt and pressure; Horse Valley's vet sells restores), food required to race.
+- Links: docs/WORLD_DESIGN.md
+
+## D-039 — The vet is a wellness clinic
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (child safety draft; engagement agreed)
+- Decision: Free check-ups with a heartbeat tapping game (+1 bond a day), Health Passport stamps (one reveals Potential), cool-down hose after races; nothing to cure or buy. David's "sick horse to the vet" conflicts with hard rule 3, so it is not built.
+- Alternatives: Sickness from neglect (hard rule 3), sore legs after hard races (teaches that racing hurts horses).
+- Links: docs/WORLD_DESIGN.md
+
+## D-040 — Training
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (competitive draft; debate 008)
+- Decision: One mini-game per stat at the Training Paddock (Sprint Lane, Gate Break, Hill Climb, Mud Splash); gain ∝ (Potential − stat); weekly cap reachable in about 3 sessions per horse; rested horses +50% inside the cap.
+- Alternatives: Passive timers only (no play), unlimited training (grind), Diamond training skips (pay-to-win).
+- Links: docs/WORLD_DESIGN.md
+
+## D-041 — Spectators
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (young player draft)
+- Decision: Cheer cards for anyone near the rail or in the grandstand, for either course; Clap Along after cheering; Fan XP cosmetic only (D-019, D-020); the Big Board shows races to anyone far away.
+- Alternatives: —
+- Links: docs/WORLD_DESIGN.md
+
+## D-042 — Friends and safety
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (child safety draft and critique; research (age-banded chat since January 2026))
+- Decision: Roblox chat only, preset emotes for players who can't chat, every typed name filtered; stable visits Friends (default), Club or Nobody, closed gate for others, anonymous carrot count for strangers; one free treat a day per friend (bond only); no trading, no cash transfers.
+- Alternatives: Public visit counts or likes (popularity scores), open visits (stalking risk), gifts of cash (begging, alt farming).
+- Links: docs/WORLD_DESIGN.md
+
+## D-043 — Stable Board: daily, weekly and monthly jobs
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (young player, engagement, competitive and child safety critiques; haunt-nyc Mission Center)
+- Decision: Noticeboard in the barn and a clipboard button; horse status row (ready, napping, crops ready, training ready), next step per horse, 3 daily / 5 weekly / ~5 monthly jobs, never win jobs, auto-claim at rollover, one free reroll a day, calendar counts days played and pauses, no streaks, countdowns, bell, red badge or push notifications; wording states facts about the horse, never feelings about absence.
+- Alternatives: haunt-nyc's tabs as-is (more reading), win tasks (luck, collusion), Diamond rerolls (buying Green Cash).
+- Links: docs/WORLD_DESIGN.md
+
+## D-044 — Money guardrails (amends D-002a)
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (child safety; engagement agreed)
+- Decision: Diamond time skips apply to decor builds only; Diamonds buy cosmetics, decor, stall and stable skins, tack looks, the Derby Pass and extra rerolls; never horses, stats, Green Cash or paid random items; the Diamond store isn't built until David signs off.
+- Alternatives: Skips for garden, training, Energy or foals (each leaks into stats, races or random rolls).
+- Links: docs/WORLD_DESIGN.md
+
+## D-045 — For grown-ups
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (child safety draft)
+- Decision: A button explaining races (no gambling, nothing buys speed), Diamonds, the visit setting and weekly play time, with a pointer to Roblox parental controls and an optional break reminder.
+- Alternatives: —
+- Links: docs/WORLD_DESIGN.md
+
+## D-046 — Leagues and careers
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (competitive draft)
+- Decision: Stakes unlock by League Points and a win promotes; once a horse's Rating passes its league's ceiling its Stakes opens and regular cash races close to it; Bronze adds Classic, Silver adds Marathon; strength pays through places and faster League Points (purses are B/q).
+- Alternatives: Demotion (loss), letting over-strong horses farm low leagues.
+- Links: docs/WORLD_DESIGN.md
+
+## D-047 — Breeding (later)
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, world workshop (competitive draft)
+- Decision: From Bronze, Green Cash fees only; foal Potential 0.7 × parents' average + 0.3 × breed average ± 5; foals start at 35% of Potential; coats separate from stats; a sim must show bloodlines level off before building.
+- Alternatives: Diamond breeding boosts (paid random items), full inheritance (runaway bloodlines).
+- Links: docs/WORLD_DESIGN.md
