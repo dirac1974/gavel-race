@@ -1,6 +1,6 @@
 # Playtest asset plan
 
-Status: **Phase 2 done (2026-10-04).** The design council approved the plan with changes (recorded in [ART_REVIEW.md](ART_REVIEW.md)), and the assets below were generated. Nothing has been uploaded to Roblox. Style: [ART_DIRECTION.md](ART_DIRECTION.md). Studio import: [IMPORT.md](IMPORT.md).
+Status: **Phase 2 done and the world set done (2026-10-04).** The playtest set below was council-approved and generated first; the world set (standing horses, more coats, foals, stable, care, garden, Fair Street, decor) follows in [World set](#world-set-2026-10-04). Everything that passed review is uploaded to Roblox (LlamaWorks group). Verdicts: [ART_REVIEW.md](ART_REVIEW.md). Style: [ART_DIRECTION.md](ART_DIRECTION.md). Studio import: [IMPORT.md](IMPORT.md).
 
 ## Credits spent
 
@@ -279,3 +279,42 @@ then: poll GET https://api.meshy.ai/openapi/v1/retexture/<task_id>, download mod
 - Grey re-rolled as a darker dapple grey at David's request (10 credits; total 180 of 200). The pale version is kept locally as `Models/generated/horse_gallop_grey_light/`.
 - Finish post kept with its plaid disc (David: reevaluate later).
 - Uploaded to Roblox under the LlamaWorks group; see `docs/art/IMPORT.md`.
+
+## World set (2026-10-04)
+
+**Budget:** David allowed up to 75% of the day's Meshy credits. The balance was 1,740, so the floor was 450 (1,290 to spend). The balance was checked (`GET /openapi/v1/balance`) before every batch.
+
+| Batch | What | Credits |
+| --- | --- | --- |
+| 1 | `horse_stand`, `foal_stand`, `stable_barn` (text) + 7 new gallop coats (retexture) | 160 |
+| 2 | 12 standing coats + 3 foal coats (retexture) + 8 care props (text) | 390 |
+| 3 | Garden (4), `saddle_rack`, Fair Street (6) (text) | 330 |
+| Re-rolls | `pitchfork`, `water_trough` (text); pinto and roan, both poses (retexture) | 100 |
+| 4 | Decor and trail (10, text) | 300 |
+| **Total** | 32 text-to-3D slots, 22 retextures, 6 re-rolls | **1,280** (balance 1,740 → 460) |
+
+Every figure is Meshy's `consumed_credits` from the slot's `task.json` (first attempts are in `<slot>_attempt1/`). The per-slot list, prompts and verdict notes are in `tools/meshy/queue.json`; the budget block there has the same totals.
+
+**Uploaded** (51 new models, 58 in all, every one approved by Roblox moderation on 2026-10-04; ids in `tools/roblox/uploaded.json` and `game/src/shared/MeshAssets.luau`):
+
+| Group | Slots |
+| --- | --- |
+| Standing horses | `horse_stand_` bay, chestnut, grey, black, palomino, pinto, appaloosa, buckskin, dun, roan, white, chestnut_blaze |
+| Gallop horses (new) | `horse_gallop_` pinto, appaloosa, buckskin, dun, roan, white, chestnut_blaze (the playtest gallop coats keep their names `horse_bay` ... `horse_palomino`) |
+| Foals | `foal_stand_` bay, chestnut, grey |
+| Stable and care | `stable_barn`, `hay_bale`, `water_trough`, `feed_bucket`, `grooming_brush`, `wheelbarrow`, `pitchfork`, `noticeboard`, `post_box`, `saddle_rack` |
+| Garden | `carrot_crop`, `apple_tree_small`, `oat_crop`, `garden_bed` |
+| Fair Street | `feed_store`, `vet_clinic`, `market_corral_booth`, `training_shed`, `race_board_frame`, `trail_gate_arch` |
+| Decor and trail | `lantern_post`, `bench`, `picnic_table`, `trophy_cup`, `rosette_ribbon`, `horseshoe_decor`, `log_jump`, `wooden_bridge`, `hay_cart` |
+
+**Dropped:** `flower_planter` (failed review, no budget to re-roll). The bases `horse_stand` and `foal_stand` are meshes for the retextures and aren't uploaded.
+
+**UI (free):** 66 world icons drawn in `tools/ui/make_ui_svgs.py` (review sheet `assets/ui/_sheet_world.svg`) and packed by `tools/ui/build_atlas.py` into two new sheets, `ui_atlas_world_1` (48 icons) and `ui_atlas_world_2` (18 icons), uploaded as Decals. The race sheets `ui_atlas_1` and `ui_atlas_2` are byte-identical to before. Names are in `game/src/shared/UiAtlas.luau`.
+
+**Local fixes (no credits):**
+
+- `tools/meshy/darken_hooves.py`: now keeps only the four lowest leg-like parts, so a standing horse's long tail isn't painted as a fifth hoof. The gallop output is byte-identical to before.
+- `tools/meshy/recolor.py`: `roan` (natural strawberry roan from the pastel re-roll) and `canopy` (green leaves for the apple tree). Writes `<slot>_recolored.glb`.
+- `tools/meshy/trim_base.py`: removes a ground plate (used on `race_board_frame`). Writes `<slot>_trimmed.glb`.
+
+Pipeline order for horses: `meshy.py retexture` → `darken_hooves.py` (one run per mesh: gallop, stand and foal meshes each get their own run, because the hoof mask is shared within a run) → `recolor.py roan` for roans only → `upload_assets.py`.

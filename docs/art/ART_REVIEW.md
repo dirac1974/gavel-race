@@ -50,4 +50,36 @@ Hoof check, all five coats: after `darken_hooves.py`, every hoof is near-ink cha
 3. **The finish post disc is plaid, not bold checks.** Accept it (the banner carries the finish read), or re-roll for 30 credits, which would reach the 200 cap.
 4. **Pad pulse interpretation** (council 6 above): confirm "steady during stretches".
 5. **The main checkout didn't ignore `Models/`.** The coordinator's note said it did, but `main` has no such rule yet. I added a self-ignoring `Models/.gitignore` (`*`) in the main checkout so the 175 MB of raw output can't be committed by accident. Merging this PR adds `Models/` to the repo `.gitignore`.
-6. **Nothing is uploaded to Roblox.** Uploading the meshes and PNGs needs David.
+6. ~~**Nothing is uploaded to Roblox.**~~ Done 2026-10-04 with David's approval (LlamaWorks group); see IMPORT.md.
+
+## World set verdicts (2026-10-04)
+
+Models for the world in `docs/WORLD_DESIGN.md`: standing horses, more coats, foals, the stable, care props, the garden, Fair Street and trail decor. Each was checked the same way (Meshy thumbnail plus the four-view `preview_glb.py` render; horses also with the `darken_hooves.py` side view), with at most one re-roll per slot. Credits are Meshy's `consumed_credits`.
+
+| Slot | Credits | Verdict | Notes |
+| --- | --- | --- | --- |
+| `horse_stand` (mesh) | 30 | PASS | Calm square stance, four separate legs, hooves down, head up, small side eyes, ears forward, bridle, bare back. Chunkier than the gallop mesh (thicker crest mane, a little leg feathering). Base not uploaded. |
+| `horse_stand_` bay, chestnut, grey, black, palomino, appaloosa, buckskin, white, chestnut_blaze | 9 × 10 | PASS | Match the gallop coats. Bay got a blaze rather than a star. |
+| `horse_stand_dun`, `horse_gallop_dun` | 2 × 10 | PASS (note) | Sandy with dark brown points and a dorsal stripe; close to the buckskin at a glance (brown points vs black). |
+| `horse_stand_pinto`, `horse_gallop_pinto` | 2 × (10 + 10) | PASS on re-roll | First try was a brown horse with one small white flank patch. The re-roll asked for "about half brown, half white" tobiano. The gallop pinto is still less bold than the standing one. |
+| `horse_stand_roan`, `horse_gallop_roan` | 2 × (10 + 10) | PASS after local fix | First try was a plain chestnut (Meshy ignores "mixed white hairs"). The re-roll gave a pastel pink body and a fantasy bright-red mane. `tools/meshy/recolor.py roan` turns the reds dark chestnut and the body rosy grey with flecks (a natural strawberry roan), at no cost. |
+| `horse_gallop_` appaloosa, buckskin, white, chestnut_blaze | 4 × 10 | PASS | |
+| `foal_stand` (mesh) + bay, chestnut, grey | 30 + 3 × 10 | PASS | Long legs, fluffy short mane, small side eyes. The grey is warm grey-fawn. Foals are taller than long, so they are sized by height (4 studs, about two thirds of a standing adult) instead of 5 studs nose to tail, which would have made them taller than the adults. |
+| `stable_barn` | 30 | PASS (notes) | Red siding, white trim and X braces, two open stall bays beside a closed centre door, blank sign board. Gable roof with a dormer instead of a gambrel. |
+| `hay_bale`, `grooming_brush`, `wheelbarrow`, `noticeboard`, `saddle_rack` | 5 × 30 | PASS | |
+| `feed_bucket`, `post_box` | 2 × 30 | PASS (notes) | Bucket has no handle and a small grain spill at its foot; the mailbox has two little flags. |
+| `water_trough` | 30 + 30 | PASS on re-roll (note) | First try was a square tub with a stray plank standing up like a backrest. The re-roll is a good long trough, but its inside is pale wood with no water: add a blue water part in game (it can rise when the fill-water chore is done). |
+| `pitchfork` | 30 + 30 | PASS on re-roll (note) | First try read as a sceptre or mace. The re-roll is a toy fork with four rounded tines; the grip has odd knobs. |
+| `carrot_crop`, `oat_crop`, `garden_bed` | 3 × 30 | PASS | |
+| `apple_tree_small` | 30 | PASS after local fix | The canopy came out brick red and hid the apples. `recolor.py canopy` turns the leaves green and keeps the apples red. |
+| `feed_store` | 30 | PASS (note) | Yellow siding, green roof, striped awning, sacks. No blank sign board: add a sign part for the game's text. |
+| `vet_clinic` | 30 | PASS | White and mint, horseshoe-with-heart emblem, no cross anywhere (checked all four views). |
+| `market_corral_booth` | 30 | PASS (notes) | The brief said "ticket-booth style"; the prompt avoided the word, because ticket windows read as betting windows. A blank board sticks out sideways. |
+| `training_shed`, `trail_gate_arch` | 2 × 30 | PASS | |
+| `race_board_frame` | 30 | PASS after local fix | Came with a wide red ground disc (a base). `tools/meshy/trim_base.py` removed it. Blank face, no numbers. |
+| `lantern_post`, `bench`, `rosette_ribbon`, `horseshoe_decor`, `log_jump` | 5 × 30 | PASS | |
+| `picnic_table`, `trophy_cup`, `wooden_bridge`, `hay_cart` | 4 × 30 | PASS (notes) | Bench end caps read as wheels end-on; the cup is pale blue with gold handles; the bridge is short and wide; the cart wheels have thin spokes. |
+| `flower_planter` | 30 | **FAIL, dropped** | The "flowers" are dry orange shards that read as dead leaves. No budget left to re-roll. |
+| **Total** | **1,280** | | 32 text-to-3D slots (960), 22 retextures (220), 6 re-rolls (100). Balance 1,740 → 460, above the 450 floor. |
+
+Guardrail check, every model: no text, logos, numbers or prices; no red cross; no whip, crop or rider; no casino or wagering shapes; horses calm with small side eyes, ears forward, mouths closed, natural coats and dark hooves (every coat run through `darken_hooves.py`, which now ignores a tail that hangs low on a standing horse).

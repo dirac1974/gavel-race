@@ -47,11 +47,34 @@ MAX_BYTES = 20 * 1024 * 1024
 POLL_START_S, POLL_MAX_S, OP_TIMEOUT_S = 2.0, 15.0, 10 * 60
 HTTP_RETRIES = 6
 
-# slot -> file under Models/generated (see docs/art/IMPORT.md for which files to use)
+# slot -> file under Models/generated (see docs/art/IMPORT.md for which files to use). Only slots that passed
+# review (docs/art/ART_REVIEW.md) are listed. Horses and foals use the *_hoofed.glb from darken_hooves.py.
+STAND_COATS = ("bay", "chestnut", "grey", "black", "palomino", "pinto", "appaloosa", "buckskin", "dun", "roan", "white",
+               "chestnut_blaze")
+NEW_GALLOP_COATS = ("pinto", "appaloosa", "buckskin", "dun", "roan", "white", "chestnut_blaze")
+FOAL_COATS = ("bay", "chestnut", "grey")
+PROPS = (
+    "stable_barn", "hay_bale", "water_trough", "feed_bucket", "grooming_brush", "wheelbarrow", "pitchfork", "noticeboard",
+    "post_box", "saddle_rack", "carrot_crop", "apple_tree_small", "oat_crop", "garden_bed",
+    "feed_store", "vet_clinic", "market_corral_booth", "training_shed", "race_board_frame", "trail_gate_arch",
+    "lantern_post", "bench", "picnic_table", "trophy_cup", "rosette_ribbon", "horseshoe_decor", "log_jump",
+    "wooden_bridge", "hay_cart",
+)
 MODELS = {
+    # The playtest gallop coats keep their original slot names (horse_<coat>); the race code uses them.
     **{f"horse_{c}": f"horse_gallop_{c}/horse_gallop_{c}_hoofed.glb" for c in ("bay", "chestnut", "grey", "black", "palomino")},
+    **{f"horse_gallop_{c}": f"horse_gallop_{c}/horse_gallop_{c}_hoofed.glb" for c in NEW_GALLOP_COATS},
+    **{f"horse_stand_{c}": f"horse_stand_{c}/horse_stand_{c}_hoofed.glb" for c in STAND_COATS},
+    **{f"foal_stand_{c}": f"foal_stand_{c}/foal_stand_{c}_hoofed.glb" for c in FOAL_COATS},
     "finish_post": "finish_post/finish_post.glb",
     "gate_stall": "gate_stall/gate_stall.glb",
+    **{slot: f"{slot}/{slot}.glb" for slot in PROPS},
+    # Local fixes (docs/art/ART_REVIEW.md): roan coats and the apple canopy recoloured by recolor.py, the race board's
+    # ground plate removed by trim_base.py.
+    "horse_stand_roan": "horse_stand_roan/horse_stand_roan_recolored.glb",
+    "horse_gallop_roan": "horse_gallop_roan/horse_gallop_roan_recolored.glb",
+    "apple_tree_small": "apple_tree_small/apple_tree_small_recolored.glb",
+    "race_board_frame": "race_board_frame/race_board_frame_trimmed.glb",
 }
 
 

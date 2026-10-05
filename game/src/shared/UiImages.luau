@@ -4,6 +4,8 @@
 local ids: { [string]: number } = {
 	ui_atlas_1 = 138919800817033,
 	ui_atlas_2 = 94337225467876,
+	ui_atlas_world_1 = 70883920012717,
+	ui_atlas_world_2 = 84597027742671,
 }
 
 return ids
