@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — fix: training T4 review — a closed Quick train game gains nothing (QuickStop), friends' results never stick on "still riding", ghost saves keep newer data and late bests, no ghosts on Gate Break or Hill Climb, phone-safe invite card, decline cooldown and receive cap, no ride/game overlap, Quick train balance (D-053)
 - 2026-10-05 — feat: training rides T4: ghosts of your best ride (own DataStore key, share with friends toggle), Ride together with friends (accept-only invites, shared countdown and Pip, stars and ribbons only), gold rosettes on the stall, Quick train scored by the server from tap times (D-053)
 - 2026-10-05 — fix: steering S0 review: post baseline fair for Smart Steer kids (a kid at each post among bots plus all-Smart lobbies, mixed 50/50; per-post checks for both), Trip moves gaps like RaceView (D-055 limiter), mover never pushes the horse behind, tuck-in up to 3 lengths, draftPerSecond 0.0010, every target per course × distance, stored full report asserted by tests, real luck-swap test, geometry checked on CI, index guards, trip.json after-lock presses
 - 2026-10-05 — feat: race steering S0 (D-054): Python trip model `src/trip.py`, `live_chances(..., extra)`, calibration sim and generated per-post baseline (`TripBaseline.luau`), parity fixtures, 491 tests; tuned groundPerLaneTurn 0.010 and bots.wideShare 0.20

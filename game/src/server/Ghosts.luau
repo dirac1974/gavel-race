@@ -3,7 +3,8 @@
 -- key (`ghosts_<userId>` in GiddyUp_Ghosts_v1) so profiles stay small. Loaded lazily (the first
 -- time a ride needs it) with pcall and retries, never blocking the profile. Saving merges with
 -- what's stored (the better run per course wins), so two servers can't overwrite a better
--- ghost and a failed load never wipes anything.
+-- ghost and a failed load never wipes anything; anything this version doesn't understand (a
+-- newer encoding, a new course, new keys) is passed through untouched.
 --   Ghosts.ensure(player)            start loading if needed; returns the entry
 --   Ghosts.ready(player)             loaded (or given up on)?
 --   Ghosts.run(player, course)       the best run kept in memory, or nil
@@ -31,7 +32,7 @@ do
 	if ok then store = res else warn("[Ghosts] DataStore unavailable: " .. tostring(res)) end
 end
 
--- [userId] = { state = "loading" | "ready" | "failed", runs = { [course] = run }, dirty }
+-- [userId] = { state = "loading" | "ready" | "failed", runs = { [course] = run }, dirty, edits }
 local entries: { [number]: any } = {}
 
 local function key(userId: number): string
@@ -60,11 +61,12 @@ local function merge(into: { [string]: any }, from: { [string]: any })
 	end
 end
 
+
 function Ghosts.ensure(player: Player)
 	local id = player.UserId
 	local e = entries[id]
 	if e then return e end
-	e = { state = "loading", runs = {}, dirty = false }
+	e = { state = "loading", runs = {}, dirty = false, edits = 0 }
 	entries[id] = e
 	task.spawn(function()
 		if not store then
@@ -103,21 +105,25 @@ function Ghosts.offer(player: Player, course: string, run: any): boolean
 	if not Ghost.better(run, e.runs[course]) then return false end
 	e.runs[course] = run
 	e.dirty = true
+	e.edits += 1
 	return true
 end
 
 local function save(userId: number)
 	local e = entries[userId]
 	if not e or not e.dirty or not store then return end
-	local mine = e.runs
+	local edits = e.edits -- a new best during the save keeps the entry dirty (like Profiles.save)
+	local mine = table.clone(e.runs)
 	local ok, err = pcall(function()
 		store:UpdateAsync(key(userId), function(old)
-			local runs = clean(typeof(old) == "table" and old.runs)
-			merge(runs, mine) -- keep the better run per course, whoever saved it
-			return { v = 1, runs = runs }, { userId }
+			return Ghost.mergeStore(old, mine), { userId } -- replaces only what we understand, with something better
 		end)
 	end)
-	if ok then e.dirty = false else warn("[Ghosts] save for " .. userId .. " failed: " .. tostring(err)) end
+	if not ok then
+		warn("[Ghosts] save for " .. userId .. " failed: " .. tostring(err))
+	elseif e.edits == edits then
+		e.dirty = false
+	end
 end
 Ghosts.save = save
 

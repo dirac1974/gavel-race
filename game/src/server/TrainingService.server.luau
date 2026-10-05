@@ -69,6 +69,7 @@ local QuickStart = Profiles.remote("QuickStart")   -- client -> server: horseId,
 local QuickBegin = Profiles.remote("QuickBegin")   -- server -> client: stat, seed, start (server time)
 local QuickTap = Profiles.remote("QuickTap")       -- client -> server: kind ("tap" | "down" | "up"), claimed server time
 local QuickEnd = Profiles.remote("QuickEnd")       -- server -> client: score
+local QuickStop = Profiles.remote("QuickStop")     -- client -> server: the game was closed (no gain)
 local TrainGhosts = Profiles.remote("TrainGhosts") -- server -> client: course, ghosts
 local TrainFriends = Profiles.remote("TrainFriends")         -- client -> server: who can I invite?
 local TrainFriendsList = Profiles.remote("TrainFriendsList") -- server -> client: { { userId, name } }
@@ -105,6 +106,8 @@ local quick: { [Player]: any } = {}                -- Quick train games in play
 local invites = RideTogether.book()
 local lastAsk: { [Player]: number } = {}
 local GROUP_LEAD = 2.5                             -- a group's countdown starts this much later (horses being called)
+local nextGroupId = 1
+local GHOST_COURSES = { speed = true, grit = true } -- courses with ghosts (see finish)
 
 local function setTrainingRide(player: Player, on: boolean)
 	if player.Parent then player:SetAttribute("TrainingRide", if on then true else nil) end
@@ -143,15 +146,38 @@ local function racing(player: Player): boolean
 end
 
 -- Quick train: the 10-second games, seeded and scored by the server (T4).
+-- The game was closed (or a race is starting): it ends with no gain, and doesn't count as a
+-- session, so opening another one straight away works.
+local function stopQuick(player: Player)
+	local q = quick[player]
+	if not q then return end
+	quick[player] = nil
+	lastTrain[player] = q.prevTrain
+	local h = history[player]
+	local i = h and table.find(h, q.startedAt)
+	if i then table.remove(h, i) end
+end
+
 QuickStart.OnServerEvent:Connect(function(player: Player, horseId: any, stat: any)
 	if typeof(stat) ~= "string" or not Training.GAMES[stat] then return end
-	if sessions[player] or quick[player] or pending[player] then return end
+	if quick[player] then stopQuick(player) end -- a game left behind (its panel closed): it ends with no gain
+	if sessions[player] or pending[player] then
+		Profiles.notify(player, "Finish your ride first, then try a quick game!", "heart")
+		return
+	end
+	if racing(player) then
+		Profiles.notify(player, "Training can wait: your race is coming up!", "heart")
+		return
+	end
 	if os.clock() - (lastTrain[player] or 0) < SESSION_GAP then
 		Profiles.notify(player, "Your horse is catching its breath. Try again in a moment!", "heart")
 		return
 	end
 	local h = horseFor(player, horseId)
-	if not h then return end
+	if not h then
+		Profiles.notify(player, "Pick a horse from a stall to train!", "heart")
+		return
+	end
 	if not near(player, "paddock", 30) then
 		Profiles.notify(player, "Training happens at the Training Paddock on Fair Street", "map_fair")
 		return
@@ -162,10 +188,11 @@ QuickStart.OnServerEvent:Connect(function(player: Player, horseId: any, stat: an
 		Profiles.notify(player, "What a lot of training! Give your horse a rest, or try a race.", "heart")
 		return
 	end
+	local prevTrain = lastTrain[player]
 	lastTrain[player] = os.clock()
 	table.insert(history[player], os.clock())
 	local q = {
-		stat = stat, horseId = horseId, seed = rng:NextInteger(1, 2 ^ 30), events = {},
+		stat = stat, horseId = horseId, seed = rng:NextInteger(1, 2 ^ 30), events = {}, prevTrain = prevTrain, startedAt = os.clock(),
 		startAt = workspace:GetServerTimeNow() + QuickTrain.LEAD,
 		allowance = TapTime.rewindAllowance(player:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds),
 	}
@@ -182,10 +209,13 @@ QuickTap.OnServerEvent:Connect(function(player: Player, kind: any, claimed: any)
 	if t then QuickTrain.addEvent(q.events, t - q.startAt, kind) end
 end)
 
-local function finishQuick(player: Player, q, score: number)
+QuickStop.OnServerEvent:Connect(stopQuick)
+
+local function finishQuick(player: Player, q, score: number, played: boolean)
 	quick[player] = nil
 	if not player.Parent then return end
 	QuickEnd:FireClient(player, score)
+	if not played or racing(player) then return end -- no taps that counted (or a race began): no gain, no toast
 	local h = horseFor(player, q.horseId)
 	if not h then return end
 	local quality = if CFG.mode == "rides" then TrainingRide.quickScore(score, CFG) else score -- courses own the top scores (D-053)
@@ -201,8 +231,10 @@ local function tickQuick(serverNow: number)
 	for player, q in quick do
 		local t = serverNow - q.startAt
 		local res = QuickTrain.play(q.stat, q.seed, q.events, t)
-		if (res.done and t >= (res.endT or 0) + QuickTrain.SETTLE) or t >= QuickTrain.MAX_GAME + QuickTrain.SETTLE then
-			local ok, err = pcall(finishQuick, player, q, res.score)
+		if racing(player) then
+			stopQuick(player) -- a race is starting: the game ends, no gain, no toast
+		elseif (res.done and t >= (res.endT or 0) + QuickTrain.SETTLE) or t >= QuickTrain.MAX_GAME + QuickTrain.SETTLE then
+			local ok, err = pcall(finishQuick, player, q, res.score, QuickTrain.played(q.stat, q.events, res))
 			if not ok then
 				quick[player] = nil
 				warn("[Training] quick train failed: " .. tostring(err))
@@ -222,8 +254,17 @@ local function shareGroup(group)
 			ribbon = r and r.ribbon, resting = r and r.resting })
 	end
 	for _, m in group.members do
-		if m.Parent then TrainTogether:FireClient(m, group.course, list) end
+		if m.Parent then TrainTogether:FireClient(m, group.course, list, group.id) end
 	end
+end
+
+-- A rider whose ride ended without a result (stopped, an error, gone): their friend's card
+-- shows them resting instead of "still riding" forever.
+local function restGroup(player: Player, s)
+	local group = s and s.group
+	if not group or group.results[player.UserId] then return end
+	group.results[player.UserId] = { resting = true }
+	shareGroup(group)
 end
 
 local function endSession(player: Player, s)
@@ -242,15 +283,13 @@ local function abort(player: Player, s, reason: string)
 	if not endSession(player, s) then return end
 	closeCard(player)
 	if player.Parent then TrainAbort:FireClient(player, reason, ABORT_TEXT[reason]) end
-	if s.group then
-		s.group.results[player.UserId] = { resting = true }
-		shareGroup(s.group)
-	end
+	restGroup(player, s)
 end
 
 -- Something went wrong part-way (an error): whatever state the session got to, clear it all,
 -- even if the session was already taken off the list, and tell the client.
 local function fail(player: Player, s)
+	restGroup(player, s)
 	if s and sessions[player] == s then sessions[player] = nil end
 	pcall(Rides.setTraining, player, false)
 	cards[player] = nil
@@ -269,11 +308,13 @@ local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 	if not result or not h then
 		closeCard(player)
 		TrainAbort:FireClient(player, "off", ABORT_TEXT.off)
+		restGroup(player, s)
 		return
 	end
 	if timedOut and not TrainingRide.timeoutCounts(result, s.tracker) then
 		closeCard(player) -- out of time with no real riding: no gain, no ribbon, no job
 		TrainAbort:FireClient(player, "again", ABORT_TEXT.again)
+		restGroup(player, s)
 		return
 	end
 	cards[player] = { untilT = os.clock() + CARD_SECONDS } -- TrainingRide stays set while the end card shows
@@ -287,8 +328,10 @@ local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 	local now = os.time()
 	local gain = TrainingRide.applyGain(h, course.stat, result.score, now)
 	local newRibbon = TrainingRide.record(h, s.course, result)
-	-- Ghost: the player's best validated ride on this course (kept in its own store)
-	if not result.flagged then
+	-- Ghost: the player's best validated ride on this course (kept in its own store). Only
+	-- Sprint Lane and Mud Splash: a Gate Break ghost would bolt at another ride's bell, and a
+	-- Hill Climb ghost followed another Pip.
+	if not result.flagged and GHOST_COURSES[s.course] then
 		local okG, errG = pcall(function()
 			local kept = TrainingRide.keptSamples(s.course, s.samples, CFG)
 			local pts = Ghost.fromSamples(kept)
@@ -307,7 +350,7 @@ local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 	Progress.record(player, "train", 1)
 	Profiles.changed(player)
 	TrainEnd:FireClient(player, {
-		course = s.course, horseId = s.horseId, horseName = h.name,
+		course = s.course, horseId = s.horseId, horseName = h.name, groupId = s.group and s.group.id,
 		stars = result.stars, ribbon = result.ribbon, newRibbon = newRibbon,
 		gained = gain.gained, before = gain.before, after = gain.after, capped = gain.capped, rested = gain.rested,
 		potential = if h.stamps and h.stamps.potential then h.potential[course.stat] else nil,
@@ -319,13 +362,30 @@ local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 	})
 end
 
--- Ghosts for a ride: your own, and (riding alone) friends here who share theirs, up to two.
+-- Ghosts for a ride: your own, and (riding alone) friends here who share theirs (and don't
+-- keep visitors out), up to two. Sprint Lane and Mud Splash only.
 local function sendGhosts(player: Player, s)
+	if not GHOST_COURSES[s.course] then return end
 	Ghosts.ensure(player)
-	local friends = if s.group then {} else TrainingFriends.friendsOf(player)
-	for _, f in friends do Ghosts.ensure(f) end
+	local friends = {}
+	if not s.group then
+		for _, f in TrainingFriends.friendsOf(player) do
+			local fd = Profiles.get(f)
+			if fd and fd.settings and fd.settings.shareGhost == true and fd.settings.visits ~= "Nobody" then
+				table.insert(friends, f)
+				Ghosts.ensure(f)
+			end
+		end
+	end
+	local function allReady(): boolean
+		if not Ghosts.ready(player) then return false end
+		for _, f in friends do
+			if f.Parent and not Ghosts.ready(f) then return false end
+		end
+		return true
+	end
 	local deadline = os.clock() + 2.5
-	while not Ghosts.ready(player) and os.clock() < deadline do task.wait(0.2) end
+	while not allReady() and os.clock() < deadline do task.wait(0.2) end
 	if sessions[player] ~= s then return end
 	local list = {}
 	local function add(run, label: string, mine: boolean)
@@ -334,9 +394,13 @@ local function sendGhosts(player: Player, s)
 		end
 	end
 	add(Ghosts.run(player, s.course), "Your best", true)
+	local shared = 0
 	for _, f in friends do
-		local fd = Profiles.get(f)
-		if #list < 3 and fd and fd.settings and fd.settings.shareGhost == true then add(Ghosts.run(f, s.course), f.DisplayName, false) end
+		local run = f.Parent and Ghosts.run(f, s.course)
+		if run and shared < 2 then
+			shared += 1
+			add(run, f.DisplayName, false)
+		end
 	end
 	if #list > 0 then TrainGhosts:FireClient(player, s.course, list) end
 end
@@ -354,6 +418,7 @@ local function startCourse(player: Player, horseId: any, course: any, opts: any?
 		Profiles.notify(player, "Training can wait: your race is coming up!", "heart")
 		return
 	end
+	if quick[player] then return end -- a Quick train game is on
 	history[player] = history[player] or {}
 	local ok, why = TrainingRide.rateCheck(history[player], os.clock(), CFG)
 	if not ok then
@@ -430,12 +495,16 @@ local function startCourse(player: Player, horseId: any, course: any, opts: any?
 	cards[player] = nil
 	setTrainingRide(player, true)
 	Rides.setTraining(player, true)
-	TrainBegin:FireClient(player, course, s.seed, CFG.countdownSeconds, s.goAtServer)
+	local partners = {}
+	for _, m in (o.group and o.group.members) or {} do
+		if m ~= player then table.insert(partners, m.UserId) end
+	end
+	TrainBegin:FireClient(player, course, s.seed, CFG.countdownSeconds, s.goAtServer, partners)
 	task.spawn(sendGhosts, player, s)
 end
 
 TrainStart.OnServerEvent:Connect(function(player: Player, horseId: any, course: any)
-	if pending[player] or sessions[player] then return end
+	if pending[player] or sessions[player] or quick[player] then return end
 	pending[player] = true
 	local ok, err = pcall(startCourse, player, horseId, course)
 	pending[player] = nil
@@ -461,7 +530,7 @@ local function inviteCtx(from: Player, to: Player, ignoreInvites: boolean?)
 	local toBusy = racing(to) or sessions[to] ~= nil or pending[to] == true or quick[to] ~= nil
 	if not ignoreInvites then toBusy = toBusy or RideTogether.pendingFor(invites, to.UserId) ~= nil end
 	return {
-		same = from == to, friends = TrainingFriends.areFriends(from, to),
+		same = from == to, friends = TrainingFriends.areFriends(from, to), toLoaded = td ~= nil,
 		fromVisits = fd and fd.settings and fd.settings.visits, toVisits = td and td.settings and td.settings.visits,
 		toNear = nearCourses(to), toBusy = toBusy,
 	}
@@ -490,6 +559,7 @@ TrainInvite.OnServerEvent:Connect(function(player: Player, toId: any, course: an
 	local id, why = RideTogether.invite(invites, player.UserId, to.UserId, course, os.clock())
 	if not id then
 		Profiles.notify(player, if why == "pending" then "Your invite is on its way. Give it a moment!"
+			elseif why == "declined" or why == "full" then to.DisplayName .. " will ride another time. Ride on!"
 			else "Give your friends a little while, then invite again!", "heart")
 		return
 	end
@@ -498,13 +568,17 @@ TrainInvite.OnServerEvent:Connect(function(player: Player, toId: any, course: an
 end)
 
 local function startGroup(a: Player, b: Player, course: string)
-	local group = { members = { a, b }, course = course, results = {} }
+	local group = { id = nextGroupId, members = { a, b }, course = course, results = {} }
+	nextGroupId += 1
 	local seed = rng:NextInteger(1, 2 ^ 30)
 	local goAtServer = workspace:GetServerTimeNow() + CFG.countdownSeconds + GROUP_LEAD
 	for i, p in group.members do
 		task.spawn(function()
 			local data = Profiles.get(p)
-			if pending[p] or sessions[p] or not data then return end
+			if pending[p] or sessions[p] or quick[p] or not data then
+				restGroup(p, { group = group })
+				return
+			end
 			pending[p] = true
 			local ok, err = pcall(startCourse, p, data.activeHorse, course, { seed = seed, goAtServer = goAtServer, group = group, side = if i == 1 then -1 else 1 })
 			pending[p] = nil
@@ -522,13 +596,16 @@ local function startGroup(a: Player, b: Player, course: string)
 	end
 end
 
-TrainInviteReply.OnServerEvent:Connect(function(player: Player, id: any, accept: any)
-	local inv = RideTogether.reply(invites, id, player.UserId, os.clock())
+-- answer: true ("Ride together"), false ("Not now": no new invite from them for a minute) or
+-- "busy" (a shop or game panel was open: no cooldown)
+TrainInviteReply.OnServerEvent:Connect(function(player: Player, id: any, answer: any)
+	local accept = answer == true
+	local inv = RideTogether.reply(invites, id, player.UserId, os.clock(), if accept then true elseif answer == "busy" then "busy" else false)
 	if not inv then return end
 	local from = Players:GetPlayerByUserId(inv.from)
 	if not from then return end
-	if accept ~= true then
-		Profiles.notify(from, player.DisplayName .. " will ride another time. Ride on!", "heart")
+	if not accept then
+		Profiles.notify(from, player.DisplayName .. (if answer == "busy" then " is busy right now. Try again soon!" else " will ride another time. Ride on!"), "heart")
 		return
 	end
 	-- still friends, nearby and free, both ways
@@ -537,6 +614,7 @@ TrainInviteReply.OnServerEvent:Connect(function(player: Player, id: any, accept:
 		Profiles.notify(from, "That ride can't start right now. Try again later!", "heart")
 		return
 	end
+	Profiles.notify(from, player.DisplayName .. " said yes! Off to the start!", "stat_" .. inv.course)
 	startGroup(from, player, inv.course)
 end)
 
@@ -563,6 +641,7 @@ end)
 local function sample(player: Player, s, now: number)
 	if not player.Parent then
 		endSession(player, s)
+		restGroup(player, s)
 		return
 	end
 	if racing(player) then return abort(player, s, "race") end
@@ -663,6 +742,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	lastTrain[player], lastVet[player] = nil, nil
+	if sessions[player] then restGroup(player, sessions[player]) end
 	sessions[player], history[player], pending[player], cards[player] = nil, nil, nil, nil
 	quick[player], lastAsk[player] = nil, nil
 	for _, inv in invites.invites do

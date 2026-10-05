@@ -146,6 +146,8 @@ local function grownUpsTab()
 		shop and shop.caps and shop.caps.dayRobux or 250, shop and shop.caps and shop.caps.monthRobux or 1000, shop and shop.monthRobux or 0), 16, 42)
 	para("🐴 Horses never get sick, run away or come to harm if your child takes a break. There are no streaks to lose and no countdowns.", 16, 5)
 	para("💬 Chat uses Roblox's own filtered chat and age settings. Horse names are built from a word list, so nothing can be typed.", 16, 6)
+	para("👫 Ride together: only Roblox friends can invite each other to a training ride, and only if the invite is accepted (it can always be declined, lapses by itself and is limited to a few). Riders see each other's stars and ribbons, never times or who was first. Setting stable visits to Nobody turns invites off.", 16, 61)
+	para("👻 Ghosts: a see-through horse shows your child's own best training ride. Friends see it only if \"Share my ghost with friends\" is turned on in Settings (it's off at first).", 16, 62)
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 7)
 end
 

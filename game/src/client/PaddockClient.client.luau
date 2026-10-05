@@ -82,13 +82,23 @@ end
 local function alive(gen: number): boolean
 	return gen == generation and gui.Enabled
 end
+-- A Quick train game asked for or in play: closing the card (or opening another) tells the
+-- server, which ends it with no gain.
+local quickLive = false
+local function stopQuickIfLive()
+	if not quickLive then return end
+	quickLive = false
+	gameRemotes:WaitForChild("QuickStop"):FireServer()
+end
 local function close()
+	stopQuickIfLive()
 	clear()
 	gui.Enabled = false
 end
 closeBtn.Activated:Connect(close)
 dim.Activated:Connect(close)
 local function open(t: string, s: string)
+	stopQuickIfLive()
 	clear()
 	title.Text, sub.Text = t, s
 	if not gui.Enabled then
@@ -163,7 +173,7 @@ local function quickTap(g, kind: string): number?
 	local t = g.now()
 	if t < 0 or g.over then return nil end
 	if not QuickTrain.addEvent(g.events, t, kind) then return nil end
-	gameRemotes:WaitForChild("QuickTap"):FireServer(kind, workspace:GetServerTimeNow())
+	gameRemotes:WaitForChild("QuickTap"):FireServer(kind, g.startAt + t) -- the same moment the preview used
 	local res = QuickTrain.play(g.stat, g.seed, g.events, t)
 	for i = #g.events, 1, -1 do
 		if g.events[i].t == t and g.events[i].kind == kind then return res.taps[i] end
@@ -196,10 +206,15 @@ function Games.speed(g, done)
 	Ui.corner(zone, 8)
 	zone.Parent = lane
 	local runner = Ui.text(lane, "🐎", 34, { Size = UDim2.fromOffset(44, 44), AnchorPoint = Vector2.new(0.5, 0.5), TextScaled = true })
+	local lastRound, tapsSeen = 1, 0
 	heartbeat(function()
-		local x, center = QuickTrain.speedView(g.seed, g.events, math.max(0, g.now()))
+		local x, center, round = QuickTrain.speedView(g.seed, g.events, math.max(0, g.now()))
 		runner.Position = UDim2.fromScale(x, 0.5)
 		zone.Position = UDim2.fromScale(center, 0.5)
+		if round > lastRound then
+			if #g.events == tapsSeen then flash("Next one!", C.plum) end -- that round passed with no tap
+			lastRound, tapsSeen = round, #g.events
+		end
 		whenDone(g, done)
 	end)
 	tapper(function()
@@ -253,21 +268,25 @@ function Games.stamina(g, done)
 	Ui.corner(band, 10)
 	band.Parent = track
 	local marker = Ui.text(track, "🐎", 30, { Size = UDim2.new(1, 0, 0, 34), AnchorPoint = Vector2.new(0, 0.5), TextScaled = true })
-	local holding = false
-	tapper(function()
-		if holding then return end
-		holding = true
-		quickTap(g, "down")
-	end, "HOLD", function()
-		if not holding then return end
-		holding = false
-		quickTap(g, "up")
-	end)
+	-- pressed: the button now; sent: what the server was last told. Holding during "Get ready…"
+	-- starts the climb at GO.
+	local pressed, sent = false, false
+	tapper(function() pressed = true end, "HOLD", function() pressed = false end)
+	local cheered = false
 	heartbeat(function()
-		local run = QuickTrain.staminaRun(g.seed, g.events, math.max(0, g.now()))
+		local t = g.now()
+		if t >= 0 and pressed ~= sent and not g.over then
+			quickTap(g, if pressed then "down" else "up")
+			sent = pressed
+		end
+		local run = QuickTrain.staminaRun(g.seed, g.events, math.max(0, t))
 		band.Position = UDim2.fromScale(0, 1 - run.band - half)
 		marker.Position = UDim2.fromScale(0, 1 - run.y)
 		band.BackgroundColor3 = if math.abs(run.y - run.band) <= half then C.green else C.gold
+		if not cheered and t >= QuickTrain.STAMINA.duration then
+			cheered = true
+			flash("All done!", C.green) -- the climb is over
+		end
 		whenDone(g, done)
 	end)
 end
@@ -389,6 +408,7 @@ local waitingQuick = nil -- { gen, stat }
 local quickScore = nil :: number?
 
 local function showResult(score: number)
+	quickLive = false
 	clear()
 	Ui.text(body, label(score), 44, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 54) }).TextColor3 = C.orangeDark
 	Ui.text(body, string.format("Score %d", math.floor(score + 0.5)), 24, { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 30) })
@@ -411,9 +431,10 @@ local function playTraining(h, stat: string)
 		local gen = generation
 		Ui.text(body, "Get ready…", 34, { Position = UDim2.new(0, 0, 0, 80), Size = UDim2.new(1, 0, 0, 44) })
 		waitingQuick, quickScore = { gen = gen, stat = stat }, nil
+		quickLive = true
 		gameRemotes:WaitForChild("QuickStart"):FireServer(h.id, stat)
 		task.delay(4, function()
-			-- the server said no (a toast says why)
+			-- no game came back: the server turned it down (its toast says why) or the message was lost
 			if waitingQuick and waitingQuick.gen == gen and alive(gen) then
 				waitingQuick = nil
 				close()

@@ -6,10 +6,11 @@
 --   speed    Sprint Lane: a runner bounces along a lane, faster each round; tap in the glowing
 --            zone, 5 rounds (a round with no tap for ROUND_MAX seconds counts 0).
 --   accel    Gate Break: wait for green, then tap; tapping on red counts 0 ("Too soon!");
---            3 rounds (no tap within GREEN_MAX of green counts as the slowest tap).
+--            3 rounds (no tap within GREEN_MAX of green counts 0 too).
 --   stamina  Hill Climb: hold to climb, let go to slide, stay in the moving green band for 8 s
 --            (simulated in fixed 1/60 s steps from the hold and release times).
---   grit     Mud Splash: tap as each of 8 puddles reaches the hoof.
+--   grit     Mud Splash: tap as each of 8 puddles reaches the hoof; a tap with no puddle near
+--            costs STRAY points, so tapping as fast as you can doesn't pay.
 -- events: { { t = seconds, kind = "tap" | "down" | "up" } }, in time order.
 -- play(stat, seed, events, now) -> { done, endT, score, taps = { per event: score or nil } }
 
@@ -133,8 +134,7 @@ local function accelPlay(seed: number, events: { any }, now: number)
 			k += 1
 			start = tap.t + ACCEL.nextPause
 		elseif now >= green + ACCEL.greenMax then
-			total += QuickTrain.accelTapScore(math.huge)
-			start = green + ACCEL.greenMax + ACCEL.nextPause
+			start = green + ACCEL.greenMax + ACCEL.nextPause -- no tap: that round counts 0
 		else
 			return res
 		end
@@ -188,7 +188,7 @@ local function staminaPlay(seed: number, events: { any }, now: number)
 end
 
 -- Mud Splash ---------------------------------------------------------------------------------
-local GRIT = { beats = 8, lead = 1, travel = 1.6, window = 0.25, tail = 0.4 }
+local GRIT = { beats = 8, lead = 1, travel = 1.6, window = 0.25, tail = 0.4, stray = 15 }
 QuickTrain.GRIT = GRIT
 
 -- When each puddle reaches the hoof.
@@ -219,12 +219,14 @@ local function gritPlay(seed: number, events: { any }, now: number)
 			local s = QuickTrain.gritTapScore(bestErr)
 			res.taps[tap.i] = s
 			total += s
+		else
+			total -= GRIT.stray -- a tap with no puddle near
 		end
 	end
 	local finish = times[GRIT.beats] + GRIT.tail
 	res.done = now >= finish
 	res.endT = if res.done then finish else nil
-	res.score = total / GRIT.beats
+	res.score = math.max(0, total / GRIT.beats)
 	return res
 end
 
@@ -239,6 +241,18 @@ function QuickTrain.play(stat: string, seed: number, events: { any }, now: numbe
 		res.done, res.endT = true, QuickTrain.MAX_GAME
 	end
 	return res
+end
+
+-- Did the player play at all? (a tap that counted, or a hold in Hill Climb)
+function QuickTrain.played(stat: string, events: { any }, res: any): boolean
+	for i, e in events do
+		if stat == "stamina" then
+			if e.kind == "down" then return true end
+		elseif res.taps[i] ~= nil then
+			return true
+		end
+	end
+	return false
 end
 
 -- Insert an event keeping time order (server: resolved tap times can arrive out of order).

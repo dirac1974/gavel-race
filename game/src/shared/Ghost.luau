@@ -1,18 +1,19 @@
 --!strict
 -- Ghost (D-053, T4): a training ride's path, small enough to keep: the server's validated
 -- samples resampled at `hz` (4 a second), quantised to `q` studs (0.5), at most `max` points
--- (300 = 75 s), delta-encoded as base64url varints in one string.
+-- (480 = 120 s, the longest a ride can run), delta-encoded as base64url varints in one string.
 --   fromSamples(samples, hz?, max?) -> points { {x, y, z} } at 0, 1/hz, 2/hz, ...
 --   encode(points, hz?, q?) -> { v, hz, q, n, d }       decode(g) -> points
 --   at(points, hz, t) -> x, y, z, facing x, facing z   (nil after the end)
 --   better(a, b): is run a better than run b (score, then time)?
+--   mergeStore(old, mine): what to save (keeps anything this version doesn't understand)
 -- Pure, tested under Lune.
 
 local Ghost = {}
 
 Ghost.HZ = 4
 Ghost.Q = 0.5
-Ghost.MAX = 300
+Ghost.MAX = 480
 Ghost.VERSION = 1
 
 local ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
@@ -122,6 +123,27 @@ function Ghost.better(a: any, b: any?): boolean
 	if not b then return true end
 	if a.score ~= b.score then return a.score > b.score end
 	return (a.seconds or math.huge) < (b.seconds or math.huge)
+end
+
+-- Can this version read (and so replace) a stored run?
+function Ghost.readable(run: any): boolean
+	return typeof(run) == "table" and (tonumber(run.v) or 1) <= Ghost.VERSION and typeof(run.score) == "number"
+		and typeof(run.seconds) == "number" and Ghost.decode(run) ~= nil
+end
+
+-- A saved ghost record with my runs merged in: a stored run is replaced only if this version
+-- can read it and mine is better. Anything else (newer encodings, courses or keys this version
+-- doesn't know) is passed through untouched, so an older server never erases newer ghosts.
+function Ghost.mergeStore(old: any, mine: { [string]: any }): any
+	local value = if typeof(old) == "table" then table.clone(old) else {}
+	local runs = if typeof(value.runs) == "table" then table.clone(value.runs) else {}
+	for course, run in mine do
+		local stored = runs[course]
+		if stored == nil or (Ghost.readable(stored) and Ghost.better(run, stored)) then runs[course] = run end
+	end
+	value.runs = runs
+	value.v = math.max(tonumber(value.v) or 1, 1)
+	return value
 end
 
 return Ghost
