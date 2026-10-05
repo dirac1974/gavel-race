@@ -1336,11 +1336,28 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		for _, leg in HorseLegs.LEGS do maxA = math.max(maxA, math.abs(HorseLegs.angle("gallop", leg, p))) end
 		if math.abs(HorseLegs.angle("trot", "LegFL", p) / 1.1 - HorseLegs.angle("trot", "LegBR", p) / 0.9) > 1e-9 then okDiag = false end
 	end
-	check(maxA > 30 and maxA <= 36 * 1.1 + 1e-6, "gallop swings big but never past its limit")
+	check(maxA > 30 and maxA <= HorseLegs.GAITS.gallop.amp * 1.1 + 1e-6, "gallop swings big but never past its limit")
 	check(okDiag, "trot moves diagonal pairs together")
-	check(close(HorseLegs.advance(0.9, "gallop", 22 * 0.25), 0.15, 1e-9), "phase follows distance (one stride per stride length)")
+	check(close(HorseLegs.advance(0.9, "gallop", HorseLegs.GAITS.gallop.stride * 0.25), 0.15, 1e-9), "phase follows distance (one stride per stride length)")
 	check(HorseLegs.angle("stand", "LegFL", 0.3) == 0, "standing horses don't swing")
-	check(HorseLegs.gaitFor(16) == "walk" and HorseLegs.gaitFor(46) == "gallop", "riding walks at walk speed, gallops on Gallop")
+	check(HorseLegs.gaitFor(16) == "trot" and HorseLegs.gaitFor(46) == "gallop", "riding trots at riding speed, gallops on Gallop (D-056)")
+	check(HorseLegs.gaitFor(10) == "walk", "slow walking is a walk")
+	-- The body drops by the lowest hoof's lift, so a hoof is always planted (D-056).
+	local lift = HorseLegs.newState()
+	check(HorseLegs.lowestLift(lift, 2.45) == 0, "standing: no hoof is lifted")
+	local maxLift = 0
+	for _ = 1, 600 do
+		HorseLegs.step(lift, 46 / 60, 1 / 60, 46)
+		local l = HorseLegs.lowestLift(lift, 2.45)
+		check(l >= 0, "a hoof lift is never negative")
+		maxLift = math.max(maxLift, l)
+	end
+	check(maxLift < 2.45 * (1 - math.cos(math.rad(HorseLegs.GAITS.gallop.amp * 1.1))),
+		"the lowest hoof is never lifted as high as one leg's full swing")
+	-- A planted hoof keeps up with the ground: stride over the hoof's sweep (D-056).
+	for _, g in { "walk", "trot" } do
+		check(HorseLegs.GAITS[g].stride <= 7, g .. " stride is short enough that hooves don't skate")
+	end
 	-- Gait changes cross-fade: no leg jumps more than a few degrees in a frame.
 	local st = HorseLegs.newState()
 	local worst, steady, dt = 0, 0, 1 / 60
@@ -1360,7 +1377,20 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 			last[leg] = a
 		end
 	end
-	check(worst <= steady * 1.05, string.format("legs never jump when the gait changes (worst step %.1f° vs %.1f° galloping)", worst, steady))
+	-- The fastest a leg moves in any steady gait on this speed profile (a short-stride trot near its
+	-- top speed swings faster per frame than a gallop, D-056): a cross-fade must never beat it.
+	for _, top in { 56, HorseLegs.GALLOP_FROM - 0.1, HorseLegs.WALK_BELOW - 0.1 } do
+		local s2, prev = HorseLegs.newState(), {}
+		for f = 1, 120 do
+			HorseLegs.step(s2, top * dt, dt, top)
+			for _, leg in HorseLegs.LEGS do
+				local a = HorseLegs.poseAngle(s2, leg)
+				if prev[leg] and f > 60 then steady = math.max(steady, math.abs(a - prev[leg])) end
+				prev[leg] = a
+			end
+		end
+	end
+	check(worst <= steady * 1.05, string.format("legs never jump when the gait changes (worst step %.1f° vs %.1f° in a steady gait)", worst, steady))
 	for f = 1, 60 do HorseLegs.step(st, 0, dt, 0) end
 	check(math.abs(HorseLegs.poseAngle(st, "LegFL")) < 1e-6, "a horse that stops eases back to standing")
 	-- Gallop toggled on a ride: speed jumps 16 -> 46 (and back) in three frames, crossing two gaits.

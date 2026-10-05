@@ -81,6 +81,21 @@ GameConfig.hud = {
 GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }
 -- Cheering on screen (D-056): CLAP one column left of the movement buttons (Gallop, Hop); the
 -- cheer strip sits at the top centre under the status line, never mid-screen.
+-- Touch screens (D-056): the 💎 button leaves the dock for a quiet pill at the top right
+-- ("dock" = the D-050 layout), and the dock leaves the bottom-right column to the movement
+-- buttons (Hop, Gallop).
+GameConfig.touchLayout = {
+	gemPlacement = "topRight",
+	movementColumn = 176, -- px kept free at the right edge for Hop (up to 170 px in) and Gallop
+}
+-- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
+GameConfig.stable = { awaySign = true }
+-- Riding your own horse (D-056).
+GameConfig.riding = {
+	hopButton = true,   -- touch: a Hop button at Roblox's own jump spot while you ride
+	bobAmp = 0.15,      -- body bob, in step with the legs (hooves stay on the ground)
+	legLength = 2.45,   -- hip to hoof, for the hoof-lift correction
+}
 GameConfig.fans = {
 	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
 	clapSizeOnFoot = { 170, 90 },

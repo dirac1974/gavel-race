@@ -286,14 +286,17 @@ local function buildPlaces(root: Instance)
 		local cf = placeCF("raceBoard")
 		local m = Instance.new("Model")
 		m.Name = "RaceBoard"
-		if not placeModel(m, "race_board_frame", cf * CFrame.Angles(0, math.pi, 0)) then
+		local frame = placeModel(m, "race_board_frame", cf * CFrame.Angles(0, math.pi, 0))
+		if not frame then
 			for _, x in { -18, 18 } do
 				part({ Name = "Post", Size = Vector3.new(2, 22, 2), Color = C.wood, Material = Enum.Material.Wood, CFrame = cf * CFrame.new(x, GROUND_Y + 11, 3) }, m)
 			end
 			part({ Name = "RoofBoard", Size = Vector3.new(42, 1.5, 7), Color = C.roofRed, CFrame = cf * CFrame.new(0, GROUND_Y + 22.5, 3) }, m)
 		end
-		local board = part({ Name = "Board", Size = Vector3.new(34, 15, 1), Color = Color3.fromHex("2B3A2F"),
-			CFrame = cf * CFrame.new(0, GROUND_Y + 12, 3) }, m)
+		-- The uploaded frame is 24.4 studs wide: the board fits inside it (same shape, so the cards
+		-- keep their layout); the 34-stud board is for the fallback posts.
+		local board = part({ Name = "Board", Size = if frame then Vector3.new(20, 8.8, 1) else Vector3.new(34, 15, 1),
+			Color = Color3.fromHex("2B3A2F"), CFrame = cf * CFrame.new(0, GROUND_Y + 12, 3) }, m)
 		local sg = Instance.new("SurfaceGui")
 		sg.Name = "Cards"
 		sg.Face = Enum.NormalId.Front
@@ -455,7 +458,8 @@ local function buildTrail(root: Instance)
 	do
 		local a, b = pts[3], pts[4]
 		local mid = Vector3.new((a.x + b.x) / 2, GROUND_Y, (a.z + b.z) / 2)
-		WorldScene.placeModel(f, "wooden_bridge", CFrame.lookAt(mid, mid + Vector3.new(b.x - a.x, 0, b.z - a.z)))
+		-- The deck sits 3.4 studs up on flat ground: sunk to ground level, so you ride over it, not through it (D-056).
+		WorldScene.placeModel(f, "wooden_bridge", CFrame.lookAt(mid, mid + Vector3.new(b.x - a.x, 0, b.z - a.z)) * CFrame.new(0, -3.1, 0))
 	end
 	local m = WorldLayout.meadow
 	for k = 0, 2 do

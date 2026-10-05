@@ -2,6 +2,9 @@
 -- Hud: the dock at the bottom of the screen (D-035, D-037): Green Cash, your active horse
 -- with its Energy, and the big RACE! button that puts you in line for the next race.
 -- Hidden while you ride; toasts for friendly server notices.
+-- Touch screens (D-056): the dock keeps clear of the bottom-right column (Hop, Gallop) and of
+-- the thumbstick zone (the cash and horse cards there are display-only; My Horses opens from a
+-- 🐴 button), and 💎 is a quiet pill at the top right. Both shop doors stay shut around races.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -15,11 +18,14 @@ local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local DiamondProducts = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DiamondProducts"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local raceRemotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 
 local C = Ui.colors
 local gui = Ui.screen("Hud", 4)
+local LAYOUT = GameConfig.touchLayout
+local touch = Ui.touchLayout() -- re-checked when the input changes (applyTouch below)
 
 local HudEvents = ReplicatedStorage:FindFirstChild("HudEvents") -- local signals between client scripts
 if not HudEvents then
@@ -58,7 +64,9 @@ local function fitDock()
 	local cam = workspace.CurrentCamera
 	if not cam then return end
 	local width = math.max(1, dock.AbsoluteSize.X / dockScale.Scale)
-	dockScale.Scale = math.clamp((cam.ViewportSize.X - 24) / width, 0.55, 1)
+	local room = cam.ViewportSize.X - 24 - (if touch then LAYOUT.movementColumn else 0)
+	-- On touch the movement column wins over the size floor: the dock is never under the jump thumb.
+	dockScale.Scale = math.clamp(room / width, if touch then 0.4 else 0.55, 1)
 end
 dock:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitDock)
 task.spawn(function()
@@ -83,18 +91,29 @@ local function slot(width: number, order: number): Frame
 end
 
 -- Green Cash
-local cashSlot = slot(230, 1)
+local cashSlot = slot(230, 0)
 local cashCard = Ui.card(cashSlot, UDim2.new(1, 0, 0, 56), UDim2.new(0, 0, 1, -60), C.paper)
 Ui.icon(cashCard, "cash", "💵", UDim2.fromOffset(36, 36), UDim2.new(0, 8, 0.5, -18))
 local cashText = Ui.text(cashCard, "0", 26, { Size = UDim2.new(0.5, -50, 1, 0), Position = UDim2.new(0, 48, 0, 0) })
 cashText.TextXAlignment = Enum.TextXAlignment.Left
 cashText.TextColor3 = C.cash
--- Diamonds: tap to open the Tack & Paint shop (never opens by itself, D-050).
-local gemBtn = Ui.button(cashCard, "💎 0", UDim2.new(0.5, -10, 1, -12), UDim2.new(0.5, 4, 0, 6), C.sky, 20)
-gemBtn.Activated:Connect(function() OpenStyleShop:Fire() end)
+-- Diamonds: tap to open the Tack & Paint shop (never opens by itself, D-050). On touch it's a
+-- 48 px pill at the top right, below the Roblox top bar: no glow, pulse, badge or sound (D-056).
+local cardGem = Ui.button(cashCard, "💎 0", UDim2.new(0.5, -10, 1, -12), UDim2.new(0.5, 4, 0, 6), C.sky, 20)
+local inset = game:GetService("GuiService"):GetGuiInset()
+local pillGem = Ui.button(gui, "💎 0", UDim2.fromOffset(110, 48), UDim2.new(1, -12, 0, inset.Y + 8), C.sky, 20)
+pillGem.AnchorPoint = Vector2.new(1, 0)
+pillGem:SetAttribute("NoPop", true)
+pillGem.Visible = false
+for _, b in { cardGem, pillGem } do
+	b.Activated:Connect(function() OpenStyleShop:Fire() end)
+end
+local function gemOnPill(): boolean
+	return touch and LAYOUT.gemPlacement == "topRight"
+end
 
 -- Active horse
-local horseSlot = slot(230, 2)
+local horseSlot = slot(230, 1)
 local horseCard = Ui.card(horseSlot, UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.paper)
 local coatDot = Instance.new("Frame")
 coatDot.Size = UDim2.fromOffset(48, 48)
@@ -123,18 +142,25 @@ for k = 1, GameConfig.energy.maxPerRacer do
 	full.LayoutOrder = k
 	hoofs[k] = full
 end
--- Tap the horse card for My Horses (D-037).
+-- Tap the horse card for My Horses (D-037). On touch the card sits in the thumbstick zone, so
+-- it is display-only and a 🐴 button in the button group opens My Horses instead (D-056).
+local function openHorses()
+	if PlayerState.activeHorse() then OpenHorses:Fire() else OpenStarter:Fire() end
+end
 local horseHit = Instance.new("TextButton")
 horseHit.BackgroundTransparency = 1
 horseHit.Text = ""
 horseHit.Size = UDim2.fromScale(1, 1)
 horseHit.ZIndex = 5
 horseHit.Parent = horseCard
-horseHit.Activated:Connect(function()
-	if PlayerState.activeHorse() then OpenHorses:Fire() else OpenStarter:Fire() end
-end)
+horseHit.Activated:Connect(openHorses)
 local restLabel = Ui.text(hoofRow, "", 16, { Size = UDim2.new(0, 70, 1, 0), LayoutOrder = 99, TextXAlignment = Enum.TextXAlignment.Left })
 restLabel.TextColor3 = C.plum
+
+local horsesSlot = slot(70, 2)
+local horsesBtn = Ui.button(horsesSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.gold, 20)
+Ui.icon(horsesBtn, "horse", "🐴", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
+horsesBtn.Activated:Connect(openHorses)
 
 -- Map (D-035)
 local mapSlot = slot(70, 4)
@@ -149,7 +175,7 @@ Ui.icon(boardBtn, "clipboard", "📋", UDim2.fromOffset(44, 44), UDim2.new(0.5, 
 boardBtn.Activated:Connect(function() OpenBoard:Fire() end)
 
 -- Race button
-local raceSlot = slot(170, 5)
+local raceSlot = slot(170, 5) -- the Ride button (RideClient) comes after it, at 6
 local raceBtn = Ui.button(raceSlot, "🏁 RACE!", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.orange, 30)
 local leaveBtn = Ui.button(raceSlot, "✕", UDim2.fromOffset(34, 34), UDim2.new(1, -20, 1, -88), C.white, 18)
 leaveBtn.Visible = false
@@ -172,7 +198,8 @@ end
 local function render(data)
 	if not data then return end
 	cashText.Text = tostring(data.cash)
-	gemBtn.Text = "💎 " .. tostring(data.diamonds or 0)
+	cardGem.Text = "💎 " .. tostring(data.diamonds or 0)
+	pillGem.Text = cardGem.Text
 	local h = PlayerState.activeHorse()
 	if h then
 		horseName.Text = h.name
@@ -251,6 +278,21 @@ gameRemotes:WaitForChild("Notice").OnClientEvent:Connect(function(text, icon)
 	Ui.toast(text, icon)
 end)
 
+-- Touch layout (D-056), switched whenever the kind of input changes: the dock sits left of the
+-- movement column (Hop, Gallop), the cards in the thumbstick zone are display-only and a 🐴
+-- button opens My Horses; 💎 moves to its pill.
+local function applyTouch(on: boolean)
+	touch = on
+	dock.AnchorPoint = if on then Vector2.new(0, 1) else Vector2.new(0.5, 1)
+	dock.Position = if on then UDim2.new(0, 12, 1, -14) else UDim2.new(0.5, 0, 1, -14)
+	horseHit.Visible = not on
+	horsesSlot.Visible = on
+	cashText.Size = if gemOnPill() then UDim2.new(1, -56, 1, 0) else UDim2.new(0.5, -50, 1, 0)
+	fitDock()
+end
+applyTouch(touch)
+Ui.TouchChanged.Event:Connect(applyTouch)
+
 -- Hide the dock while you ride (RaceState knows your lane), while a results card is up (it
 -- would cover the replay buttons on a phone) and during the replay.
 RunService.Heartbeat:Connect(function()
@@ -258,4 +300,10 @@ RunService.Heartbeat:Connect(function()
 	local replay = Players.LocalPlayer.PlayerGui:FindFirstChild("ReplayUI")
 	local hide = riding or RaceState.resultsOpen or (replay and replay.Enabled)
 	if dock.Visible == hide then dock.Visible = not hide end
+	-- The 💎 door: shut around races (D-050, D-056); the pill also steps aside for the race map.
+	local gemShown = not RaceState.shopClosed(DiamondProducts.afterRaceSeconds)
+	local pill = gemOnPill()
+	if pill then gemShown = gemShown and not (RaceState.active and not RaceState.watchHidden) and not hide end
+	if pillGem.Visible ~= (pill and gemShown) then pillGem.Visible = pill and gemShown end
+	if cardGem.Visible ~= (not pill and gemShown) then cardGem.Visible = not pill and gemShown end
 end)

@@ -638,6 +638,7 @@ Template:
     - gallop {stride 18, amp 40°} above 36: 2.6 Hz riding, 3.1 Hz racing.
     - Bob = 0.15 × |sin 2π·phase| driven by the leg phase, minus the lowest hoof's lift, so hooves stay on the ground and the rider moves with the back. Reduced Motion keeps the camera off the bob.
     - Simulated: planted-hoof slip at riding speed falls from 73% to 38%. QA's walk at 16 studs/s would have needed 3.2 Hz "sewing-machine" legs; real trots run about 1.5 Hz and gallops 2.2–2.5 Hz.
+    - As built: the bob moves the horse's body only; the saddle stays on the rig's root, so the rider doesn't bob (the body's 0.15 rise never reaches the rider). Moving the rider with the back waits for a Studio check.
   - **Diamond button** (amends D-050's placement):
     - On touch, 💎 leaves the dock for a 48 px "💎 N" pill at the top-right, below the Roblox top bar. It has no glow, pulse, badge or sound, and a tap opens Tack & Paint as before. PC keeps 💎 in the dock.
     - On every device, both shop doors (the 💎 button and the Fair Street counter prompt) are hidden in line, while racing, on the results card, for D-050's 2 minutes after a race, and during training rides. No countdown or "back soon" text appears.
@@ -662,11 +663,12 @@ Template:
     - The client shows "Getting to know you…" with a filling heart until the server answers.
     - Then it shows "💖 Friends!" or **"Not yet, try again!"**. Not "So close": that is near-miss wording.
   - **Ride or Map while still seated after a race:** a "Tap Done first" notice instead of nothing.
+  - **Bug fixes that came with it (QA riding audit):** taming checks where the horse stood when the game began (it silently failed about half the time); a 1–2.5-stud "shins" collider stops the ride horse at troughs, beds and the fountain (it ignores CourseProps); getting off puts you where the horse stood; calling the horse checks for room (four headings) or says "Find an open spot"; your own horse's name tag is hidden from you; Shift gallop sits above Shift Lock while riding; the Trail bridge is sunk to the ground; the Race Board fits its frame; touch layout follows the last input (`Ui.touchLayout()`).
   - **Config:**
     - `GameConfig.riding.hopButton = true`;
     - `HorseLegs.GAITS` and `HorseLegs.WALK_BELOW = 12`;
     - `GameConfig.riding.bobAmp = 0.15`;
-    - `GameConfig.hud.gemTouchPlacement = "topRight"` ("dock" = D-050 layout);
+    - `GameConfig.touchLayout.gemPlacement = "topRight"` ("dock" = D-050 layout) and `movementColumn = 176`;
     - `GameConfig.fans.clapOffset`, `clapSizeOnFoot`, `clapSizeRiding`;
     - `GameConfig.fans.cheerStripTop = true`;
     - `GameConfig.stable.awaySign = true`.
