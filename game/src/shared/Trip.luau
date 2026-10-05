@@ -84,6 +84,12 @@ function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: a
 		st.x[i] = posts[i]
 		st.tgt[i] = posts[i]
 	end
+	-- After the lock (Luau only; never part of the trip): offsets and lanes on screen, and the
+	-- make-room look-ahead (closing at up to twice the gap cap, a glide plus a little must finish
+	-- before two horses meet).
+	st.view = table.clone(st.off)
+	st.shown, st.shownTgt = table.clone(st.x), table.clone(st.tgt)
+	st.lookahead = cfg.holdGap + 2 * race.maxGapFeetPerSecond * (cfg.laneSeconds + 0.2)
 	local smart, bots = cfg.smart, cfg.bots
 	for i = 1, n do
 		local uRail, uLead = uniforms[2 * i - 1], uniforms[2 * i]
@@ -464,6 +470,7 @@ function Trip.start(config: any, session: any, track: any, plan: any, baselineRo
 	st.baselineRow = baselineRow
 	st.shown = table.clone(st.x)     -- lanes on screen after the lock (cosmetic, see Trip.cosmetic)
 	st.shownTgt = table.clone(st.tgt)
+	st.view = table.clone(st.off)
 	return st
 end
 
@@ -480,6 +487,7 @@ function Trip.advance(st: any, live: { number }, t: number): boolean
 		Trip.lock(st)
 		st.shown = table.clone(st.x)
 		st.shownTgt = table.clone(st.tgt) -- a glide under way at the bell finishes on screen
+		st.view = table.clone(st.off)     -- the screen showed Trip's offsets up to now
 		return true
 	end
 	return false
@@ -490,48 +498,164 @@ function Trip.raceTau(st: any): { number }
 	return Trip.tau(Trip.tripValues(st), st.posts, st.baselineRow, st.cfg)
 end
 
--- After the lock, lanes are cosmetic: they make room so horses passing on screen (the race
--- shape's luck blend) never sit on top of each other. A horse within holdGap behind another in
--- its lane moves to the nearest free lane (outward first); glides as in the race. Never touches
--- the trip or tau. Returns the lanes to show.
-function Trip.cosmetic(st: any, offsets: { number }, dt: number): { number }
-	local cfg, n = st.cfg, st.n
-	local band, gap = cfg.laneBand, cfg.holdGap
-	local x = st.shown
-	local tgt = st.shownTgt
-	local ord = table.create(n)
-	for i = 1, n do ord[i] = i end
+-- After the lock the screen eases each horse toward the race shape's offsets (RaceView: eased at
+-- viewEasePerSecond, capped at maxGapFeetPerSecond unless catching up by the line). The server
+-- keeps the same eased copy (st.view, carried on from Trip's offsets at the lock, which is what
+-- the screen showed then) so the make-room lanes act on what kids actually see. Substeps of
+-- 1/60 s follow a 60 fps client closely.
+local VIEW_SUBSTEP = 1 / 60
+local HOLD_RELEASE_SECONDS = 1 -- holds let go this long before the line, so the order there is the result
+local MAKE_WAY_DEPTH = 3       -- how far a boxed-in horse's way out may be cleared (Trip.cosmetic)
+
+-- A horse on screen may not run through the one ahead in its lane: it sits holdGap behind until
+-- the make-room lanes let it out (as Trip holds before the lock).
+local function holdView(st: any)
+	local band, gap = st.cfg.laneBand, st.cfg.holdGap
+	local view, x = st.view, st.shown
+	local ord = table.create(st.n)
+	for i = 1, st.n do ord[i] = i end
 	table.sort(ord, function(a: number, b: number): boolean
-		if offsets[a] ~= offsets[b] then return offsets[a] > offsets[b] end
+		if view[a] ~= view[b] then return view[a] > view[b] end
 		if x[a] ~= x[b] then return x[a] < x[b] end
 		return a < b
 	end)
+	for a = 1, st.n do
+		local i = ord[a]
+		for b = 1, a - 1 do
+			local j = ord[b]
+			if math.abs(x[i] - x[j]) < band and view[j] - view[i] < gap then view[i] = view[j] - gap end
+		end
+	end
+end
+
+function Trip.viewStep(st: any, targets: { number }, dt: number, toLine: number)
+	local race = st.race
+	local margin = race.catchUpMarginSeconds
+	local left, tl = dt, toLine
+	while left > 1e-9 do
+		local h = math.min(VIEW_SUBSTEP, left)
+		local k = math.min(1, h * race.viewEasePerSecond)
+		local allowed = race.maxGapFeetPerSecond * h
+		for i = 1, st.n do
+			local gap = targets[i] - st.view[i]
+			local limit = if tl <= margin then math.huge else math.max(allowed, math.abs(gap) * h / (tl - margin))
+			st.view[i] += math.clamp(gap * k, -limit, limit)
+		end
+		left -= h
+		tl -= h
+		if tl > HOLD_RELEASE_SECONDS then holdView(st) end
+	end
+end
+
+-- j, ahead of i on screen in i's lane, is in i's way: i is held behind it (closer than holdGap)
+-- or closing on it (i's place is not holdGap behind j's) from less than the look-ahead apart.
+local function inWay(st: any, i: number, j: number, targets: { number }): boolean
+	local d = st.view[j] - st.view[i]
+	return d < st.cfg.holdGap or (targets[i] > targets[j] - st.cfg.holdGap and d < st.lookahead)
+end
+
+-- After the lock, lanes are cosmetic: they make room so horses passing on screen (the race
+-- shape's luck blend) never run through each other. Working on the shown offsets (st.view, held
+-- by viewStep), the horse behind on screen in a meeting glides to the nearest free lane it can
+-- reach across lanes clear of nearby horses (outward first); boxed in, a horse in its way moves
+-- over instead (up to MAKE_WAY_DEPTH deep), else it stays held. Decided again each tick. Never
+-- touches the trip or tau. t = race time (seconds since the gate). Returns the lanes to show.
+function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { number }
+	local cfg, n = st.cfg, st.n
+	local band = cfg.laneBand
+	Trip.viewStep(st, targets, dt, st.geo.length / st.speed - t)
+	local view, x, tgt = st.view, st.shown, st.shownTgt
+	local ord = table.create(n)
+	for i = 1, n do ord[i] = i end
+	table.sort(ord, function(a: number, b: number): boolean
+		if view[a] ~= view[b] then return view[a] > view[b] end
+		if x[a] ~= x[b] then return x[a] < x[b] end
+		return a < b
+	end)
+	local clear = cfg.clearFeet
+	local cross = 2 * st.race.maxGapFeetPerSecond * cfg.laneSeconds -- closing while crossing a lane
+	local function inLane(j: number, lane: number): boolean
+		return math.abs(x[j] - lane) < band or tgt[j] == lane
+	end
+	-- j stands in i's way in `lane`: alongside (within clearFeet), or ahead and being closed on.
+	-- (A horse i will stay behind may be a little under holdGap ahead: the hold eases i back a
+	-- foot or two.) A horse behind i there adapts in turn (held, or moving over).
+	local function blocks(i: number, j: number, lane: number): boolean
+		if j == i or not inLane(j, lane) then return false end
+		local d = view[j] - view[i]
+		return math.abs(d) < clear or (d > 0 and targets[i] > targets[j] - cfg.holdGap and d < st.lookahead)
+	end
 	local function free(i: number, lane: number): boolean
 		for j = 1, n do
-			if j ~= i and (math.abs(x[j] - lane) < band or tgt[j] == lane) and math.abs(offsets[j] - offsets[i]) < gap then
-				return false
-			end
+			if blocks(i, j, lane) then return false end
 		end
 		return true
+	end
+	-- i can glide across `lane` now: nobody in it near enough to meet i while it crosses.
+	local function passable(i: number, lane: number): boolean
+		for j = 1, n do
+			if j ~= i and inLane(j, lane) and math.abs(view[j] - view[i]) < clear + cross then return false end
+		end
+		return true
+	end
+	-- The nearest free lane i can reach across passable lanes, outward first at equal distance.
+	local function findLane(i: number): number?
+		for dist = 1, st.lanes - 1 do
+			for _, dir in { 1, -1 } do
+				local lane = tgt[i] + dir * dist
+				if lane >= 1 and lane <= st.lanes and free(i, lane) then
+					local ok = true
+					for m = 1, dist - 1 do
+						if not passable(i, tgt[i] + dir * m) then ok = false end
+					end
+					if ok then return lane end
+				end
+			end
+		end
+		return nil
+	end
+	-- Boxed in: open a way for i by moving one horse over, one move per tick. First the horse it
+	-- is catching (to any free lane), then a horse blocking a lane beside i (further away from
+	-- i); with depth to spare, a horse blocking that horse's way out, and so on.
+	local function clearLane(i: number, catching: number?, depth: number): boolean
+		if catching and x[catching] == tgt[catching] then
+			local other = findLane(catching)
+			if other then
+				tgt[catching] = other
+				return true
+			end
+		end
+		for _, dir in { 1, -1 } do
+			local side = tgt[i] + dir
+			if side >= 1 and side <= st.lanes then
+				for j = 1, n do
+					if x[j] == tgt[j] and blocks(i, j, side) then
+						local other = findLane(j)
+						if other and (other - side) * dir > 0 then
+							tgt[j] = other
+							return true
+						end
+						if depth > 1 and clearLane(j, nil, depth - 1) then return true end
+					end
+				end
+			end
+		end
+		return false
 	end
 	for a = 1, n do
 		local i = ord[a]
 		if x[i] == tgt[i] then
-			local crowded = false
-			for b = 1, a - 1 do
+			local blocker = nil
+			for b = 1, a - 1 do -- horses ahead on screen (or level and earlier): i gives way
 				local j = ord[b]
-				if math.abs(x[j] - x[i]) < band and offsets[j] - offsets[i] < gap then crowded = true end
+				if inLane(j, x[i]) and inWay(st, i, j, targets) then blocker = j end
 			end
-			if crowded then
-				for k = 1, st.lanes do
-					local out, inward = tgt[i] + k, tgt[i] - k
-					if out <= st.lanes and free(i, out) then
-						tgt[i] = out
-						break
-					elseif inward >= 1 and free(i, inward) then
-						tgt[i] = inward
-						break
-					end
+			if blocker then
+				local lane = findLane(i)
+				if lane then
+					tgt[i] = lane
+				else
+					clearLane(i, blocker, MAKE_WAY_DEPTH) -- if nothing can move, it is held until a lane opens
 				end
 			end
 		end
@@ -550,14 +674,22 @@ function Trip.cosmetic(st: any, offsets: { number }, dt: number): { number }
 	return table.clone(x)
 end
 
--- What RaceOffsets carries now: before the lock, Trip's offsets and lanes; after it, the race
--- shape's offsets (from live chances and, late on, luck) and the cosmetic lanes. With no trip
--- (steering off) the offsets alone, exactly as before steering (lanes = nil).
-function Trip.frame(st: any, session: any, shownLive: { number }, w: number, shapeCfg: any, dt: number): ({ number }, { number }?)
+-- Lanes as sent: rounded to 0.01 lane (0.06 ft, invisible; smaller packets).
+local function sendLanes(x: { number }): { number }
+	local out = table.create(#x)
+	for i, v in x do out[i] = math.floor(v * 100 + 0.5) / 100 end
+	return out
+end
+
+-- What RaceOffsets carries now (t = race time), which the screen shows as sent: before the lock,
+-- Trip's offsets and lanes; after it, the race shape's offsets (live chances, late on luck) as
+-- the screen eases them, held so none runs through another, and the make-room lanes. With no
+-- trip (steering off) the race shape's offsets alone, exactly as before steering (lanes = nil).
+function Trip.frame(st: any, session: any, shownLive: { number }, w: number, shapeCfg: any, dt: number, t: number): ({ number }, { number }?)
 	if st == nil then return session:displayOffsets(shownLive, w, shapeCfg), nil end
-	if not st.locked then return table.clone(st.off), table.clone(st.x) end
-	local offsets = session:displayOffsets(shownLive, w, shapeCfg)
-	return offsets, Trip.cosmetic(st, offsets, dt)
+	if not st.locked then return table.clone(st.off), sendLanes(st.x) end
+	local lanes = Trip.cosmetic(st, session:displayOffsets(shownLive, w, shapeCfg), dt, t)
+	return table.clone(st.view), sendLanes(lanes)
 end
 
 return Trip

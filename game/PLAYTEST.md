@@ -295,7 +295,8 @@ This week's course (T5):
 - [ ] From the gate, horses hold their posts, then head toward the rail before each turn. Most settle one off the rail (lane 2); about a quarter of the bots take the rail, a few sit one lane wider.
 - [ ] A horse blocked from moving in eases back (up to about 3 lengths) and slots in behind; horses never overlap or bump. Often a line of horses forms in lane 2 and others wait outside it.
 - [ ] Your own horse steers itself the same way (Smart Steer); there are no steering controls yet (S3).
-- [ ] At the far turn lanes lock (no bell or message until S3). After it, a horse passing another in its lane moves out a lane; nothing pops or jumps.
+- [ ] At the far turn lanes lock (no bell or message until S3). After it, horses never run through each other: a horse catching another in its lane swings out to pass, or waits a moment behind it until there's room. Lane changes glide smoothly (no stutter); nothing pops or jumps.
+- [ ] Steering is cosmetic for now (`GameConfig.steering.scale = 0`): lanes move, but no one's chances change until the controls arrive (S3).
 - [ ] The order across the line is still the result, and the results card looks as before (the trip line comes in S4).
 - [ ] Output shows no RaceService errors around the far turn. With `GameConfig.steering.enabled = false` the horses stay in their posts all race, exactly as before.
 

@@ -545,12 +545,15 @@ local function runRace(c, players: { Player })
 	-- two uniforms per lane after every other gate draw. Bots steer with Smart Steer and its bot
 	-- variety; riders with Smart Steer too (their controls come in S3). nil when
 	-- GameConfig.steering.enabled is false: today's race exactly.
-	local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
-	if not tripRow then
-		warn(string.format("[RaceService] no trip baseline for %s %s; posts count as equal", c.id, tostring(cond.distance)))
-		tripRow = table.create(GameConfig.lanes, 0)
+	local trip = nil
+	if GameConfig.steering.enabled then
+		local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
+		if not tripRow then
+			warn(string.format("[RaceService] no trip baseline for %s %s; posts count as equal", c.id, tostring(cond.distance)))
+			tripRow = table.create(GameConfig.lanes, 0)
+		end
+		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout)
 	end
-	local trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout)
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
 	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
@@ -590,38 +593,63 @@ local function runRace(c, players: { Player })
 	-- Live chances shown on screen: closed segments, refreshed each second in the stretch drive.
 	local shownLive = table.clone(session.live)
 	local racing = true
+	-- The offsets loop runs while this race is on; a race that errors is marked aborted by
+	-- courseLoop and stops here too (no trip lock or remotes for a dead race).
+	local function alive(): boolean
+		return racing and not cur.aborted and (c.current == cur or c.current == nil)
+	end
 	-- The far-turn lock (D-054): Trip steps every fixed tick up to it, books the far turn, and the
-	-- trip tau joins the race (clamped; 0 until now, so it never depends on luck). The live
-	-- chances shown pick it up at once.
+	-- trip tau joins the race (clamped; 0 until now, so it never depends on luck).
+	-- A late server steps the missed ticks with the live chances of now, so around checkpoint 1 a
+	-- tick or two can use the new chances a tick early or late. That is fair: live chances are the
+	-- same for every horse, it moves only when their skill gaps grow (by a tick), and tau is
+	-- measured against that same field.
 	local function advanceTrip(t: number)
-		if trip and not trip.locked and Trip.advance(trip, session.live, t - tStart) then
+		if not trip or trip.locked or cur.aborted then return end
+		if Trip.advance(trip, session.live, t - tStart) then
 			session:setTrip(Trip.raceTau(trip))
 			shownLive = table.clone(session.live)
 			TripLocked:FireAllClients(c.id)
-			LiveChances:FireAllClients(session.closed, shownLive, c.id)
+			-- The chances shown pick tau up at once (when the lock comes before checkpoint 1, as it
+			-- can in a Sprint, the checkpoint's own update carries it).
+			if session.closed > 0 then LiveChances:FireAllClients(session.closed, shownLive, c.id) end
 		end
 	end
 	task.spawn(function()
 		local period = 1 / GameConfig.offsetsPerSecond
-		if not trip then -- steering off: today's offsets, unchanged
-			while racing and (c.current == cur or c.current == nil) do
+		if not trip then -- steering off: today's offsets
+			while alive() do
 				local w = RaceShape.blendWeight(now(), tFar, postEnd, GameConfig.raceShape.blendPower)
 				RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape), c.id)
 				task.wait(period)
 			end
 			return
 		end
-		-- Steering: up to the lock, Trip's gaps and lanes at sendHz; after it, the race shape's
-		-- gaps (skill, then luck) with cosmetic make-room lanes.
+		-- Steering: the screen shows what the server sends, at sendHz all race: Trip's gaps and lanes
+		-- up to the lock; after it, the race shape's gaps as the screen eases them, held so no horse
+		-- runs through another, with make-room lanes (Trip.frame). Lanes go out when they change and
+		-- once a second (a dropped packet is harmless).
 		local last = now()
-		while racing and (c.current == cur or c.current == nil) do
+		local sentLanes, lanesAt = nil, -math.huge
+		while alive() do
 			local t = now()
 			advanceTrip(t)
 			local w = RaceShape.blendWeight(t, tFar, postEnd, GameConfig.raceShape.blendPower)
-			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, t - last)
-			RaceOffsets:FireAllClients(offsets, lanes, c.id)
+			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, t - last, t - tStart)
 			last = t
-			task.wait(if trip.locked then period else 1 / GameConfig.steering.sendHz)
+			local changed = sentLanes == nil or t - lanesAt >= 1
+			if not changed and lanes then
+				for i, x in lanes do
+					if x ~= sentLanes[i] then changed = true end
+				end
+			end
+			if changed and lanes then
+				sentLanes, lanesAt = lanes, t
+				RaceOffsets:FireAllClients(offsets, lanes, c.id)
+			else
+				RaceOffsets:FireAllClients(offsets, c.id)
+			end
+			task.wait(1 / GameConfig.steering.sendHz)
 		end
 	end)
 	local function previewStretch(seg: number)
@@ -804,6 +832,7 @@ local function courseLoop(c)
 		for _, p in racers do QueueStatus:FireClient(p, false, #c.queue, nil, c.id) end
 		if #racers > 0 then
 			local ok, err = pcall(runRace, c, racers)
+			if not ok and c.current then c.current.aborted = true end -- its loops stop (RaceService alive())
 			if not ok then
 				warn(string.format("Race on %s failed: %s", c.id, tostring(err)))
 				c.current = nil

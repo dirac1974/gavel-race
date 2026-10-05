@@ -17,6 +17,7 @@ local RaceSession = require("../../game/src/shared/RaceSession")
 local TrackLayout = require("../../game/src/shared/TrackLayout")
 local Trip = require("../../game/src/shared/Trip")
 local TripBaseline = require("../../game/src/shared/TripBaseline")
+local simulateRace = require("./race_overlap")
 
 local function makeRng(seed0: number)
 	local seed = seed0
@@ -47,9 +48,15 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local baselineJson = serde.decode("json", fs.readFile("tests/fixtures/trip_baseline.json"))
 
 	-- GameConfig mirrors the Python CONFIG and RACE; TripBaseline is the generated table.
+	-- GameConfig.steering mirrors CONFIG, except S1's post switch and the scale: S2 ships cosmetic
+	-- (scale 0) until the rider controls go live in S3, which sets src/trip.py's 1.
 	local steering = table.clone(GameConfig.steering)
-	steering.drawPosts = nil -- S1's switch; not part of the trip model
-	check(deepEqual(steering, data.cfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py")
+	steering.drawPosts = nil
+	steering.scale = nil
+	local pyCfg = table.clone(data.cfg)
+	pyCfg.scale = nil
+	check(deepEqual(steering, pyCfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py (scale aside)")
+	check(GameConfig.steering.scale == 0 and data.cfg.scale == 1, "S2 ships cosmetic (scale 0); the model's scale is 1")
 	local race = Trip.raceParams(GameConfig)
 	check(deepEqual(race, data.race, 0), "Trip.raceParams(GameConfig) mirrors RACE in src/trip.py")
 	check(deepEqual(TripBaseline, baselineJson.baseline, 1e-15), "TripBaseline.luau is trip_baseline.json's baseline")
@@ -66,6 +73,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local function runConfig(run: any): any
 		local cfg = table.clone(GameConfig.steering)
 		cfg.drawPosts = nil
+		cfg.scale = data.cfg.scale -- the model's scale (S2 ships 0; the fixture uses 1)
 		cfg.smart = table.clone(cfg.smart)
 		if run.cfg then -- a run with other settings: copy the ones that differ (simple values)
 			for key, value in run.cfg do
@@ -234,7 +242,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	for i = 1, 8 do
 		if not close(b.live[i], w1[i], 1e-12) then tilted = false end
 	end
-	check(tilted, "the exponent is kappa * R + tau (crowd 0), as liveChances(..., extra)")
+	check(tilted, "the exponent equals step 5 (kappa * R + tau, crowd 0) within 1e-12; the game folds tau/kappa into R")
 	a:closeSegment(2)
 	b:closeSegment(2)
 	check(b.live[1] / a.live[1] > 1, "tau stays in at the next checkpoint")
@@ -327,24 +335,65 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		check(not Trip.advance(st, s.live, t + 10), "nothing steps after the lock")
 		-- After the lock: race-shape offsets and cosmetic lanes that make room.
 		local liveNow = table.clone(s.live)
-		local o1, l1 = Trip.frame(st, s, liveNow, 0, GameConfig.raceShape, 0.25)
-		check(deepEqual(o1, s:displayOffsets(liveNow, 0, GameConfig.raceShape), 0) and l1 ~= nil, "after the lock: race-shape offsets plus lanes")
+		local viewBefore = table.clone(st.view)
+		local o1, l1 = Trip.frame(st, s, liveNow, 0, GameConfig.raceShape, 0.25, st.lockT + 0.25)
+		local eased = true
+		local targets = s:displayOffsets(liveNow, 0, GameConfig.raceShape)
+		for i = 1, #o1 do
+			if o1[i] ~= st.view[i] then eased = false end
+			-- each moves toward its race-shape target, no faster than the cap (or is held back)
+			if math.abs(o1[i] - viewBefore[i]) > GameConfig.raceView.maxGapFeetPerSecond * 0.25 + 1e-9 + GameConfig.steering.holdGap then
+				eased = false
+			end
+		end
+		check(eased and l1 ~= nil, "after the lock: the offsets the screen shows (eased toward the race shape, held), plus lanes")
+		check(targets ~= nil, "race-shape targets exist")
 		local inside = true
 		for _, x in l1 :: { number } do
 			if x < 1 or x > GameConfig.lanes then inside = false end
 		end
 		check(inside, "cosmetic lanes stay on the track")
 	end
+	-- Overlaps on screen (B1 of the S2 review): whole races as RaceService runs them and RaceView
+	-- draws them, steering at scale 0 (as shipped) and 1 (from S3). No horse may come within half
+	-- a lane and 6 ft of another anywhere, and the order across the line must be the result.
+	-- (tests/luau/overlap_report.luau runs the same at any size: 960 races, 0 overlaps.)
+	do
+		local s1 = table.clone(GameConfig)
+		s1.steering = table.clone(GameConfig.steering)
+		s1.steering.scale = 1
+		local races, overlaps, wrongOrder, cell = 0, 0, 0, 0
+		for _, course in { "dirt", "turf" } do
+			for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
+				cell += 1
+				for k = 1, 8 do
+					local s = simulateRace(course, distance, cell * 7907 + k * 104729, if k % 2 == 0 then s1 else nil)
+					races += 1
+					overlaps += s.before + s.after
+					if not s.orderOk then wrongOrder += 1 end
+				end
+			end
+		end
+		check(races == 64 and overlaps == 0, `no overlapping horses on screen in {races} races ({overlaps} frames)`)
+		check(wrongOrder == 0, "the order across the line is the result in every race")
+	end
 	do -- make room: a horse closing on another in its lane moves out
 		local track = TrackLayout.courses.dirt
 		local plan = TrackLayout.plan(track, TrackLayout.distances.Sprint)
-		local st = Trip.new({ 2, 2 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), data.cfg, { "manual", "manual" }, data.race)
-		st.shown, st.shownTgt = { 2, 2 }, { 2, 2 }
+		local st = Trip.new({ 2, 2 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), data.cfg, { "manual", "manual" }, race)
 		Trip.lock(st)
-		local lanes = Trip.cosmetic(st, { 10, 4 }, 0.1) -- the second horse is 6 ft behind the first
-		for _ = 1, 10 do lanes = Trip.cosmetic(st, { 10, 4 }, 0.1) end
-		check(lanes[1] == 2 and lanes[2] == 3, "a horse too close behind in its lane moves out to make room")
-		lanes = Trip.cosmetic(st, { 10, -20 }, 0.1)
-		check(lanes[2] == 3, "cosmetic lanes don't jump back")
+		st.view = { 10, -10 } -- the second horse 20 ft behind the first in lane 2, but its place is ahead
+		local lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 10)
+		for _ = 1, 10 do lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 10) end
+		check(lanes[1] == 2 and lanes[2] == 3, "a horse about to pass another in its lane moves out first")
+		check(st.view[2] > 0, "...and goes on toward its place")
+		lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 11)
+		check(lanes[2] == 3, "make-room lanes don't jump back")
+		local held = Trip.new({ 1, 1 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), data.cfg, { "manual", "manual" }, race)
+		Trip.lock(held)
+		held.view = { 0, -10 }
+		held.shown, held.shownTgt = { 1, 1 }, { 1, 1 }
+		Trip.viewStep(held, { 0, 20 }, 0.5, 30) -- wants to pass at once, no time to move out
+		check(held.view[1] - held.view[2] >= GameConfig.steering.holdGap - 1e-9, "a horse is held rather than run through another")
 	end
 end

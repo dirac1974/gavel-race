@@ -62,7 +62,8 @@ GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line 
 GameConfig.steering = {
 	drawPosts = true,              -- posts drawn at random at the gate; false = the old humans-first lanes
 	enabled = true,                -- false: today's fixed lanes and offsets, exactly
-	scale = 1,                     -- 0: steering is cosmetic (lanes move, chances don't)
+	scale = 0,                     -- 0: steering is cosmetic (lanes move, chances don't). 0 until the
+	                               -- rider controls (S3) go live, then 1 (src/trip.py's value)
 	floor = -0.02, ceiling = 0.04, -- clamp on tau (1 point of S = 0.02)
 	groundPerLaneTurn = 0.010,     -- per lane off the rail per 180 degrees of turn
 	draftPerSecond = 0.0010, draftCap = 0.016,

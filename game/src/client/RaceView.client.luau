@@ -11,9 +11,11 @@
 --   Where: rail coordinates (D-054). A horse is drawn at s = progress * railLength feet along
 --   the lane-1 path and lane position x (TrackLayout.railPoint), so horses at the same s are
 --   abreast on turns too. x starts at the horse's post (lane number = post since posts are
---   drawn). With steering on (TripInfo), RaceOffsets also carries every horse's x up to the
---   far-turn lock (the server's Trip: Smart Steer, tuck-ins, holds) and cosmetic make-room lanes
---   after it; x eases toward them here. Steering's gaps already grow in from the gate, so the
+--   drawn). With steering on (TripInfo) the server sends what to show, all race: gaps and lanes
+--   from its Trip up to the far-turn lock (Smart Steer, tuck-ins, holds), then the race shape's
+--   gaps as they ease, held so no horse runs through another, with make-room lanes. The screen
+--   interpolates between those 10 Hz samples instead of easing them again, and lanes glide
+--   linearly at the race's lane speed. Steering's gaps already grow in from the gate, so the
 --   30% ramp below is skipped for those races.
 --   Gaps: the server sends each horse's offset from the pace a few times a second. Up to
 --   the far turn it comes from live chance (skill); from the far turn to the last tap it
@@ -43,7 +45,8 @@ local BOB_HZ, BOB_STUDS = 1.8, 0.3
 local PAST_LINE = 0.012     -- past the line, horses ease to a stop within about this fraction
 local RECORD_HZ = 10
 local VIEW = GameConfig.raceView
-local LANE_EASE = 10        -- lanes ease toward the server's x at this rate (per second)
+local STEER = GameConfig.steering
+local SAMPLE_SECONDS = 1 / STEER.sendHz -- steering: interpolate the server's offsets over one send
 
 -- The tap nudge rises over nudgeRiseSeconds and fades over nudgeFallSeconds; scaled so its
 -- peak is tapNudgeFeet.
@@ -69,7 +72,7 @@ end
 
 -- races[course] = { course, cfg, start, T, len1, plan, lanes, myLane, offset = {}, target = {},
 --   lane = {} (x per lane, updated in place: RaceState.lane is the same table), laneTarget = {},
---   steering (TripInfo), lockAt, done, doneAt, settleAt }
+--   steering (TripInfo), lockAt, locked (TripLocked), from = {}, to = {}, sampleAt, done, doneAt, settleAt }
 local races: { [string]: any } = {}
 
 local function horseModel(courseId: string?, i: number): Model?
@@ -153,10 +156,11 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 	local len1 = plan.lengths[1]
 	local race = {
 		course = courseId, cfg = cfg, start = start, plan = plan, lanes = #laneList, offset = {}, target = {},
-		lane = {}, laneTarget = {}, steering = false, done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond,
+		lane = {}, laneTarget = {}, steering = false, locked = false, from = {}, to = {}, sampleAt = 0,
+		done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond,
 	}
 	for i, lane in laneList do
-		race.offset[i], race.target[i] = 0, 0
+		race.offset[i], race.target[i], race.from[i], race.to[i] = 0, 0, 0, 0
 		race.lane[i] = i -- x starts at the post (lanes are numbered by post, D-054)
 		race.laneTarget[i] = i
 		if lane.id == myId then race.myLane = i end
@@ -192,7 +196,16 @@ remotes.RaceOffsets.OnClientEvent:Connect(function(offsets, a, b)
 	if typeof(a) == "table" then lanes, courseId = a, b end
 	local race = races[courseId or "dirt"]
 	if not race then return end
-	for i, feet in offsets do race.target[i] = feet end
+	if race.steering then
+		-- The server's offsets are what to show: glide from where the horse is to the new sample
+		-- over one send interval (no second easing, so held gaps stay as the server holds them).
+		for i, feet in offsets do
+			race.from[i], race.to[i] = race.offset[i], feet
+		end
+		race.sampleAt = os.clock()
+	else
+		for i, feet in offsets do race.target[i] = feet end
+	end
 	if lanes then
 		for i, x in lanes do race.laneTarget[i] = x end
 	end
@@ -204,6 +217,16 @@ remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt,
 	if not race then return end
 	race.steering = enabled == true
 	race.lockAt = lockAt
+	if race.steering then
+		for i = 1, race.lanes do race.from[i], race.to[i] = race.offset[i], race.offset[i] end
+	end
+end)
+
+-- The far-turn bell (D-054): lanes are locked; from here they only make room on screen. The
+-- bell and "Lanes locked!" come with the steering controls (S3).
+remotes:WaitForChild("TripLocked").OnClientEvent:Connect(function(courseId)
+	local race = races[courseId or "dirt"]
+	if race then race.locked = true end
 end)
 
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
@@ -238,7 +261,8 @@ local lastRecord = 0
 RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, function(dt)
 	local t = serverNow()
 	local k = math.min(1, dt * VIEW.easePerSecond)
-	local kLane = math.min(1, dt * LANE_EASE)
+	local glide = dt / STEER.laneSeconds -- lanes move at the race's lane speed, linearly
+	local clock = os.clock()
 	for courseId, race in races do
 		local isFocus = RaceState.focus == courseId -- only the followed race writes the shared state
 		local s = t - race.start
@@ -250,11 +274,17 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 		local allowed = VIEW.maxGapFeetPerSecond * dt
 		local allStopped = true
 		for i = 1, race.lanes do
-			local gap = race.target[i] - race.offset[i]
-			local limit = if toLine <= VIEW.catchUpMarginSeconds then math.huge
-				else math.max(allowed, math.abs(gap) * dt / (toLine - VIEW.catchUpMarginSeconds))
-			race.offset[i] += math.clamp(gap * k, -limit, limit)
-			race.lane[i] += (race.laneTarget[i] - race.lane[i]) * kLane -- in place: RaceState.lane follows
+			if race.steering then
+				local f = math.clamp((clock - race.sampleAt) / SAMPLE_SECONDS, 0, 1)
+				race.offset[i] = race.from[i] + (race.to[i] - race.from[i]) * f
+			else
+				local gap = race.target[i] - race.offset[i]
+				local limit = if toLine <= VIEW.catchUpMarginSeconds then math.huge
+					else math.max(allowed, math.abs(gap) * dt / (toLine - VIEW.catchUpMarginSeconds))
+				race.offset[i] += math.clamp(gap * k, -limit, limit)
+			end
+			-- In place: RaceState.lane is this table.
+			race.lane[i] += math.clamp(race.laneTarget[i] - race.lane[i], -glide, glide)
 			-- Gaps grow in over the first 30% so the field leaves the gate together (with steering,
 			-- the server's gaps already grow in from the gate).
 			local ramp = if race.steering then 1 else math.min(1, base / (0.3 * race.len1))
