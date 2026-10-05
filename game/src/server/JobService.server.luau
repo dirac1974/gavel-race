@@ -13,6 +13,7 @@ local Care = require(Shared:WaitForChild("Care"))
 local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Profile = require(Shared:WaitForChild("Profile"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local JobClaim = Profiles.remote("JobClaim")     -- client -> server: kind, index
@@ -44,7 +45,7 @@ Profiles.Loaded.Event:Connect(function(player: Player)
 	local now = os.time()
 	local auto = Jobs.refresh(data, player.UserId, now)
 	if auto > 0 then
-		Profiles.notify(player, string.format("Welcome back! %d finished job%s paid out while you were away", auto, if auto == 1 then "" else "s"), "gift")
+		Profiles.notify(player, string.format("Welcome back! %d finished job%s added to your stable", auto, if auto == 1 then " was" else "s were"), "gift")
 	end
 	-- One "day" a day for the weekly and monthly visit jobs (days played, never in a row).
 	local today = now // 86400
@@ -63,9 +64,18 @@ local function busy(player: Player): boolean
 end
 
 JobClaim.OnServerEvent:Connect(function(player: Player, kind: any, index: any)
-	if busy(player) or typeof(kind) ~= "string" or typeof(index) ~= "number" then return end
+	if busy(player) or typeof(kind) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
+	if index == "all" then
+		local n = Jobs.claimAllIn(data, player.UserId, kind, os.time())
+		if n > 0 then
+			Profiles.notify(player, string.format("%d reward%s collected!", n, if n == 1 then "" else "s"), "gift")
+			Profiles.changed(player)
+		end
+		return
+	end
+	if typeof(index) ~= "number" then return end
 	local ok, def = Jobs.claim(data, player.UserId, kind, index, os.time())
 	if ok and def then
 		Profiles.notify(player, "Reward collected!", "gift")
@@ -103,21 +113,32 @@ task.spawn(function()
 	end
 end)
 
+-- New day for players who stay on: roll the jobs over and count the day (once).
+local function newDayCheck(player: Player)
+	local data = Profiles.get(player)
+	if not data then return end
+	local now = os.time()
+	local auto = Jobs.refresh(data, player.UserId, now)
+	if auto > 0 then Profiles.notify(player, "New day! Yesterday's finished jobs were added to your stable", "gift") end
+	local today = now // 86400
+	if data.jobs.dayCounted ~= today then
+		data.jobs.dayCounted = today
+		Profile.touchDay(data, now)
+		Progress.record(player, "day", 1)
+	elseif auto > 0 then
+		Profiles.changed(player)
+	end
+end
+
 task.spawn(function()
 	while true do
 		task.wait(60)
-		local now = os.time()
-		for _, player in Players:GetPlayers() do
-			local data = Profiles.get(player)
-			if data and data.jobs and data.jobs.dailyPeriod ~= Jobs.periods(now).daily then
-				local auto = Jobs.refresh(data, player.UserId, now)
-				if auto > 0 then Profiles.notify(player, "New day! Yesterday's finished jobs paid out", "gift") end
-				data.jobs.dayCounted = now // 86400
-				Progress.record(player, "day", 1)
-			end
-		end
+		for _, player in Players:GetPlayers() do task.spawn(newDayCheck, player) end
 	end
 end)
+
+-- Players whose profile loaded before this script connected.
+for _, player in Players:GetPlayers() do task.spawn(newDayCheck, player) end
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	trailAt[player] = nil

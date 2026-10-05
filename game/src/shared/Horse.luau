@@ -231,6 +231,7 @@ function Horse.repair(h: any, now: number): Horse
 	h.daily.day = tonumber(h.daily.day) or day(now)
 	h.daily.treats = math.max(0, math.floor(tonumber(h.daily.treats) or 0))
 	h.daily.petted = h.daily.petted == true
+	h.daily.pets = math.max(0, math.floor(tonumber(h.daily.pets) or 0))
 	h.name = if typeof(h.name) == "string" and #h.name > 0 then string.sub(h.name, 1, 40) else "Comet"
 	return h :: Horse
 end
