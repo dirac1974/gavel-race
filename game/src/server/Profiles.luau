@@ -31,6 +31,11 @@ local REQUEST_GAP = 0.5
 local Profiles = {}
 Profiles.Loaded = Instance.new("BindableEvent")   -- (player)
 Profiles.Changed = Instance.new("BindableEvent")  -- (player)
+Profiles.decorators = {} :: { (any, any) -> () }  -- add fields to the owner's view (JobService, MarketService)
+
+function Profiles.addDecorator(fn: (any, any) -> ())
+	table.insert(Profiles.decorators, fn)
+end
 
 local remotes = ReplicatedStorage:FindFirstChild("GameRemotes")
 if not remotes then
@@ -78,7 +83,7 @@ local function sendSync(player: Player)
 	e.syncQueued = false
 	e.lastSync = os.clock()
 	local view = Profile.view(e.data, now(), GameConfig.energy)
-	if Profiles.decorate then Profiles.decorate(e.data, view) end -- jobs, garden readiness (JobService)
+	for _, decorate in Profiles.decorators do decorate(e.data, view) end -- jobs, garden, market (other services)
 	ProfileSync:FireClient(player, view)
 end
 

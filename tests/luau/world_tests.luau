@@ -448,4 +448,57 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local top = Fans.topFans(entries)
 	check(#top == 2 and top[1].id == "a" and Fans.rankOf(entries, "c") == 2 and Fans.rankOf(entries, "d") == nil
 		and Fans.rankOf(entries, "b") == 1, "top fans skip flagged and zero; flagged fans still see their own rank")
+
+	-- More horses (Stage 8) ---------------------------------------------------------------
+	local Market = require("../../game/src/shared/Market")
+	local stockA, stockB = Market.stock(T0), Market.stock(T0 + 3600)
+	check(#stockA == Market.STOCK_SIZE and stockA[1].id == stockB[1].id and stockA[1].price == stockB[1].price, "same stock all week, every server")
+	local nextWeek = Market.stock(T0 + 7 * 86400)
+	check(nextWeek[1].id ~= stockA[1].id, "new stock next week")
+	local priced = true
+	for _, l in stockA do
+		if l.price < 250 or l.stars < 1 or l.stars > 3 or not table.find(Market.MARKET_COATS, l.coat) then priced = false end
+		for _, k in Horse.STATS do if l.potential[k] < l.stats[k] then priced = false end end
+	end
+	check(priced, "listings are sane")
+	local cheap = { stats = { speed = 40, accel = 40, stamina = 40, grit = 40 }, potential = { speed = 66, accel = 66, stamina = 66, grit = 66 } }
+	local fancy = { stats = { speed = 40, accel = 40, stamina = 40, grit = 40 }, potential = { speed = 92, accel = 92, stamina = 92, grit = 92 } }
+	check(Market.price(fancy) > Market.price(cheap) * 2 and Market.stars(fancy.potential) == 3 and Market.stars(cheap.potential) == 1, "price and stars follow bloodline")
+	check(Market.viewListing(stockA[1], false).potential == nil, "listing hides Potential numbers")
+	local mp = Profile.new(T0)
+	Profile.addHorse(mp, Horse.starter(Profile.newHorseId(mp), "Lucky", "bay", rng, T0))
+	Profile.addHorse(mp, Horse.starter(Profile.newHorseId(mp), "Pip", "grey", rng, T0))
+	mp.cash = 100000
+	local l1 = stockA[1]
+	local okB, msgB, hb = Market.buy(mp, l1.id, T0)
+	check(okB and hb and #mp.horses == 3 and mp.cash == 100000 - l1.price and string.find(msgB, "pasture") ~= nil, "buy: pays, goes to the pasture when stalls are full")
+	check(not Market.buy(mp, l1.id, T0), "each listing once per player")
+	check(not Market.buy(mp, "m1_1", T0), "old listings can't be bought")
+	mp.cash = 0
+	check(not Market.buy(mp, stockA[2].id, T0) and #mp.horses == 3, "can't buy without the cash")
+	-- stalls
+	mp.cash = 300
+	check(Market.nextStallPrice(mp) == 300 and Market.buyStall(mp) and mp.stalls == 3 and mp.cash == 0, "third stall")
+	check(Profile.isStalled(mp, hb.id), "the pasture horse now has a stall")
+	mp.cash = 100000
+	for _ = 1, 3 do Market.buyStall(mp) end
+	check(mp.stalls == 6 and not Market.buyStall(mp), "six stalls at most")
+	-- taming
+	local tp = Profile.new(T0)
+	tp.items.carrot = nil
+	check(not Market.canTame(tp, T0), "need a treat to tame")
+	tp.items.apple = 2
+	local okT2, _, th2 = Market.tame(tp, "appaloosa", makeRng(4), T0)
+	check(okT2 and th2.coat == "appaloosa" and tp.items.apple == 1 and #tp.horses == 1, "taming uses a treat, keeps the wild coat")
+	check(not Market.tame(tp, "dun", makeRng(5), T0 + 60), "one new friend a day")
+	check(Market.tame(tp, "zebra", makeRng(6), T0 + 86400), "tomorrow again (unknown coats become a wild one)")
+	check(table.find(Market.WILD_COATS, tp.horses[2].coat) ~= nil, "wild coats only")
+	-- full stable
+	local fp = Profile.new(T0)
+	for k = 1, Market.MAX_HORSES do Profile.addHorse(fp, Horse.starter(Profile.newHorseId(fp), "H" .. k, "bay", rng, T0)) end
+	fp.items.treat = 3
+	fp.cash = 100000
+	check(not Market.canTame(fp, T0) and not Market.buy(fp, stockA[3].id, T0), "stable full at 20 horses")
+	check(Market.rename(fp, fp.horses[1].id, "Sunny", "Moon") and fp.horses[1].name == "Sunny Moon" and not Market.rename(fp, fp.horses[1].id, "Bad", nil),
+		"rename with word chips only")
 end
