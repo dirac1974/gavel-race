@@ -125,6 +125,8 @@ Shop.OnServerEvent:Connect(function(player: Player, action: any, item: any, qty:
 		ok, msg = Care.buy(data, item, qty)
 	elseif action == "sell" then
 		ok, msg = Care.sell(data, item, qty)
+	elseif action == "sellAll" then
+		ok, msg = Care.sellAll(data, qty)
 	else
 		return
 	end

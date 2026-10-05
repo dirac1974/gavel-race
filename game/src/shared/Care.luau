@@ -155,4 +155,17 @@ function Care.sell(p: any, item: string, qty: number): (boolean, string)
 	return true, string.format("Sold for %d Green Cash", price * qty)
 end
 
+-- Sell every crop above `keep` of each in one go.
+function Care.sellAll(p: any, keep: number): (boolean, string)
+	if typeof(keep) ~= "number" or keep < 0 or keep ~= math.floor(keep) then return false, "How many?" end
+	local total = 0
+	for item, price in Care.SELL do
+		local extra = Profile.itemCount(p, item) - keep
+		if extra > 0 and Profile.takeItem(p, item, extra) then total += price * extra end
+	end
+	if total == 0 then return false, string.format("Nothing to sell (you keep %d of each for treats)", keep) end
+	Profile.addCash(p, total)
+	return true, string.format("Sold for %d Green Cash", total)
+end
+
 return Care
