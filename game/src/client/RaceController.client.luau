@@ -23,8 +23,11 @@ local PaceMeter = require(Shared:WaitForChild("PaceMeter"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ThemePack = require(Shared:WaitForChild("ThemePack"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
+local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
@@ -32,6 +35,23 @@ local DEFAULT_MAX_ZOOM = 128
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
+end
+
+-- Race sounds (Sound.luau) on the shared clock. A newer or stopped race cancels pending cues;
+-- watchers hear the race at half volume and only riders hear their own hoofbeats.
+local cueRace, cueVolume = 0, 1
+local function cue(at: number, ...)
+	if not Sound then return end
+	local id, names, volume = cueRace, { ... }, cueVolume
+	task.delay(math.max(0, at - serverNow()), function()
+		if id ~= cueRace then return end
+		for _, name in names do Sound.play(name, volume) end
+	end)
+end
+local stopGallop = nil
+local function gallop(on: boolean)
+	if stopGallop then stopGallop() end
+	stopGallop = if on and Sound then Sound.loop("gallop_loop") else nil
 end
 
 local function reducedMotion(): boolean
@@ -420,6 +440,7 @@ local function tap()
 		showResultIcon(labelText)
 		hint.Text = ""
 		if labelText == "Perfect" or labelText == "Great" then
+			if Sound then Sound.play("tap_good") end
 			RaceState.nudgeAt = t -- instant, luck-free nudge on your own horse (D-033)
 		end
 		if RaceState.recording then table.insert(RaceState.recording.events, { t = t, kind = "tap", label = labelText }) end
@@ -455,6 +476,7 @@ end
 
 RunService.RenderStepped:Connect(function()
 	local t = serverNow()
+	if stopGallop and not (RaceState.active and RaceState.myLane) then gallop(false) end
 	if chanceArrow.Visible and os.clock() > arrowUntil then chanceArrow.Visible = false end
 	if RaceState.active and os.clock() - lastHud > 0.2 then
 		lastHud = os.clock()
@@ -508,6 +530,7 @@ RunService.RenderStepped:Connect(function()
 				burst.stroke.Thickness = 6 + 2 * math.abs(math.sin(t * 6)) -- pulsing gold rim (3 Hz)
 			end
 		elseif t > burstState.close then
+			cue(t, "vo_stretch") -- "Down the stretch they come!"
 			if not burstState.tapped then feedback.Text = "Missed the Final Burst!" end
 			burst.bar.Visible, burstTitle.Visible = false, false
 			burstState = nil
@@ -522,6 +545,7 @@ remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
 end)
 
 local pendingBurstOpen = nil
+local finishAt = 0 -- when the field reaches the line (same sums as RaceService)
 local COURSE_NAME = { dirt = "Dirt course", turf = "Turf course" }
 remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen, courseId)
 	-- Two races can run at once (D-036): follow yours, or the newest when watching.
@@ -549,6 +573,22 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	showResultIcon(nil)
 	speedFill.Size = UDim2.fromScale(0, 1)
 	renderBoard()
+	-- Sound cues: the bell and "And they're off!" at the gate, "Into the far turn!" as the field
+	-- enters the final far turn, your hoofbeats while you ride.
+	cueRace, cueVolume = cueRace + 1, if riding then 1 else 0.5
+	gallop(false)
+	cue(start, "gate_bell", "vo_off")
+	if riding and Sound then
+		local id = cueRace
+		task.delay(math.max(0, start - serverNow()), function() if id == cueRace then gallop(true) end end)
+	end
+	if burstOpen then
+		local tTop = burstOpen - GameConfig.burstAfterTurnSeconds
+		local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
+		local tFar = tTop - math.pi * TrackLayout.laneRadius(cfg, 1) / GameConfig.raceSpeedStudsPerSecond
+		finishAt = tTop + cfg.finishFromTop / GameConfig.raceSpeedStudsPerSecond
+		if tFar > start + 4 then cue(tFar, "vo_far_turn") end
+	end
 	if riding then
 		setJumping(false)
 		task.delay(math.max(0, start - serverNow() - 1), rideCamera, true)
@@ -625,6 +665,7 @@ remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec, _name
 	if not RaceState.isFocus(courseId) then return end
 	pace.bar.Visible = false
 	burstState = { seg = seg, open = open, close = close, spec = spec, tapped = false }
+	cue(open, "burst_whoosh", "vo_burst")
 	feedback.Text, hint.Text = "", if riding then "One big tap in the glow. It counts double!" else ""
 	showResultIcon(nil)
 	tapArea.Visible = riding
@@ -638,6 +679,7 @@ remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText, courseI
 	feedback.Text = ""
 	hint.Text = "Stretch drive! Keep tapping to the line"
 	showResultIcon(labelText)
+	if Sound and score >= 80 then Sound.play("tap_good", 1.4) end
 	celebrate(score, labelText) -- the burst is scored on arrival; the window may still be open for others
 end)
 
@@ -674,6 +716,8 @@ end)
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	if not RaceState.isFocus(courseId) then return end
 	-- The server hit an error mid-race: clear the race screens and give control back.
+	cueRace += 1
+	gallop(false)
 	paceState, burstState = nil, nil
 	hideMeters()
 	burstBanner.Visible, results.Visible, placeBadge.Visible = false, false, false
@@ -751,6 +795,7 @@ local function showResults(summary)
 	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
 	doneBtn.Visible = true
 	results.Visible = true
+	cue(0, "vo_finish") -- "What a finish!"
 	placeBadge.Visible = false
 	status.Text = "Results"
 	feedback.Text, hint.Text = "", ""
@@ -765,6 +810,7 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	feedback.Text, hint.Text = "", ""
 	showResultIcon(nil)
 	status.Text = "And they're home!"
+	cue(finishAt, "finish_fanfare", "crowd_cheer") -- as the leader reaches the line
 	task.delay(GameConfig.runInSeconds, showResults, summary)
 	rideReport = nil
 	if riding then

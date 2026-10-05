@@ -2,6 +2,7 @@
 -- SettingsService (D-042, D-045, D-049): the owner's own settings and the gentle extras.
 --   Stable visits: Friends (default) or Nobody (D-042); the plot's walls follow it.
 --   Break reminder: optional, off by default (D-045).
+--   Sound: on by default; Off mutes the client's effects and announcer (Sound.luau).
 --   Play time this week: counted while playing, shown in the For grown-ups panel (D-045).
 --   The first-ten-minutes tour (D-049): each step finishes when the player does the thing
 --   (Progress events); players can skip it.
@@ -69,6 +70,8 @@ SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
 		data.settings.visits = value
 	elseif key == "breakReminder" and typeof(value) == "boolean" then
 		data.settings.breakReminder = value
+	elseif key == "sound" and typeof(value) == "boolean" then
+		data.settings.sound = value -- client Sound module; nil = on
 	elseif key == "tour" and value == "restart" then
 		data.flags.tourStep, data.flags.tourDone, data.flags.tourDid = 1, nil, nil
 	else

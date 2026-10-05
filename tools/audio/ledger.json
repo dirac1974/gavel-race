@@ -1,0 +1,111 @@
+{
+ "budget": 2000,
+ "usageBaseline": 55641.0,
+ "calls": [
+  {
+   "name": "vo_off",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 16,
+   "bytes": 16762,
+   "at": "2026-10-05T14:43:42Z",
+   "chars": 16,
+   "headers": {
+    "character-cost": "4"
+   },
+   "usageAfter": 0.0
+  },
+  {
+   "name": "vo_far_turn",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 18,
+   "bytes": 22613,
+   "at": "2026-10-05T14:44:01Z",
+   "chars": 18,
+   "headers": {
+    "character-cost": "4"
+   },
+   "usageAfter": 4.0
+  },
+  {
+   "name": "vo_burst",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 12,
+   "bytes": 16762,
+   "at": "2026-10-05T14:44:02Z",
+   "chars": 12,
+   "headers": {
+    "character-cost": "3"
+   },
+   "usageAfter": 4.0
+  },
+  {
+   "name": "vo_stretch",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 27,
+   "bytes": 23449,
+   "at": "2026-10-05T14:44:03Z",
+   "chars": 27,
+   "headers": {
+    "character-cost": "6"
+   },
+   "usageAfter": 4.0
+  },
+  {
+   "name": "vo_finish",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 14,
+   "bytes": 18016,
+   "at": "2026-10-05T14:44:03Z",
+   "chars": 14,
+   "headers": {
+    "character-cost": "3"
+   },
+   "usageAfter": 4.0
+  },
+  {
+   "name": "vo_giddyup",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 9,
+   "bytes": 15090,
+   "at": "2026-10-05T14:44:04Z",
+   "chars": 9,
+   "headers": {
+    "character-cost": "2"
+   },
+   "usageAfter": 4.0
+  },
+  {
+   "name": "vo_welcome",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 20,
+   "bytes": 19688,
+   "at": "2026-10-05T14:44:05Z",
+   "chars": 20,
+   "headers": {
+    "character-cost": "4"
+   },
+   "usageAfter": 4.0
+  },
+  {
+   "name": "vo_photo",
+   "take": 1,
+   "kind": "voice",
+   "estimate": 13,
+   "bytes": 17598,
+   "at": "2026-10-05T14:44:05Z",
+   "chars": 13,
+   "headers": {
+    "character-cost": "3"
+   },
+   "usageAfter": 4.0
+  }
+ ],
+ "startedAt": "2026-10-05T14:43:12Z"
+}

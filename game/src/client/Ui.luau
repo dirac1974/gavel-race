@@ -7,6 +7,8 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local Ui = {}
 
@@ -130,7 +132,10 @@ function Ui.button(parent: Instance, text: string, size: UDim2, pos: UDim2, colo
 	local function to(s: number, t: number)
 		TweenService:Create(scale, TweenInfo.new(t, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = s }):Play()
 	end
-	b.MouseButton1Down:Connect(function() to(0.92, 0.08) end)
+	b.MouseButton1Down:Connect(function()
+		to(0.92, 0.08)
+		if Sound and not b:GetAttribute("NoPop") then Sound.play("ui_pop") end -- quiet; game buttons with their own sound opt out
+	end)
 	b.MouseButton1Up:Connect(function() to(1, 0.18) end)
 	b.MouseLeave:Connect(function() to(1, 0.18) end)
 	b.Parent = parent

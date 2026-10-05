@@ -10,6 +10,8 @@ local TweenService = game:GetService("TweenService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Horse = require(Shared:WaitForChild("Horse"))
@@ -265,7 +267,12 @@ end
 
 HudEvents:WaitForChild("OpenStarter").Event:Connect(open)
 
+local welcomed = false
 PlayerState.watch(function(data)
+	if not welcomed then -- "Welcome to Giddy-Up!" once per visit, when your stable has loaded
+		welcomed = true
+		if Sound then Sound.play("vo_welcome") end
+	end
 	if #data.horses == 0 then
 		open()
 	elseif gui.Enabled then

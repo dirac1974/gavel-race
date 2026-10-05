@@ -1,7 +1,7 @@
 --!nonstrict
 -- GrownUps (D-045, D-049): the ⚙️ button (top right) opens settings and a page for parents;
 -- plus the first-ten-minutes tour card and the optional break reminder.
---   Settings: who can visit your stable (Friends or Nobody), break reminder on or off.
+--   Settings: who can visit your stable (Friends or Nobody), break reminder on or off, sound on or off.
 --   For grown-ups: how races work (no gambling, nothing buys speed), what's saved, chat and
 --   safety, this week's play time, and where Roblox's parental controls live.
 --   Tour: one friendly step at a time with a GO button (golden hoofprints) and Skip.
@@ -115,14 +115,16 @@ local function settingsTab()
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("visits", v) end, 1)
 	choice("Break reminder (each hour)", { { true, "On" }, { false, "Off" } }, d.settings.breakReminder == true,
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("breakReminder", v) end, 2)
+	choice("Sound", { { true, "🔊 On" }, { false, "🔇 Off" } }, d.settings.sound ~= false,
+		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("sound", v) end, 3)
 	local tourBtn = Ui.button(body, "🧭 Show me around again", UDim2.fromOffset(260, 46), UDim2.new(), C.sky, 18)
-	tourBtn.LayoutOrder = 3
+	tourBtn.LayoutOrder = 4
 	tourBtn.Activated:Connect(function()
 		Ui.toast("Follow the steps at the top of the screen!", "map", "🧭")
 		panelGui.Enabled = false
 		gameRemotes:WaitForChild("SetSetting"):FireServer("tour", "restart")
 	end)
-	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable.", 15, 4).TextColor3 = C.plum
+	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable.", 15, 5).TextColor3 = C.plum
 end
 
 local function grownUpsTab()

@@ -16,6 +16,8 @@ local TweenService = game:GetService("TweenService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Guide = require(script.Parent:WaitForChild("Guide"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Advice = require(Shared:WaitForChild("Advice"))
@@ -161,7 +163,11 @@ local function jobCard(job, index: number)
 		Ui.text(card, "✓ Done!", 22, { Position = UDim2.new(0, 0, 1, -42), Size = UDim2.new(1, 0, 0, 30) }).TextColor3 = C.green
 	elseif done then
 		local claim = Ui.button(card, "🎁 Claim", UDim2.new(1, -20, 0, 38), UDim2.new(0, 10, 1, -46), C.green, 20)
-		claim.Activated:Connect(function() gameRemotes:WaitForChild("JobClaim"):FireServer("daily", index) end)
+		claim.Activated:Connect(function()
+			gameRemotes:WaitForChild("JobClaim"):FireServer("daily", index)
+			if Sound then Sound.play("job_done") end
+		end)
+		claim:SetAttribute("NoPop", true)
 	elseif swapping then
 		local swap = Ui.button(card, "🔀 Swap this", UDim2.new(1, -20, 0, 38), UDim2.new(0, 10, 1, -46), C.sky, 18)
 		swap.Activated:Connect(function()
@@ -205,6 +211,7 @@ local function ribbon(kind: string, label: string, list, y: number)
 		-- Claim everything ready in this set, or list the jobs in a toast.
 		if claimable > 0 then
 			gameRemotes:WaitForChild("JobClaim"):FireServer(kind, "all")
+			if Sound then Sound.play("job_done") end
 		else
 			for _, j in list do
 				if not j.claimed then Ui.toast(string.format("%s (%d/%d)", j.text, j.progress, j.target), j.icon, "⭐") end

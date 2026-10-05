@@ -16,6 +16,8 @@ local ContextActionService = game:GetService("ContextActionService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local player = Players.LocalPlayer
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
@@ -63,7 +65,12 @@ local function currentRide(): Model?
 	return nil
 end
 
+local lastGiddyUp = -math.huge
 local function setGallop(on: boolean)
+	if on and not galloping and Sound and os.clock() - lastGiddyUp > 20 then -- "Giddy-up!", not on every Shift
+		lastGiddyUp = os.clock()
+		Sound.play("vo_giddyup", 0.8)
+	end
 	galloping = on
 	gallopBtn.Text = if on then "🐢 Walk" else "💨 Gallop"
 	gallopBtn.BackgroundColor3 = if on then C.sky else C.orange

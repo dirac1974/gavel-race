@@ -21,6 +21,8 @@ local GuiService = game:GetService("GuiService")
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local player = Players.LocalPlayer
 local HORSE_LENGTH = 8
@@ -286,6 +288,7 @@ RunService.RenderStepped:Connect(function(dt)
 		if first and second and progress[first] and progress[second]
 			and (progress[first] - progress[second]) * rec.plan.lengths[first] < HORSE_LENGTH then
 			caption.Text = "PHOTO FINISH"
+			if Sound then Sound.play("vo_photo") end
 			playing.frozenUntil = os.clock() + 2.5
 			return
 		end

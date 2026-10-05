@@ -11,6 +11,8 @@ local RunService = game:GetService("RunService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
@@ -191,6 +193,7 @@ PlayerState.watch(function(data, before)
 	render(data)
 	if before and data.cash > before.cash then
 		Ui.pop(cashCard)
+		if Sound then Sound.play("coin") end
 	end
 end)
 

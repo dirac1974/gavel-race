@@ -421,3 +421,11 @@ Template:
 - Alternatives: a long text tutorial (kids don't read it), forced steps (pressure), no tour (the world is big and new players wander).
 - Links: game/src/shared/Tour.luau, game/src/server/SettingsService.server.luau, game/src/client/GrownUps.client.luau
 
+## D-050 — Sound and the race announcer
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team (audio lead, small call)
+- Decision: one warm, upbeat announcer voice (ElevenLabs premade "Liam", Flash v2.5) with eight short lines, plus short friendly sound effects (docs/audio/AUDIO_PLAN.md). Race cues follow the shared clock: bell and "And they're off!" at the gate, "Into the far turn!", whoosh and "Final Burst!", "Down the stretch they come!" when the burst closes, fanfare and cheer at the line, "What a finish!" on the results card, "Photo finish!" in a replay. Riders hear their own hoofbeats; spectators hear race cues at half volume. UI buttons pop quietly. Sound is on by default with an On/Off choice in Settings (`settings.sound`).
+- Why: sound tells young players what's happening without reading, and on a phone their eyes are on the slider; the announcer names the race moments the HUD already shows.
+- Alternatives: no announcer (less excitement, more reading), a different voice per moment (costs more, less familiar), sound off by default (most kids never find it).
+- Links: game/src/client/Sound.luau, game/src/client/RaceController.client.luau, tools/audio/sounds.json
