@@ -44,11 +44,6 @@ local SPIRE_CAP = Color3.fromHex("3B4A5A")
 local BRICK = Color3.fromHex("8C4A32")
 
 local venue: Folder? = nil   -- static buildings, built once
-local root: Folder? = nil    -- per race: gate and horses
-local horses: { Model } = {}
-local saddles: { Seat } = {}
-local stalls: { Model } = {}
-local currentPlan = nil
 -- Saddle position on a model, as fractions of its bounding box (gallop pose; tune in Studio).
 local SADDLE_HEIGHT = 0.6     -- of the model's height, measured from the hooves
 local SADDLE_BACK = 0.06      -- of its length, toward the tail (+Z; horses face -Z)
@@ -178,6 +173,15 @@ local function buildVenue(): Folder
 			part({ Name = "Finish", Size = Vector3.new(2, 0.05, 2), CanCollide = false,
 				Color = if (k + row) % 2 == 0 then Color3.new(1, 1, 1) else Color3.fromRGB(28, 31, 38),
 				CFrame = CFrame.new(x0 + 1 + k * 2, 0.08, lineZ - 1 + row * 2) }, f)
+		end
+	end
+	local turfCfg = TrackLayout.churchillTurf
+	local tx0, tx1 = turfCfg.centerX + turfCfg.railRadius, turfCfg.centerX + TrackLayout.outerRadius(turfCfg)
+	for k = 0, math.floor((tx1 - tx0) / 2) - 1 do -- the turf course finishes on the same line
+		for row = 0, 1 do
+			part({ Name = "TurfFinish", Size = Vector3.new(2, 0.05, 2), CanCollide = false,
+				Color = if (k + row) % 2 == 0 then Color3.new(1, 1, 1) else Color3.fromRGB(28, 31, 38),
+				CFrame = CFrame.new(tx0 + 1 + k * 2, 0.06, lineZ - 1 + row * 2) }, f)
 		end
 	end
 	part({ Name = "FinishPole", Size = Vector3.new(1, 16, 1), Color = Color3.fromHex("C8102E"), CFrame = CFrame.new(x0 - 1.5, 8, lineZ) }, f)
@@ -344,44 +348,63 @@ local function badge(i: number): BillboardGui
 	return gui
 end
 
--- Lane i's CFrame at progress p of the current race, standing on the dirt, facing its way.
-function TrackScene.laneCFrame(i: number, p: number): CFrame
-	local x, z, dx, dz = TrackLayout.lanePoint(CFG, currentPlan, i, p)
+-- Courses (D-036): the dirt oval and the turf course inside it each run their own race,
+-- so two races can be on at once. Each course keeps its own gate, horses and saddles in its
+-- own folder ("RaceTrack" for dirt, "RaceTrack_turf" for turf); the buildings are shared.
+local Course = {}
+Course.__index = Course
+local courses: { [string]: any } = {}
+
+function TrackScene.course(id: string, cfg): any
+	if courses[id] then return courses[id] end
+	local c = setmetatable({
+		id = id, cfg = cfg, root = nil, horses = {}, saddles = {}, stalls = {}, plan = nil,
+		folderName = if id == "dirt" then "RaceTrack" else "RaceTrack_" .. id,
+	}, Course)
+	courses[id] = c
+	return c
+end
+
+-- Lane i's CFrame at progress p of this course's race, standing on the track, facing its way.
+function Course:laneCFrame(i: number, p: number): CFrame
+	local x, z, dx, dz = TrackLayout.lanePoint(self.cfg, self.plan, i, p)
 	local pos = Vector3.new(x, 0, z)
 	return CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
 end
 
 -- Per race: the gate where this distance starts, and the horses in it.
-function TrackScene.build(plan, coats: { string? }?)
+function Course:build(plan, coats: { string? }?)
 	if not venue or not venue.Parent then
 		Lighting.ClockTime = 15
 		venue = buildVenue()
 	end
-	currentPlan = plan
-	if root then root:Destroy() end
+	self.plan = plan
+	if self.root then self.root:Destroy() end
 	local folder = Instance.new("Folder")
-	folder.Name = "RaceTrack"
+	folder.Name = self.folderName
 	folder:SetAttribute("Distance", plan.distance)
+	folder:SetAttribute("Course", self.id)
 
-	stalls = {}
+	self.stalls = {}
 	for i = 1, LANES do
 		local stall = modelFor("gate_stall")
 		if stall then
-			stall:PivotTo(TrackScene.laneCFrame(i, 0) * CFrame.new(0, 0, 1))
+			stall:PivotTo(self:laneCFrame(i, 0) * CFrame.new(0, 0, 1))
 			stall.Parent = folder
-			stalls[i] = stall
+			self.stalls[i] = stall
 		end
 	end
 
 	local horseFolder = Instance.new("Folder")
 	horseFolder.Name = "Horses"
 	horseFolder.Parent = folder
-	horses, saddles = {}, {}
+	self.horses, self.saddles = {}, {}
 	for i = 1, LANES do
 		local coat = (coats and coats[i]) or COATS[i]
-		local horse = modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
+		-- The first five coats are uploaded as horse_<coat>, the newer ones as horse_gallop_<coat>.
+		local horse = modelFor("horse_gallop_" .. coat) or modelFor("horse_" .. coat) or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
-		horse:PivotTo(TrackScene.laneCFrame(i, 0))
+		horse:PivotTo(self:laneCFrame(i, 0))
 		badge(i).Parent = horse
 		-- The saddle is anchored inside the model, so pivoting the horse moves it, and a
 		-- seated rider (welded to it by the Seat) moves with the horse.
@@ -396,11 +419,11 @@ function TrackScene.build(plan, coats: { string? }?)
 		saddle.CFrame = horse:GetPivot() * CFrame.new(0, horse:GetAttribute("SaddleY") or size.Y * SADDLE_HEIGHT, size.Z * SADDLE_BACK)
 		saddle.Parent = horse
 		horse.Parent = horseFolder
-		horses[i] = horse
-		saddles[i] = saddle
+		self.horses[i] = horse
+		self.saddles[i] = saddle
 	end
 	folder.Parent = workspace
-	root = folder
+	self.root = folder
 end
 
 -- Roblox-style jockeys for the bot horses: a standard character in its lane's silks
@@ -449,9 +472,9 @@ local function jockeyFor(i: number): Model?
 end
 
 -- Seat a jockey on every bot lane (`isBot[i]` true). Call after build().
-function TrackScene.addJockeys(isBot: { boolean })
+function Course:addJockeys(isBot: { boolean })
 	for i, bot in isBot do
-		local horse, saddle = horses[i], saddles[i]
+		local horse, saddle = self.horses[i], self.saddles[i]
 		if bot and horse and saddle and not saddle.Occupant then
 			task.spawn(function()
 				local jockey = jockeyFor(i)
@@ -478,46 +501,56 @@ function TrackScene.addJockeys(isBot: { boolean })
 end
 
 -- The gate opens: stalls clear away when the race starts.
-function TrackScene.openGate()
-	for _, stall in stalls do
+function Course:openGate()
+	for _, stall in self.stalls do
 		if stall.Parent then stall:Destroy() end
 	end
-	stalls = {}
+	self.stalls = {}
 end
 
 -- Put a racing player's character in the saddle of lane `i`.
-function TrackScene.seatRider(i: number, character: Model?): boolean
-	local saddle = saddles[i]
+function Course:seatRider(i: number, character: Model?): boolean
+	local saddle = self.saddles[i]
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not saddle or not humanoid or humanoid.Health <= 0 then return false end
+	-- Still sitting somewhere (the other course's horse after its race): get off first.
+	local old = humanoid.SeatPart
+	if old then
+		local weld = old:FindFirstChild("SeatWeld")
+		if weld then weld:Destroy() end
+		humanoid.Sit = false
+	end
 	character:PivotTo(saddle.CFrame + Vector3.new(0, 3, 0))
 	saddle:Sit(humanoid)
 	return true
 end
 
+local function apronBase(): CFrame
+	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+	local _, _, lineZ = TrackLayout.finishLine(CFG)
+	return if spawn then spawn.CFrame else CFrame.new(TrackLayout.outerRadius(CFG) + 12, 0, lineZ)
+end
+
 -- One rider off (they pressed Done), standing on the apron by the finish line.
-function TrackScene.dismount(character: Model?)
+function Course:dismount(character: Model?): boolean
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
-	for i, saddle in saddles do
+	if not humanoid then return false end
+	for i, saddle in self.saddles do
 		if saddle.Occupant == humanoid then
 			local weld = saddle:FindFirstChild("SeatWeld")
 			if weld then weld:Destroy() end
 			humanoid.Sit = false
-			local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
-			local _, _, lineZ = TrackLayout.finishLine(CFG)
-			local base = if spawn then spawn.CFrame else CFrame.new(TrackLayout.outerRadius(CFG) + 12, 0, lineZ)
-			character:PivotTo(base * CFrame.new((i - 4.5) * 3, 3.5, 0))
+			character:PivotTo(apronBase() * CFrame.new((i - 4.5) * 3, 3.5, 0))
+			return true
 		end
 	end
+	return false
 end
 
 -- After a race: everyone off, standing on the apron by the finish line.
-function TrackScene.dismountAll()
-	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
-	local _, _, lineZ = TrackLayout.finishLine(CFG)
-	local base = if spawn then spawn.CFrame else CFrame.new(TrackLayout.outerRadius(CFG) + 12, 0, lineZ)
-	for i, saddle in saddles do
+function Course:dismountAll()
+	local base = apronBase()
+	for i, saddle in self.saddles do
 		local humanoid = saddle.Occupant
 		if humanoid then
 			local character = humanoid.Parent
@@ -530,5 +563,18 @@ function TrackScene.dismountAll()
 		end
 	end
 end
+
+-- Off whichever course's saddle this character is in.
+function TrackScene.dismount(character: Model?)
+	for _, c in courses do
+		if c:dismount(character) then return end
+	end
+end
+
+-- The dirt course, for callers that don't care about courses.
+local dirt = TrackScene.course("dirt", CFG)
+function TrackScene.build(plan, coats) dirt:build(plan, coats) end
+function TrackScene.laneCFrame(i: number, p: number): CFrame return dirt:laneCFrame(i, p) end
+function TrackScene.dismountAll() for _, c in courses do c:dismountAll() end end
 
 return TrackScene

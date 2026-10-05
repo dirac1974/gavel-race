@@ -183,7 +183,8 @@ gapText.Parent = panel
 
 local myLane = nil
 local window = MIN_WINDOW
-remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList)
+remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, _cond, _resultAt, _burstOpen, courseId)
+	if not RaceState.consider(courseId or "dirt", laneList, start) then return end
 	myLane = nil
 	window = MIN_WINDOW
 	for i, lane in laneList do
@@ -248,7 +249,7 @@ RunService.RenderStepped:Connect(function(dt)
 		else
 			gapText.Text = lengths(lead - covered[myLane]) .. " behind the leader"
 		end
-		local x, z = TrackLayout.lanePoint(CFG, plan, myLane, RaceState.progress[myLane] or 0)
+		local x, z = TrackLayout.lanePoint(TrackLayout.courses[RaceState.course or "dirt"] or CFG, plan, myLane, RaceState.progress[myLane] or 0)
 		myOvalDot.Position = toOval(x, z)
 		myOvalDot.Visible = true
 		title.Text = if togo[myLane] < CFG.finishFromTop then "Homestretch!" else string.format("%d ft to go", math.floor(togo[myLane] / 10 + 0.5) * 10)

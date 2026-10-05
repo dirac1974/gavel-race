@@ -115,6 +115,17 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Vet: the "Check-up" prompt → pick a horse → Health Passport with five stamp slots → tap with the heartbeat (the heart pulses); first visit stamps "First check-up", the next day's visit reveals Potential.
 - [ ] Stable Board: horse cards suggest "Next: train <stat>" when training is ready; daily and weekly jobs for training and check-ups appear in the mix.
 
+## Race Board and two courses (Stage 4, D-036)
+
+- [ ] RACE! (or the Race Board prompt) opens the picker: two cards, Dirt course and Turf course, each with league, distance, surface, weather, eight lane dots and "Open / Filling / Starts in Ns / Racing now".
+- [ ] Your stalled horses are listed with Energy and "Loves today's race (+3)" / "Not its best today (−2)"; tired horses say "Resting" and can't be picked (Rookie is free, so this shows from Bronze on).
+- [ ] Join puts you in that course's line; the dock shows "In line! Turf 14s · 2 riders"; ✕ leaves.
+- [ ] Two players join different courses: both races run at the same time, on the dirt and on the turf; each rider's screen follows their own race.
+- [ ] A player who isn't racing sees both races animate and the HUD follows the newest race ("(watching)").
+- [ ] Turf races start from a gate on the turf course and finish on the same line (a checkered strip across the turf too).
+- [ ] The Race Board on Fair Street lists both courses with riders and status, updating each second.
+- [ ] Replay of a turf race shows the turf horses; a race starting on the other course doesn't stop your replay.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

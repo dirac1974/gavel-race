@@ -522,7 +522,10 @@ remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
 end)
 
 local pendingBurstOpen = nil
-remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen)
+local COURSE_NAME = { dirt = "Dirt course", turf = "Turf course" }
+remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen, courseId)
+	-- Two races can run at once (D-036): follow yours, or the newest when watching.
+	if not RaceState.consider(courseId or "dirt", laneList, start) then return end
 	pendingBurstOpen = burstOpen
 	lanes = laneList
 	chances = {}
@@ -538,7 +541,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		end
 	end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
-	status.Text = string.format("%s race: %s", league, conditions)
+	status.Text = string.format("%s race: %s%s", league, conditions, if riding then "" else "  (watching)")
+	if COURSE_NAME[courseId] and not riding then status.Text = COURSE_NAME[courseId] .. " · " .. status.Text end
 	feedback.Text, hint.Text = "", if riding then "Tap when the marker crosses the glow" else ""
 	burstBanner.Visible = false
 	results.Visible = false
@@ -555,7 +559,12 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		for i, lane in laneList do
 			if lane.id == myId then myLane = i end
 		end
-		local track = workspace:WaitForChild("RaceTrack", 5)
+		local track = nil
+		for _ = 1, 50 do
+			track = RaceState.trackFolder(courseId)
+			if track then break end
+			task.wait(0.1)
+		end
 		local horseFolder = track and track:WaitForChild("Horses", 5)
 		local horse = myLane and horseFolder and horseFolder:WaitForChild("Lane" .. myLane, 5)
 		if not horse or horse:FindFirstChild("YouMarker") then return end
@@ -595,7 +604,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	end)
 end)
 
-remotes.PaceSchedule.OnClientEvent:Connect(function(passes)
+remotes.PaceSchedule.OnClientEvent:Connect(function(passes, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	paceState = { passes = passes, tapsByPass = {}, firstTap = {}, done = 0, recent = {}, burstOpen = pendingBurstOpen }
 end)
 
@@ -603,14 +613,16 @@ local function stars(score: number): number
 	return if score >= 85 then 3 elseif score >= 65 then 2 elseif score >= 40 then 1 else 0
 end
 
-remotes.PaceResult.OnClientEvent:Connect(function(seg, score, labelText)
+remotes.PaceResult.OnClientEvent:Connect(function(seg, score, labelText, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	if RaceState.recording then
 		table.insert(RaceState.recording.events, { t = serverNow(), kind = "checkpoint", stars = stars(score) })
 	end
 	hint.Text = string.format("Checkpoint %d: %s %d", seg, labelText, math.round(score))
 end)
 
-remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec)
+remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec, _name, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	pace.bar.Visible = false
 	burstState = { seg = seg, open = open, close = close, spec = spec, tapped = false }
 	feedback.Text, hint.Text = "", if riding then "One big tap in the glow. It counts double!" else ""
@@ -618,7 +630,8 @@ remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec)
 	tapArea.Visible = riding
 end)
 
-remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText)
+remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	if RaceState.recording then
 		table.insert(RaceState.recording.events, { t = serverNow(), kind = "burst", label = labelText, score = score })
 	end
@@ -628,7 +641,8 @@ remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText)
 	celebrate(score, labelText) -- the burst is scored on arrival; the window may still be open for others
 end)
 
-remotes.BurstSparkle.OnClientEvent:Connect(function(laneIds)
+remotes.BurstSparkle.OnClientEvent:Connect(function(laneIds, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	local untilT = os.clock() + 4
 	for _, id in laneIds do
 		if id ~= myId then sparkleUntil[id] = untilT end
@@ -637,7 +651,8 @@ remotes.BurstSparkle.OnClientEvent:Connect(function(laneIds)
 	task.delay(4.1, renderBoard)
 end)
 
-remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
+remotes.LiveChances.OnClientEvent:Connect(function(_seg, live, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	local before = {}
 	for i, v in chances do before[i] = v end
 	chances = live
@@ -656,7 +671,8 @@ remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
 	end
 end)
 
-remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function()
+remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
+	if not RaceState.isFocus(courseId) then return end
 	-- The server hit an error mid-race: clear the race screens and give control back.
 	paceState, burstState = nil, nil
 	hideMeters()
@@ -679,6 +695,7 @@ local function closeResults()
 	remotes.Dismount:FireServer()
 	rideCamera(false)
 	setJumping(true)
+	RaceState.releaseMyRace()
 end
 doneBtn.Activated:Connect(closeResults)
 watchBtn.Activated:Connect(function()
@@ -740,7 +757,8 @@ local function showResults(summary)
 	showResultIcon(nil)
 end
 
-remotes.RaceFinished.OnClientEvent:Connect(function(summary)
+remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
+	if not RaceState.isFocus(courseId) then return end
 	-- The horses run home first (RaceView), then the results; riders are dismounted 3 s later.
 	hideMeters()
 	paceState, burstState = nil, nil
@@ -753,9 +771,12 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary)
 		-- Riders stay on their horse for the results and replay; Done gets them off. The
 		-- server also dismounts everyone after a timeout, so restore the camera then too.
 		task.delay(GameConfig.dismountTimeoutSeconds + 0.5, function()
-			if not RaceState.active then
+			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.SeatPart == nil and not (RaceState.active and RaceState.myLane) then
 				rideCamera(false)
 				setJumping(true)
+				results.Visible = false
+				RaceState.releaseMyRace()
 			end
 		end)
 	end

@@ -1,16 +1,15 @@
 --!nonstrict
--- RaceService: Phase 1 prototype race loop.
--- Everyone in the server races together (up to 8), bots fill the rest; racing players
--- ride their own horse (D-024) on the Churchill-style track (D-027).
+-- RaceService: the races (D-024 to D-036).
+-- Two courses, the dirt oval and the turf course inside it, each run their own race, so two
+-- can be on at once (D-036). Each course shows its next race as a card (league, distance,
+-- surface, weather, riders in line) on the Race Board and in the RACE! picker; players join a
+-- card with the horse they choose, and bots fill the empty lanes after the fill time.
 -- Each race: the pace slider from the gate to the final turn (two checkpoints), the Final
--- Burst as the field enters the homestretch (one tap on a big meter, counts double), then
--- the slider again for the stretch drive (D-026, D-031). Race length follows the distance
--- condition (Sprint ~69 s ... ).
--- All scoring and the finish draw happen here; clients only send tap times.
--- Stage 1 (D-037): players join the next race with the Race button and ride their active
--- horse; its Rating (stats, today's care, bond) sets its base chance and results pay into the save.
--- Still to come: Race Board cards per league and two courses at once (Stage 4), parties,
--- integrity trackers in the save.
+-- Burst as the field enters the homestretch (one tap on a big meter, counts double), then the
+-- slider again for the stretch drive (D-026, D-031). Race length follows the distance.
+-- All scoring and the finish draw happen here; clients only send tap times. Race events go
+-- to everyone (spectators watch both courses) with the course id as the LAST argument, so
+-- each client follows the race it rides in, or the newest one when watching.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -35,9 +34,13 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
-local LEAGUE = "Rookie" -- prototype: one league
+local LEAGUE = "Rookie" -- every horse is Rookie until leagues arrive (Stage 9)
 local COUNTDOWN = 3
 local LATENCY_GRACE = 0.35 -- wait after a segment closes for late packets
+local COURSE_ORDER = { "dirt", "turf" }
+local SURFACE = { dirt = "Dirt", turf = "Turf" }
+local WEATHERS = { "Sunny", "Sunny", "Rain", "Wind" }
+local DISTANCES = { "Sprint", "Mile", "Classic", "Marathon" }
 
 local remotes = Instance.new("Folder")
 remotes.Name = "RaceRemotes"
@@ -50,25 +53,26 @@ local function makeRemote(name: string): RemoteEvent
 	return r
 end
 
-local LobbyStatus = makeRemote("LobbyStatus")     -- server -> all: seconds until start
-local RaceStarted = makeRemote("RaceStarted")     -- server -> all: league, lanes, start, conditions, expected result time, burst open
-local PaceSchedule = makeRemote("PaceSchedule")   -- server -> all: the slider's passes for the race
-local PaceResult = makeRemote("PaceResult")       -- server -> one: checkpoint, score, label
-local BurstOpened = makeRemote("BurstOpened")     -- server -> all: seg, open, close, meter spec, name
-local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst score, label
-local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances after it
-local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results
+local LobbyStatus = makeRemote("LobbyStatus")     -- server -> queued: seconds until start, course
+local RaceStarted = makeRemote("RaceStarted")     -- server -> all: league, lanes, start, conditions, result time, burst open, course
+local PaceSchedule = makeRemote("PaceSchedule")   -- server -> all: the slider's passes, course
+local PaceResult = makeRemote("PaceResult")       -- server -> one: checkpoint, score, label, course
+local BurstOpened = makeRemote("BurstOpened")     -- server -> all: seg, open, close, meter spec, name, course
+local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst score, label, course
+local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances, course
+local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results, course
 local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
-local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place (D-033)
+local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, course (D-033)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
-RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck)
+RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), course
 RaceOffsets.Parent = remotes
-local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst (small badge sparkle)
-local JoinRace = makeRemote("JoinRace")           -- client -> server: true = put me in line, false = leave the line
-local QueueStatus = makeRemote("QueueStatus")     -- server -> one: in line?, riders in line, seconds to the start (or nil)
-local RaceAborted = makeRemote("RaceAborted")     -- server -> all: the race stopped with an error; clear race screens
+local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst, course
+local JoinRace = makeRemote("JoinRace")           -- client -> server: want (bool), course id?, horse id?
+local QueueStatus = makeRemote("QueueStatus")     -- server -> one: in line?, riders in line, seconds (or nil), course
+local RaceAborted = makeRemote("RaceAborted")     -- server -> all: the race stopped with an error, course
+local RaceCards = makeRemote("RaceCards")         -- server -> all: the next race on each course (Race Board)
 local PaceTap = makeRemote("PaceTap")             -- client -> server: claimed server time
 local BurstTap = makeRemote("BurstTap")           -- client -> server: seg, claimed server time
 
@@ -80,81 +84,145 @@ local function today(): number
 	return math.floor(os.time() / 86400)
 end
 
--- Player state ----------------------------------------------------------------
+-- Courses -------------------------------------------------------------------------
+-- course = { id, cfg, scene, surface, queue, fillDeadline, current, card, charged, nextDistance }
+local courses: { [string]: any } = {}
+for _, id in COURSE_ORDER do
+	local cfg = TrackLayout.courses[id]
+	courses[id] = {
+		id = id, cfg = cfg, scene = TrackScene.course(id, cfg), surface = SURFACE[id],
+		queue = {}, fillDeadline = nil, current = nil, card = nil, charged = {}, nextDistance = if id == "dirt" then 1 else 2,
+	}
+end
+
 local trackers: { [number]: any } = {}
-local DISTANCES = { "Sprint", "Mile", "Classic", "Marathon" }
-local SURFACES = { "Dirt", "Turf", "Sand" }
-local WEATHERS = { "Sunny", "Rain", "Wind" }
+local inLine: { [Player]: any } = {}   -- player -> course whose line they're in
+local riding: { [Player]: any } = {}   -- player -> course they're racing on
+local chosen: { [Player]: string } = {} -- player -> horse id picked for the race
+
 local function setupPlayer(player: Player)
 	trackers[player.UserId] = Integrity.new()
 end
-
--- The line for the next race (Stage 4 replaces this with Race Board cards per league).
-local queue: { Player } = {}
-local fillDeadline: number? = nil
-local function inQueue(player: Player): boolean
-	return table.find(queue, player) ~= nil
-end
-local function leaveQueue(player: Player)
-	local i = table.find(queue, player)
-	if i then table.remove(queue, i) end
-	if #queue == 0 then fillDeadline = nil end
-end
-local function queueStatus()
-	local seconds = if fillDeadline then math.max(0, math.ceil(fillDeadline - os.clock())) else nil
-	for _, p in queue do QueueStatus:FireClient(p, true, #queue, seconds) end
-end
-
 Players.PlayerAdded:Connect(setupPlayer)
 for _, p in Players:GetPlayers() do setupPlayer(p) end
 
--- Race state shared with the tap handlers -------------------------------------
--- { session, seg, kind ("pace" | "burst" | nil when closed), open, close,
---   taps = { [userId] = {times} }, allowances = { [userId] = seconds }, maxTaps }
-local current = nil
+local function newCard(c)
+	local league = GameConfig.leagues[LEAGUE]
+	local distances = league.distances or DISTANCES
+	local distance = distances[((c.nextDistance - 1) % #distances) + 1]
+	c.nextDistance += 1
+	c.card = { league = LEAGUE, distance = distance, surface = c.surface, weather = WEATHERS[math.random(1, #WEATHERS)] }
+end
+
+local function cardsView()
+	local out = {}
+	for _, id in COURSE_ORDER do
+		local c = courses[id]
+		local card = c.card or {}
+		table.insert(out, {
+			course = id,
+			league = card.league,
+			distance = card.distance,
+			surface = card.surface,
+			weather = card.weather,
+			riders = #c.queue,
+			lanes = GameConfig.lanes,
+			seconds = if c.fillDeadline then math.max(0, math.ceil(c.fillDeadline - os.clock())) else nil,
+			racing = c.current ~= nil,
+		})
+	end
+	return out
+end
+
+-- The Race Board on Fair Street shows the same cards.
+local function updateBoard(view)
+	local world = workspace:FindFirstChild("World")
+	local board = world and world:FindFirstChild("Places") and world.Places:FindFirstChild("RaceBoard")
+	local info = board and board:FindFirstChild("Info", true)
+	if not info then return end
+	local lines = {}
+	for _, card in view do
+		local status = if card.racing then "racing now" elseif card.seconds then string.format("starts in %ds", card.seconds)
+			elseif card.riders > 0 then "filling" else "open"
+		table.insert(lines, string.format("%s %s · %s %s · %d/%d · %s", if card.course == "dirt" then "🟤" else "🟢",
+			card.surface or "", card.league or "", card.distance or "", card.riders, card.lanes, status))
+	end
+	info.Text = table.concat(lines, "\n")
+end
+
+local function publishCards()
+	local view = cardsView()
+	RaceCards:FireAllClients(view)
+	updateBoard(view)
+end
+
+local function queueStatus(c)
+	local seconds = if c.fillDeadline then math.max(0, math.ceil(c.fillDeadline - os.clock())) else nil
+	for _, p in c.queue do QueueStatus:FireClient(p, true, #c.queue, seconds, c.id) end
+end
+
+local function leaveLine(player: Player)
+	local c = inLine[player]
+	if not c then return end
+	inLine[player] = nil
+	local i = table.find(c.queue, player)
+	if i then table.remove(c.queue, i) end
+	if #c.queue == 0 then c.fillDeadline = nil end
+	QueueStatus:FireClient(player, false, #c.queue, nil, c.id)
+	queueStatus(c)
+end
+
+-- Tap handlers ----------------------------------------------------------------------
+-- course.current = { session, seg, kind ("pace" | "burst" | nil), open, close, taps, allowances, maxTaps }
 
 -- Latency is snapshotted per checkpoint so a lag spike can't widen it (D-021).
-local function snapshotAllowances(): { [number]: number }
+local function snapshotAllowances(players: { Player }): { [number]: number }
 	local out = {}
-	for _, p in Players:GetPlayers() do
+	for _, p in players do
 		out[p.UserId] = TapTime.rewindAllowance(p:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
 	end
 	return out
 end
 
-local function resolveTap(player: Player, claimed: any, kind: string): number?
-	if not current or current.kind ~= kind or typeof(claimed) ~= "number" then return nil end
-	local allowance = current.allowances[player.UserId]
+local function resolveTap(player: Player, claimed: any, kind: string)
+	local c = riding[player]
+	local cur = c and c.current
+	if not cur or cur.kind ~= kind or typeof(claimed) ~= "number" then return nil, nil end
+	local allowance = cur.allowances[player.UserId]
 		or TapTime.rewindAllowance(player:GetNetworkPing(), GameConfig.tapJitterMarginSeconds, GameConfig.maxTapRewindSeconds)
-	return TapTime.resolve(claimed, now(), current.open, current.close, allowance)
+	return TapTime.resolve(claimed, now(), cur.open, cur.close, allowance), cur
 end
 
 PaceTap.OnServerEvent:Connect(function(player: Player, claimed: any)
-	local t = resolveTap(player, claimed, "pace")
+	local t, cur = resolveTap(player, claimed, "pace")
 	if not t then return end
-	local list = current.taps[player.UserId]
+	local list = cur.taps[player.UserId]
 	if not list then
 		list = {}
-		current.taps[player.UserId] = list
+		cur.taps[player.UserId] = list
 	end
-	if #list < current.maxTaps then table.insert(list, t) end -- extra taps would score 0 anyway
+	if #list < cur.maxTaps then table.insert(list, t) end -- extra taps would score 0 anyway
 end)
 
 BurstTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
-	if not current or seg ~= current.seg then return end
-	local t = resolveTap(player, claimed, "burst")
+	local c = riding[player]
+	if not c or not c.current or seg ~= c.current.seg then return end
+	local t, cur = resolveTap(player, claimed, "burst")
 	if not t then return end
-	local score = current.session:submitBurst(tostring(player.UserId), seg, t - current.open)
+	local score = cur.session:submitBurst(tostring(player.UserId), seg, t - cur.open)
 	if score then
-		TapResult:FireClient(player, seg, score, GameConfig.labelFor(score))
+		TapResult:FireClient(player, seg, score, GameConfig.labelFor(score), c.id)
 	end
 end)
 
--- Can this player ride in the next race? Returns the horse or nil and a reason.
-local function rideable(player: Player)
+-- Joining ----------------------------------------------------------------------------
+-- Can this player ride? Their chosen horse if it's stalled, else the active one.
+local function rideable(player: Player, horseId: string?)
 	local data = Profiles.get(player)
 	if not data then return nil, "Your stable is still loading" end
-	local h = Profile.activeHorse(data)
+	local h = nil
+	if horseId and Profile.isStalled(data, horseId) then h = Profile.horse(data, horseId) end
+	h = h or Profile.activeHorse(data)
 	if not h then return nil, "Pick your first horse to race" end
 	local league = GameConfig.leagues[LEAGUE]
 	local cost = if GameConfig.energy.freeLeagues[league.name] then 0 else GameConfig.energy.costPerCashRace
@@ -164,43 +232,70 @@ local function rideable(player: Player)
 	return h, nil
 end
 
+-- With no course picked: join riders already waiting, else a free course, else the shorter line.
+local function bestCourse()
+	local best, bestScore = nil, -math.huge
+	for _, id in COURSE_ORDER do
+		local c = courses[id]
+		if #c.queue < GameConfig.lanes then
+			local score = #c.queue * 10 + (if c.current then -50 else 0) + (if c.fillDeadline then 5 else 0)
+			if score > bestScore then best, bestScore = c, score end
+		end
+	end
+	return best
+end
+
 local lastJoin: { [Player]: number } = {}
-JoinRace.OnServerEvent:Connect(function(player: Player, want: any)
+JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any, horseId: any)
 	if os.clock() - (lastJoin[player] or 0) < 0.5 then return end
 	lastJoin[player] = os.clock()
 	if want == false then
-		leaveQueue(player)
-		QueueStatus:FireClient(player, false, #queue, nil)
-		queueStatus()
+		leaveLine(player)
+		publishCards()
 		return
 	end
-	if inQueue(player) then return end
-	local h, why = rideable(player)
+	if riding[player] then return end
+	local c = if typeof(courseId) == "string" and courses[courseId] then courses[courseId] else bestCourse()
+	if not c then
+		Profiles.notify(player, "Both races are full. Try again after these races!", "flag_ready")
+		return
+	end
+	local h, why = rideable(player, if typeof(horseId) == "string" then horseId else nil)
 	if not h then
 		Profiles.notify(player, why, "zzz_resting")
-		QueueStatus:FireClient(player, false, #queue, nil)
+		if not inLine[player] then QueueStatus:FireClient(player, false, 0, nil, c.id) end
 		return
 	end
-	if #queue >= GameConfig.lanes * 2 then
-		Profiles.notify(player, "The line is full. Try again after this race!", "flag_ready")
+	if inLine[player] == c then
+		chosen[player] = h.id -- just changing horse
 		return
 	end
-	table.insert(queue, player)
-	if not fillDeadline and not current then fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
-	queueStatus()
+	if #c.queue >= GameConfig.lanes then
+		Profiles.notify(player, "That race is full. Try the other course!", "flag_ready")
+		return
+	end
+	leaveLine(player)
+	table.insert(c.queue, player)
+	inLine[player] = c
+	chosen[player] = h.id
+	if not c.fillDeadline and not c.current then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
+	queueStatus(c)
+	publishCards()
 end)
 
 Dismount.OnServerEvent:Connect(function(player: Player)
-	if current then return end -- not during a race
+	local c = riding[player]
+	if c and c.current then return end -- not during your race
 	TrackScene.dismount(player.Character)
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
-	if current and current.seg then
-		current.session:dropSegment(tostring(player.UserId), current.seg)
+	local c = riding[player]
+	if c and c.current and c.current.seg then
+		c.current.session:dropSegment(tostring(player.UserId), c.current.seg)
 	end
-	leaveQueue(player)
-	lastJoin[player] = nil
+	leaveLine(player)
+	riding[player], chosen[player], lastJoin[player] = nil, nil, nil
 	task.defer(function()
 		trackers[player.UserId] = nil -- session-only until saved trackers (STATUS backlog)
 	end)
@@ -242,10 +337,7 @@ local function recordIntegrity(players: { Player }, errors: { [number]: { number
 	end
 end
 
--- Energy spent for the race in progress, refunded if the race fails.
-local charged: { [Player]: string } = {}
-
--- Main loop -------------------------------------------------------------------
+-- A race ------------------------------------------------------------------------------
 local function lanesSummary(session)
 	local out = {}
 	for i, lane in session.lanes do
@@ -258,37 +350,34 @@ local function waitUntil(t: number)
 	task.wait(math.max(0, t - now()))
 end
 
-local function runRace(players: { Player })
+local function runRace(c, players: { Player })
 	local rng = Random.new()
 	local league = GameConfig.leagues[LEAGUE]
-	local distances = league.distances or DISTANCES
-	local cond = {
-		distance = distances[rng:NextInteger(1, #distances)],
-		surface = SURFACES[rng:NextInteger(1, #SURFACES)],
-		weather = WEATHERS[rng:NextInteger(1, #WEATHERS)],
-	}
+	local cond = table.clone(c.card)
+	cond.league = nil
 	local humans = {}
 	local horseOf: { [number]: string } = {}
 	local coatOf: { [string]: string } = {}
 	local riders = {}
 	local cost = if GameConfig.energy.freeLeagues[league.name] then 0 else GameConfig.energy.costPerCashRace
 	for _, p in players do
-		local h = rideable(p)
+		local h = rideable(p, chosen[p])
 		local data = Profiles.get(p)
-		if h and data and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
+		if h and data and not riding[p] and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
 			local rating = Horse.rating(h, cond, os.time(), RaceRating)
 			table.insert(humans, { id = tostring(p.UserId), name = h.name, rating = rating, isBot = false })
 			horseOf[p.UserId] = h.id
 			coatOf[tostring(p.UserId)] = h.coat
 			table.insert(riders, p)
 			if cost > 0 then
-				charged[p] = h.id
+				c.charged[p] = h.id
 				Profiles.changed(p)
 			end
 		end
 	end
 	players = riders
 	if #players == 0 then return end
+	newCard(c) -- the board shows the next race on this course while this one runs
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
 	local coats = {}
 	for i, lane in lanes do coats[i] = coatOf[lane.id] end -- bots keep the default coats
@@ -303,7 +392,7 @@ local function runRace(players: { Player })
 
 	-- Timeline (D-026, D-027, D-031): gate -> pace (2 checkpoints) -> into the homestretch:
 	-- "FINAL BURST" -> burst -> stretch drive (pace, 1 checkpoint) -> the line.
-	local cfg = TrackLayout.churchill
+	local cfg = c.cfg
 	local plan = TrackLayout.plan(cfg, TrackLayout.distances[cond.distance])
 	local speed = GameConfig.raceSpeedStudsPerSecond
 	local tStart = now() + COUNTDOWN
@@ -325,41 +414,45 @@ local function runRace(players: { Player })
 	local r1 = TrackLayout.laneRadius(cfg, 1)
 	local tFar = tFinish - (cfg.finishFromTop + math.pi * r1) / speed
 
-	TrackScene.dismountAll() -- anyone still sitting from the last race
-	TrackScene.build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
-	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, resultAt, burstOpen)
-	PaceSchedule:FireAllClients(passes)
-	task.delay(math.max(0, tStart - now()), TrackScene.openGate) -- and they're off
+	c.scene:dismountAll() -- anyone still sitting from this course's last race
+	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
+	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
+	PaceSchedule:FireAllClients(passes, c.id)
+	task.delay(math.max(0, tStart - now()), function() c.scene:openGate() end) -- and they're off
 	local isBot = {}
 	for i, lane in session.lanes do -- racing players ride their own horse as the jockey
 		isBot[i] = lane.isBot
 		if not lane.isBot then
 			local p = Players:GetPlayerByUserId(tonumber(lane.id))
 			if p then
+				riding[p] = c
 				p:SetAttribute("Racing", true)
 				Rides.dismount(p) -- off your own horse before the race horse
-				TrackScene.seatRider(i, p.Character)
+				TrackScene.dismount(p.Character) -- and off the other course's horse after its race
+				c.scene:seatRider(i, p.Character)
 			end
 		end
 	end
-	TrackScene.addJockeys(isBot) -- Roblox-style jockeys on the bot horses
+	c.scene:addJockeys(isBot) -- Roblox-style jockeys on the bot horses
 
 	local preLast, postLast = tStart, postStart
 	for _, p in passes do
 		if p.t0 < burstOpen then preLast = math.max(preLast, p.t1) else postLast = math.max(postLast, p.t1) end
 	end
-	current = {
+	local cur = {
 		session = session, seg = 1, kind = "pace", open = tStart, close = preLast,
-		taps = {}, allowances = snapshotAllowances(), maxTaps = #passes * 2 + 10,
+		taps = {}, allowances = snapshotAllowances(players), maxTaps = #passes * 2 + 10,
 	}
+	c.current = cur
+	publishCards()
 	-- Live chances shown on screen: closed segments, refreshed each second in the stretch drive.
 	local shownLive = table.clone(session.live)
 	local racing = true
 	task.spawn(function()
 		local period = 1 / GameConfig.offsetsPerSecond
-		while racing do
+		while racing and (c.current == cur or c.current == nil) do
 			local w = RaceShape.blendWeight(now(), tFar, postEnd, GameConfig.raceShape.blendPower)
-			RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape))
+			RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape), c.id)
 			task.wait(period)
 		end
 	end)
@@ -373,11 +466,11 @@ local function runRace(players: { Player })
 		local partial = {}
 		for i, lane in session.lanes do
 			if not lane.isBot then
-				partial[i] = (PaceMeter.score(done, current.taps[tonumber(lane.id)] or {}))
+				partial[i] = (PaceMeter.score(done, cur.taps[tonumber(lane.id)] or {}))
 			end
 		end
 		shownLive = session:previewLive(seg, partial)
-		LiveChances:FireAllClients(seg, shownLive)
+		LiveChances:FireAllClients(seg, shownLive, c.id)
 	end
 
 	local errors: { [number]: { number } } = {}
@@ -385,10 +478,10 @@ local function runRace(players: { Player })
 	local greatTaps: { [number]: number } = {}  -- Great or Perfect pace taps, for Stable Board jobs
 	local greatBurst: { [number]: boolean } = {} -- tapped a Great or Perfect Final Burst
 	for seg, kind in GameConfig.segments do
-		current.seg = seg
+		cur.seg = seg
 		if kind == "pace" then
 			if seg > 1 and GameConfig.segments[seg - 1] == "burst" then
-				current.kind, current.open, current.close = "pace", postStart, postLast -- the stretch drive
+				cur.kind, cur.open, cur.close = "pace", postStart, postLast -- the stretch drive
 			end
 			local segPasses = session:pacePasses(seg)
 			local lastEnd = if #segPasses > 0 then segPasses[#segPasses].t1 else select(2, session:paceRange(seg))
@@ -400,26 +493,26 @@ local function runRace(players: { Player })
 				end
 			end
 			waitUntil(lastEnd + LATENCY_GRACE)
-			current.allowances = snapshotAllowances()
+			cur.allowances = snapshotAllowances(players)
 			for _, p in players do
-				local res = session:scorePace(tostring(p.UserId), seg, current.taps[p.UserId] or {})
+				local res = session:scorePace(tostring(p.UserId), seg, cur.taps[p.UserId] or {})
 				if res then
-					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, current.taps[p.UserId] or {}, 80)
+					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, cur.taps[p.UserId] or {}, 80)
 					local list = errors[p.UserId] or {}
 					for _, e in res.errors do table.insert(list, e) end
 					errors[p.UserId] = list
 					matched[p.UserId] = (matched[p.UserId] or 0) + res.matched
-					PaceResult:FireClient(p, seg, res.score, GameConfig.labelFor(res.score))
+					PaceResult:FireClient(p, seg, res.score, GameConfig.labelFor(res.score), c.id)
 				end
 			end
 		else
 			waitUntil(burstOpen)
-			current.kind, current.open, current.close = "burst", burstOpen, burstClose
-			current.allowances = snapshotAllowances()
-			BurstOpened:FireAllClients(seg, burstOpen, burstClose, session:burstSpec(), ThemePack.words.burst)
+			cur.kind, cur.open, cur.close = "burst", burstOpen, burstClose
+			cur.allowances = snapshotAllowances(players)
+			BurstOpened:FireAllClients(seg, burstOpen, burstClose, session:burstSpec(), ThemePack.words.burst, c.id)
 			waitUntil(burstClose + LATENCY_GRACE)
-			current.kind = "pace" -- taps before the stretch drive opens are outside its window and dropped
-			current.open, current.close = postStart, postLast
+			cur.kind = "pace" -- taps before the stretch drive opens are outside its window and dropped
+			cur.open, cur.close = postStart, postLast
 			local great = {}
 			for _, p in players do
 				local i = session:laneIndex(tostring(p.UserId))
@@ -429,12 +522,12 @@ local function runRace(players: { Player })
 					greatBurst[p.UserId] = true
 				end
 			end
-			if #great > 0 then BurstSparkle:FireAllClients(great) end
+			if #great > 0 then BurstSparkle:FireAllClients(great, c.id) end
 		end
 		shownLive = session:closeSegment(seg)
-		LiveChances:FireAllClients(seg, shownLive)
+		LiveChances:FireAllClients(seg, shownLive, c.id)
 	end
-	current.seg = nil
+	cur.seg = nil
 
 	local result = session:finish() -- by now the order on screen is this order (D-033)
 	task.delay(GameConfig.runInSeconds + 2, function() racing = false end)
@@ -452,8 +545,8 @@ local function runRace(players: { Player })
 			end
 		end
 	end
-	RaceFinished:FireAllClients(summary)
-	table.clear(charged) -- the race counted
+	RaceFinished:FireAllClients(summary, c.id)
+	table.clear(c.charged) -- the race counted
 	-- Your ride: stars from your score, and places your riding gained versus riding at the race
 	-- average (same luck, everything else the same). Only gains are shown to the rider.
 	local S = session:scoresSoFar()
@@ -463,7 +556,7 @@ local function runRace(players: { Player })
 		local i = session:laneIndex(tostring(p.UserId))
 		if i then
 			local stars = if S[i] >= 85 then 3 elseif S[i] >= 65 then 2 elseif S[i] >= 40 then 1 else 0
-			RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i])
+			RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i], c.id)
 		end
 	end
 	recordIntegrity(players, errors, matched)
@@ -474,50 +567,82 @@ local function runRace(players: { Player })
 		if greatBurst[p.UserId] then Progress.record(p, "burst_great", 1) end
 	end
 	-- Riders stay on their horse for the results and replay; they press Done to get off.
-	task.delay(GameConfig.dismountTimeoutSeconds, TrackScene.dismountAll)
-	for _, p in players do p:SetAttribute("Racing", nil) end
-	current = nil
+	task.delay(GameConfig.dismountTimeoutSeconds, function()
+		if not c.current then c.scene:dismountAll() end
+	end)
+	for _, p in players do
+		p:SetAttribute("Racing", nil)
+		if riding[p] == c then riding[p] = nil end
+	end
+	c.current = nil
 end
 
-task.delay(3, function()
-	TrackScene.build(TrackLayout.plan(TrackLayout.churchill, TrackLayout.distances.Sprint)) -- a scene for the lobby
-end)
-
-while true do
-	-- Wait for someone to join the line, then give others the fill time to join too.
-	while #queue == 0 do task.wait(0.5) end
-	fillDeadline = fillDeadline or (os.clock() + GameConfig.lobbyFillSeconds)
-	while #queue > 0 and os.clock() < (fillDeadline or 0) and #queue < GameConfig.lanes do
-		for _, p in queue do LobbyStatus:FireClient(p, math.ceil((fillDeadline or 0) - os.clock())) end
-		queueStatus()
-		task.wait(1)
-	end
-	local racers = {}
-	while #queue > 0 and #racers < GameConfig.lanes do
-		table.insert(racers, table.remove(queue, 1))
-	end
-	fillDeadline = nil
-	for _, p in racers do QueueStatus:FireClient(p, false, #queue, nil) end
-	if #racers > 0 then
-		local ok, err = pcall(runRace, racers)
-		if not ok then
-			warn("Race failed: " .. tostring(err))
-			current = nil
-			TrackScene.dismountAll()
-			RaceAborted:FireAllClients()
-			for p, horseId in charged do -- give back the Energy for a race that didn't count
-				local data = Profiles.get(p)
-				local h = data and Profile.horse(data, horseId)
-				if h then
-					Horse.addEnergy(h, GameConfig.energy.costPerCashRace, os.time(), GameConfig.energy)
-					Profiles.changed(p)
+-- One loop per course ---------------------------------------------------------------
+local function courseLoop(c)
+	newCard(c)
+	publishCards()
+	while true do
+		-- Wait for someone to join this course's line, then give others the fill time to join too.
+		while #c.queue == 0 do task.wait(0.5) end
+		c.fillDeadline = c.fillDeadline or (os.clock() + GameConfig.lobbyFillSeconds)
+		while #c.queue > 0 and os.clock() < (c.fillDeadline or 0) and #c.queue < GameConfig.lanes do
+			for _, p in c.queue do LobbyStatus:FireClient(p, math.ceil((c.fillDeadline or 0) - os.clock()), c.id) end
+			queueStatus(c)
+			task.wait(1)
+		end
+		local racers = {}
+		while #c.queue > 0 and #racers < GameConfig.lanes do
+			local p = table.remove(c.queue, 1)
+			inLine[p] = nil
+			table.insert(racers, p)
+		end
+		c.fillDeadline = nil
+		for _, p in racers do QueueStatus:FireClient(p, false, #c.queue, nil, c.id) end
+		if #racers > 0 then
+			local ok, err = pcall(runRace, c, racers)
+			if not ok then
+				warn(string.format("Race on %s failed: %s", c.id, tostring(err)))
+				c.current = nil
+				c.scene:dismountAll()
+				RaceAborted:FireAllClients(c.id)
+				for p, horseId in c.charged do -- give back the Energy for a race that didn't count
+					local data = Profiles.get(p)
+					local h = data and Profile.horse(data, horseId)
+					if h then
+						Horse.addEnergy(h, GameConfig.energy.costPerCashRace, os.time(), GameConfig.energy)
+						Profiles.changed(p)
+					end
+				end
+				table.clear(c.charged)
+				for _, p in racers do
+					p:SetAttribute("Racing", nil)
+					if riding[p] == c then riding[p] = nil end
 				end
 			end
-			table.clear(charged)
-			for _, p in racers do p:SetAttribute("Racing", nil) end
 		end
+		publishCards()
+		task.wait(5) -- results screen
+		if #c.queue > 0 then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
+		queueStatus(c)
 	end
-	task.wait(5) -- results screen
-	if #queue > 0 then fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
-	queueStatus()
+end
+
+-- Lobby scenes: a gate and horses on both courses before the first races.
+task.delay(3, function()
+	for _, id in COURSE_ORDER do
+		local c = courses[id]
+		if not c.current then c.scene:build(TrackLayout.plan(c.cfg, TrackLayout.distances.Sprint)) end
+	end
+end)
+
+-- Cards tick down once a second for the board and the picker.
+task.spawn(function()
+	while true do
+		task.wait(1)
+		publishCards()
+	end
+end)
+
+for _, id in COURSE_ORDER do
+	task.spawn(courseLoop, courses[id])
 end

@@ -146,6 +146,14 @@ function WorldScene.tree(parent: Instance, x: number, z: number, h: number, rng:
 end
 
 local function lamp(parent: Instance, x: number, z: number)
+	local folder = ReplicatedStorage:FindFirstChild("RaceModels")
+	local lantern = folder and folder:FindFirstChild("lantern_post")
+	if lantern then
+		local m = lantern:Clone()
+		m:PivotTo(CFrame.new(x, GROUND_Y, z))
+		m.Parent = parent
+		return
+	end
 	part({ Name = "LampPost", Shape = Enum.PartType.Cylinder, Size = Vector3.new(12, 0.8, 0.8), Color = C.ink,
 		CFrame = CFrame.new(x, GROUND_Y + 6, z) * CFrame.Angles(0, 0, math.pi / 2) }, parent)
 	local bulb = part({ Name = "Lamp", Shape = Enum.PartType.Ball, Size = Vector3.new(2.2, 2.2, 2.2), Color = Color3.fromHex("FFF1B8"),
@@ -250,6 +258,19 @@ local function buildFairStreet(root: Instance)
 		prev = x
 		x += 60
 	end
+	-- Benches round the fountain, facing it; picnic tables and a hay cart by Feed & Seed.
+	for k = 0, 3 do
+		local a = k * math.pi / 2 + math.pi / 4
+		local pos = Vector3.new(fx + math.cos(a) * 22, GROUND_Y, fz + math.sin(a) * 22)
+		WorldScene.placeModel(f, "bench", CFrame.lookAt(pos, Vector3.new(fx, GROUND_Y, fz)))
+	end
+	local store = WorldLayout.places.feedStore
+	for k = 0, 1 do
+		local pos = Vector3.new(store.x + store.w / 2 + 14 + k * 16, GROUND_Y, Z - W / 2 - 14)
+		WorldScene.placeModel(f, "picnic_table", CFrame.new(pos))
+	end
+	WorldScene.placeModel(f, "hay_cart", CFrame.lookAt(Vector3.new(store.x - store.w / 2 - 10, GROUND_Y, Z - W / 2 - 8),
+		Vector3.new(store.x - store.w / 2 - 10, GROUND_Y, Z)))
 	f.Parent = root
 	return f
 end
@@ -294,6 +315,9 @@ local function buildPlaces(root: Instance)
 		info.TextColor3 = C.white
 		info.Text = "Next race: Rookie\nTap RACE! to join"
 		info.Parent = sg
+		local pedestal = part({ Name = "Pedestal", Size = Vector3.new(5, 4, 5), Color = C.white, Material = Enum.Material.Marble,
+			CFrame = cf * CFrame.new(26, GROUND_Y + 2, 2) }, m)
+		WorldScene.placeModel(m, "trophy_cup", pedestal.CFrame * CFrame.new(0, 2, 0))
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "RacePrompt"
 		prompt.ActionText = "Join the next race"
@@ -307,7 +331,9 @@ local function buildPlaces(root: Instance)
 	do
 		local p = WorldLayout.places.feedStore
 		local cf = placeCF("feedStore")
-		if not placeModel(f, "feed_store", cf * CFrame.new(0, GROUND_Y, p.d / 2)) then
+		if placeModel(f, "feed_store", cf * CFrame.new(0, GROUND_Y, p.d / 2)) then
+			WorldScene.sign(f, (cf * CFrame.new(0, GROUND_Y + 22, -2)).Position, cf.LookVector, "Feed & Seed", "🥕", 24, 5)
+		else
 			WorldScene.shop(f, cf, p.w, p.d, 18, C.red, C.roofRed, { C.white, Color3.fromHex("2E9E5B") }, "Feed & Seed", "🥕")
 		end
 		for k = 0, 2 do -- hay bales out front
@@ -321,7 +347,9 @@ local function buildPlaces(root: Instance)
 	do
 		local p = WorldLayout.places.vet
 		local cf = placeCF("vet")
-		if not placeModel(f, "vet_clinic", cf * CFrame.new(0, GROUND_Y, p.d / 2)) then
+		if placeModel(f, "vet_clinic", cf * CFrame.new(0, GROUND_Y, p.d / 2)) then
+			WorldScene.sign(f, (cf * CFrame.new(0, GROUND_Y + 20, -2)).Position, cf.LookVector, "Vet", "💚", 16, 5)
+		else
 			WorldScene.shop(f, cf, p.w, p.d, 16, C.white, Color3.fromHex("3E8E7E"), { C.white, C.mint }, "Vet", "💚")
 		end
 	end
@@ -344,6 +372,7 @@ local function buildPlaces(root: Instance)
 		end
 		for k = 0, 2 do
 			local jx, jz = x0 + 40 + k * 45, z0 + 100
+			if WorldScene.placeModel(f, "log_jump", CFrame.new(jx, GROUND_Y, jz)) then continue end
 			for _, dx in { -5, 5 } do
 				part({ Name = "JumpPost", Size = Vector3.new(0.8, 4, 0.8), Color = C.white, CFrame = CFrame.new(jx + dx, GROUND_Y + 2, jz) }, f)
 			end
@@ -419,7 +448,18 @@ local function buildTrail(root: Instance)
 	for k = 1, #pts - 1 do
 		strip(f, pts[k].x, pts[k].z, pts[k + 1].x, pts[k + 1].z, 14, C.trail, Enum.Material.Ground, 0.03)
 	end
+	do
+		local a, b = pts[3], pts[4]
+		local mid = Vector3.new((a.x + b.x) / 2, GROUND_Y, (a.z + b.z) / 2)
+		WorldScene.placeModel(f, "wooden_bridge", CFrame.lookAt(mid, mid + Vector3.new(b.x - a.x, 0, b.z - a.z)))
+	end
 	local m = WorldLayout.meadow
+	for k = 0, 2 do
+		local ang = k * 2.1
+		local pos = Vector3.new(m.x + math.cos(ang) * (m.radius - 8), GROUND_Y, m.z + math.sin(ang) * (m.radius - 8))
+		WorldScene.placeModel(f, "bench", CFrame.lookAt(pos, Vector3.new(m.x, GROUND_Y, m.z)))
+	end
+	WorldScene.placeModel(f, "picnic_table", CFrame.new(m.x + 20, GROUND_Y, m.z - 12))
 	part({ Name = "Meadow", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, m.radius * 2, m.radius * 2), Color = C.meadow,
 		Material = Enum.Material.Grass, CFrame = CFrame.new(m.x, GROUND_Y + 0.02, m.z) * CFrame.Angles(0, 0, math.pi / 2) }, f)
 	local rng = Random.new(42)
@@ -526,9 +566,14 @@ end
 -- Rebuild Fair Street buildings once uploaded models load (they replace the part versions).
 function WorldScene.rebuildPlaces()
 	if not built then return end
-	local old = built:FindFirstChild("Places")
-	if old then old:Destroy() end
+	for _, name in { "FairStreet", "Places", "BarnLane", "Trail" } do
+		local old = built:FindFirstChild(name)
+		if old then old:Destroy() end
+	end
+	buildFairStreet(built)
 	buildPlaces(built)
+	buildLane(built)
+	buildTrail(built)
 end
 
 WorldScene.GROUND_Y = GROUND_Y
