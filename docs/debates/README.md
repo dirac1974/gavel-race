@@ -51,3 +51,4 @@ Date: YYYY-MM-DD · Status: Proposed | Decided (D-NNN)
 4. **004 — Breeding and rarity**: what is inherited, mutation odds, how foals grow, keeping it free of paid randomness.
 5. **005 — Diamond store v1 catalog**: exact items and prices within D-002a.
 6. **006 — Social layer**: stable clubs, Derby Day, spectating (cheering decided in D-019), visiting stables.
+7. ~~007 — Race taps and macros~~: decided as D-022 (stride stretches). Record: [007](007-race-taps-and-macros.md).

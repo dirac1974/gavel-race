@@ -7,7 +7,7 @@ local ThemePack = {
 	gameTitle = "Gavel Derby",
 	racer = { singular = "Horse", plural = "Horses" },
 	pilot = { singular = "Jockey", plural = "Jockeys" },
-	gavelAction = "Whip timing",
+	gavelAction = "Giddy-up", -- D-022: never whip wording
 	currency = { earned = "Green Cash", premium = "Diamonds" },
 	stats = {
 		speed = "Speed",

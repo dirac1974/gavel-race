@@ -14,7 +14,7 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 
 - 8 lanes, about 60–90 seconds, bots fill empty lanes within 20 seconds.
 - Lobby shows each horse's Win Chance % and locked win purse ("Win: 464").
-- Three gavel windows (break, backstretch, final stretch). Live Win Chance updates after each tap.
+- Three **Giddy-up** stretches (break, backstretch, final stretch; D-022). In each, the rider taps on the horse's stride for about 8 beats; on-beat taps make the horse surge, mashing makes it break stride. Live Win Chance updates after each stretch. Then the **Final Burst**: one big tap on a sweeping meter right before the line, worth double (40% of the rider's score). No whip: hands-and-heels riding.
 - Server draws the finish order, then animates the race to match.
 - Prizes: winner gets the locked purse; 2nd 1.2B, 3rd 0.8B, 4th 0.4B. League Points: win 10, 2nd 6, 3rd 4, 4th 2, finish 1.
 
