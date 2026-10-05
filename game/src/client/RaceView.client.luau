@@ -3,8 +3,8 @@
 -- smoothly instead of stepping with server updates. Everyone gets the same timeline from
 -- the server (start time, expected end, live chances, finish order), so all screens show
 -- the same race. Riders are welded to their horse's saddle and move with it.
---   During the race: all horses advance together along the race plan for the distance,
---   reaching about a second short of the line when the Final Burst closes;
+--   During the race: all horses run at the race's constant speed, so they reach the line
+--   when the race ends; near the line they ease toward it until the result is known;
 --   the likelier winners (live win chance) edge ahead, eased in so nobody lurches.
 --   Run-in: when the result arrives, horses cross the line in finish order, one by one.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -19,8 +19,8 @@ local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 
 local CFG = TrackLayout.churchill
-local LEAD_SCALE = 0.25      -- lap fraction of lead per unit of (win chance - fair share)
-local MAX_BEFORE_RESULT = 0.995 -- nobody crosses the line before the result is known
+local LEAD_FEET = 320        -- feet of lead per unit of (win chance - fair share): ~55 ft for a strong favourite
+local SOFT_FROM, SOFT_MAX = 0.975, 0.995 -- near the line, ease toward it; nobody crosses before the result
 local BOB_HZ, BOB_STUDS = 1.8, 0.3
 local FIRST_CROSS, CROSS_GAP = 1.0, 0.25 -- run-in: winner crosses after 1 s, the rest 0.25 s apart
 
@@ -46,23 +46,23 @@ local function place(i: number, p: number, bob: number)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
 end
 
-local function cruise(t: number): number
-	local span = math.max(1, race.finishEst - race.start)
-	return race.cruiseEnd * math.clamp((t - race.start) / span, 0, 1)
+-- Past SOFT_FROM, progress bends smoothly toward SOFT_MAX instead of stopping dead.
+local function soften(p: number): number
+	if p <= SOFT_FROM then return p end
+	local room = SOFT_MAX - SOFT_FROM
+	return SOFT_FROM + room * (1 - math.exp(-(p - SOFT_FROM) / room))
 end
 
--- Progress of lane i during the race (before the result): shared pace plus its lead,
--- with the lead growing in over the first third of the lap.
+-- Progress of lane i during the race (before the result): the race's constant speed plus
+-- the horse's lead, which grows in over the first third.
 local function racing(i: number, t: number): number
-	local b = cruise(t)
-	return math.clamp(b + race.offset[i] * math.min(1, b / 0.3), 0, MAX_BEFORE_RESULT)
+	local b = math.max(0, (t - race.start) * GameConfig.raceSpeedStudsPerSecond / race.plan.lengths[1])
+	return soften(math.max(0, b + race.offset[i] * math.min(1, b / 0.3)))
 end
 
 remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, cond, finishEst)
 	local plan = TrackLayout.plan(CFG, TrackLayout.distances[cond and cond.distance or "Sprint"] or TrackLayout.distances.Sprint)
-	-- At the expected end (the burst closing) horses are about burstBeforeLine seconds from the line.
-	local cruiseEnd = 1 - GameConfig.raceSpeedStudsPerSecond * GameConfig.burstBeforeLineSeconds / plan.lengths[1]
-	race = { start = start, finishEst = finishEst or (start + 60), plan = plan, cruiseEnd = cruiseEnd,
+	race = { start = start, finishEst = finishEst or (start + 60), plan = plan,
 		lanes = #laneList, offset = {}, target = {}, runIn = nil }
 	for i = 1, #laneList do
 		race.offset[i], race.target[i] = 0, 0
@@ -74,7 +74,7 @@ end)
 remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)
 	if not race then return end
 	local fair = 1 / race.lanes
-	for i, c in live do race.target[i] = LEAD_SCALE * (c - fair) end
+	for i, c in live do race.target[i] = LEAD_FEET * (c - fair) / race.plan.lengths[i] end
 end)
 
 remotes.RaceFinished.OnClientEvent:Connect(function(summary)

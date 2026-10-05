@@ -228,7 +228,7 @@ speedLabel.TextXAlignment = Enum.TextXAlignment.Right
 -- Your place in the race (D-030): big, top right under the minimap.
 local placeBadge = Instance.new("Frame")
 placeBadge.AnchorPoint = Vector2.new(1, 0)
-placeBadge.Position = UDim2.new(1, -16, 0, 200)
+placeBadge.Position = UDim2.new(1, -16, 0, 268) -- under the race map
 placeBadge.Size = UDim2.fromOffset(150, 70)
 placeBadge.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
 placeBadge.BackgroundTransparency = 0.2
@@ -452,8 +452,9 @@ RunService.RenderStepped:Connect(function()
 			for _, v in paceState.recent do sum += v end
 			TweenService:Create(speedFill, TweenInfo.new(0.2), { Size = UDim2.fromScale(sum / #paceState.recent / 100, 1) }):Play()
 		end
-		if paceState.done >= #passes and not burstState then
-			burstTitle.Visible = true -- "FINAL BURST" shows during the lead-in
+		if paceState.burstOpen and not burstState and t < paceState.burstOpen
+			and t >= paceState.burstOpen - GameConfig.burstLeadSeconds then
+			burstTitle.Visible = true -- "FINAL BURST" shows as the field turns into the homestretch
 		end
 	end
 	if burstState then
@@ -480,7 +481,9 @@ remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
 	hint.Text = ThemePack.tagline
 end)
 
-remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond)
+local pendingBurstOpen = nil
+remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond, _resultAt, burstOpen)
+	pendingBurstOpen = burstOpen
 	lanes = laneList
 	chances = {}
 	sparkleUntil = {}
@@ -553,7 +556,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 end)
 
 remotes.PaceSchedule.OnClientEvent:Connect(function(passes)
-	paceState = { passes = passes, tapsByPass = {}, firstTap = {}, done = 0, recent = {} }
+	paceState = { passes = passes, tapsByPass = {}, firstTap = {}, done = 0, recent = {}, burstOpen = pendingBurstOpen }
 end)
 
 remotes.PaceResult.OnClientEvent:Connect(function(seg, score, labelText)
@@ -570,7 +573,7 @@ end)
 
 remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText)
 	feedback.Text = ""
-	hint.Text = ""
+	hint.Text = "Stretch drive! Keep tapping to the line"
 	showResultIcon(labelText)
 	celebrate(score, labelText) -- the burst is scored on arrival; the window may still be open for others
 end)

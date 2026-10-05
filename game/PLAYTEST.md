@@ -27,7 +27,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] Space, clicks and taps never throw you off the horse.
 - [ ] A big place badge ("3rd of 8") sits at the top right and changes as horses pass each other; the YOU marker over your horse shows the same place.
 - [ ] The board on the left re-sorts by running order, each row starting with its place (1st, 2nd, ...).
-- [ ] A minimap of the oval in the top-right corner shows every horse as a numbered dot in its lane colour (yours larger with a white ring) moving round; the white tick is the finish line, and the homestretch is along the bottom.
+- [ ] The race map (top right) has a small oval with only your dot, the distance to go ("Homestretch!" in the stretch), and a race strip below: one row per lane, the leader near the right, gaps readable, a checkered flag sliding in near the line, and your gap in lengths ("1.5 lengths behind the leader").
 - [ ] The gate clears and the horses gallop (with a bob) round the course without stopping; the likelier winners edge ahead after each checkpoint.
 - [ ] The race lasts about as long as its distance says (Sprint ~70 s, Mile ~95 s on Rookie).
 
@@ -38,7 +38,8 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] A checkpoint message appears three times (e.g. "Checkpoint 1: Great 84").
 
 ## Final Burst
-- [ ] "FINAL BURST ×2" appears in the homestretch, then a big rainbow meter with a pulsing gold rim; the marker starts somewhere different each race.
+- [ ] "FINAL BURST ×2" appears as the horses come off the final turn, then the big rainbow meter just into the homestretch; the marker starts somewhere different each race. The horses never pause.
+- [ ] After the burst the slider comes back for the stretch drive ("Stretch drive! Keep tapping to the line") until just before the finish.
 - [ ] One tap scores; a great burst plays a banner on your screen (and rays); other players' great bursts show a ✦ by their name.
 - [ ] The horses then cross the line one by one in finish order, "And they're home!", and the results panel with ribbons appears.
 - [ ] About 3 s later you're off the horse on the apron, back in third person, and can jump again.

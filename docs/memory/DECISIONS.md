@@ -265,3 +265,20 @@ Template:
 - Also fixed: horses ran backwards. The imported models already face Roblox's forward, so the 180-degree turn from the import notes is removed (`AssetService` YAW table, 0 by default).
 - Links: game/src/client/RaceState.luau, game/src/client/Minimap.client.luau, game/src/client/RaceController.client.luau, game/src/server/AssetService.server.luau
 
+## D-031 — Final Burst entering the homestretch; stretch drive; no pause
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("there is a pause on the final burst in the horses movement. It should be a bit earlier in the race after the final turn after they get in the straight away")
+- Decision: the race runs pace (two checkpoints) from the gate to the final turn, then "FINAL BURST ×2" shows as the field turns for home and the burst opens 0.5 s into the homestretch (about 22 s from the line), then the slider resumes for the stretch drive (third checkpoint) until 1.5 s before the line. Segment order is pace, pace, burst, pace with weights 1, 1, 2, 1 (the burst is still 40% of S). Horses run at the race's constant speed and reach the line as the race ends; near the line they bend smoothly toward it instead of stopping, and leads are in feet (a strong favourite is about 55 ft ahead), so nobody freezes waiting for the result.
+- Cause of the pause: leaders were capped just short of the line until the result arrived, and the pace clock stopped at the expected end.
+- Links: game/src/server/RaceService.server.luau, game/src/shared/RaceSession.luau (paceSchedule spans), game/src/client/RaceView.client.luau
+
+## D-032 — Race strip replaces dots on the oval
+- Date: 2026-10-04
+- Status: Accepted (provisional)
+- Decided by: team, design council consult (4/4 for the race strip); David asked for a fix to the minimap overlap
+- Decision: the race map has a race strip like a TV broadcast's running order: one row per lane so dots never stack, zoomed to the field (leader near the right edge, everyone spaced by their real gap, at least ~10 lengths shown) with a checkered flag sliding in when the line is in range, and a line of text with your gap in horse lengths ("1.5 lengths behind the leader", "Leading by 2 lengths"). Above it a small still oval shows only your own dot and the distance to go ("Homestretch!" once in the stretch). Your dot is larger with a white ring; every dot shows its lane number in high contrast.
+- Rejected: spreading dots across the track by lane (doesn't fix squashed distances, suggests lanes matter), a panning zoomed map (motion while timing taps; kids think their horse stopped), a bigger map (phone space), hiding other horses.
+- Open for David: three of four designers say the running-order board on the left is now one display too many (place badge plus strip cover it) and suggest hiding it during the race. Kept for now because David asked for it.
+- Links: game/src/client/Minimap.client.luau
+
