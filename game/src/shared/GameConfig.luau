@@ -56,15 +56,38 @@ GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own scr
 GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
--- Race steering (D-054). S1 needs only the post draw; S2 adds the rest of the block (src/trip.py
--- CONFIG is the reference for those values).
+-- Race steering (D-054). Mirrors CONFIG in src/trip.py (the Python reference; tests/luau checks
+-- the two match). Values after the S0 calibration: docs/research/steering-calibration.md. The
+-- per-post baselines are generated into TripBaseline.luau by sims/steering.py.
 GameConfig.steering = {
-	drawPosts = true, -- posts drawn at random at the gate; false = the old humans-first lanes
+	drawPosts = true,              -- posts drawn at random at the gate; false = the old humans-first lanes
+	enabled = true,                -- false: today's fixed lanes and offsets, exactly
+	scale = 1,                     -- 0: steering is cosmetic (lanes move, chances don't)
+	floor = -0.02, ceiling = 0.04, -- clamp on tau (1 point of S = 0.02)
+	groundPerLaneTurn = 0.010,     -- per lane off the rail per 180 degrees of turn
+	draftPerSecond = 0.0010, draftCap = 0.016,
+	draftNear = 4, draftFar = 24,  -- feet behind the horse ahead in your lane (0.5-3 lengths)
+	laneSeconds = 0.6, minRequestGap = 0.6,
+	maxQueued = 1,                 -- 0 or 1: one press can wait behind the one in progress
+	clearFeet = 8,                 -- a lane change needs this much room ahead in the new lane...
+	holdGap = 10,                  -- ...and this much behind; a held horse sits this far back
+	tuckBackMax = 24,              -- ease back up to 3 lengths to slot in behind horses
+	outwardWaitSeconds = 1.0,      -- a blocked move outward cancels after this long
+	tickHz = 10, sendHz = 10,
+	gapRampSeconds = 8,            -- skill gaps grow in over this long (replaces RaceView's 30% ramp)
+	lockBellSeconds = 3,
+	smart = { homeLane = 2, turnLeadSeconds = 8, resumeSeconds = 5 },
+	bots = { turnLeadMin = 4, turnLeadMax = 12, railShare = 0.25, wideShare = 0.20 },
+	introRaces = 3,
+	stars = { 0.015, -0.005 },     -- trip three-star and two-star thresholds
+	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
+	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.
 GameConfig.raceView = {
-	maxGapFeetPerSecond = 10, -- a horse gains or loses ground on the pace at most this fast...
+	easePerSecond = 2.5,      -- gaps ease toward their target at this rate (Trip mirrors it, D-054)...
+	maxGapFeetPerSecond = 10, -- ...a horse gains or loses ground on the pace at most this fast...
 	catchUpMarginSeconds = 0.3, -- ...unless it must go faster to reach its place by the line
 	gateEaseSeconds = 0.6,    -- horses reach full gallop out of the gate over about this long
 	nudgeRiseSeconds = 0.15,  -- a good tap's nudge on your own horse eases in...

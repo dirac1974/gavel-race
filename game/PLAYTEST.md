@@ -282,6 +282,14 @@ Ghosts, Ride together, rosettes and Quick train (T4):
 - [ ] Horses level with each other stay side by side through the turns (abreast across the track), instead of outer horses drifting ahead or behind on the bends. On the straights nothing changes.
 - [ ] Everything else looks and plays as before: the gate, horses easing out, gaps, the order across the line (the result), the race map's oval dot following your horse, and replays showing each horse in its own lane.
 
+## Steering on the server (steering S2, D-054)
+- [ ] From the gate, horses hold their posts, then head toward the rail before each turn. Most settle one off the rail (lane 2); about a quarter of the bots take the rail, a few sit one lane wider.
+- [ ] A horse blocked from moving in eases back (up to about 3 lengths) and slots in behind; horses never overlap or bump. Often a line of horses forms in lane 2 and others wait outside it.
+- [ ] Your own horse steers itself the same way (Smart Steer); there are no steering controls yet (S3).
+- [ ] At the far turn lanes lock (no bell or message until S3). After it, a horse passing another in its lane moves out a lane; nothing pops or jumps.
+- [ ] The order across the line is still the result, and the results card looks as before (the trip line comes in S4).
+- [ ] Output shows no RaceService errors around the far turn. With `GameConfig.steering.enabled = false` the horses stay in their posts all race, exactly as before.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

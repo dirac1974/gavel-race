@@ -1025,8 +1025,11 @@ RaceState.ReplayClosed.Event:Connect(function()
 	if RaceState.resultsOpen then results.Visible = true end -- back to the results card, not the lobby
 end)
 
-remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace)
+-- (stars, gain, place, course), or with steering (D-054) (stars, gain, place, trip stars, places
+-- the trip gained, course). The trip line on the results card comes in S4; it's kept here.
+remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace, a, b)
 	rideReport = { stars = starCount, gain = gain, place = finishPlace }
+	if typeof(a) == "number" then rideReport.tripStars, rideReport.tripGain = a, b end
 	if RaceState.recording then RaceState.recording.ride = rideReport end
 end)
 

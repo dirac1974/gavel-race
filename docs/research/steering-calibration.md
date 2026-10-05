@@ -198,6 +198,7 @@ Drafting rewards being behind someone, so the horse in front of a line drafts le
 - A bad lane index or post raises in Python, because Luau would read nil.
 - Bots' two uniforms per lane (rail, lead) come from the race generator after all existing draws; every lane consumes them, bot or not.
 - Turn timing follows the server's constant-speed timeline (RaceService's `tFar`), not the client's gate-eased `paceFeet`. They differ by at most 34 ft at the gate, shrinking to about 14 ft at the lock.
+- Fixture numbers (found in S2): Lune's JSON reader is not correctly rounded and lands about one number in six one ulp off. Two horses exactly `holdGap` apart turn that ulp into a different race. So `trip.json` carries the lanes' inputs (q, p1, uniforms) as exact decimal strings for Luau's `tonumber`, and the parity test takes config values from `GameConfig`'s literals. With exact inputs, `Trip.luau` agrees with every run: answers exactly, numbers to 1e-9.
 
 **`tests/fixtures/trip.json`** (200 runs; generated, gitignored):
 - per-tick intents and the answers;
