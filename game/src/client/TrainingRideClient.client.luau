@@ -28,6 +28,9 @@
 --   is open the invite is answered "busy". After the ride the end card shows how your friend
 --   did, in stars and ribbons only. In a Gate Break together your friend fades on your screen
 --   while you wait in the stall, so their go never looks like yours.
+--   This week's course (T5): Mud Splash rides the layout the server picked (TrainBegin's course
+--   key, grit_w1..grit_w4); GymkhanaView keeps that layout's props in the arena until the ride
+--   ends, even if the week turns over meanwhile.
 -- The glow, hoofprints and feedback come from this client's own position with the same
 -- tracker the server uses; the server's samples decide the score.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -41,6 +44,7 @@ local UserInputService = game:GetService("UserInputService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
+local GymkhanaView = require(script.Parent:WaitForChild("GymkhanaView"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -152,13 +156,15 @@ local function clearGlow()
 end
 
 -- A piece of the course by name: "Hoop3", "Mud1" ... (gymkhana), "Finish" (the gymkhana's
--- arch) or "StartLine" (the oval's start and finish line).
+-- arch) or "StartLine" (the oval's start and finish line). The gymkhana on this screen is the
+-- layout GymkhanaView shows (the one being ridden).
 local function courseModel(name: string): Instance?
+	if string.sub(name, 1, 4) ~= "Hoop" and name ~= "StartLine" then return GymkhanaView.find(name) end
 	local world = workspace:FindFirstChild("World")
 	local tg = world and world:FindFirstChild("TrainingGround")
 	if not tg then return nil end
 	if name == "StartLine" then return tg:FindFirstChild("StartLine") end
-	local folder = tg:FindFirstChild(if string.sub(name, 1, 4) == "Hoop" then "Hoops" else "Gymkhana")
+	local folder = tg:FindFirstChild("Hoops")
 	return folder and folder:FindFirstChild(name)
 end
 
@@ -454,6 +460,7 @@ local function stopVisuals()
 	clearGlow()
 	clearPrints()
 	clearExtras()
+	GymkhanaView.unpin() -- the arena follows the week again (a new week's layout shows now)
 	hud.Visible = false
 	countdown.Visible = false
 	jumpBtn.Visible = false
@@ -502,9 +509,12 @@ local function finishPrints(tr)
 	printsAlong(pts, 7, 18)
 end
 
-local routeIndex: { [number]: number } = {} -- gymkhana piece -> nearest route point
-do
-	local g = TC.courses.grit
+-- Per Mud Splash layout: gymkhana piece -> nearest route point.
+local routeIndexes: { [string]: { [number]: number } } = {}
+local function routeIndexFor(g): { [number]: number }
+	local cached = routeIndexes[g.key]
+	if cached then return cached end
+	local routeIndex = {}
 	for i, e in g.elements do
 		local best, bestD = 1, math.huge
 		for k, pt in g.route.points do
@@ -513,10 +523,12 @@ do
 		end
 		routeIndex[i] = best
 	end
+	routeIndexes[g.key] = routeIndex
+	return routeIndex
 end
 
-local function gritPrints(index: number)
-	local g = TC.courses.grit
+local function gritPrints(g, index: number)
+	local routeIndex = routeIndexFor(g)
 	local rig = myRide()
 	local root = rig and rig.PrimaryPart
 	if not root then return end
@@ -581,6 +593,9 @@ local function beginSession(course: string, n: number, seed: number, goAtServer:
 	local dotCount = if course == "speed" or course == "stamina" then c.laps
 		elseif course == "accel" then CFG.accel.breaks else #c.elements
 	setDots(dotCount, 0, true)
+	if c.kind == "arena" then
+		GymkhanaView.pin(course) -- this ride's layout stays in the arena until it ends
+	end
 	if course == "accel" then
 		buildDoors()
 	elseif course == "stamina" then
@@ -863,7 +878,7 @@ RunService.RenderStepped:Connect(function(dt)
 				glow("Finish")
 				courseLabel.Text = "🏁 To the finish!"
 			end
-			gritPrints(nextIndex) -- after the last piece the prints lead to the finish
+			gritPrints(s.c, nextIndex) -- after the last piece the prints lead to the finish
 		end
 	end
 end)
@@ -1221,7 +1236,7 @@ local function panelOpen(): boolean
 end
 
 TrainInvited.OnClientEvent:Connect(function(id, fromName, course)
-	local c = TC.courses[course]
+	local c = TC.info(course) -- a stat ("grit" is this week's Mud Splash)
 	if typeof(id) ~= "number" or not c then return end
 	if session or player:GetAttribute("Racing") or player:GetAttribute("InLine") or panelOpen() then
 		TrainInviteReply:FireServer(id, "busy") -- riding, racing or in a shop: "busy", no cooldown

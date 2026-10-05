@@ -5,6 +5,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 ## Setup
 - [ ] `cd game && rojo serve`, connect the Rojo plugin in a new Baseplate, press Play.
 - [ ] Publish the place to the **LlamaWorks** group (File → Publish to Roblox As), so it can load the uploaded art.
+- [ ] Publishing an update while players are on: if any T2–T4 training build is live when T5 ("This week's course") ships, publish with **Shut Down All Servers** or **Migrate to latest update**. A T2–T4 server drops training ribbons it doesn't know, so a kid hopping from a T5 server back to an old one would lose their Mud Splash layout ribbons (T5 and later keep unknown ones).
 - [ ] Output window shows no red errors on start. `[AssetService] ... not loaded yet` warnings mean an asset is still in moderation or the place isn't group-owned; placeholders show meanwhile.
 
 ## Track and art
@@ -160,7 +161,15 @@ Ghosts, Ride together, rosettes and Quick train (T4):
 - [ ] "Ride together": both of you are put at the start side by side (both in the practice gate for Gate Break, where your friend fades while you wait in the stall), one shared 3-2-1, the same Pip in Hill Climb; you ride through each other. Each end card shows your own stars, gain and ribbon, plus a line for your friend with their stars and ribbon only ("still riding…" until they finish, "is taking a rest" if they stop or leave); never times or who was first. A later solo ride's card never shows that line.
 - [ ] Settings → visits "Nobody" (either of you): no Ride together list or invites ("Ride together is off").
 - [ ] A gold ribbon puts a gold rosette on that horse's stall under its name plate, one per course; four golds, four rosettes.
-- [ ] Quick train: the four games look and feel as before (the reaction time and the hold game's countdown are no longer shown: no timers on screen); "Get ready…" for a second, then play (holding HOLD during "Get ready…" starts the climb at GO); "Next one!" when a Sprint Lane round passes, "All done!" when the climb ends; mashing Mud Splash scores low. The score shown at the end is the server's; a perfect game still gains like a score of 70. Closing the card mid-game (✕, tapping outside, or a race starting) gains nothing and toasts nothing, and you can start another game straight away; a game with no taps gains nothing.
+- [ ] Quick train (T4, unchanged by T5): the four games look and feel as before (the reaction time and the hold game's countdown are no longer shown: no timers on screen); "Get ready…" for a second, then play (holding HOLD during "Get ready…" starts the climb at GO); "Next one!" when a Sprint Lane round passes, "All done!" when the climb ends; mashing Mud Splash scores low. The score shown at the end is the server's; a perfect game still gains like a score of 70. Closing the card mid-game (✕, tapping outside, or a race starting) gains nothing and toasts nothing, and you can start another game straight away; a game with no taps gains nothing.
+
+This week's course (T5):
+- [ ] The "⭐ Training" picker's Mud Splash tile says "This week's course" with four small ribbon icons under it, one per layout: the ribbon you've earned on that layout (🥉🥈🥇) or a faint 🎀, and this week's ringed in orange. No dates, days, timers or "last chance" anywhere.
+- [ ] The arena shows this week's layout: for the week starting Monday 2026-10-05 that's layout 3 (two puddles in the first lane, two logs in the second, the poles and the darker canter lane in the fifth). Ride it: the dots, glowing pieces, hoofprints and finish arch all match what you see, and a clean, quick ride is gold. A ribbon lands on this week's icon only.
+- [ ] The other layouts: before pressing Play, set `GameConfig.training.grit.layoutPin` to 1, 2, 3 or 4 (0 = by the week). Each has its canter lane in a different place (lanes 4, 2, 5, 3), 4 puddles, 3 logs and 4 poles, nothing on the turns and no log on the walk from the street gate to the south gate; the start line is always in the same corner. A perfect ride is gold on each. Layout 1 is the Mud Splash from before T5, and an older save's Mud Splash ribbon shows on its icon.
+- [ ] Each layout has its own ghost ("👻 Your best" on that layout only). A gold on any layout puts one Mud Splash rosette on the stall, not one per layout.
+- [ ] Riding together: both riders get the same layout. Quick train's Mud Splash game is unchanged.
+- [ ] If you're riding Mud Splash when the week turns over (Monday 00:00 UTC: Sunday evening in the US), your ride keeps its layout to the finish; the arena changes to the new one as the end card opens. Everyone else sees the new layout straight away.
 
 ## Race Board and two courses (Stage 4, D-036)
 

@@ -7,6 +7,7 @@
 --   at(points, hz, t) -> x, y, z, facing x, facing z   (nil after the end)
 --   better(a, b): is run a better than run b (score, then time)?
 --   mergeStore(old, mine): what to save (keeps anything this version doesn't understand)
+--   loadRuns(runs, courses, aliases): what a load keeps (old course keys count for new ones)
 -- Pure, tested under Lune.
 
 local Ghost = {}
@@ -129,6 +130,23 @@ end
 function Ghost.readable(run: any): boolean
 	return typeof(run) == "table" and (tonumber(run.v) or 1) <= Ghost.VERSION and typeof(run.score) == "number"
 		and typeof(run.seconds) == "number" and Ghost.decode(run) ~= nil
+end
+
+-- The runs a load keeps in memory: well-formed runs on courses this version rides. A run under
+-- an old key (`aliases`: T2-T4 saved Mud Splash as "grit", which is layout grit_w1 now) counts
+-- for its new key when it's the better one. The stored record isn't changed by this: mergeStore
+-- passes the old key through, and the run is written under its new key with the next save.
+function Ghost.loadRuns(runs: any, courses: { [string]: boolean }, aliases: { [string]: string }?): { [string]: any }
+	local out = {}
+	if typeof(runs) ~= "table" then return out end
+	for course, run in runs do
+		local key = if courses[course] then course elseif aliases and typeof(course) == "string" then aliases[course] else nil
+		if key and courses[key] and typeof(run) == "table" and typeof(run.score) == "number" and typeof(run.seconds) == "number"
+			and Ghost.decode(run) ~= nil and Ghost.better(run, out[key]) then
+			out[key] = run
+		end
+	end
+	return out
 end
 
 -- A saved ghost record with my runs merged in: a stored run is replaced only if this version
