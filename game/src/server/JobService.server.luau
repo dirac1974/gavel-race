@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Jobs = require(Shared:WaitForChild("Jobs"))
 local Care = require(Shared:WaitForChild("Care"))
+local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
@@ -26,6 +27,14 @@ Profiles.decorate = function(data, view)
 	local now = os.time()
 	for i, b in view.garden or {} do
 		b.ready = b.seed ~= "" and Care.cropProgress(data.garden[i], now) >= 1
+	end
+	for i, hv in view.horses or {} do
+		local h = data.horses[i]
+		if h then
+			hv.trainingReady = Training.ready(h, now)
+			hv.trainedWeek = Training.gainedThisWeek(h, now)
+			hv.rested = Training.isRested(h, now)
+		end
 	end
 end
 
