@@ -50,4 +50,8 @@ Suggestion: compare skill to the average for that specific race to make the game
 
 ## Request 9 — autonomous agent team
 
-Set up implementation, testing, and review agents that keep all decisions in memory documents and update the repo autonomously, plus Roblox research and expert designer agents that debate as the game develops. Response: CLAUDE.md, 13 subagents, memory docs, debate protocol, test suite, CI. Tests caught an overstated rounding claim in V2_PROPOSAL, now corrected (D-010).
+Set up implementation, testing, and review agents that keep all decisions in memory documents and update the repo autonomously, plus Roblox research and expert designer agents that debate as the game develops. Response: CLAUDE.md, 13 subagents, memory docs, debate protocol, test suite, CI. Tests caught an overstated rounding claim in V2_PROPOSAL; purses now round to whole cash (D-017).
+
+## Request 10 — team makes design decisions
+
+"Make all decisions yourself and we can review later." Response: design decisions are logged as `Accepted (provisional)` and listed in `docs/memory/REVIEW_QUEUE.md` (D-009). Hard rules 1–3 stay outside the delegation.

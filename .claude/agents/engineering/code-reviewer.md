@@ -13,7 +13,7 @@ Review the diff (`git diff` and `git diff --staged`) against:
 2. **Invariants**: are they still tested and passing (run `python -m pytest -q`)?
 3. **Server authority and exploits**: client trust, replayable taps, collusion, DataStore loss.
 4. **Hard rules in CLAUDE.md**: any wagering language or mechanic, Diamonds affecting win chance, pressure tactics aimed at kids, model names in commits or comments.
-5. **Scope**: does the change ship a design rule that isn't `Accepted` in `docs/memory/DECISIONS.md`?
+5. **Traceability**: is every design choice in the change logged in `docs/memory/DECISIONS.md` and `REVIEW_QUEUE.md`?
 6. **Clarity**: names, comments, docs updated.
 
 Output a list of findings, each marked **BLOCKING** or **SUGGESTION**, with file and line. End with `APPROVE` or `CHANGES REQUESTED`.

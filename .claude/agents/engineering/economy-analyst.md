@@ -16,6 +16,6 @@ Your job:
 - Targets to test against: Bronze in about 3 hours of play, Silver in about 3 days, Gold in about 3 weeks; a non-payer can reach Champion.
 - Flag any route where Diamonds turn into Green Cash or win chance, directly or indirectly.
 
-Changing a number inside an existing tuning range is an engineering decision; record it. Changing a target, adding a sink or faucet, or changing a price structure is a design proposal for David.
+Changing a number inside an existing tuning range is an engineering decision. Changing a target, sink, faucet, or price structure is a design decision: make it, explain it, and flag it as provisional for David's review.
 
-Return: what you simulated, key numbers in a short table, and recommendations marked as tuning or proposal.
+Return: what you simulated, key numbers in a short table, and recommendations marked as tuning or provisional design decision.

@@ -57,7 +57,7 @@ The model is being used for a kid-friendly Roblox horse racing game. Roblox proh
 ### v2 decisions
 
 1. Base chance `q = softmax(Rating / T)`, floored at 2.5%; `T` by league (Rookie 22 … Champion 12).
-2. Win purse `5 · round(B / 5q)`: every horse expects `B` at average play. No margin, no tiered rounding.
+2. Win purse `round(B / q)` in whole cash (D-017; first written as rounding to 5): every horse expects `B` at average play. No margin, no tiered rounding.
 3. Window score `100 (1 − d)`, constant-speed meter; `S` = mean of 3 windows.
 4. Skill measured against **this race's average**: `R = clamp((S − mean S) / 50, −0.5, 1)`. Same chances as a league median (the tilt is shift-invariant) except at clamp edges; chosen for clarity, no gameable statistic, and lower collusion gain.
 5. Exponential tilt `p' ∝ q · e^{κR}`, `κ = 1.0`. Always positive; better timing never lowers your own chance.
@@ -72,6 +72,8 @@ The model is being used for a kid-friendly Roblox horse racing game. Roblox proh
 - Set `κ` and `T` from playtests.
 - Reserve dial `α` (`Purse ∝ q^(−α)`) if training needs to pay more win cash.
 
-## Agent team (2026-10-04)
+## Agent team and game build (2026-10-04)
 
-The repo now runs as a Claude Code project: `CLAUDE.md` holds the hard rules and build loop, `.claude/agents/` defines the engineering team (model, Roblox, test, review, economy, scribe) and the design council (moderator, four designers, researcher). Living memory is in `docs/memory/`; debates in `docs/debates/`; research in `docs/research/`. Tests in `tests/`, CI in `.github/workflows/ci.yml`. How to run it: [KICKOFF.md](KICKOFF.md).
+David delegated design decisions to the team for later review (D-009). Claude Code agents now carry the project: an engineering team (model, Roblox, test, review, economy, scribe) and a design council (moderator, four designers, researcher). Rules and the build loop are in `CLAUDE.md`; decisions in `docs/memory/DECISIONS.md`; provisional ones awaiting David in `docs/memory/REVIEW_QUEUE.md`.
+
+Built so far: Python and Luau race math with exact parity, a Rojo Phase 1 prototype (meter, race session, server loop, client UI; not yet run in Studio), Race Rating from stats and conditions, an economy simulator that set Stakes thresholds, and debate 001 on gavel feel.
