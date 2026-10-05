@@ -331,6 +331,12 @@ local function attachBarn(barn: Instance)
 			if anchor and not anchor:FindFirstChild("CarePrompt") then
 				prompt(anchor, "Care", h and h.name or "Horse").Triggered:Connect(function() horseCard(id) end)
 			end
+		elseif m:IsA("BasePart") and m.Name == "Noticeboard" then
+			if not m:FindFirstChild("CarePrompt") then
+				prompt(m, "Read", "Stable Board", Enum.KeyCode.E).Triggered:Connect(function()
+					ReplicatedStorage:WaitForChild("HudEvents"):WaitForChild("OpenBoard"):Fire()
+				end)
+			end
 		elseif m:IsA("BasePart") and string.sub(m.Name, 1, 5) == "Stall" then
 			local stall = tonumber(string.sub(m.Name, 6))
 			if stall and not m:FindFirstChild("CarePrompt") then

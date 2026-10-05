@@ -77,7 +77,9 @@ local function sendSync(player: Player)
 	if not e or not player.Parent then return end
 	e.syncQueued = false
 	e.lastSync = os.clock()
-	ProfileSync:FireClient(player, Profile.view(e.data, now(), GameConfig.energy))
+	local view = Profile.view(e.data, now(), GameConfig.energy)
+	if Profiles.decorate then Profiles.decorate(e.data, view) end -- jobs, garden readiness (JobService)
+	ProfileSync:FireClient(player, view)
 end
 
 -- Mark a profile edited: it saves on the next autosave and the client gets a fresh view.

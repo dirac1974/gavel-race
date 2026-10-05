@@ -91,6 +91,19 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Out of hay and cash: the message points to chores; nothing ever hurts the horse.
 - [ ] Visitors (friends) don't see your care prompts.
 
+## Stable Board (Stage 5, D-043)
+
+- [ ] The 📋 button in the dock and the noticeboard by your gate both open the Stable Board.
+- [ ] Top row: one card per stalled horse with a fact ("Comet is rested and ready to race", "napping in the straw") and a next step with GO.
+- [ ] Today's jobs: three cards with picture, words, progress bar, reward and GO; GO draws golden hoofprints to the place.
+- [ ] Doing the thing (feed, brush, race, pick a crop, ride…) moves the bar; a toast says the job is done; Claim pays the reward.
+- [ ] All three claimed: a sleeping horse and "All done today!".
+- [ ] "Swap a job" once a day replaces an unfinished job; then the button hides.
+- [ ] This week / this month ribbons with a 🎁 when something's ready to claim; monthly shows ⭐ stamps.
+- [ ] The pinned job above the dock shows the first unfinished job with GO; hidden while you race or with the board open.
+- [ ] No bell, no red badge, no timers anywhere; no job asks you to win, spend or invite.
+- [ ] Next day (or change the clock): finished but unclaimed jobs pay out with a "Welcome back" toast; the visit counts once per day.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.

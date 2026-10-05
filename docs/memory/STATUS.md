@@ -26,6 +26,12 @@ Last updated: 2026-10-04
 - `CareClient`: care card per horse, brushing game, garden and shop cards, prompts on your own plot only.
 - `StableService`: stall doors named for chores, garden beds with crops growing in stages and a sparkle when ready, a sparkle on horses brushed today; refreshes every 20 s.
 
+**Stage 5 — Stable Board** (branch `claude/stage5-board`, stacked on Stage 3):
+- `Jobs` (pure, tested): 3 daily / 5 weekly / 5 monthly from pools seeded by player and period, effort events only, claim, auto-claim at rollover, one free swap a day, monthly stamps. `Advice` (pure, tested): one fact and one next step per horse, never guilt.
+- `Progress` (server): records events from care, garden, chores, rides, races (Great taps via `PaceMeter.countAtLeast`, Great bursts) and visits (a day, the Trail meadow).
+- `JobService`: rollover, claim, swap, adds jobs and garden readiness to the profile view.
+- `StableBoard` (client): board with horse cards, job cards with GO hoofprints and Claim, ribbons, "All done today!", pinned job; 📋 dock button and barn noticeboard.
+
 ## Backlog (top = next)
 
 World build stages from [WORLD_DESIGN.md](../WORLD_DESIGN.md) (D-035 to D-047). David's go-ahead (2026-10-04): build autonomously, merge as we go, Meshy up to 1,305 credits.

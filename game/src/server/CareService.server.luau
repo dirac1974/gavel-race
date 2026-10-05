@@ -13,6 +13,7 @@ local Profile = require(Shared:WaitForChild("Profile"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local CareAction = Profiles.remote("CareAction")   -- client -> server: horseId, "feed"|"groom"|"treat"|"pet", item?
 local Garden = Profiles.remote("Garden")           -- client -> server: bed, "plant"|"harvest", seed?
@@ -80,7 +81,10 @@ CareAction.OnServerEvent:Connect(function(player: Player, horseId: any, action: 
 		return
 	end
 	reply(player, ok, msg, if action == "groom" then "care_star" else "heart")
-	if ok then CareFx:FireAllClients(player:GetAttribute("PlotIndex"), horseId, action) end
+	if ok then
+		CareFx:FireAllClients(player:GetAttribute("PlotIndex"), horseId, action)
+		Progress.record(player, action, 1)
+	end
 end)
 
 Garden.OnServerEvent:Connect(function(player: Player, bedIndex: any, action: any, seed: any)
@@ -96,6 +100,7 @@ Garden.OnServerEvent:Connect(function(player: Player, bedIndex: any, action: any
 		return
 	end
 	reply(player, ok, msg, "carrot")
+	if ok then Progress.record(player, action, 1) end
 end)
 
 Chore.OnServerEvent:Connect(function(player: Player, stall: any)
@@ -104,6 +109,7 @@ Chore.OnServerEvent:Connect(function(player: Player, stall: any)
 	if not data or not atOwnPlot(player) then return end
 	local ok, msg = Care.chore(data, stall, os.time())
 	reply(player, ok, msg, "hay")
+	if ok then Progress.record(player, "chore", 1) end
 end)
 
 Shop.OnServerEvent:Connect(function(player: Player, action: any, item: any, qty: any)

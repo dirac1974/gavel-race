@@ -171,6 +171,29 @@ local function buildBarn(i: number, owner: Player, data)
 		part({ Name = "Water", Size = Vector3.new(5.4, 0.2, 2), Color = C.water, Material = Enum.Material.Glass, Transparency = 0.25,
 			CanCollide = false, CFrame = plotCF(i, front - 4, -width / 2 - 5, GROUND_Y + 1.9) }, barn)
 	end
+	-- The Stable Board noticeboard by the gate (D-043).
+	local nbCF = plotCF(i, 9, -GATE_W / 2 - 9, GROUND_Y)
+	local nb = WorldScene.placeModel(barn, "noticeboard", nbCF)
+	if not nb then
+		for _, dx in { -3.2, 3.2 } do
+			part({ Name = "NoticePost", Size = Vector3.new(0.6, 7, 0.6), Color = C.wood, CFrame = nbCF * CFrame.new(dx, 3.5, 0) }, barn)
+		end
+		part({ Name = "NoticeRoof", Size = Vector3.new(8, 0.6, 2), Color = C.roofRed, CFrame = nbCF * CFrame.new(0, 7.2, 0) }, barn)
+	end
+	local board = part({ Name = "Noticeboard", Size = Vector3.new(6.4, 4, 0.4), Color = Color3.fromHex("C9A26B"),
+		Material = Enum.Material.Wood, CFrame = nbCF * CFrame.new(0, 4.6, 0) }, barn)
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Front
+	sg.CanvasSize = Vector2.new(320, 200)
+	sg.Parent = board
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1)
+	t.BackgroundTransparency = 1
+	t.Font = Enum.Font.FredokaOne
+	t.TextScaled = true
+	t.TextColor3 = C.ink
+	t.Text = "📋 Stable Board"
+	t.Parent = sg
 	barn:SetAttribute("Owner", owner.UserId)
 	barn.Parent = shell
 end

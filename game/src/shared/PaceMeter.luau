@@ -85,4 +85,22 @@ function PaceMeter.score(passes: { Pass }, taps: { number }): (number, { number 
 	return total / #passes, errors, single
 end
 
+-- How many passes got exactly one tap scoring at least `min` (80 = Great or Perfect), the
+-- same rule as score(): a doubled pass counts for nothing.
+function PaceMeter.countAtLeast(passes: { Pass }, taps: { number }, min: number): number
+	local byPass: { [number]: { number } } = {}
+	for _, t in taps do
+		local k = PaceMeter.passIndex(passes, t)
+		if k then
+			byPass[k] = byPass[k] or {}
+			table.insert(byPass[k], t)
+		end
+	end
+	local n = 0
+	for k, ts in byPass do
+		if #ts == 1 and PaceMeter.tapScore(passes[k], ts[1]) >= min then n += 1 end
+	end
+	return n
+end
+
 return PaceMeter

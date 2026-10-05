@@ -260,4 +260,85 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local mig = Profile.migrate(cp, T0)
 	check(mig.garden[2].seed == "seed_oats" and #mig.garden == Profile.BEDS and mig.chores["1"] ~= nil, "garden and chores saved")
 	check(#Profile.migrate(nil, T0).garden == Profile.BEDS, "new profile has empty beds")
+
+	-- Jobs (Stage 5) --------------------------------------------------------------------
+	local Jobs = require("../../game/src/shared/Jobs")
+	local Advice = require("../../game/src/shared/Advice")
+	local PaceMeter = require("../../game/src/shared/PaceMeter")
+	local jp = Profile.new(T0)
+	Jobs.refresh(jp, 12345, T0)
+	check(#jp.jobs.daily == 3 and #jp.jobs.weekly == 5 and #jp.jobs.monthly == 5, "3 daily, 5 weekly, 5 monthly")
+	local again = Profile.new(T0)
+	Jobs.refresh(again, 12345, T0 + 3600)
+	local same = true
+	for i = 1, 3 do if again.jobs.daily[i].id ~= jp.jobs.daily[i].id then same = false end end
+	check(same, "same jobs on any server the same day")
+	local noWin, noSpend = true, true
+	for _, pool in { Jobs.DAILY, Jobs.WEEKLY, Jobs.MONTHLY } do
+		for _, d in pool do
+			if string.find(string.lower(d.text), "win") then noWin = false end
+			if d.event == "buy" or d.event == "spend" or d.event == "invite" then noSpend = false end
+			if d.reward.items then
+				for item in d.reward.items do if not table.find(Profile.ITEMS, item) then noSpend = false end end
+			end
+		end
+	end
+	check(noWin and noSpend, "no win, spend or invite jobs; rewards are real items")
+	local dailyCash = 0
+	for _, d in Jobs.DAILY do dailyCash = math.max(dailyCash, d.reward.cash or 0) end
+	check(dailyCash * 3 <= 30, "daily job cash stays small (about 10% of a day's races)")
+	-- Progress, claim, rollover auto-claim.
+	local first = jp.jobs.daily[1]
+	local def = Jobs.def(first.id)
+	local finished = Jobs.record(jp, 12345, def.event, def.target, T0)
+	local found = false
+	for _, d in finished do if d.id == first.id then found = true end end
+	check(found and first.progress == def.target, "recording finishes a job")
+	Jobs.record(jp, 12345, def.event, 50, T0)
+	check(first.progress == def.target, "progress caps at the target")
+	local cashBefore = jp.cash
+	check(Jobs.claim(jp, 12345, "daily", 1, T0) and jp.cash == cashBefore + (def.reward.cash or 0), "claim pays the reward")
+	check(not Jobs.claim(jp, 12345, "daily", 1, T0), "claim once")
+	local second = jp.jobs.daily[2]
+	local def2 = Jobs.def(second.id)
+	Jobs.record(jp, 12345, def2.event, def2.target, T0)
+	local cash2 = jp.cash
+	local auto = Jobs.refresh(jp, 12345, T0 + 86400)
+	check(auto >= 1 and jp.cash >= cash2 + (def2.reward.cash or 0) and jp.jobs.daily[1].progress == 0, "rollover auto-claims finished jobs")
+	-- Reroll once a day, only unfinished jobs.
+	local before = jp.jobs.daily[3].id
+	check(Jobs.reroll(jp, 12345, 3, T0 + 86400) and jp.jobs.daily[3].id ~= before, "free swap")
+	check(not Jobs.reroll(jp, 12345, 2, T0 + 86400), "one swap a day")
+	-- All done today.
+	for i = 1, 3 do
+		local d = Jobs.def(jp.jobs.daily[i].id)
+		Jobs.record(jp, 12345, d.event, d.target, T0 + 86400)
+		Jobs.claim(jp, 12345, "daily", i, T0 + 86400)
+	end
+	check(Jobs.allDoneToday(jp), "all done today")
+	local jv = Jobs.view(jp)
+	check(#jv.daily == 3 and jv.daily[1].text ~= nil and jv.rerollUsed, "jobs view for the board")
+
+	-- Advice: facts, never guilt.
+	local tipA = Advice.forHorse({ name = "Comet", fed = false, groomed = false, resting = false, stats = {} }, { garden = {} }, T0)
+	check(tipA.go == "stable" and string.find(tipA.next, "hay") ~= nil, "unfed: a meal is next")
+	local tipB = Advice.forHorse({ name = "Comet", fed = true, groomed = true, resting = false, stats = {} }, { garden = {} }, T0)
+	check(tipB.go == "raceBoard", "cared for and rested: race next")
+	local tipC = Advice.forHorse({ name = "Comet", fed = true, groomed = true, resting = true, stats = {} }, { garden = {} }, T0)
+	local guilt = false
+	for _, tip in { tipA, tipB, tipC } do
+		local text = string.lower(tip.fact .. " " .. tip.next)
+		for _, w in { "miss", "hungry", "sad", "lonely", "neglect" } do
+			if string.find(text, w) then guilt = true end
+		end
+	end
+	check(not guilt and string.find(tipC.fact, "napping") ~= nil, "tips state facts, never guilt")
+	check(Advice.trainNext({ stats = { speed = 50, accel = 60, stamina = 40, grit = 70 }, potential = { speed = 80, accel = 70, stamina = 85, grit = 75 } }) == "stamina",
+		"train the stat with the most room")
+
+	-- PaceMeter.countAtLeast: single good taps only.
+	local passes = { { t0 = 0, t1 = 1, dir = 1, center = 0 }, { t0 = 1, t1 = 2, dir = -1, center = 0 } }
+	check(PaceMeter.countAtLeast(passes, { 0.5, 1.5 }, 80) == 2, "two centred taps are Great")
+	check(PaceMeter.countAtLeast(passes, { 0.5, 0.51, 1.5 }, 80) == 1, "a doubled pass doesn't count")
+	check(PaceMeter.countAtLeast(passes, { 0.05 }, 80) == 0, "an edge tap isn't Great")
 end
