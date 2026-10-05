@@ -1,18 +1,22 @@
 --!nonstrict
--- RaceController: prototype race UI (D-022).
--- Giddy-up stretches: a ring closes on the hoof for each beat; tap anywhere (or
--- Space / gamepad A) on the beat. The on-screen beat is what counts; there is no
--- audio cue yet, and when there is it stays decoration (Bluetooth lag).
--- Final Burst: one tap on the sweeping meter, which starts at a random point.
+-- RaceController: prototype race UI (D-022, art review 2026-10-04).
+-- Giddy-up stretches: each beat sends a ring that closes on the hoof in the same
+-- fixed time, so tempo changes show as ring spacing. Tap anywhere, any key, or any
+-- gamepad button; the pulsing pad at the bottom is only a reminder, not a target.
+-- The on-screen beat is what counts; audio, when added, stays decoration.
+-- Final Burst: one tap on the sweeping meter, which starts at a random point. The
+-- celebration plays on your own screen after it's scored; others see a sparkle.
 -- Drawn from the shared server clock; all scoring happens on the server.
--- Placeholder shapes until the playtest art lands.
+-- Placeholder shapes until the playtest art is imported.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
 local HapticService = game:GetService("HapticService")
+local GuiService = game:GetService("GuiService")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BurstMeter = require(Shared:WaitForChild("BurstMeter"))
@@ -23,9 +27,15 @@ local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
+local RING_LEAD = GameConfig.stride.ringLeadSeconds
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
+end
+
+local function reducedMotion(): boolean
+	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
+	return ok and on == true
 end
 
 -- UI construction -----------------------------------------------------------
@@ -84,35 +94,51 @@ for i = 1, 8 do
 end
 
 local segmentName = label(gui, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0.30, 0), "", 24)
-local feedback = label(gui, UDim2.new(1, 0, 0, 50), UDim2.new(0, 0, 0.72, 0), "", 34)
-local hint = label(gui, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0.80, 0), "", 20)
+local feedback = label(gui, UDim2.new(1, 0, 0, 50), UDim2.new(0, 0, 0.66, 0), "", 34)
+local hint = label(gui, UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0.73, 0), "", 20)
 
--- Giddy-up: hoof target and the closing ring.
+-- Giddy-up: hoof target and a pool of closing rings (several can be on screen).
 local HOOF = 110
 local hoof = Instance.new("Frame")
 hoof.AnchorPoint = Vector2.new(0.5, 0.5)
 hoof.Position = UDim2.fromScale(0.5, 0.5)
 hoof.Size = UDim2.fromOffset(HOOF, HOOF)
-hoof.BackgroundColor3 = Color3.fromRGB(150, 95, 55)
+hoof.BackgroundColor3 = Color3.fromRGB(60, 40, 30) -- dark, high contrast: the beat lands here
 hoof.ZIndex = 3
 hoof.Visible = false
 hoof.Parent = gui
 round(hoof)
-local hoofText = label(hoof, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), ThemePack.words.giddyUp, 18)
 
-local ring = Instance.new("Frame")
-ring.AnchorPoint = Vector2.new(0.5, 0.5)
-ring.Position = UDim2.fromScale(0.5, 0.5)
-ring.Size = UDim2.fromOffset(HOOF, HOOF)
-ring.BackgroundTransparency = 1
-ring.ZIndex = 3
-ring.Visible = false
-ring.Parent = gui
-round(ring)
-local ringStroke = Instance.new("UIStroke")
-ringStroke.Thickness = 6
-ringStroke.Color = Color3.fromRGB(255, 225, 90)
-ringStroke.Parent = ring
+local rings = {}
+for i = 1, 4 do
+	local r = Instance.new("Frame")
+	r.AnchorPoint = Vector2.new(0.5, 0.5)
+	r.Position = UDim2.fromScale(0.5, 0.5)
+	r.BackgroundTransparency = 1
+	r.ZIndex = 4
+	r.Visible = false
+	r.Parent = gui
+	round(r)
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 6
+	stroke.Color = Color3.fromRGB(255, 225, 90)
+	stroke.Parent = r
+	rings[i] = { frame = r, stroke = stroke }
+end
+
+-- The pulsing pad: kids look for a button, but any tap anywhere counts.
+local pad = Instance.new("Frame")
+pad.AnchorPoint = Vector2.new(0.5, 1)
+pad.Position = UDim2.new(0.5, 0, 1, -24)
+pad.Size = UDim2.new(0.7, 0, 0, 90)
+pad.BackgroundColor3 = Color3.fromRGB(255, 190, 40)
+pad.BackgroundTransparency = 0.35
+pad.ZIndex = 2
+pad.Visible = false
+pad.Parent = gui
+round(pad, UDim.new(0, 24))
+local padText = label(pad, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), ThemePack.words.giddyUp, 40)
+padText.Font = Enum.Font.GothamBlack
 
 -- Final Burst meter.
 local meter = Instance.new("Frame")
@@ -143,24 +169,40 @@ marker.BackgroundColor3 = Color3.new(1, 1, 1)
 marker.ZIndex = 4
 marker.Parent = meter
 
+-- Burst celebration (own screen only, after scoring).
+local burstBanner = label(gui, UDim2.new(1, 0, 0, 80), UDim2.new(0, 0, 0.36, 0), "", 64)
+burstBanner.Font = Enum.Font.GothamBlack
+burstBanner.TextColor3 = Color3.fromRGB(255, 225, 90)
+burstBanner.Visible = false
+
 -- State ---------------------------------------------------------------------
 local lanes = {}
 local chances = {}
+local sparkleUntil = {} -- lane id -> time a burst sparkle stops showing on the board
 -- active = { kind = "stride", seg, beats, half, lastTapBeat, tapsThisBeat }
 --        | { kind = "burst", seg, open, close, spec, tapped }
 local active = nil
 
 local function renderBoard()
+	local t = os.clock()
 	for i, row in rows do
 		local lane = lanes[i]
 		if lane then
-			local you = lane.id == myId and "  (you)" or ""
-			row.Text = string.format("%s%s  %d%%  %s %d", lane.name, you, math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
+			local you = lane.id == myId and "  ◀ YOU" or ""
+			local sparkle = (sparkleUntil[lane.id] or 0) > t and " ✦" or ""
+			row.Text = string.format("%d  %s%s%s  %d%%  %s %d", i, lane.name, sparkle, you,
+				math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
 			row.TextColor3 = lane.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
 		else
 			row.Text = ""
 		end
 	end
+end
+
+-- During taps only the ring should stand out (art review).
+local function setFocus(on: boolean)
+	board.BackgroundTransparency = if on then 0.75 else 0.3
+	for _, row in rows do row.TextTransparency = if on then 0.6 else 0 end
 end
 
 local function buzz()
@@ -175,7 +217,28 @@ local function buzz()
 end
 
 local function hideAll()
-	hoof.Visible, ring.Visible, meter.Visible, tapArea.Visible = false, false, false, false
+	hoof.Visible, meter.Visible, tapArea.Visible, pad.Visible = false, false, false, false
+	for _, r in rings do r.frame.Visible = false end
+	setFocus(false)
+end
+
+local function celebrate(score: number, labelText: string)
+	burstBanner.Text = string.format("%s! %d", labelText, math.round(score))
+	burstBanner.Visible = true
+	burstBanner.TextTransparency = 0
+	burstBanner.TextSize = 40
+	TweenService:Create(burstBanner, TweenInfo.new(0.25, Enum.EasingStyle.Back), { TextSize = 64 }):Play()
+	if score >= 80 and not reducedMotion() then
+		local camera = workspace.CurrentCamera
+		if camera then
+			local fov = camera.FieldOfView
+			local punch = TweenService:Create(camera, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), { FieldOfView = fov - 3 })
+			punch:Play()
+		end
+	end
+	task.delay(1.6, function()
+		TweenService:Create(burstBanner, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+	end)
 end
 
 local function tap()
@@ -200,40 +263,51 @@ local function tap()
 	elseif active.kind == "burst" and not active.tapped then
 		active.tapped = true
 		remotes.BurstTap:FireServer(active.seg, t)
-		tapArea.Visible = false
+		tapArea.Visible, pad.Visible = false, false
 	end
 end
 
 tapArea.Activated:Connect(tap)
-ContextActionService:BindAction("RaceTap", function(_, state)
-	if state == Enum.UserInputState.Begin then tap() end
-	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end -- typing in chat, menus
+	local kind = input.UserInputType
+	if kind == Enum.UserInputType.Keyboard or kind.Name:sub(1, 7) == "Gamepad" then
+		tap()
+	end
+end)
 
 local lastBeatBuzzed = 0
 RunService.RenderStepped:Connect(function()
-	if not active then return end
+	if not active then
+		return
+	end
 	local t = serverNow()
 	if active.kind == "stride" then
 		local beats = active.beats
-		-- The ring closes over the interval before the next beat and meets the hoof on it.
-		local nextK = nil
+		-- Each ring appears RING_LEAD before its beat and closes at a constant rate.
+		local used = 0
 		for k, b in beats do
-			if b >= t - 0.05 then nextK = k break end
-		end
-		if nextK then
-			local b = beats[nextK]
-			local prev = if nextK > 1 then beats[nextK - 1] else b - (beats[2] - beats[1])
-			local progress = math.clamp((b - t) / (b - prev), 0, 1)
-			local size = HOOF * (1 + 1.6 * progress)
-			ring.Size = UDim2.fromOffset(size, size)
-			local onBeat = math.abs(t - b) < 0.06
-			hoof.BackgroundColor3 = if onBeat then Color3.fromRGB(255, 225, 90) else Color3.fromRGB(150, 95, 55)
-			if onBeat and lastBeatBuzzed ~= nextK then
-				lastBeatBuzzed = nextK
+			local ahead = b - t
+			if ahead <= RING_LEAD and ahead >= -0.06 and used < #rings then
+				used += 1
+				local r = rings[used]
+				local size = HOOF * (1 + 1.6 * math.max(ahead, 0) / RING_LEAD)
+				r.frame.Size = UDim2.fromOffset(size, size)
+				r.stroke.Transparency = if ahead > RING_LEAD * 0.8 then (ahead - RING_LEAD * 0.8) / (RING_LEAD * 0.2) else 0
+				r.frame.Visible = true
+			end
+			if math.abs(ahead) < 0.06 and lastBeatBuzzed ~= k then
+				lastBeatBuzzed = k
 				buzz()
 			end
 		end
+		for i = used + 1, #rings do rings[i].frame.Visible = false end
+		local onBeat = false
+		for _, b in beats do
+			if math.abs(t - b) < 0.06 then onBeat = true break end
+		end
+		hoof.BackgroundColor3 = if onBeat then Color3.fromRGB(255, 225, 90) else Color3.fromRGB(60, 40, 30)
+		pad.BackgroundTransparency = 0.35 + 0.2 * math.abs(math.sin(t * math.pi * 2))
 		if t > beats[#beats] + active.half + 0.1 then
 			hideAll()
 			active = nil
@@ -272,18 +346,21 @@ end)
 remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, _start, cond)
 	lanes = laneList
 	chances = {}
+	sparkleUntil = {}
 	for i, lane in laneList do chances[i] = lane.chance end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
 	status.Text = string.format("%s race: %s", league, conditions)
 	feedback.Text, hint.Text = "", ""
+	burstBanner.Visible = false
 	renderBoard()
 end)
 
 remotes.StretchOpened.OnClientEvent:Connect(function(seg, beats, name, half)
 	active = { kind = "stride", seg = seg, beats = beats, half = half, lastTapBeat = 0, tapsThisBeat = 0 }
-	segmentName.Text = string.format("%s: %s", name, ThemePack.words.giddyUp)
+	segmentName.Text = name
 	feedback.Text, hint.Text = "", "Tap when the ring meets the hoof"
-	hoof.Visible, ring.Visible, meter.Visible, tapArea.Visible = true, true, false, true
+	hoof.Visible, meter.Visible, tapArea.Visible, pad.Visible = true, false, true, true
+	setFocus(true)
 end)
 
 remotes.StretchResult.OnClientEvent:Connect(function(_seg, score, labelText)
@@ -295,12 +372,24 @@ remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec, name)
 	active = { kind = "burst", seg = seg, open = open, close = close, spec = spec, tapped = false }
 	segmentName.Text = name or ThemePack.words.burst
 	feedback.Text, hint.Text = "", "One big tap in the glow. It counts double!"
-	hoof.Visible, ring.Visible, meter.Visible, tapArea.Visible = false, false, true, true
+	hoof.Visible, meter.Visible, tapArea.Visible, pad.Visible = false, true, true, true
+	for _, r in rings do r.frame.Visible = false end
+	setFocus(true)
 end)
 
 remotes.TapResult.OnClientEvent:Connect(function(_seg, score, labelText)
-	feedback.Text = string.format("%s! %d", labelText, math.round(score))
+	feedback.Text = ""
 	hint.Text = ""
+	celebrate(score, labelText) -- the burst is scored on arrival; the window may still be open for others
+end)
+
+remotes.BurstSparkle.OnClientEvent:Connect(function(laneIds)
+	local untilT = os.clock() + 4
+	for _, id in laneIds do
+		if id ~= myId then sparkleUntil[id] = untilT end
+	end
+	renderBoard()
+	task.delay(4.1, renderBoard)
 end)
 
 remotes.LiveChances.OnClientEvent:Connect(function(_seg, live)

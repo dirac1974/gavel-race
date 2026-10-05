@@ -46,6 +46,7 @@ local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst s
 local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances after it
 local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results
 local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
+local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst (small badge sparkle)
 local StrideTap = makeRemote("StrideTap")         -- client -> server: seg, claimed server time
 local BurstTap = makeRemote("BurstTap")           -- client -> server: seg, claimed server time
 
@@ -245,6 +246,13 @@ local function runRace(players: { Player })
 			BurstOpened:FireAllClients(seg, current.open, current.close, spec, ThemePack.words.burst)
 			waitUntil(current.close + LATENCY_GRACE)
 			current.kind = nil
+			local great = {}
+			for _, p in players do
+				local i = session:laneIndex(tostring(p.UserId))
+				local s = i and session.lanes[i].scores[seg]
+				if s and s >= 80 then table.insert(great, tostring(p.UserId)) end
+			end
+			if #great > 0 then BurstSparkle:FireAllClients(great) end
 		end
 		LiveChances:FireAllClients(seg, session:closeSegment(seg))
 		t = current.close + LATENCY_GRACE

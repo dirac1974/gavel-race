@@ -26,7 +26,8 @@ GameConfig.windowGapSeconds = 4.0    -- running time between segments
 GameConfig.stride = {
 	beats = 8,                 -- per stretch, ~2 taps a second
 	halfWindowSeconds = 0.08,  -- a tap scores if within this of its beat
-	leadInSeconds = 1.2,       -- first ring shows this long before the first beat
+	leadInSeconds = 1.2,       -- stretch opens this long before the first beat
+	ringLeadSeconds = 0.9,     -- every ring takes this long to close (tempo shows as spacing)
 	maxTapsPerBeat = 2,        -- taps beyond beats * this + 4 are ignored (they'd count against anyway)
 }
 -- Per-tap labels for Giddy-up feedback, by closeness 1 - |error| / halfWindow.

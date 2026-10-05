@@ -14,8 +14,9 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 
 ## Giddy-up stretches (×3)
 - [ ] The stretch name appears with "GIDDY-UP!" (The Break, Backstretch, Final Stretch).
-- [ ] A ring closes on the hoof about twice a second and meets it on each beat; the hoof flashes on the beat.
-- [ ] Tapping anywhere on the screen (or Space, or gamepad A) counts; each tap shows Perfect / Great / Good / Okay / Off beat.
+- [ ] Each beat sends a ring that closes on the dark hoof in the same time (0.9 s), so two rings are often on screen; the hoof flashes on the beat.
+- [ ] The board dims during taps so the ring stands out; the yellow GIDDY-UP pad pulses at the bottom.
+- [ ] Tapping anywhere on the screen (or any key, or any gamepad button) counts, but not while typing in chat; each tap shows Perfect / Great / Good / Okay / Off beat.
 - [ ] Tapping twice on one beat shows "Broke stride!" and the too-fast hint.
 - [ ] Rookie tempo is steady (0.6 s per beat); there are 8 beats.
 - [ ] At the end of each stretch a summary appears (Perfect stretch 70+, Great 45+, Good 20+, Keep the beat).
@@ -27,6 +28,8 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] One tap scores (Perfect 95+, Great 80+, Good 60+, Okay 30+, Miss); the tap area hides after tapping.
 - [ ] Not tapping shows "Missed!" when the window ends.
 - [ ] Win chance swings more after the burst than after a stretch (it counts double).
+- [ ] Your burst result plays as a big banner on your screen only; a Great+ burst adds a tiny camera punch (none with Reduced Motion on).
+- [ ] Other players' Great+ bursts show only a small ✦ next to their name on the board.
 
 ## Integrity (log only)
 - [ ] After each race, the Output window shows no errors from integrity tracking. (A flag prints an `[Integrity]` line; nothing is shown to players while `logOnly` is on.)
