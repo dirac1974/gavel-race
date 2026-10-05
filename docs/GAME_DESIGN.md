@@ -13,7 +13,7 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 ## Race
 
 - 8 lanes, about 60–90 seconds, bots fill empty lanes within 20 seconds.
-- Lobby shows each horse's Win Chance % and locked win purse ("Win: 465").
+- Lobby shows each horse's Win Chance % and locked win purse ("Win: 464").
 - Three gavel windows (break, backstretch, final stretch). Live Win Chance updates after each tap.
 - Server draws the finish order, then animates the race to match.
 - Prizes: winner gets the locked purse; 2nd 1.2B, 3rd 0.8B, 4th 0.4B. League Points: win 10, 2nd 6, 3rd 4, 4th 2, finish 1.
@@ -51,9 +51,19 @@ League base purse B: Rookie 20, Bronze 50, Silver 120, Gold 300, Champion 750. P
 
 ## Progression
 
-Per-horse leagues: Rookie → Bronze → Silver → Gold → Champion. 100 League Points unlock the league's Stakes race; a Stakes win promotes. No demotion; no entering leagues below the horse's own. Matchmaking by Rating band. Weekly Derby Day showcase per league.
+Per-horse leagues: Rookie → Bronze → Silver → Gold → Champion. League Points unlock the league's Stakes race (D-013); a Stakes win promotes. No demotion; no entering leagues below the horse's own. Matchmaking by Rating band. Weekly Derby Day showcase per league.
 
-Gavel difficulty rises by league (meter speed, zone width; Gold has a moving zone; Champion's final window has two zones).
+Scoring is the same in every league; the gavel gets harder through meter speed and target behavior (D-010).
+
+| League | B | Points to unlock Stakes | Gavel meter (full sweep) | Unlocks |
+| --- | --- | --- | --- | --- |
+| Rookie | 20 | 100 | 2.4 s, 4 s windows | Garden, grooming, first pet |
+| Bronze | 50 | 110 | 2.0 s | Breeding, Tactics |
+| Silver | 120 | 1,400 | 1.6 s | Pool, hill course, clubs |
+| Gold | 300 | 3,000 | 1.3 s, drifting target | Rare NPC bloodlines, weather variants |
+| Champion | 750 | top league | 1.1 s, drifting target, two half-size targets in the final window | Hall of Fame, seasonal trophies |
+
+Values live in `game/src/shared/GameConfig.luau`.
 
 ## Retention (fun version of each hook)
 

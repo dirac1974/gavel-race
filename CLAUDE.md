@@ -25,7 +25,7 @@ Kid-friendly Roblox horse racing game built on the gavel-race model. Read this f
 | Design debates | `docs/debates/` |
 | Research notes | `docs/research/` |
 | Python reference model | `src/gavel_race_v2.py` (v1 `src/gavel_race.py` is frozen history) |
-| Roblox code | `src/RaceMath.luau` now; `game/` (Rojo project) once created |
+| Roblox code | `game/` (Rojo project); race math in `src/RaceMath.luau` |
 
 Each subagent also keeps its own notes in `.claude/agent-memory/<agent>/` (checked in).
 

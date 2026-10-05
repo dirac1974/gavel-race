@@ -91,8 +91,8 @@ def test_purse_expected_value_equals_B_within_tolerance(seed):
         q = base_chances(ratings, cfg)
         for qi, purse in zip(q, lock_purses(q, cfg)):
             # Rounding to whole cash moves q * purse by at most 0.5 q (D-017).
-            # As a share of B that is 2.5 q / B: up to ~4.4% for a 35% favorite
-            # in Rookie (B 20), ~0.1% in Champion. See V2_PROPOSAL, "Rounding".
+            # As a share of B that is 0.5 q / B: up to ~1% for a strong favorite
+            # in Rookie (B 20), under 0.2% from Silver up. See V2_PROPOSAL step 2.
             assert abs(qi * purse - B) <= 0.5 * qi + 1e-9
 
 

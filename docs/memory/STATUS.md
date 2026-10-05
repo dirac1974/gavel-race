@@ -25,6 +25,7 @@ Last updated: 2026-10-04
 
 ## Done
 
+- 2026-10-04: merged the local PR #1 history into the cloud history (cloud tree kept, as it already contained PR #1's content); refreshed GAME_DESIGN league table; D-018.
 - 2026-10-04: merged a parallel review: whole-cash purses (D-017), policy guard in CI, `.claude/settings.json`, `docs/KICKOFF.md`, 567 extra tests.
 - 2026-10-04: Energy (D-015), prizes and exactas (D-016), Diamond limits amended (D-002a).
 - 2026-10-04: Race Rating formula (D-014) in Python and Luau; prototype races now use random conditions and starter stats.

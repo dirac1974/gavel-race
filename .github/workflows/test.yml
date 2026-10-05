@@ -16,6 +16,8 @@ jobs:
       - run: python -m pytest -q
       - run: bash scripts/policy_guard.sh
       - run: python src/gavel_race_v2.py --races 2000
+      - name: v1 still runs (frozen history)
+        run: python src/gavel_race.py > /dev/null
 
   luau:
     runs-on: ubuntu-latest

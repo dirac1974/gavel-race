@@ -147,3 +147,11 @@ Template:
 - Context: rounding purses to 5 cash was documented as < 0.2% error, but the real bound is `2.5 q / B`, up to ~4.4% for a strong favorite in Rookie. Found in a parallel review of the repo.
 - Decision: `Purse = round(B / q)` in whole cash (floor(x + 0.5) in both languages). Error bound `0.5 q / B`: ≤ 1% in Rookie, ≤ 0.2% from Silver up.
 - Links: src/gavel_race_v2.py, src/RaceMath.luau, docs/V2_PROPOSAL.md
+
+## D-018 — Tests and CI gate every push
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: team (engineering)
+- Context: two sessions (cloud and local) built the repo in parallel; their histories were merged on 2026-10-04. The local one recorded this rule as its D-009 and the rounding correction as its D-010 (now D-017); those numbers were reused here, so this entry keeps the CI rule.
+- Decision: GitHub Actions (`.github/workflows/test.yml`) runs pytest, the policy guard, the v2 and v1 models, Luau syntax checks, and Luau parity under Lune on every push and pull request. Parity fixtures are generated at test time, never committed (floats differ in the last digit across platforms). A red run blocks the next build loop until fixed.
+- Links: .github/workflows/test.yml, scripts/policy_guard.sh, tests/fixtures/make_fixtures.py
