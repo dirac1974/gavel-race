@@ -1,7 +1,7 @@
 --!nonstrict
 -- RaceController: prototype race UI (D-026).
--- Riders see the race from the saddle (first person by default; scroll or pinch out for
--- third person). The pace slider runs the whole race with no pauses: tap when the marker
+-- Riders see the race in a close chase view behind their horse (scroll or pinch in for
+-- first person from the saddle). The pace slider runs the whole race with no pauses: tap when the marker
 -- crosses the glowing target, one tap per pass; distance from the target sets the score
 -- and the speed meter fills from your last few passes. The target moves every 2-3 passes.
 -- In the homestretch comes the Final Burst: one tap on a big, colourful meter that counts
@@ -44,16 +44,30 @@ local function setJumping(enabled: boolean)
 	if humanoid then humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, enabled) end
 end
 
--- First person from the saddle by default; zooming out still works (D-026).
+-- Riding camera (D-026, amended): a close chase view from just behind and above the rider,
+-- a little wider than normal so nearby horses are in view, turning with the horse round
+-- the bends (Follow camera). Scroll or pinch in for first person, or out for more.
+local RIDE_ZOOM, RIDE_FOV, NORMAL_FOV = 14, 80, 70
 local function rideCamera(on: boolean)
+	local camera = workspace.CurrentCamera
 	if on then
-		player.CameraMinZoomDistance = 0.5
-		player.CameraMaxZoomDistance = 0.5 -- snaps the camera into first person
-		task.delay(0.2, function() player.CameraMaxZoomDistance = 40 end) -- then allow zooming out
+		if camera then
+			camera.CameraType = Enum.CameraType.Follow
+			camera.FieldOfView = RIDE_FOV
+		end
+		player.CameraMinZoomDistance = RIDE_ZOOM
+		player.CameraMaxZoomDistance = RIDE_ZOOM -- snaps the camera to the chase distance
+		task.delay(0.2, function()
+			player.CameraMinZoomDistance = 0.5 -- then allow zooming in to first person
+			player.CameraMaxZoomDistance = 40
+		end)
 	else
-		player.CameraMinZoomDistance = 12 -- pops out of first person
+		if camera then
+			camera.CameraType = Enum.CameraType.Custom
+			camera.FieldOfView = NORMAL_FOV
+		end
 		player.CameraMaxZoomDistance = DEFAULT_MAX_ZOOM
-		task.delay(0.2, function() player.CameraMinZoomDistance = 0.5 end)
+		player.CameraMinZoomDistance = 0.5
 	end
 end
 

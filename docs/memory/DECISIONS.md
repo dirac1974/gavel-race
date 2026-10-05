@@ -241,3 +241,11 @@ Template:
 - Supersedes: D-025's small oval.
 - Links: game/src/shared/TrackLayout.luau, game/src/server/TrackScene.luau, game/src/client/RaceView.client.luau, game/default.project.json
 
+## D-028 — Chase camera, NPC jockeys, solid rails
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("during the race maybe it should be zoomed out a little, because you can't see the other nearby horses"; "npc horses should have roblox character style jockeys"; "you can walk right through the railing")
+- Decision: the riding camera starts as a close chase view (zoom 14 studs, field of view 80, Follow camera so it turns with the horse) instead of first person; riders can zoom in to first person or out. Every bot horse carries a standard Roblox R15 character as its jockey, in lane-colour silks and helmet with white breeches, seated with Roblox's default sit animation. Rails are solid, with an invisible wall from the ground to each rail so nobody walks through; players can still jump a rail.
+- Amends: D-026 (first-person default), D-024 (riders; now bots ride too).
+- Links: game/src/client/RaceController.client.luau (rideCamera), game/src/server/TrackScene.luau (addJockeys, railBlocker)
+

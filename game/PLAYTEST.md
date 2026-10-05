@@ -9,6 +9,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 
 ## Track and art
 - [ ] You spawn on the grandstand apron by the finish line, facing the track; invisible walls stop you leaving the grounds.
+- [ ] You can't walk through any rail (main track or turf course); you can still jump over one.
 - [ ] It looks like Churchill Downs: a big one-mile dirt oval with white rails, a green turf course inside, the long grandstand with the Twin Spires on its roof, the clubhouse at the first turn, the Big Board in the infield, barns on the far side, furlong poles and the finish pole on the inside rail, a checkered strip at the finish.
 - [ ] Eight horses stand in the starting gate, each with a lane badge 1–8; your horse has a YOU marker. The gate's position changes with the distance (Sprint: backstretch; Mile: just past the finish; Classic: top of the stretch).
 
@@ -19,7 +20,8 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] The status line shows the race conditions (for example "Rookie race: Sprint · Dirt · Sunny").
 
 ## Riding and the race
-- [ ] When the race starts you're seated on your horse and the view is first person from the saddle; scrolling (or pinching) zooms out to third person.
+- [ ] When the race starts you're seated on your horse and the camera is a close chase view from just behind and above, wide enough to see the nearby horses; it turns with your horse round the bends. Scrolling (or pinching) zooms in to first person or further out.
+- [ ] Every bot horse has a Roblox-style jockey in its lane's colours (shirt and helmet) with white breeches, sitting in the saddle, not standing.
 - [ ] Your rider sits on the horse's back (not floating or sunk in). If not, note roughly how far off; `SADDLE_HEIGHT` and `SADDLE_BACK` in `TrackScene.luau` tune it.
 - [ ] Space, clicks and taps never throw you off the horse.
 - [ ] The gate clears and the horses gallop (with a bob) round the course without stopping; the likelier winners edge ahead after each checkpoint.
@@ -51,7 +53,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 
 ## Feel (write down impressions)
 - Can a young player keep up with the slider for a whole Sprint (~70 s)? Is a Mile (~95 s) too long for Rookies? Would a 2-minute Classic be fun or tiring?
-- First person or third person: which do testers prefer while tapping?
+- Is the chase camera distance right, or should it start closer or further out?
 - Is the Final Burst exciting enough, and is double weight too much or too little?
 - Can you tell how your taps changed the result?
 - Is anything confusing in the first 30 seconds?

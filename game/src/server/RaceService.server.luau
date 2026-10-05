@@ -231,12 +231,15 @@ local function runRace(players: { Player })
 	RaceStarted:FireAllClients(LEAGUE, lanesSummary(session), tStart, cond, burstClose + LATENCY_GRACE)
 	PaceSchedule:FireAllClients(passes)
 	task.delay(math.max(0, tStart - now()), TrackScene.openGate) -- and they're off
+	local isBot = {}
 	for i, lane in session.lanes do -- racing players ride their own horse as the jockey
+		isBot[i] = lane.isBot
 		if not lane.isBot then
 			local p = Players:GetPlayerByUserId(tonumber(lane.id))
 			if p then TrackScene.seatRider(i, p.Character) end
 		end
 	end
+	TrackScene.addJockeys(isBot) -- Roblox-style jockeys on the bot horses
 
 	current = {
 		session = session, seg = 1, kind = "pace", open = tStart, close = passes[#passes].t1,

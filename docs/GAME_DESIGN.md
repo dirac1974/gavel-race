@@ -13,7 +13,7 @@ Care and feed → Train → **Race (gavel moves win chance)** → Earn Green Cas
 ## Race
 
 - A Churchill Downs-style course (D-027): one-mile dirt oval, turf inside, grandstand and Twin Spires. Eight lanes; bots fill empty lanes within 20 seconds.
-- Racing players ride their own horse (D-024), seeing the race in first person from the saddle; they can zoom out.
+- Racing players ride their own horse (D-024) in a close chase view (zoom in for first person, D-028); bot horses carry Roblox-style jockeys in lane colours.
 - Race length follows the distance: Sprint ~69 s, Mile ~94 s, Classic (the Derby) ~2 min, Marathon ~2:21. Rookie runs Sprint and Mile.
 - The pace slider runs the whole race (D-026): tap as the marker crosses the glowing target, one tap per pass. The target moves every 2–3 passes; the speed meter fills from your last few passes.
 - In the homestretch: the **Final Burst**, one tap on a big rainbow meter, worth double (40% of the rider's score).

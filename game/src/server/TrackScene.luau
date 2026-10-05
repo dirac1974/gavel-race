@@ -99,6 +99,19 @@ local function band(parent: Instance, name: string, rIn: number, rOut: number, h
 	end
 end
 
+-- An invisible wall from the ground to the rail, so players can't walk through under it.
+-- Horses aren't affected: they're anchored and moved by CFrame.
+local function railBlocker(parent: Instance, r: number)
+	local folder = Instance.new("Folder")
+	folder.Name = "RailBlocker"
+	band(folder, "Blocker", r - 0.3, r + 0.3, 3.2, 1.6, Color3.new(1, 1, 1), nil, true)
+	for _, b in folder:GetChildren() do
+		b.Transparency = 1
+		b.CastShadow = false
+	end
+	folder.Parent = parent
+end
+
 -- A four-sided spire roof from wedges, apex up, base centred on `base` (top of a tower).
 local function pyramid(parent: Instance, base: Vector3, size: number, height: number, color: Color3)
 	for k = 0, 3 do
@@ -136,14 +149,18 @@ local function buildVenue(): Folder
 
 	-- Main dirt track and its rails.
 	band(f, "Dirt", rIn, rOut, 1, -0.45, DIRT, Enum.Material.Ground)
-	band(f, "InnerRail", rIn - 0.3, rIn + 0.3, 0.6, 3.2, RAIL)
-	band(f, "OuterRail", rOut - 0.3, rOut + 0.3, 0.6, 3.2, RAIL)
+	band(f, "InnerRail", rIn - 0.3, rIn + 0.3, 0.6, 3.2, RAIL, nil, true)
+	band(f, "OuterRail", rOut - 0.3, rOut + 0.3, 0.6, 3.2, RAIL, nil, true)
+	railBlocker(f, rIn)
+	railBlocker(f, rOut)
 	-- Turf course inside, with its own rails.
 	local tOut = rIn - CFG.turfGap
 	local tIn = tOut - CFG.turfWidth
 	band(f, "Turf", tIn, tOut, 1, -0.47, TURF, Enum.Material.Grass)
-	band(f, "TurfRail", tOut - 0.25, tOut + 0.25, 0.5, 3, RAIL)
-	band(f, "TurfRail", tIn - 0.25, tIn + 0.25, 0.5, 3, RAIL)
+	band(f, "TurfRail", tOut - 0.25, tOut + 0.25, 0.5, 3, RAIL, nil, true)
+	band(f, "TurfRail", tIn - 0.25, tIn + 0.25, 0.5, 3, RAIL, nil, true)
+	railBlocker(f, tOut)
+	railBlocker(f, tIn)
 
 	-- Furlong poles on the inside rail (every 660 ft back from the finish), red and white.
 	local r1 = TrackLayout.laneRadius(CFG, 1)
@@ -341,6 +358,80 @@ function TrackScene.build(plan)
 	end
 	folder.Parent = workspace
 	root = folder
+end
+
+-- Roblox-style jockeys for the bot horses: a standard character in its lane's silks
+-- (torso and arms), white breeches and a lane-coloured helmet, seated with Roblox's own
+-- R15 sit animation. Built in the background; a horse simply has no jockey until it's ready.
+local SKIN = { "FFCC99", "EAB892", "C69C6D", "A57143", "7C4A2D", "5A3825" }
+local SIT_ANIMATION = "rbxassetid://2506281703" -- Roblox's default R15 sit (from the Animate script)
+
+local function jockeyFor(i: number): Model?
+	local desc = Instance.new("HumanoidDescription")
+	local skin = Color3.fromHex(SKIN[(i - 1) % #SKIN + 1])
+	desc.HeadColor = skin
+	desc.TorsoColor = LANE_COLOURS[i]
+	desc.LeftArmColor, desc.RightArmColor = LANE_COLOURS[i], LANE_COLOURS[i]
+	desc.LeftLegColor, desc.RightLegColor = Color3.new(1, 1, 1), Color3.new(1, 1, 1)
+	desc.HeightScale, desc.WidthScale, desc.DepthScale, desc.HeadScale = 0.9, 0.85, 0.9, 1
+	local ok, model = pcall(function()
+		return game:GetService("Players"):CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
+	end)
+	if not ok or not model then
+		warn("[TrackScene] jockey not created: " .. tostring(model))
+		return nil
+	end
+	model.Name = "Jockey"
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
+	local head = model:FindFirstChild("Head")
+	if head then
+		local helmet = Instance.new("Part")
+		helmet.Name = "Helmet"
+		helmet.Shape = Enum.PartType.Ball
+		helmet.Size = Vector3.new(1.35, 1.35, 1.35)
+		helmet.Color = LANE_COLOURS[i]
+		helmet.Material = Enum.Material.SmoothPlastic
+		helmet.CanCollide, helmet.CanQuery, helmet.CanTouch, helmet.Massless = false, false, false, true
+		helmet.CFrame = head.CFrame * CFrame.new(0, 0.25, 0)
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0, weld.Part1 = head, helmet
+		weld.Parent = helmet
+		helmet.Parent = model
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then d.CanCollide, d.CanTouch = false, false end
+	end
+	return model
+end
+
+-- Seat a jockey on every bot lane (`isBot[i]` true). Call after build().
+function TrackScene.addJockeys(isBot: { boolean })
+	for i, bot in isBot do
+		local horse, saddle = horses[i], saddles[i]
+		if bot and horse and saddle and not saddle.Occupant then
+			task.spawn(function()
+				local jockey = jockeyFor(i)
+				if not jockey or not horse.Parent then
+					if jockey then jockey:Destroy() end
+					return
+				end
+				jockey:PivotTo(saddle.CFrame + Vector3.new(0, 3, 0))
+				jockey.Parent = horse -- inside the horse model, so the horse's pivot carries it too
+				local humanoid = jockey:FindFirstChildOfClass("Humanoid")
+				if not humanoid then return end
+				saddle:Sit(humanoid)
+				local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+				local anim = Instance.new("Animation")
+				anim.AnimationId = SIT_ANIMATION
+				local okLoad, track = pcall(function() return animator:LoadAnimation(anim) end)
+				if okLoad and track then
+					track.Looped = true
+					track:Play()
+				end
+			end)
+		end
+	end
 end
 
 -- The gate opens: stalls clear away when the race starts.
