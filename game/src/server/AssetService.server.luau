@@ -2,8 +2,9 @@
 -- AssetService: brings the uploaded playtest art into the game (D-023).
 -- UI sheets are Decals (UiImages); an ImageLabel needs the Decal's inner image id, which
 -- only InsertService can read, so each is loaded once and published as ReplicatedStorage
--- attribute UiSheet_<sheet>. Models (MeshAssets) are loaded, sized and turned to face -Z
--- per docs/art/IMPORT.md, then stored in ReplicatedStorage.RaceModels for TrackScene.
+-- attribute UiSheet_<sheet>. Models (MeshAssets) are loaded, sized, turned to face -Z and
+-- given collision per ModelSpecs (docs/art/IMPORT.md), then stored in
+-- ReplicatedStorage.RaceModels for TrackScene and the world.
 -- Loads fail until Roblox moderation approves an asset, or if the place isn't owned by the
 -- same group as the assets; the placeholders stay in that case.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -14,22 +15,26 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UiImages = require(Shared:WaitForChild("UiImages"))
 local MeshAssets = require(Shared:WaitForChild("MeshAssets"))
+local ModelSpecs = require(Shared:WaitForChild("ModelSpecs"))
 
--- Target size in studs along the named axis after scaling (docs/art/IMPORT.md).
-local SIZES = {
-	horse = { axis = "Z", studs = 8.0 },
-	finish_post = { axis = "Y", studs = 14.0 },
-	gate_stall = { axis = "Y", studs = 8.0 },
-}
+-- Used when a slot has no ModelSpecs entry (and warned about), so a new upload still shows.
+local FALLBACK = { axis = "Y", studs = 4.0, yaw = 0, collide = true }
 
--- Turn applied after import so each model faces -Z (Roblox forward). Playtest showed the
--- imported horses already face -Z (the 180-degree turn from docs/art/IMPORT.md put them
--- backwards), so no turn by default; set math.pi for a slot that comes in reversed.
-local YAW = {
-	horse = 0,
-	finish_post = 0,
-	gate_stall = 0,
-}
+-- Exact slot first, then the longest prefix ending in "_" (horse_, foal_). The second
+-- result is true for prefix matches (creatures: never collide or take queries).
+local function specFor(slot: string)
+	local exact = ModelSpecs[slot]
+	if exact then return exact, false end
+	local best, bestLen = nil, 0
+	for key, spec in ModelSpecs do
+		if string.sub(key, -1) == "_" and #key > bestLen and string.sub(slot, 1, #key) == key then
+			best, bestLen = spec, #key
+		end
+	end
+	if best then return best, true end
+	warn(`[AssetService] no ModelSpecs entry for {slot}; using the fallback size`)
+	return FALLBACK, false
+end
 
 local models = Instance.new("Folder")
 models.Name = "RaceModels"
@@ -61,23 +66,22 @@ local function normalize(container: Model, slot: string): Model
 	model.Name = slot
 	for _, child in container:GetChildren() do child.Parent = model end
 	container:Destroy()
-	local isHorse = string.sub(slot, 1, 6) == "horse_"
+	local size, creature = specFor(slot)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored = true
-			d.CanCollide = not isHorse
+			d.CanCollide = size.collide
 			d.CanTouch = false
-			d.CanQuery = not isHorse
+			d.CanQuery = not creature
 		end
 	end
 	-- Scale so the named axis reaches the target size.
-	local size = if isHorse then SIZES.horse else SIZES[slot]
 	local _, extents = model:GetBoundingBox()
 	local current = if size.axis == "Y" then extents.Y else math.max(extents.X, extents.Z)
 	if current > 0 then model:ScaleTo(model:GetScale() * size.studs / current) end
-	-- Turn to face -Z (YAW above), then put an unrotated pivot at the bottom centre so
+	-- Turn to face -Z (ModelSpecs yaw), then put an unrotated pivot at the bottom centre so
 	-- PivotTo(CFrame.new(p)) faces -Z standing on p.
-	local yaw = if isHorse then YAW.horse else (YAW[slot] or 0)
+	local yaw = size.yaw
 	local cf = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(cf.Position)
 	model:PivotTo(CFrame.new(cf.Position) * CFrame.Angles(0, yaw, 0))

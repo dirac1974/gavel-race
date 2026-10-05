@@ -7,6 +7,11 @@ writes assets/ui/atlas/ui_atlas_<n>.png plus game/src/shared/UiAtlas.luau (name 
 sheet, x, y, w, h). Particle textures (fx_*) and unused variants stay out: particles
 need their own image ids.
 
+The race set (NAMES) and the world set (WORLD_NAMES) are packed separately: the race
+sheets ui_atlas_<n> are already uploaded (sha256 in tools/roblox/uploaded.json), so new
+icons go on their own sheets ui_atlas_world_<n> and never move a race rect. A sheet file
+whose pixels are unchanged is left untouched.
+
   python tools/ui/build_atlas.py
 """
 
@@ -35,6 +40,23 @@ NAMES = (
     + [f"lane_{i}_sparkle" for i in range(1, 9)]
 )
 
+# World UI (docs/WORLD_DESIGN.md): wallet, care, Map, Race Board, Health Passport, Stable Board, training.
+WORLD_NAMES = (
+    ["cash", "diamond", "hay", "grain", "carrot", "apple", "oats", "treat", "brush", "seed_carrot", "seed_apple", "seed_oats",
+     "energy_hoof", "energy_hoof_empty", "heart", "care_star", "flag_ready", "zzz_resting",
+     "clipboard", "map", "camera", "gift", "lock", "friends", "settings", "grownups", "go_button", "go_button_pressed",
+     "map_stable", "map_track", "map_fair", "map_vet", "map_trail", "hoofprint"]
+    + [f"league_{t}" for t in ("rookie", "bronze", "silver", "gold", "champion")]
+    + ["dist_short", "dist_long", "surface_dirt", "surface_turf", "weather_sunny", "weather_rain", "weather_wind",
+       "lane_dot_empty", "lane_dot_full"]
+    + [f"stamp_{k}" for k in ("checkup", "teeth", "farrier", "vaccine", "potential")]
+    + ["stethoscope", "job_care", "job_ride", "job_explore", "job_cheer", "trophy", "ribbon_progress", "sleeping_horse",
+       "welcome_sun"]
+    + [f"stat_{k}" for k in ("speed", "accel", "stamina", "grit")]
+)
+
+SETS = ((NAMES, "ui_atlas_"), (WORLD_NAMES, "ui_atlas_world_"))
+
 
 def pack(images: dict[str, Image.Image]) -> list[dict[str, tuple[int, int, int, int]]]:
     """Shelf packing, tallest first. Returns one {name: (x, y, w, h)} per sheet."""
@@ -56,23 +78,47 @@ def pack(images: dict[str, Image.Image]) -> list[dict[str, tuple[int, int, int, 
     return sheets
 
 
-def main() -> None:
+def save_sheet(path: Path, canvas: Image.Image) -> bool:
+    """Write a sheet unless the file already holds the same pixels (keeps uploaded sheets byte-identical)."""
+    if path.exists():
+        with Image.open(path) as old:
+            if old.size == canvas.size and old.convert("RGBA").tobytes() == canvas.tobytes():
+                return False
+    canvas.save(path, optimize=True)
+    return True
+
+
+def build(names: list[str], prefix: str, entries: dict[str, dict[str, int | str]]) -> list[str]:
     images = {}
-    for name in NAMES:
+    for name in names:
+        if name in entries:
+            raise SystemExit(f"{name} is listed twice")
         im = Image.open(SRC / f"{name}.png").convert("RGBA")
         images[name] = im.resize((max(1, round(im.width * SCALE)), max(1, round(im.height * SCALE))), Image.LANCZOS)
-    sheets = pack(images)
-    OUT.mkdir(parents=True, exist_ok=True)
-    entries = {}
-    for i, rects in enumerate(sheets, start=1):
-        sheet_name = f"ui_atlas_{i}"
+    written = []
+    for i, rects in enumerate(pack(images), start=1):
+        sheet_name = f"{prefix}{i}"
         height = max(y + h for (_, y, _, h) in rects.values())
         canvas = Image.new("RGBA", (SHEET, height), (0, 0, 0, 0))
         for name, (x, y, w, h) in rects.items():
             canvas.paste(images[name], (x, y))
             entries[name] = {"sheet": sheet_name, "x": x, "y": y, "w": w, "h": h}
-        canvas.save(OUT / f"{sheet_name}.png", optimize=True)
-        print(f"{sheet_name}.png  {SHEET}x{height}  {len(rects)} images")
+        changed = save_sheet(OUT / f"{sheet_name}.png", canvas)
+        print(f"{sheet_name}.png  {SHEET}x{height}  {len(rects)} images{'' if changed else '  (unchanged)'}")
+        written.append(sheet_name)
+    return written
+
+
+def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    entries: dict[str, dict[str, int | str]] = {}
+    written = []
+    for names, prefix in SETS:
+        written += build(names, prefix, entries)
+    for stale in OUT.glob("ui_atlas_world_*.png"):
+        if stale.stem not in written:
+            stale.unlink()
+            print(f"removed stale {stale.name}")
     (OUT / "atlas.json").write_text(json.dumps(entries, indent=1, sort_keys=True) + "\n")
     lines = [
         "--!strict",
