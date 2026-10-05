@@ -144,7 +144,7 @@ renderKinds = function()
 	local card = pickedCourse and cardFor(pickedCourse)
 	local h = pickedHorse and PlayerState.horse(pickedHorse)
 	local open = card == nil or card.open
-	for kind, b in kindButtons do
+	for _, kind in { "race", "cup", "practice" } do
 		local allowed = true
 		if not open then
 			allowed = (kind == "cup" and card.cup) or (kind == "practice" and card.practice) or (kind == "race" and not card.cup and not card.practice)
@@ -152,10 +152,15 @@ renderKinds = function()
 			if kind == "cup" then allowed = h.cupOpen == true end
 			if kind == "race" then allowed = not h.overCeiling end
 		end
-		if not open and allowed then pickedKind = kind end
-		if open and not allowed and pickedKind == kind then pickedKind = "practice" end
-		b.BackgroundColor3 = if pickedKind == kind and allowed then C.gold elseif allowed then C.white else C.shade
-		kindAllowed[kind] = allowed
+		kindAllowed[kind] = allowed == true
+	end
+	if not open then
+		pickedKind = if card.cup then "cup" elseif card.practice then "practice" else "race"
+	elseif not kindAllowed[pickedKind] then
+		pickedKind = if kindAllowed.race then "race" else "practice"
+	end
+	for kind, b in kindButtons do
+		b.BackgroundColor3 = if pickedKind == kind then C.gold elseif kindAllowed[kind] then C.white else C.shade
 	end
 	if h and h.pointsToCup and h.pointsToCup > 0 then
 		kindButtons.cup.Text = string.format("🏆 %d pts", h.pointsToCup)

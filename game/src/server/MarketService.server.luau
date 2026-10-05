@@ -161,7 +161,11 @@ end)
 Retire.OnServerEvent:Connect(function(player: Player, id: any)
 	if busy(player, 1, "retire") or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
-	if not data or player:GetAttribute("Racing") then return end
+	if not data then return end
+	if player:GetAttribute("Racing") or player:GetAttribute("InLine") then
+		Profiles.notify(player, "Retire after your race!", "heart")
+		return
+	end
 	if #data.horses <= 1 then
 		Profiles.notify(player, "Keep at least one horse in your stable!", "heart")
 		return

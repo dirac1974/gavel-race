@@ -9,12 +9,14 @@
 --   a fully trained horse can't farm the Rookies.
 --   Retiring is always the player's choice: a Hall of Fame plaque keeps the career record.
 
+local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
+
 local Leagues = {}
 
 Leagues.ORDER = { "Rookie", "Bronze", "Silver", "Gold", "Champion" }
-Leagues.UNLOCK = { Rookie = 100, Bronze = 110, Silver = 1400, Gold = 3000 } -- GameConfig.stakesUnlockPoints (the D-013 Stakes race points)
-Leagues.CEILING = { Rookie = 58, Bronze = 68, Silver = 78, Gold = 88 }      -- best Rating that closes regular races
-Leagues.CUP_PURSE = 3                                                   -- × B for the winner
+Leagues.UNLOCK = GameConfig.stakesUnlockPoints -- the D-013 Stakes race points
+Leagues.CEILING = GameConfig.leagueCeiling      -- best base Rating that closes regular races
+Leagues.CUP_PURSE = GameConfig.cupPurseB        -- × B for the winner
 Leagues.MAX_PLAQUES = 50
 
 function Leagues.next(league: string): string?
