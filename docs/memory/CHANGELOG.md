@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: Stage 1 your horse: saved profiles with session lock, starter pick and name chips, race queue with your own horse, dock HUD (D-037)
 - 2026-10-04 — docs: world design (stables, care, Race Board, Stable Board, friends, money guardrails), D-035 to D-047, build stages
 - 2026-10-04 — feat: exponential race with luck from the far turn, live stretch drive, ride report (D-033); replays (D-034); debate 008
 - 2026-10-04 — feat: Final Burst entering the homestretch, stretch drive, no pause (D-031); race strip map (D-032)

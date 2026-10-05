@@ -51,6 +51,20 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] leaderstats Green Cash and League Points increase by the right amounts.
 - [ ] A new lobby starts about 5 seconds after the results.
 
+## Your horse (Stage 1, D-037)
+
+Turn on **Game Settings → Security → Enable Studio Access to API Services** to test saving; without it you get a temporary profile (Output says so) and nothing saves.
+
+- [ ] First join: the starter picker opens with three turning horses (bay, palomino, dapple grey); picking one highlights it.
+- [ ] Naming: word chips build the name live ("Lucky Star"); tapping a chosen chip again removes it; New words reshuffles; one word is allowed.
+- [ ] "That's my horse!" closes the picker with a "Meet …!" toast; the dock shows your horse's name, coat colour and five Energy hoofs.
+- [ ] Dock: Green Cash (starts at 50), horse card, RACE! button. Nothing overlaps the Roblox thumbstick or jump button on a phone.
+- [ ] RACE! puts you in line ("In line! 18s"); ✕ leaves the line; a second player joining shows "· 2 riders".
+- [ ] The race uses your horse: its name on the board and badge, its coat under you. Players who didn't press RACE! watch instead.
+- [ ] Results pay into Green Cash (the dock number bounces) and the player list shows Green Cash and Wins.
+- [ ] Leave and rejoin (with API access on): your horse, cash and wins are still there; the picker doesn't reopen.
+- [ ] Two Studio test clients: each has their own horse; one leaving doesn't affect the other's save.
+
 ## Race shape and replay (D-033, D-034)
 
 - [ ] Up to the far turn, favourites run a little ahead; from the far turn some horses charge late; nobody jumps or reshuffles at the line.
