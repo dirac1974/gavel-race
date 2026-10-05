@@ -15,7 +15,9 @@
 --   off (the first two weeks).
 --   While a course session runs, from the countdown until the end card closes, the player has
 --   the attribute TrainingRide = true (other HUDs read it). It clears on the card's Done, an
---   abort, getting off, leaving, or CARD_SECONDS after the end.
+--   abort, an error, leaving, or after CARD_SECONDS as a safety net if the card never says.
+--   A ride that runs out of time (maxSessionSeconds) counts only with real riding in it;
+--   otherwise it ends kindly with no gain ("Let's try that one again!").
 --   Quick train (the old 10-second games) still sends a client score until T4; its quality is
 --   capped at GameConfig.training.quickQualityCap.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -44,14 +46,14 @@ local TrainBegin = Profiles.remote("TrainBegin")   -- server -> client: course, 
 local TrainEnd = Profiles.remote("TrainEnd")       -- server -> client: result
 local TrainAbort = Profiles.remote("TrainAbort")   -- both ways: reason / stop
 local SESSION_GAP = CFG.sessionGapSeconds          -- seconds between sessions (each game takes longer)
-local CARD_SECONDS = 30                            -- the end card keeps TrainingRide set at most this long
+local CARD_SECONDS = 90                            -- safety net: TrainingRide clears this long after the end card opens
 
 local lastTrain: { [Player]: number } = {}
 local lastVet: { [Player]: number } = {}
 local sessions: { [Player]: any } = {}
 local history: { [Player]: { number } } = {}
 local pending: { [Player]: boolean } = {}
-local cards: { [Player]: any } = {}                -- end card showing: { rig, untilT }
+local cards: { [Player]: any } = {}                -- end card showing: { untilT }
 
 local function setTrainingRide(player: Player, on: boolean)
 	if player.Parent then player:SetAttribute("TrainingRide", if on then true else nil) end
@@ -61,6 +63,7 @@ local ABORT_TEXT = {
 	race = "Your race is starting! Training paused.",
 	off = "Training paused. Hop back on and ride again any time!",
 	left = "You rode off the course, so training paused. Ride again any time!",
+	again = "Let's try that one again!",
 }
 
 local function near(player: Player, key: string, radius: number): boolean
@@ -131,7 +134,17 @@ local function abort(player: Player, s, reason: string)
 	if player.Parent then TrainAbort:FireClient(player, reason, ABORT_TEXT[reason]) end
 end
 
-local function finish(player: Player, s, seconds: number)
+-- Something went wrong part-way (an error): whatever state the session got to, clear it all,
+-- even if the session was already taken off the list, and tell the client.
+local function fail(player: Player, s)
+	if s and sessions[player] == s then sessions[player] = nil end
+	pcall(Rides.setTraining, player, false)
+	cards[player] = nil
+	setTrainingRide(player, false)
+	if player.Parent then TrainAbort:FireClient(player, "off", ABORT_TEXT.off) end
+end
+
+local function finish(player: Player, s, seconds: number, timedOut: boolean?)
 	if not endSession(player, s) then return end
 	local result = TrainingRide.run(s.course, s.samples, CFG, seconds)
 	local data = Profiles.get(player)
@@ -141,11 +154,17 @@ local function finish(player: Player, s, seconds: number)
 		TrainAbort:FireClient(player, "off", ABORT_TEXT.off)
 		return
 	end
-	cards[player] = { rig = s.rig, untilT = os.clock() + CARD_SECONDS } -- TrainingRide stays set for the end card
+	if timedOut and not TrainingRide.timeoutCounts(result, s.tracker) then
+		closeCard(player) -- out of time with no real riding: no gain, no ribbon, no job
+		TrainAbort:FireClient(player, "again", ABORT_TEXT.again)
+		return
+	end
+	cards[player] = { untilT = os.clock() + CARD_SECONDS } -- TrainingRide stays set while the end card shows
 	if result.flagged then
 		-- Log only (D-053): replication jitter on phones can drop honest samples.
-		warn(string.format("[Training] %d %s: %.0f%% of %d samples dropped%s", player.UserId, s.course,
-			result.badShare * 100, #s.samples, if result.floored then " (scored at the floor)" else " (log only)"))
+		warn(string.format("[Training] %d %s: %.0f%% of %d samples too fast or teleported (%d stale, %d off course)%s",
+			player.UserId, s.course, result.badShare * 100, #s.samples, result.counts.stale, result.counts.off,
+			if result.floored then " (scored at the floor)" else " (log only)"))
 	end
 	local course = TrainingCourses.courses[s.course]
 	local now = os.time()
@@ -200,10 +219,10 @@ local function startCourse(player: Player, horseId: any, course: any)
 		Profiles.notify(player, "Training happens at the Training Paddock on Fair Street", "map_fair")
 		return
 	end
-	-- Not riding yet? Bring the horse and wait for the saddle.
+	-- Not riding yet? Bring the horse (with the Ride button's throttle) and wait for the saddle.
 	local rig, rigHorse = Rides.horseOf(player)
 	if not rig then
-		Rides.call(player)
+		Rides.request(player)
 		for _ = 1, 25 do
 			if Rides.isSeated(player) or not player.Parent then break end
 			task.wait(0.1)
@@ -222,7 +241,6 @@ local function startCourse(player: Player, horseId: any, course: any)
 	local base = Vector3.new(st.x, WorldScene.GROUND_Y + TrainingCourses.groundHeight(st.x, st.z), st.z)
 	Rides.travel(player, CFrame.lookAt(base, base + Vector3.new(st.lookX, 0, st.lookZ)))
 	if rig.PrimaryPart then rig.PrimaryPart.AssemblyLinearVelocity = Vector3.zero end
-	Rides.setTraining(player, true)
 	table.insert(history[player], os.clock())
 	local now = os.clock()
 	local s = {
@@ -230,9 +248,11 @@ local function startCourse(player: Player, horseId: any, course: any)
 		goAt = now + CFG.countdownSeconds, lastSample = now, samples = {}, base = {}, baseY = nil,
 		outside = 0, tracker = TrainingRide.tracker(course),
 	}
+	-- Register first, then change groups and attributes: an error from here on is undone by fail().
 	sessions[player] = s
 	cards[player] = nil
 	setTrainingRide(player, true)
+	Rides.setTraining(player, true)
 	TrainBegin:FireClient(player, course, s.seed, CFG.countdownSeconds)
 end
 
@@ -241,7 +261,11 @@ TrainStart.OnServerEvent:Connect(function(player: Player, horseId: any, course: 
 	pending[player] = true
 	local ok, err = pcall(startCourse, player, horseId, course)
 	pending[player] = nil
-	if not ok then warn("[Training] start failed: " .. tostring(err)) end
+	if not ok then
+		warn("[Training] start failed: " .. tostring(err))
+		fail(player, sessions[player])
+		return
+	end
 	if not sessions[player] and cards[player] then closeCard(player) end -- "Ride again" that didn't start
 end)
 
@@ -258,7 +282,7 @@ end)
 -- The sampler: the rider's own ride rig, 10 times a second on the server's clock.
 local function sample(player: Player, s, now: number)
 	if not player.Parent then
-		sessions[player] = nil
+		endSession(player, s)
 		return
 	end
 	if racing(player) then return abort(player, s, "race") end
@@ -287,14 +311,13 @@ local function sample(player: Player, s, now: number)
 	if TrainingRide.feed(s.tracker, smp, CFG) then
 		return finish(player, s, s.tracker.finishT or t)
 	end
-	if t >= CFG.maxSessionSeconds then return finish(player, s, t) end -- counts what was ridden
+	if t >= CFG.maxSessionSeconds then return finish(player, s, t, true) end -- counts only with real riding
 end
 
 RunService.Heartbeat:Connect(function()
 	local now = os.clock()
 	for player, card in cards do
-		local rig = Rides.horseOf(player)
-		if now > card.untilT or rig ~= card.rig or not player.Parent then closeCard(player) end
+		if now > card.untilT or not player.Parent then closeCard(player) end -- the card's Done normally clears it
 	end
 	local step = 1 / CFG.sampleHz
 	for player, s in sessions do
@@ -303,7 +326,7 @@ RunService.Heartbeat:Connect(function()
 			local ok, err = pcall(sample, player, s, now)
 			if not ok then
 				warn("[Training] sample failed: " .. tostring(err))
-				abort(player, s, "off")
+				fail(player, s) -- also when finish() had already ended the session
 			end
 		end
 	end

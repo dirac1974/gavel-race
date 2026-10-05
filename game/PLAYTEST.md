@@ -129,17 +129,19 @@ The Training Ground (T1):
 Riding the courses (T2: Sprint Lane and Mud Splash):
 - [ ] The paddock's "Train" prompt opens "⭐ Training" with four picture tiles: Sprint Lane and Mud Splash say their stat; Gate Break and Hill Climb say "Coming soon" (tapping one only shows a toast). "⚡ Quick train" opens the old horse and stat games; a perfect Quick train game gains the same as a score of 70 (quality capped at 0.85).
 - [ ] Tapping Sprint Lane (or "Ride" at its picture sign) puts you on your active horse (it's called if you weren't riding) at the white start line on the oval's north straight, facing west. Big 3, 2, 1, then "Go!" and "Giddy-up!". The horse can't move or hop during the 3-2-1.
-- [ ] While riding: push the stick and the horse gallops by itself; only the next hoop glows gold; dark hoofprints lead to it; riding through gives a ✨; three lap dots at the top fill one per lap. No timer anywhere. Near a hoop the horse is nudged gently toward it, never steered without you.
+- [ ] While riding: push the stick (even half-way) and the horse gallops by itself at full course speed; only the next hoop glows gold; dark hoofprints lead to it; riding through gives a ✨; three lap dots at the top: done laps gold, the lap you're on orange. No timer anywhere. Near a hoop the horse is nudged gently toward it, never steered without you.
+- [ ] After the last hoop: "🏁 To the finish line!", the start/finish line glows gold and hoofprints lead to it; the ride ends as you cross it. On Mud Splash, after the last piece the 🏁 Finish arch glows and the prints lead there.
 - [ ] Phones: the Gallop button goes away and a big ⬆️ Jump button appears bottom-right, above the dock (not under the Ride button). It hops the horse and never throws you off. Keyboard Space and gamepad A hop as usual; gamepad R2 gallops in free riding too.
-- [ ] Other riders (training or free riding) pass straight through you during a ride; rails still stop you; you never sink into the ground or the hill.
+- [ ] Other riders (training or free riding) and players on foot pass straight through you during a ride; rails still stop you; you never sink into the ground or the hill. Off a course, walkers and ride horses bump as before.
 - [ ] After three laps the end card shows the stars one at a time, then the stat bar grows with "+x.x Speed!" (and "Rested bonus ✨" after 3 h away), then the ribbon: 🥉 for finishing, 🥈 from 75, 🥇 from 90 if the ride was quick; "New!" the first time. "Ride again" starts over at the start line; "Done" closes the card.
 - [ ] After the week's 6 points: the card says "Speed is full this week. Ride for stars!" and the stat doesn't change. Rides never cost Energy.
 - [ ] Mud Splash starts at the arena's north-west corner. The horse lopes round the lanes and slows to a canter in the darker pole lane by itself. "Splash! 💦" in a puddle, "Clean hop!" only when the horse is in the air over a log, "Nice bend!" passing a pole on the hoofprints' side. Riding through a log without hopping just doesn't score: no message, no stumble. The 🏁 Finish arch ends the ride and the card shows splashes, hops and poles.
 - [ ] Ending early: "✕ Stop", Get off, riding out of the ground or the arena for a couple of seconds, or a queued race starting all end the ride with a kind note and no gain ("Your race is starting! Training paused.").
+- [ ] Standing at the start for two minutes without riding ends with "Let's try that one again!": no stars, no gain, no job progress.
 - [ ] Two rides within 4 seconds: "Your horse is catching its breath". More than 40 in an hour: a kind rest note.
 - [ ] Rejoin: the tiles still show your ribbons (🥉🥈🥇) for that horse.
-- [ ] During a ride and its end card, Explorer shows the attribute TrainingRide = true on your Player; it clears on Done, Stop, Get off or after 30 s.
-- [ ] Output: lines like `[Training] <id> speed: 12% of 430 samples dropped (log only)` are expected only now and then; note how often they appear on a phone (the floor stays log-only, `enforceFloor = false`).
+- [ ] During a ride and its end card, Explorer shows the attribute TrainingRide = true on your Player; it stays while the card is up and clears on Done, Stop or an early end (or after 90 s as a safety net).
+- [ ] Output: lines like `[Training] <id> speed: 12% of 430 samples too fast or teleported (3 stale, 0 off course) (log only)` are expected only now and then; note how often they appear on a phone and the stale count (freezes) (the floor stays log-only, `enforceFloor = false`).
 
 ## Race Board and two courses (Stage 4, D-036)
 

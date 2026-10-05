@@ -497,7 +497,9 @@ local function coursePicker()
 	local h = PlayerState.activeHorse()
 	if not h or not h.stalled then
 		open("⭐ Training", "Ride your horse round a course!")
-		Ui.text(body, "Pick your first horse to start training!", 22, { Size = UDim2.new(1, 0, 0, 40) })
+		local msg = if h then h.name .. " is out in the pasture. Pick a horse from a stall in My Horses to train!"
+			else "Pick your first horse to start training!"
+		Ui.text(body, msg, 22, { Size = UDim2.new(1, 0, 0, 60) })
 		return
 	end
 	local sub = if h.trainingReady == false then string.format("%s's training is full this week. Ride for stars!", h.name)

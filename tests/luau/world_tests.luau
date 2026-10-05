@@ -381,8 +381,8 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 	for k = 0, 19 do table.insert(okFast, { t = k / HZ, x = 850 - k * 5.2, y = 0, z = -55 }) end
 	local _, ob = TR.validate(okFast, nil, CFG)
 	check(ob == 0, "52 studs/s is fine")
-	local _, offb = TR.validate(line, function(x, z) return x > 820 end, CFG)
-	check(close(offb, 13 / 20, 1e-9), "samples off the course are dropped")
+	local offk, offb, offc = TR.validate(line, function(x, z) return x > 820 end, CFG)
+	check(#offk == 7 and offc.off == 13 and offb == 0, "samples off the course don't score and don't count toward the floor")
 	check(#TR.crossings(vk, { ax = 805, az = -100, bx = 805, bz = 100, nx = -1, nz = 0 }) == 1, "a crossing over a jitter drop still counts")
 
 	-- More than 10% dropped: the floor when enforcing, a normal score while log-only.
@@ -573,6 +573,169 @@ local function trainingRideTests(check: (boolean, string) -> (), close: (number,
 	check(typeof(c.ribbons) == "table" and next(c.ribbons) == nil and typeof(c.trainingBest) == "table", "older horses get empty records")
 	local view = Horse.view(a, T0, GameConfig.energy)
 	check(view.ribbons.speed == "silver" and view.trainingBest.speed.score == 80, "the owner's view shows ribbons and best runs")
+end
+
+-- Training rides: network freezes, catch-ups and timeouts (PR #35 review).
+local function trainingJitterTests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local TR = require("../../game/src/shared/TrainingRide")
+	local CFG = GameConfig.training
+	local HZ = CFG.sampleHz
+	local sp = TC.courses.speed
+
+	local function hoopLateral(p: number): number
+		local prevS, prevL = 0, sp.posts[#sp.posts].lateral
+		for _, hp in sp.hoops do
+			local l = sp.posts[hp.post].lateral
+			if p <= hp.s then return prevL + (l - prevL) * (p - prevS) / (hp.s - prevS) end
+			prevS, prevL = hp.s, l
+		end
+		return prevL
+	end
+	-- A perfect gallop seen through the network: observed(k) is the sample time whose true
+	-- position the server sees at sample k (a freeze repeats an earlier one). The ride carries
+	-- on 30 studs past the line, as a real horse does.
+	local function ride(observed: (number) -> number)
+		local out = {}
+		local k = 0
+		while CFG.gallop * k / HZ <= sp.finish + 30 do
+			local p = CFG.gallop * observed(k) / HZ
+			local x, z = TC.ovalPoint(sp.startD + p, hoopLateral(p))
+			table.insert(out, { t = k / HZ, x = x, y = 0, z = z })
+			k += 1
+		end
+		return out
+	end
+	local function judge(samples)
+		local tr = TR.tracker("speed")
+		for _, s in samples do TR.feed(tr, s, CFG) end
+		local res = TR.run("speed", samples, CFG, tr.finishT)
+		return res, tr
+	end
+	local ideal = sp.finish / CFG.gallop
+
+	-- One freeze then a catch-up, right on a hoop crossing and between hoops.
+	local hoopK = math.floor(sp.hoops[3].s / CFG.gallop * HZ + 0.5)
+	for _, at in { hoopK, hoopK + 1, 57, 200 } do
+		for _, len in { 1, 2 } do
+			local res, tr = judge(ride(function(k: number): number
+				if k >= at and k < at + len then return at - 1 end
+				return k
+			end))
+			check(res.detail.hoops == 18 and res.counts.bad == 0 and res.counts.stale == len and tr.finished
+				and close(tr.finishT :: number, ideal, 0.1),
+				string.format("freeze of %d00 ms at sample %d, then a catch-up: 18/18 and done at the line (%d hoops)", len, at, res.detail.hoops))
+		end
+	end
+	-- Ten 100 ms freezes (the review's repro).
+	local res10, tr10 = judge(ride(function(k: number): number
+		if k >= 40 and k <= 400 and k % 40 == 0 then return k - 1 end
+		return k
+	end))
+	check(res10.detail.hoops == 18 and res10.score == 100 and tr10.finished and close(tr10.finishT :: number, ideal, 0.1)
+		and res10.ribbon == "gold", "ten 100 ms freezes: 18/18, gold, finished at the line")
+
+	-- A lag-then-burst catch-up (too fast for one sample, no teleport) over a hoop.
+	local burst, burstTr = judge(ride(function(k: number): number
+		if k == hoopK - 1 or k == hoopK then return hoopK - 2 end
+		if k == hoopK + 1 then return hoopK end
+		return k
+	end))
+	check(burst.detail.hoops == 18 and burstTr.finished, "a burst after lag still counts the hoop it crossed")
+	-- A forward jump bigger than a sample allows is clamped, then re-synced at the next hoop.
+	local jumpRes, jumpTr = judge(ride(function(k: number): number
+		if k >= 100 then return k + 4 end
+		return k
+	end))
+	check(jumpRes.detail.hoops == 18 and jumpTr.finished, "an over-large jump loses only a little, back in step at the next hoop")
+
+	-- Freezes whose replica wobbles a hair (so not exactly stale): the catch-up is clamped,
+	-- not thrown away, and progress snaps back onto each hoop.
+	local wobble, wobbleTr = judge(ride(function(k: number): number
+		if k >= 20 and k <= 420 and k % 10 == 0 then return k - 1 + 0.0003 end
+		return k
+	end))
+	check(wobble.detail.hoops == 18 and wobbleTr.finished and close(wobbleTr.finishT :: number, ideal, 0.25),
+		string.format("40 wobbly freezes: 18/18 and the live tracker ends at the line (%d hoops, %.2f s vs %.2f)",
+			wobble.detail.hoops, wobbleTr.finishT or -1, ideal))
+
+	-- Wobbly freezes on the run-in after the last hoop (nothing to snap back onto): clamped.
+	local lastK = math.floor(sp.hoops[#sp.hoops].s / CFG.gallop * HZ) + 2
+	local runIn, runInTr = judge(ride(function(k: number): number
+		if k == lastK + 2 or k == lastK + 6 or k == lastK + 10 then return k - 1 + 0.0003 end
+		return k
+	end))
+	check(runIn.detail.hoops == 18 and runInTr.finished and close(runInTr.finishT :: number, ideal, 0.25),
+		"freezes on the run-in to the line still end the ride at the line")
+
+	-- 1% random 100-200 ms freezes, back-to-back ones included, on 100 rides.
+	local seed = 7
+	local function rnd(): number
+		seed = (seed * 16807) % 2147483647
+		return seed / 2147483647
+	end
+	local all18, allLine, worstBad = true, true, 0
+	for _ = 1, 100 do
+		local frozen: { [number]: number } = {}
+		local left, at = 0, 0
+		for k = 0, 500 do
+			if left > 0 then
+				frozen[k] = at
+				left -= 1
+			elseif k > 5 and rnd() < 0.01 then
+				at = k - 1
+				frozen[k] = at
+				left = if rnd() < 0.5 then 0 else 1
+			end
+		end
+		local res, tr = judge(ride(function(k: number): number return frozen[k] or k end))
+		if res.detail.hoops ~= 18 then all18 = false end
+		if not tr.finished or math.abs((tr.finishT :: number) - ideal) > 0.25 then allLine = false end
+		worstBad = math.max(worstBad, res.badShare)
+	end
+	check(all18, "1% random 100-200 ms freezes: every perfect ride scores 18/18")
+	check(allLine, "1% random freezes: every ride ends at the line")
+	check(worstBad <= CFG.maxBadShare / 2, string.format("freezes stay well under the floor (worst %.3f)", worstBad))
+
+	-- Stale and stopped: a frozen replica is skipped; a horse standing still stays.
+	local line = {}
+	for k = 0, 9 do table.insert(line, { t = k / HZ, x = 850 - k * 4.6, y = 0, z = -55 }) end
+	for k = 10, 19 do table.insert(line, { t = k / HZ, x = line[10].x, y = 0, z = -55 }) end
+	local kept, bad, counts = TR.validate(line, nil, CFG)
+	check(counts.stale == TR.MAX_STALE and #kept == 20 - TR.MAX_STALE and bad == 0, "a short freeze is skipped; a real stop is kept")
+	local tr = TR.tracker("speed")
+	local fed = 0
+	for _, s in line do
+		TR.feed(tr, s, CFG)
+		if tr.last == s then fed += 1 end
+	end
+	check(fed == 10, "the live tracker skips unchanged positions")
+
+	-- Timeouts need real riding: something scored or more than a quarter of the course.
+	local still = {}
+	for k = 0, 1200 do table.insert(still, { t = k / HZ, x = sp.start.x, y = 0, z = sp.start.z }) end
+	local stillTr = TR.tracker("speed")
+	for _, s in still do TR.feed(stillTr, s, CFG) end
+	local stillRes = TR.run("speed", still, CFG, 120)
+	check(stillRes.scored == 0 and not TR.timeoutCounts(stillRes, stillTr), "standing still until time runs out earns nothing")
+	local wander = ride(function(k: number): number return math.min(k, 120) end) -- one lap and a bit, then stops
+	local wTr = TR.tracker("speed")
+	for _, s in wander do TR.feed(wTr, s, CFG) end
+	local wRes = TR.run("speed", wander, CFG, 120)
+	check(TR.timeoutCounts(wRes, wTr) and wRes.scored > 0, "riding part of the course before time runs out counts")
+	local outside = {}
+	for k = 0, 50 do
+		local x, z = TC.ovalPoint(sp.startD + k * 4.6, -11) -- the inside edge: misses every hoop
+		table.insert(outside, { t = k / HZ, x = x, y = 0, z = z })
+	end
+	local oTr = TR.tracker("speed")
+	for _, s in outside do TR.feed(oTr, s, CFG) end
+	local oRes = TR.run("speed", outside, CFG, 120)
+	check(oRes.scored == 0 and not TR.timeoutCounts(oRes, oTr), "a little riding with nothing scored doesn't count")
+	local gTr = TR.tracker("grit")
+	gTr.next = 4
+	check(TR.timeoutCounts({ scored = 0 }, gTr) and not TR.timeoutCounts({ scored = 0 }, TR.tracker("grit"))
+		and TR.timeoutCounts({ scored = 1 }, TR.tracker("grit")), "Mud Splash timeouts: past three pieces or one scored")
 end
 
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
@@ -1220,5 +1383,6 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 
 	trainingGroundTests(check, close)
 	trainingRideTests(check, close)
+	trainingJitterTests(check, close)
 
 end

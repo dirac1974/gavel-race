@@ -130,6 +130,7 @@ end
 -- A soft pull toward the next hoop when the horse is heading for it and within magnetStuds of
 -- its edge (D-053). It never steers on its own: no stick, no pull.
 local MAGNET = GameConfig.training.magnetStuds
+local COURSE_DEADZONE = 0.2
 local function magnet(dir: Vector3, pos: Vector3): Vector3
 	local t = TrainingState.target
 	if not t or dir.Magnitude < 1e-3 then return dir end
@@ -183,8 +184,11 @@ RunService.RenderStepped:Connect(function()
 	end
 	local root = riding.PrimaryPart
 	if TrainingState.active and TrainingState.phase == "ride" and root and TrainingState.course then
+		-- Courses ride at their own speed: a part-pushed stick still rides at full course speed
+		-- (only the direction counts), with a small deadzone so a resting thumb doesn't steer.
+		local dir = if move.Magnitude > COURSE_DEADZONE then move.Unit else Vector3.zero
 		hh.WalkSpeed = TrainingCourses.speedAt(TrainingState.course, root.Position.X, root.Position.Z)
-		hh:Move(magnet(worldMove(move), root.Position), false)
+		hh:Move(magnet(worldMove(dir), root.Position), false)
 		return
 	end
 	hh.WalkSpeed = if galloping then GALLOP else WALK

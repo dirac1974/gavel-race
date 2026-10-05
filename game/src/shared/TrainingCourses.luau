@@ -247,8 +247,10 @@ end
 
 -- Mud Splash: the gymkhana in the paddock arena -----------------------------------------------
 -- Element x positions are offsets from the arena's centre line; logs keep 15+ studs clear of
--- it so people walking from gate to gate never meet one. side = +1 passes a pole on the
--- rider's left, -1 on the right.
+-- it so people walking from gate to gate never meet one. A pole's `side` says where the horse
+-- goes past it: side = +1 means the horse passes on the pole's left as the rider sees it (the
+-- pole is on the rider's right), side = -1 the other way. The route weaves accordingly, so the
+-- sides alternate down the lane.
 local GRIT_LAYOUT = {
 	{ kind = "mud", lane = 1, dx = 0 },
 	{ kind = "log", lane = 2, dx = -45 },
@@ -289,7 +291,8 @@ local function buildGrit()
 		elseif e.kind == "log" then
 			el.gate = gate(x, z, 0, 1, TC.LOG_HALF, dir, 0)
 		else
-			-- left of travel (dir, 0) is (0, -dir); the pole gate reaches out on the required side
+			-- Left of travel (dir, 0) is (0, -dir). The pole's gate reaches from 1.5 to 10 studs out
+			-- on the side the horse must pass, so riding through the pole itself never counts.
 			local sz = -dir * (e.side :: number)
 			local mid = (TC.POLE_REACH.inner + TC.POLE_REACH.outer) / 2
 			local half = (TC.POLE_REACH.outer - TC.POLE_REACH.inner) / 2

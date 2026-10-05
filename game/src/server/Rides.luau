@@ -6,10 +6,12 @@
 -- RideClient). The rider's client owns the rig's physics and steers it, like a character.
 -- Free roaming wins nothing, so the server only checks requests, not movement; training rides
 -- (D-053) are scored by TrainingService from its own samples of the rig.
--- Collision groups (CollisionGroups.luau): every ride rig and its rider are in RideHorses.
--- During a training ride they move to TrainingRiders, which still collides with the world
--- (Default: ground, rails, fences) but not with other ride horses, course riders or CourseProps.
--- Rides.horseOf(player) -> (rig, horseId) is the stable way to ask which horse someone rides.
+-- Collision groups (CollisionGroups.luau): players on foot are Walkers; every ride rig and its
+-- rider are in RideHorses. During a training ride they move to TrainingRiders, which still
+-- collides with the world (Default: ground, rails, fences) but not with walkers, other ride
+-- horses, other course riders or CourseProps.
+-- Rides.horseOf(player) -> (rig, horseId) is the stable way to ask which horse someone rides;
+-- Rides.request(player) brings the horse with the Ride button's throttle.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -118,7 +120,7 @@ folder.Parent = workspace
 
 local active: { [Player]: Model } = {}
 local lastCall: { [Player]: number } = {}
-local riderGroups: { [Player]: { [BasePart]: string } } = {} -- the rider's own groups, put back on dismount
+local riderGroup: { [Player]: string } = {} -- the group a rider's character is in while riding
 
 local CollisionGroups = require(script.Parent:WaitForChild("CollisionGroups"))
 CollisionGroups.ensure()
@@ -304,15 +306,25 @@ function Rides.setTraining(player: Player, on: boolean)
 	local rig = active[player]
 	if rig then setGroup(rig, group) end
 	local c = player.Character
-	if rig and c and riderGroups[player] then setGroup(c, group) end
+	if rig and c and riderGroup[player] then
+		riderGroup[player] = group
+		setGroup(c, group)
+	end
 end
 
+-- Off the horse: the character walks again (Walkers).
 local function restoreRider(player: Player)
-	local saved = riderGroups[player]
-	riderGroups[player] = nil
-	for p, g in saved or {} do
-		if p.Parent then p.CollisionGroup = g end
-	end
+	riderGroup[player] = nil
+	if player.Character then setGroup(player.Character, CollisionGroups.WALKERS) end
+end
+
+-- Every character starts as a Walker; parts added later (accessories, tools) join whatever
+-- group the character is in, so a seated rider never fights its own horse.
+local function watchCharacter(player: Player, character: Model)
+	setGroup(character, riderGroup[player] or CollisionGroups.WALKERS)
+	character.DescendantAdded:Connect(function(d)
+		if d:IsA("BasePart") then d.CollisionGroup = riderGroup[player] or CollisionGroups.WALKERS end
+	end)
 end
 
 -- Off the horse and send it home. Safe to call any time.
@@ -360,14 +372,8 @@ function Rides.call(player: Player): (boolean, string?)
 	local rig = build(player, h, at)
 	active[player] = rig
 	-- The rider joins the horse's collision group while riding.
-	local saved = {}
-	for _, d in character:GetDescendants() do
-		if d:IsA("BasePart") then
-			saved[d] = d.CollisionGroup
-			d.CollisionGroup = Rides.GROUP
-		end
-	end
-	riderGroups[player] = saved
+	riderGroup[player] = Rides.GROUP
+	setGroup(character, Rides.GROUP)
 	local data2 = Profiles.get(player)
 	if data2 then
 		addCloth(rig, Style.worn(data2, "cloth"))
@@ -392,17 +398,28 @@ function Rides.call(player: Player): (boolean, string?)
 	return true, nil
 end
 
+-- Bring the horse and ride, at most once every CALL_GAP seconds (the Ride button and training
+-- both come through here). Returns (ok, why).
+local CALL_GAP = 1.5
+function Rides.request(player: Player): (boolean, string?)
+	if os.clock() - (lastCall[player] or 0) < CALL_GAP then return false, nil end
+	lastCall[player] = os.clock()
+	local ok, why = Rides.call(player)
+	if ok then Progress.record(player, "ride", 1) end
+	return ok, why
+end
+
 function Rides.start()
 	CallHorse.OnServerEvent:Connect(function(player: Player)
-		if os.clock() - (lastCall[player] or 0) < 1.5 then return end
-		lastCall[player] = os.clock()
-		local ok, why = Rides.call(player)
-		if ok then
-			Progress.record(player, "ride", 1)
-		elseif why then
-			Profiles.notify(player, why, "heart")
-		end
+		local ok, why = Rides.request(player)
+		if not ok and why then Profiles.notify(player, why, "heart") end
 	end)
+	local function onPlayer(player: Player)
+		player.CharacterAdded:Connect(function(character) watchCharacter(player, character) end)
+		if player.Character then watchCharacter(player, player.Character) end
+	end
+	Players.PlayerAdded:Connect(onPlayer)
+	for _, player in Players:GetPlayers() do task.spawn(onPlayer, player) end
 	GetOff.OnServerEvent:Connect(function(player: Player)
 		if active[player] then
 			Rides.dismount(player)
@@ -419,7 +436,7 @@ function Rides.start()
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		Rides.dismount(player)
-		lastCall[player] = nil
+		lastCall[player], riderGroup[player] = nil, nil
 	end)
 	-- A change of active horse (or losing it) sends the current ride home (by id: two horses
 	-- can share a name).

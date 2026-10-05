@@ -692,8 +692,12 @@ local function buildGymkhana(f: Instance)
 			local cf = CFrame.lookAt(base, base + Vector3.new(e.dir, 0, 0)) -- the model's long side lies across the lane
 			local lm = WorldScene.model("log_jump")
 			if lm then
+				-- Fit the model inside the scoring gate: 12 studs across the lane, at most 2 high.
 				local _, size = lm:GetBoundingBox()
-				if size.Y > 0.1 then lm:ScaleTo(lm:GetScale() * logH / size.Y) end
+				local width = math.max(size.X, size.Z)
+				local k = math.min(if size.Y > 0.1 then logH / size.Y else 1, if width > 0.1 then TC.LOG_HALF * 2 / width else 1)
+				lm:ScaleTo(lm:GetScale() * k)
+				if size.Z > size.X then cf *= CFrame.Angles(0, math.pi / 2, 0) end -- long side across the lane
 				lm:PivotTo(cf)
 				for _, d in lm:GetDescendants() do
 					if d:IsA("BasePart") then d.CanCollide, d.CanQuery, d.CanTouch = false, false, false end
@@ -708,6 +712,13 @@ local function buildGymkhana(f: Instance)
 					prop({ Name = "Stump", Size = Vector3.new(1, logH - dia / 2, 1), Color = C.wood, Material = Enum.Material.Wood,
 						CFrame = CFrame.new(e.x, GROUND_Y + (logH - dia / 2) / 2, e.z + s * (TC.LOG_HALF - 1)) }, m)
 				end
+			end
+			-- Jump wings mark the ends of the scoring gate (the log counts anywhere between them).
+			for _, sd in { -1, 1 } do
+				prop({ Name = "Wing", Size = Vector3.new(0.6, 4, 0.6), Color = C.white,
+					CFrame = CFrame.new(e.x, GROUND_Y + 2, e.z + sd * (TC.LOG_HALF + 0.5)) }, m)
+				prop({ Name = "WingFlag", Size = Vector3.new(0.1, 1.2, 1.6), Color = if sd > 0 then C.red else C.white,
+					CFrame = CFrame.new(e.x, GROUND_Y + 3.5, e.z + sd * (TC.LOG_HALF + 1.3)) }, m)
 			end
 		else
 			local stripes = { C.red, C.white, C.red }
@@ -730,10 +741,13 @@ local function buildGymkhana(f: Instance)
 	local fin = G.finish
 	local fx, fz = fin.ax, (fin.az + fin.bz) / 2
 	local halfW = (fin.bz - fin.az) / 2 - 2
+	local arch = Instance.new("Model")
+	arch.Name = "Finish" -- one model, so a rider's client can light it up as the last target
+	arch.Parent = gy
 	for _, s in { -1, 1 } do
-		prop({ Name = "FinishPost", Size = Vector3.new(0.8, 11, 0.8), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 5.5, fz + s * halfW) }, gy)
+		prop({ Name = "FinishPost", Size = Vector3.new(0.8, 11, 0.8), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 5.5, fz + s * halfW) }, arch)
 	end
-	local banner = prop({ Name = "FinishBanner", Size = Vector3.new(0.4, 2.4, halfW * 2), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 10, fz) }, gy)
+	local banner = prop({ Name = "FinishBanner", Size = Vector3.new(0.4, 2.4, halfW * 2), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 10, fz) }, arch)
 	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face

@@ -2,8 +2,10 @@
 -- TrainingRide (D-053): scores a training ride from the server's own samples of the ride rig
 -- (10 Hz on the server clock; the client sends no score). Pure, tested under Lune; the client
 -- runs the same tracker on its own position for the lap dots and the glowing next piece.
---   validate        drops samples faster than maxSpeed, steps longer than maxStep (teleports)
---                   and samples off the course; returns the kept ones and the share dropped.
+--   validate        skips stale samples (a frozen replica), drops samples faster than maxSpeed
+--                   or longer than maxStep (teleports) and samples off the course; returns the
+--                   kept ones and the share dropped for speed or teleports (off-course samples
+--                   just don't score and never count toward the floor).
 --   crossings       where a path crosses a gate, with direction (+1 forward, -1 backward).
 --   tracker / feed  live progress: laps on the oval, the next gymkhana piece, the finish.
 --   scoreSpeed      Sprint Lane: 100 × hoops ridden through, in order and forward, / 18.
@@ -27,9 +29,24 @@ TR.RIBBONS = { "bronze", "silver", "gold" }
 TR.RIBBON_RANK = { bronze = 1, silver = 2, gold = 3 }
 TR.MIN_FINISH_SHARE = 0.4 -- the gymkhana finish counts only after this share of its ideal time
 
--- A change of oval distance the horse could have made between two samples.
-local function plausible(delta: number, dt: number, cfg: any): boolean
-	return math.abs(delta) <= cfg.maxSpeed * math.max(dt, 1 / cfg.sampleHz) * 1.2 + 1
+TR.MAX_STALE = 5          -- an unchanged position this many samples in a row is a real stop
+TR.TIMEOUT_SHARE = 0.25   -- a ride that runs out of time counts only past this share of the course
+
+-- The most oval distance the horse could cover between two samples (a bigger jump is clamped).
+local function stepLimit(dt: number, cfg: any): number
+	return cfg.maxSpeed * math.max(dt, 1 / cfg.sampleHz) * 1.2 + 1
+end
+TR.stepLimit = stepLimit
+
+-- Is the move from a to b a teleport (longer than maxStep per sample interval)?
+local function teleport(a: Sample, b: Sample, cfg: any): boolean
+	local dx, dy, dz = b.x - a.x, b.y - a.y, b.z - a.z
+	return math.sqrt(dx * dx + dy * dy + dz * dz) > cfg.maxStep * math.max(1, (b.t - a.t) * cfg.sampleHz)
+end
+
+-- Same position as the previous sample (a replica that didn't update)?
+local function same(a: Sample, b: Sample): boolean
+	return math.abs(a.x - b.x) < 1e-4 and math.abs(a.z - b.z) < 1e-4 and math.abs(a.y - b.y) < 1e-4
 end
 
 -- Could the horse have gone from a to b? (horizontal speed and the teleport step)
@@ -40,31 +57,48 @@ local function possible(a: Sample, b: Sample, cfg: any): boolean
 	return dt > 0 and h / dt <= cfg.maxSpeed and math.sqrt(h * h + dy * dy) <= cfg.maxStep * math.max(1, dt * cfg.sampleHz)
 end
 
--- Kept samples are marked `gap` when the move from the previous kept one is impossible (a
--- teleport): nothing is counted across that stretch. A plausible move over a dropped sample
--- (phone jitter) still counts.
-function TR.validate(samples: { Sample }, onCourse: ((number, number) -> boolean)?, cfg: any): ({ Sample }, number)
+-- A network freeze shows the horse standing still for a sample or two and then catching up:
+-- an unchanged position right after movement is stale and skipped (neither kept nor counted),
+-- so the catch-up is measured from the last real sample over the whole freeze.
+-- Kept samples are marked `gap` when the move from the previous kept one is a teleport: no
+-- crossing counts across that stretch. A lag-then-burst catch-up (too fast for one sample, but
+-- no teleport) is dropped and counted, yet the ride across it still counts.
+-- Returns (kept, bad share, counts { bad, stale, off }).
+function TR.validate(samples: { Sample }, onCourse: ((number, number) -> boolean)?, cfg: any): ({ Sample }, number, any)
 	local kept: { Sample } = {}
-	local bad = 0
+	local bad, stale, off = 0, 0, 0
 	local prev: Sample? = nil
+	local moving = false
+	local staleRun = 0
 	local lastKept: Sample? = nil
 	local dropped = false
 	for _, s in samples do
-		local ok = prev == nil or possible(prev :: Sample, s, cfg)
-		if ok and onCourse and not onCourse(s.x, s.z) then ok = false end
-		if ok then
-			local gap = dropped and lastKept ~= nil and not possible(lastKept :: Sample, s, cfg)
+		if prev and moving and staleRun < TR.MAX_STALE and same(prev :: Sample, s) then
+			stale += 1
+			staleRun += 1
+			continue
+		end
+		staleRun = 0
+		local fast = prev ~= nil and not possible(prev :: Sample, s, cfg)
+		local outside = not fast and onCourse ~= nil and not onCourse(s.x, s.z)
+		if fast then
+			bad += 1
+			dropped = true
+		elseif outside then
+			off += 1
+			dropped = true
+		else
+			local gap = dropped and lastKept ~= nil and teleport(lastKept :: Sample, s, cfg)
 			local k = { t = s.t, x = s.x, y = s.y, z = s.z, gap = gap }
 			table.insert(kept, k)
 			lastKept = k
 			dropped = false
-		else
-			bad += 1
-			dropped = true
 		end
+		moving = prev ~= nil and not same(prev :: Sample, s)
 		prev = s
 	end
-	return kept, if #samples > 0 then bad / #samples else 0
+	local judged = #samples - stale - off
+	return kept, if judged > 0 then bad / judged else 0, { bad = bad, stale = stale, off = off }
 end
 
 local function crossing(p: Sample, q: Sample, g: any): (number, number)
@@ -97,33 +131,84 @@ function TR.crossings(samples: { Sample }, g: any): { Crossing }
 	return out
 end
 
+-- Oval progress ------------------------------------------------------------------------------
+-- Progress round the oval from the start, shared by the live tracker and scoreSpeed. A jump
+-- bigger than the horse could make is clamped, not thrown away, and every hoop ridden through
+-- puts progress back exactly on that hoop, so a freeze or a dropped sample costs at most a
+-- few studs until the next hoop. A forward crossing counts for the hoop whose place in the
+-- ride matches the progress, so reversed, repeated or out-of-order crossings don't count.
+local hoopsByPost: { [number]: { any } } = {}
+for _, hp in TC.courses.speed.hoops do
+	hoopsByPost[hp.post] = hoopsByPost[hp.post] or {}
+	table.insert(hoopsByPost[hp.post], hp)
+end
+local HOOP_TOL = TC.LAP / (2 * #TC.courses.speed.posts)
+
+local function matchHoop(post: number, at: number): any?
+	local best, bestErr = nil, HOOP_TOL
+	for _, hp in hoopsByPost[post] or {} do
+		local err = math.abs(at - hp.s)
+		if err <= bestErr then best, bestErr = hp, err end
+	end
+	return best
+end
+
+local function ovalStep(st: any, prev: Sample?, s: Sample, cfg: any)
+	local c = TC.courses[st.key]
+	local d = TC.ovalProject(s.x, s.z)
+	local delta = TC.wrap(d - st.lastD)
+	st.lastD = d
+	local lim = stepLimit(if prev then s.t - prev.t else 1 / cfg.sampleHz, cfg)
+	delta = math.clamp(delta, -lim, lim)
+	local before = st.progress
+	st.progress += delta
+	if prev and not s.gap and c.posts then
+		for _, post in c.posts do
+			local dir, f = crossing(prev, s, post.gate)
+			if dir > 0 then
+				local at = before + delta * f
+				local hp = matchHoop(post.index, at)
+				if hp then
+					st.hit[hp.index] = true
+					st.progress += hp.s - at -- re-sync to the hoop
+				end
+			end
+		end
+	end
+	if not st.finishT and st.progress >= c.finish then
+		local moved = st.progress - before
+		local f = if moved > 0 then math.clamp((c.finish - before) / moved, 0, 1) else 1
+		st.finishT = if prev then prev.t + (s.t - prev.t) * f else s.t
+	end
+end
+
 -- Live tracker ------------------------------------------------------------------------------
 function TR.tracker(key: string)
 	local c = TC.courses[key]
-	return { key = key, progress = 0, lastD = c.startD or 0, last = nil :: Sample?, next = 1, finished = false,
+	return { key = key, progress = 0, lastD = c.startD or 0, last = nil :: Sample?, next = 1, finished = false, hit = {},
 		finishT = nil :: number?, minFinish = if c.kind == "arena" then TR.MIN_FINISH_SHARE * TC.idealSeconds(key) else 0 }
 end
 
--- Feed one sample; returns true once the course is finished.
+-- Feed one sample; returns true once the course is finished. A sample at exactly the last
+-- position (a frozen replica, or standing still) is skipped, so the catch-up after a freeze
+-- is measured over the whole freeze.
 function TR.feed(tr: any, s: Sample, cfg: any): boolean
 	local c = TC.courses[tr.key]
 	local prev = tr.last
-	tr.last = s
 	if tr.finished then return true end
+	if prev and same(prev, s) then return false end
+	tr.last = s
 	if c.kind == "oval" then
-		local d = TC.ovalProject(s.x, s.z)
-		local delta = TC.wrap(d - tr.lastD)
-		local dt = if prev then s.t - prev.t else 1 / cfg.sampleHz
-		tr.lastD = d
-		if plausible(delta, dt, cfg) then
-			local before = tr.progress
-			tr.progress += delta
-			if tr.progress >= c.finish then
-				tr.finished = true
-				local f = if delta > 0 then (c.finish - before) / delta else 1
-				tr.finishT = if prev then prev.t + (s.t - prev.t) * f else s.t
-			end
+		if c.posts then
+			ovalStep(tr, prev, s, cfg)
+		else -- Hill Climb (T3): progress only
+			local d = TC.ovalProject(s.x, s.z)
+			local lim = stepLimit(if prev then s.t - prev.t else 1 / cfg.sampleHz, cfg)
+			tr.progress += math.clamp(TC.wrap(d - tr.lastD), -lim, lim)
+			tr.lastD = d
+			if tr.progress >= c.finish then tr.finishT = s.t end
 		end
+		if tr.finishT then tr.finished = true end
 	elseif c.kind == "arena" and prev then
 		for j = tr.next, #c.elements do
 			if crossing(prev, s, c.elements[j].pass) > 0 then tr.next = j + 1 end -- passing a piece moves the glow on
@@ -147,45 +232,30 @@ end
 
 function TR.laps(tr: any): number
 	local c = TC.courses[tr.key]
+	if tr.finished then return c.laps or 0 end
 	return math.clamp(math.floor(tr.progress / TC.LAP), 0, c.laps or 0)
+end
+
+-- How much of the course the tracker has been round (0..1).
+function TR.progressShare(tr: any): number
+	local c = TC.courses[tr.key]
+	if tr.finished then return 1 end
+	if c.kind == "arena" then return math.clamp((tr.next - 1) / #c.elements, 0, 1) end
+	return math.clamp(tr.progress / c.finish, 0, 1)
 end
 
 -- Scoring ---------------------------------------------------------------------------------
 function TR.scoreSpeed(kept: { Sample }, cfg: any): (number, any)
 	local c = TC.courses.speed
-	local prog = {}
-	local p, lastD = 0, c.startD
-	local finishT: number? = nil
-	for i, s in kept do
-		local d = TC.ovalProject(s.x, s.z)
-		local delta = TC.wrap(d - lastD)
-		lastD = d
-		-- (over a dropped sample the time step is longer, so honest movement still counts)
-		if plausible(delta, if i > 1 then s.t - kept[i - 1].t else 1 / cfg.sampleHz, cfg) then
-			if not finishT and p < c.finish and p + delta >= c.finish and i > 1 then
-				finishT = kept[i - 1].t + (s.t - kept[i - 1].t) * (c.finish - p) / delta
-			end
-			p += delta
-		end
-		prog[i] = p
-	end
-	-- A forward crossing counts for the hoop whose place in the ride matches where you are, so
-	-- reversed, repeated or out-of-order crossings don't count.
-	local tol = TC.LAP / (2 * #c.posts)
-	local hit = {}
-	for _, post in c.posts do
-		for _, x in TR.crossings(kept, post.gate) do
-			if x.dir > 0 then
-				local at = prog[x.i - 1] + (prog[x.i] - prog[x.i - 1]) * x.f
-				for _, hp in c.hoops do
-					if hp.post == post.index and math.abs(at - hp.s) <= tol then hit[hp.index] = true end
-				end
-			end
-		end
+	local st = TR.tracker("speed")
+	local prev: Sample? = nil
+	for _, s in kept do
+		ovalStep(st, prev, s, cfg)
+		prev = s
 	end
 	local n = 0
-	for _ in hit do n += 1 end
-	return 100 * n / #c.hoops, { hoops = n, of = #c.hoops, hit = hit, finishT = finishT }
+	for _ in st.hit do n += 1 end
+	return 100 * n / #c.hoops, { hoops = n, of = #c.hoops, hit = st.hit, finishT = st.finishT, progress = st.progress }
 end
 
 -- A log is cleared when the horse is airborne over it: at the crossing, or in a sample within
@@ -266,7 +336,7 @@ end
 -- Validate, score and finalize a whole ride. `seconds` is the ride time the server measured
 -- (its tracker's finish, or the time when the ride ran out).
 function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?)
-	local kept, bad = TR.validate(samples, function(x: number, z: number): boolean return TC.onCourse(key, x, z) end, cfg)
+	local kept, bad, counts = TR.validate(samples, function(x: number, z: number): boolean return TC.onCourse(key, x, z) end, cfg)
 	local raw, detail
 	if key == "speed" then
 		raw, detail = TR.scoreSpeed(kept, cfg)
@@ -277,8 +347,15 @@ function TR.run(key: string, samples: { Sample }, cfg: any, seconds: number?)
 	end
 	local secs = seconds or detail.finishT or (if #samples > 0 then samples[#samples].t else 0)
 	local res = TR.finalize(raw, bad, secs, TC.idealSeconds(key), cfg)
-	res.detail, res.course, res.kept = detail, key, #kept
+	res.detail, res.course, res.kept, res.counts = detail, key, #kept, counts
+	res.scored = if key == "speed" then detail.hoops else detail.mud + detail.logs + detail.poles
 	return res
+end
+
+-- A ride that ran out of time counts only with real riding in it: something scored, or more
+-- than TIMEOUT_SHARE of the course ridden. Otherwise it ends kindly with no gain.
+function TR.timeoutCounts(result: any, tr: any): boolean
+	return result ~= nil and ((result.scored or 0) > 0 or TR.progressShare(tr) > TR.TIMEOUT_SHARE)
 end
 
 -- Session limits: at least sessionGapSeconds apart and at most maxSessionsPerHour. `history`

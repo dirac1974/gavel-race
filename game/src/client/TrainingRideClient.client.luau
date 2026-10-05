@@ -123,10 +123,13 @@ local function clearGlow()
 	table.clear(glowing)
 end
 
+-- A piece of the course by name: "Hoop3", "Mud1" ... (gymkhana), "Finish" (the gymkhana's
+-- arch) or "StartLine" (the oval's start and finish line).
 local function courseModel(name: string): Instance?
 	local world = workspace:FindFirstChild("World")
 	local tg = world and world:FindFirstChild("TrainingGround")
 	if not tg then return nil end
+	if name == "StartLine" then return tg:FindFirstChild("StartLine") end
 	local folder = tg:FindFirstChild(if string.sub(name, 1, 4) == "Hoop" then "Hoops" else "Gymkhana")
 	return folder and folder:FindFirstChild(name)
 end
@@ -135,7 +138,8 @@ local function glow(name: string?)
 	clearGlow()
 	local m = name and courseModel(name)
 	if not m then return end
-	for _, d in m:GetDescendants() do
+	local parts = if m:IsA("BasePart") then { m } else m:GetDescendants()
+	for _, d in parts do
 		if d:IsA("BasePart") then
 			glowing[d] = { d.Color, d.Material }
 			d.Color, d.Material = C.gold, Enum.Material.Neon
@@ -188,7 +192,8 @@ end
 -- Session --------------------------------------------------------------------------------------
 local session = nil -- { course, c, tracker, goAt, base, baseY, target, prev, got = {} }
 
-local function setDots(count: number, filled: number)
+-- Dots: done ones gold, the one you're on orange (laps on Sprint Lane, pieces on Mud Splash).
+local function setDots(count: number, filled: number, current: boolean?)
 	if dots:GetAttribute("Count") ~= count then
 		dots:SetAttribute("Count", count)
 		for _, ch in dots:GetChildren() do
@@ -209,11 +214,11 @@ local function setDots(count: number, filled: number)
 	for k = 1, count do
 		local d = dots:FindFirstChild("Dot" .. k)
 		if d then
-			local on = k <= filled
-			if d:GetAttribute("On") ~= on then
-				d:SetAttribute("On", on)
-				d.BackgroundColor3 = if on then C.gold else C.white
-				if on then Ui.pop(d) end
+			local state = if k <= filled then "done" elseif current and k == filled + 1 then "now" else "todo"
+			if d:GetAttribute("State") ~= state then
+				d:SetAttribute("State", state)
+				d.BackgroundColor3 = if state == "done" then C.gold elseif state == "now" then C.orange else C.white
+				if state == "done" then Ui.pop(d) end
 			end
 		end
 	end
@@ -246,6 +251,27 @@ local function speedPrints(tr, hp)
 	for k = 0, steps do
 		local f = k / steps
 		local x, z = TC.ovalPoint(d0 + ahead * f, lat0 * (1 - f) + post.lateral * f)
+		table.insert(pts, { x = x, z = z })
+	end
+	printsAlong(pts, 7, 18)
+end
+
+-- After the last hoop: hoofprints from where you are to the finish line.
+local function finishPrints(tr)
+	local c = TC.courses.speed
+	local ahead = math.max(0, c.finish - tr.progress)
+	local rig = myRide()
+	local root = rig and rig.PrimaryPart
+	local lat0 = 0
+	if root then
+		local _, l = TC.ovalProject(root.Position.X, root.Position.Z)
+		lat0 = math.clamp(l, -CFG.oval.width / 2, CFG.oval.width / 2)
+	end
+	local pts = {}
+	local steps = math.max(2, math.floor(ahead / 6))
+	for k = 0, steps do
+		local f = k / steps
+		local x, z = TC.ovalPoint(tr.lastD + ahead * f, lat0 * (1 - f))
 		table.insert(pts, { x = x, z = z })
 	end
 	printsAlong(pts, 7, 18)
@@ -314,11 +340,11 @@ local function beginSession(course: string, n: number)
 	stopVisuals()
 	local c = TC.courses[course]
 	if not c then return end
-	local s = { course = course, c = c, base = {}, got = {}, target = nil, recent = {}, hops = {} }
+	local s = { course = course, c = c, base = {}, got = {}, target = nil, recent = {}, hops = {}, hoopsHit = 0 }
 	session = s
 	TrainingState.active, TrainingState.course, TrainingState.phase = true, course, "countdown"
 	courseLabel.Text = c.emoji .. " " .. c.name
-	setDots(if course == "speed" then c.laps else #c.elements, 0)
+	setDots(if course == "speed" then c.laps else #c.elements, 0, true)
 	hud.Visible = true
 	jumpBtn.Visible = UserInputService.TouchEnabled
 	countdown.Visible = true
@@ -358,16 +384,13 @@ local function cheerFor(s, prev, cur)
 		end
 	end
 	if s.course == "speed" then
-		local hp = TrainingRide.nextHoop(s.tracker)
-		local target = s.target
-		if target and target ~= hp and not s.got[target.index] then
-			local post = TC.courses.speed.posts[target.post]
-			local xs = TrainingRide.crossings({ prev, cur }, post.gate)
-			if xs[1] and xs[1].dir > 0 then
-				s.got[target.index] = true
-				say("✨", C.gold)
-				play("tap_good", 0.6)
-			end
+		-- the tracker counts hoops with the server's rule
+		local n = 0
+		for _ in s.tracker.hit do n += 1 end
+		if n > s.hoopsHit then
+			s.hoopsHit = n
+			say("✨", C.gold)
+			play("tap_good", 0.6)
 		end
 		return
 	end
@@ -405,28 +428,40 @@ RunService.RenderStepped:Connect(function()
 	if prev ~= cur then cheerFor(s, prev, cur) end
 	s.prev = cur
 	if s.course == "speed" then
-		setDots(s.c.laps, TrainingRide.laps(s.tracker))
+		setDots(s.c.laps, TrainingRide.laps(s.tracker), not s.tracker.finished)
 		local hp = TrainingRide.nextHoop(s.tracker)
-		if hp ~= s.target then
-			s.target = hp
+		local key = if hp then hp.index else "finish"
+		if key ~= s.target then
+			s.target = key
 			if hp then
 				local post = s.c.posts[hp.post]
 				glow("Hoop" .. hp.post)
 				TrainingState.target = { x = post.x, z = post.z, nx = post.tx, nz = post.tz, half = post.width / 2 }
 				speedPrints(s.tracker, hp)
 			else
-				glow(nil)
-				clearPrints()
+				-- the last hoop is behind you: on to the line
+				glow("StartLine")
 				TrainingState.target = nil
+				courseLabel.Text = "🏁 To the finish line!"
+				s.printsAt = s.tracker.progress
+				finishPrints(s.tracker)
 			end
+		elseif not hp and s.tracker.progress - (s.printsAt or 0) > 20 then
+			s.printsAt = s.tracker.progress -- keep the prints just ahead of the horse
+			finishPrints(s.tracker)
 		end
 	else
 		local nextIndex = s.tracker.next
-		setDots(#s.c.elements, nextIndex - 1)
+		setDots(#s.c.elements, nextIndex - 1, not s.tracker.finished)
 		if nextIndex ~= s.target then
 			s.target = nextIndex
 			local e = s.c.elements[nextIndex]
-			glow(e and e.name)
+			if e then
+				glow(e.name)
+			else
+				glow("Finish")
+				courseLabel.Text = "🏁 To the finish!"
+			end
 			gritPrints(nextIndex) -- after the last piece the prints lead to the finish
 		end
 	end
