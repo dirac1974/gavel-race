@@ -26,6 +26,9 @@ RaceState.resultsOpen = false   -- a results card is on screen (the Hud keeps th
 RaceState.holdFocus = false     -- it's your own card: a new race on that course doesn't take the HUD
 RaceState.burstShowing = false  -- the Final Burst bar is up (the race map steps aside)
 RaceState.myHome = false        -- your horse is past the line and pulling up (hoofbeats stop)
+RaceState.watchHidden = false   -- watching: the HUD is hidden (busy, or walked out of range)
+RaceState.cheeredLane = nil     -- watching: the lane you cheered for (FanClient)
+RaceState.cheerOpen = false     -- watching: the cheer strip is still open (FanClient)
 
 -- Race HUD size on small screens (D-055): the board, place badge, results card and race map
 -- shrink with the screen height. The race map's top and unscaled height place the badge under it.
@@ -49,13 +52,35 @@ RaceState.myCourse = nil   -- the course of your own race, kept until you're off
 local decided: { [string]: boolean } = {}
 
 -- Watching is for players at the racecourse (D-055): someone brushing their horse in the barn
--- gets no race HUD, results card or cheer bar.
-function RaceState.nearCourse(courseId: string?): boolean
+-- gets no race HUD, results card or cheer strip. `studs` defaults to the follow range.
+function RaceState.nearCourse(courseId: string?, studs: number?): boolean
 	local character = localPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not root then return false end
 	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
-	return TrackLayout.distanceToTrack(cfg, root.Position.X, root.Position.Z) <= GameConfig.raceView.spectateStuds
+	return TrackLayout.distanceToTrack(cfg, root.Position.X, root.Position.Z) <= (studs or GameConfig.spectate.rangeStuds)
+end
+
+-- Busy (D-055): a training ride (the server sets TrainingRide), a care or training game, or a
+-- full-screen panel. A spectator's race HUD waits until the kid is done.
+local PANELS = { "Care", "Paddock", "Taming", "MyHorses", "MarketCard", "RacePicker", "StableBoard", "Starter",
+	"StyleShop", "Map", "GrownUpsPanel" }
+function RaceState.busy(): boolean
+	if localPlayer:GetAttribute("TrainingRide") then return true end
+	local playerGui = localPlayer:FindFirstChild("PlayerGui")
+	if not playerGui then return false end
+	for _, name in PANELS do
+		local g = playerGui:FindFirstChild(name)
+		if g and g:IsA("ScreenGui") and g.Enabled then return true end
+	end
+	return false
+end
+
+-- A phone-sized screen (short side 500 px or less).
+function RaceState.phone(): boolean
+	local camera = workspace.CurrentCamera
+	if not camera then return false end
+	return math.min(camera.ViewportSize.X, camera.ViewportSize.Y) <= 500
 end
 
 function RaceState.consider(courseId: string?, laneList, start: number): boolean

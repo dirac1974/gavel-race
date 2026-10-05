@@ -2,6 +2,9 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: race feel (D-055): finger bounces ignored, 3-2-1 countdown, Early/Late instead of Miss, riders' board off in-race and no win % anywhere, Space/Enter/click/touch/A/R2 tap, spectating only near the course and never while busy; cheer strip at the top and CLAP left of the movement buttons (D-056); debate 011
+- 2026-10-05 — fix: race review: a turned-down race clears a stale focus, replay buttons after the next race, spectator burst text, stick clicks
+- 2026-10-05 — fix: race on screen matches the result (every lane timed on lane 1), smooth gaps, eased gate, replay hand-off, finger-down taps, phone HUD, camera back on dismount, first race waits for horse models
 - 2026-10-05 — docs: debates 009 (training rides) and 010 (race steering); D-053 and D-054
 - 2026-10-05 — fix: running legs review: legs never drift, gait cross-fade, rest at race end, fitted saddle cloth (lane numbers in races), smooth normals, fallbacks
 - 2026-10-05 — feat: running legs: standing horses split into body and legs, walk/trot/gallop cycles on races, rides and wild horses (D-051)

@@ -188,6 +188,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local mash = {}
 	for k = 0, 36 * 8 do table.insert(mash, 100 + k / 8) end
 	check((PaceMeter.score(passes, mash)) < 2, "mashing scores about 0")
+	-- Finger bounces (D-055): ignored within 0.15 s of the last counted tap; mashing still fails.
+	local bounced = {}
+	for _, t in ideal do
+		table.insert(bounced, t)
+		table.insert(bounced, t + 0.08)
+	end
+	check((PaceMeter.score(passes, bounced)) == 0, "without the bounce rule two taps zero a pass")
+	check(close((PaceMeter.score(passes, bounced, 0.15)), 100, 1e-6), "bounces are ignored, the first tap counts")
+	check((PaceMeter.score(passes, mash, 0.15)) < 5, "mashing still scores about 0 with the bounce rule")
+	local kept, ignored = PaceMeter.debounce({ 1.0, 1.1, 1.2, 1.4 }, 0.15)
+	check(#kept == 3 and kept[2] == 1.2 and ignored == 1, "bounces are measured from the last counted tap")
 
 	-- RaceShape (D-033) -------------------------------------------------------
 	-- The exponential race gives the Harville finish: win share = live chance, and

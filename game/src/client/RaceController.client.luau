@@ -5,9 +5,10 @@
 -- crosses the glowing target, one tap per pass; distance from the target sets the score
 -- and the speed meter fills from your last few passes. The target moves every 2-3 passes.
 -- In the homestretch comes the Final Burst: one tap on a big, colourful meter that counts
--- double. Tap anywhere (counted as the finger goes down), or press a key or gamepad button;
--- movement, camera and menu keys never tap (D-055). Drawn from the shared server clock; all
--- scoring happens on the server (this screen only predicts it for feedback).
+-- double. Tap anywhere (counted as the finger goes down), Space or Enter, or gamepad A or R2
+-- (GameConfig.tapKeys, D-055); a finger bounce within 0.15 s is ignored. "3, 2, 1" counts down
+-- over the gate. Drawn from the shared server clock; all scoring happens on the server (this
+-- screen only predicts it for feedback).
 -- Placeholder shapes show until the uploaded atlas art arrives (UiArt).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -33,6 +34,8 @@ if not okSound then Sound = nil end
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
 local DEFAULT_MAX_ZOOM = 128
+local HUD = GameConfig.hud
+local BOUNCE = GameConfig.pace.bounceSeconds or 0
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -43,7 +46,7 @@ end
 -- spectators hear it at half volume, and only near that race's course. Only riders hear
 -- their own hoofbeats, and only while they're in the saddle.
 local cueRace, cueVolume, cueRider, cueCourse = 0, 1, false, "dirt"
-local nearCourse = RaceState.nearCourse -- within GameConfig.raceView.spectateStuds (D-052, D-055)
+local nearCourse = RaceState.nearCourse -- within GameConfig.spectate.rangeStuds (D-052, D-055)
 local function cue(at: number, ...)
 	if not Sound then return end
 	local id, names, volume, rider, course = cueRace, { ... }, cueVolume, cueRider, cueCourse
@@ -256,6 +259,22 @@ end
 
 local pace = makeMeter(0.7, 34, 0.80, false)
 local burst = makeMeter(0.9, 72, 0.44, true)
+-- "3, 2, 1, GO!" over the gate (D-055): big for riders, smaller for spectators.
+local countLabel = label(gui, UDim2.new(1, 0, 0, 160), UDim2.new(0, 0, 0.26, 0), "", 140)
+countLabel.Font = Enum.Font.GothamBlack
+countLabel.TextColor3 = Color3.fromHex("FFD34D")
+countLabel.TextStrokeTransparency = 0.2
+countLabel.ZIndex = 9
+countLabel.Visible = false
+-- On keyboard devices the slider shows which key taps.
+local keyCap = label(pace.bar, UDim2.fromOffset(70, 24), UDim2.new(1, 10, 0.5, -12), "SPACE", 14)
+keyCap.BackgroundTransparency = 0.1
+keyCap.BackgroundColor3 = Color3.fromHex("F4EFE6")
+keyCap.TextColor3 = Color3.fromHex("1F2430")
+keyCap.TextStrokeTransparency = 1
+keyCap.ZIndex = 6
+round(keyCap, UDim.new(0, 6))
+keyCap.Visible = UserInputService.KeyboardEnabled and not UserInputService.TouchEnabled
 local burstTitle = label(gui, UDim2.new(1, 0, 0, 60), UDim2.new(0, 0, 0.34, 0), "FINAL BURST  ×2", 52)
 burstTitle.Font = Enum.Font.GothamBlack
 burstTitle.TextColor3 = Color3.fromHex("FFD34D")
@@ -430,25 +449,53 @@ local riding = false
 local myLaneIndex = nil
 local youMarkerPlace: TextLabel? = nil
 local lastHud = 0
+local lastWatchCheck = 0
 -- pace = { passes, tapsByPass = {}, done = 0, recent = {} } for the race
 local paceState = nil
 -- active burst = { seg, open, close, spec, tapped }
 local burstState = nil
 
--- During a race the rows follow the running order (D-030): place, lane badge, name,
--- win chance and purse. Before the race they're in lane order.
+-- The running-order board (D-030, D-055). During a race the rows follow the running order;
+-- before it they're in lane order. Rows show place, lane badge and name, with a ★ (and an up or
+-- down arrow after cheers lock) on the rider you cheered. No win % or purse unless
+-- GameConfig.hud.boardShowsChance. Spectators on a phone get the top 3 plus their rider.
+local cheerArrow = nil -- { up, untilT } for the rider you cheered
+local function boardLanes(racing: boolean): { number }
+	local list = {}
+	for r = 1, math.min(RaceState.lanes, #rows) do
+		local i = if racing then RaceState.order[r] else r
+		if i then table.insert(list, i) end
+	end
+	if myLaneIndex or not RaceState.phone() or #list <= HUD.spectatorBoardRowsPhone then return list end
+	local mine = RaceState.cheeredLane
+	local short, hasMine = {}, false
+	for r = 1, HUD.spectatorBoardRowsPhone - 1 do
+		table.insert(short, list[r])
+		if list[r] == mine then hasMine = true end
+	end
+	table.insert(short, if mine and not hasMine then mine else list[HUD.spectatorBoardRowsPhone])
+	return short
+end
 local function renderBoard()
 	local t = os.clock()
 	local racing = RaceState.active and #RaceState.order > 0
+	local list = boardLanes(racing)
 	for r, row in rows do
-		local i = if racing then RaceState.order[r] else r
+		local i = list[r]
 		local lane = i and lanes[i]
 		if lane then
 			local you = lane.id == myId and "  ◀ YOU" or ""
+			local star = ""
+			if i == RaceState.cheeredLane then
+				star = " ★"
+				if cheerArrow and cheerArrow.untilT > t then star ..= if cheerArrow.up then " ▲" else " ▼" end
+			end
 			local sparkle = (sparkleUntil[lane.id] or 0) > t and " ✦" or ""
-			local lead = if racing then RaceState.ordinal(r) else tostring(i)
-			row.Text = string.format("%s  %s%s%s  %d%%  %s %d", lead, lane.name, sparkle, you,
-				math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
+			local lead = if racing then RaceState.ordinal(RaceState.place[i] or r) else tostring(i)
+			local extra = if HUD.boardShowsChance
+				then string.format("  %d%%  %s %d", math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
+				else ""
+			row.Text = string.format("%s  %s%s%s%s%s", lead, lane.name, star, sparkle, you, extra)
 			row.TextColor3 = lane.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
 			UiArt.set(rowBadges[r], if sparkle ~= "" then `lane_{i}_sparkle` else `lane_{i}`)
 		else
@@ -456,6 +503,30 @@ local function renderBoard()
 			rowBadges[r].Visible = false
 		end
 	end
+	board.Size = UDim2.new(0, if HUD.boardShowsChance then 300 else 240, 0, math.max(1, #list) * 26 + 10)
+end
+
+-- A pass with no tap: the glow greys for a moment instead of a failure word (D-055).
+local greyToken = 0
+local function greyGlow()
+	greyToken += 1
+	local token = greyToken
+	local zone = pace.zone
+	local function paint(c: Color3)
+		zone.BackgroundColor3 = c
+		for _, d in zone:GetDescendants() do
+			if d:IsA("ImageLabel") then d.ImageColor3 = c end
+		end
+	end
+	paint(Color3.fromRGB(150, 150, 150))
+	task.delay(0.3, function()
+		if token == greyToken then
+			zone.BackgroundColor3 = Color3.fromRGB(60, 200, 90)
+			for _, d in zone:GetDescendants() do
+				if d:IsA("ImageLabel") then d.ImageColor3 = Color3.new(1, 1, 1) end
+			end
+		end
+	end)
 end
 
 local function hideMeters()
@@ -494,13 +565,21 @@ local function tap()
 	end
 	if not paceState or not riding then return end
 	local k = PaceMeter.passIndex(paceState.passes, t)
-	if not k then return end
-	remotes.PaceTap:FireServer(t)
+	if not k then return end -- before the bell (no false starts) or between passes
+	remotes.PaceTap:FireServer(t) -- the server applies the same bounce rule
+	-- A finger bounce (another tap within BOUNCE of the last counted tap) is ignored (D-055).
+	if paceState.lastCounted and t - paceState.lastCounted < BOUNCE then return end
+	paceState.lastCounted = t
 	local n = (paceState.tapsByPass[k] or 0) + 1
 	paceState.tapsByPass[k] = n
 	if n == 1 then
 		paceState.firstTap[k] = t
-		local labelText = GameConfig.labelFor(PaceMeter.tapScore(paceState.passes[k], t))
+		local pass = paceState.passes[k]
+		local score = PaceMeter.tapScore(pass, t)
+		local labelText = GameConfig.labelFor(score)
+		if score < HUD.earlyLateBelow then
+			labelText = if t < PaceMeter.idealTime(pass) then "Early" else "Late" -- says what to fix
+		end
 		feedback.Text = labelText
 		showResultIcon(labelText)
 		hint.Text = ""
@@ -510,7 +589,7 @@ local function tap()
 		end
 		if RaceState.recording then table.insert(RaceState.recording.events, { t = t, kind = "tap", label = labelText }) end
 	else
-		feedback.Text = "Too fast!"
+		feedback.Text = "One tap!"
 		showResultIcon("Too fast")
 		hint.Text = "One tap each time the marker crosses"
 	end
@@ -524,24 +603,38 @@ tapArea.InputBegan:Connect(function(input)
 		tap()
 	end
 end)
--- Keys and buttons that never tap: moving, steering (D-054), the camera, chat and menus. A kid
--- pressing W to "go" or O to zoom out shouldn't waste a pass or the Final Burst.
-local NOT_TAPS = {}
-for _, name in {
-	"W", "A", "S", "D", "Up", "Down", "Left", "Right", "I", "O", "Slash", "Tab", "Escape", "Backquote",
-	"LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt", "LeftSuper", "RightSuper",
-	"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "PageUp", "PageDown",
-	"DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Thumbstick1", "Thumbstick2", "ButtonL3", "ButtonR3",
-	"ButtonSelect", "ButtonStart",
-} do
-	local ok, code = pcall(function() return (Enum.KeyCode :: any)[name] end)
-	if ok and code then NOT_TAPS[code] = true end
+-- Only GameConfig.tapKeys tap (D-055): a kid pressing W to "go" or O to zoom out never wastes
+-- a pass or the Final Burst. The first other key pressed during a pass shows which keys tap,
+-- once a race; keys kids press on purpose for something else (moving, steering, the camera,
+-- clapping, prompts, menus) don't.
+local function keyCodes(names: { string }): { [Enum.KeyCode]: boolean }
+	local set = {}
+	for _, name in names do
+		local ok, code = pcall(function() return (Enum.KeyCode :: any)[name] end)
+		if ok and code then set[code] = true end
+	end
+	return set
 end
+local TAP_KEYS = keyCodes(GameConfig.tapKeys)
+local QUIET_KEYS = keyCodes({
+	"W", "A", "S", "D", "Up", "Down", "Left", "Right", "I", "O", "C", "E", "X", "Slash", "Tab", "Escape",
+	"Backquote", "LeftShift", "RightShift", "LeftControl", "RightControl", "LeftAlt", "RightAlt", "LeftSuper",
+	"RightSuper", "DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Thumbstick1", "Thumbstick2", "ButtonL3",
+	"ButtonR3", "ButtonSelect", "ButtonStart", "ButtonX", "ButtonY", "ButtonB",
+})
+local keyHintShown = false -- once a race
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end -- typing in chat, menus, or a GUI button took it
 	local kind = input.UserInputType
-	if kind == Enum.UserInputType.Keyboard or kind.Name:sub(1, 7) == "Gamepad" then
-		if not NOT_TAPS[input.KeyCode] then tap() end
+	local pad = kind.Name:sub(1, 7) == "Gamepad"
+	if kind == Enum.UserInputType.Keyboard or pad then
+		if TAP_KEYS[input.KeyCode] then
+			tap()
+		elseif not keyHintShown and not QUIET_KEYS[input.KeyCode] and riding and paceState
+			and PaceMeter.passIndex(paceState.passes, serverNow()) then
+			keyHintShown = true
+			hint.Text = if pad then "Tap: A or R2" else "Tap: SPACE or click"
+		end
 	elseif (kind == Enum.UserInputType.MouseButton1 or kind == Enum.UserInputType.Touch) and not tapArea.Visible then
 		tap() -- the tap pad isn't up yet; tap() ignores it unless a pass or the burst is open
 	end
@@ -571,7 +664,20 @@ RunService.RenderStepped:Connect(function()
 	-- badge step aside (on a phone they would cover most of the burst bar).
 	local burstUp = burst.bar.Visible
 	RaceState.burstShowing = burstUp
-	board.Visible = RaceState.active and not burstUp
+	-- Watching (D-055): the HUD hides while you're busy or have walked out of range.
+	if os.clock() - lastWatchCheck > 0.25 then
+		lastWatchCheck = os.clock()
+		RaceState.watchHidden = myLaneIndex == nil and RaceState.focus ~= nil
+			and (RaceState.busy() or not RaceState.nearCourse(RaceState.focus, GameConfig.spectate.keepStuds))
+	end
+	local showBoard = RaceState.active and not burstUp and not RaceState.watchHidden
+	if myLaneIndex then
+		showBoard = showBoard and HUD.riderBoardInRace -- riders: the race strip and badge show position
+	elseif RaceState.phone() and RaceState.cheerOpen then
+		showBoard = false -- spectators on a phone: after the cheer strip closes
+	end
+	board.Visible = showBoard
+	status.Visible = not (RaceState.watchHidden and RaceState.active)
 	if not RaceState.active then placeBadge.Visible = false end
 	if RaceState.active and os.clock() - lastHud > 0.2 then
 		lastHud = os.clock()
@@ -587,12 +693,16 @@ RunService.RenderStepped:Connect(function()
 	if paceState and riding then
 		local passes = paceState.passes
 		local k = PaceMeter.passIndex(passes, t)
-		pace.bar.Visible = k ~= nil
+		-- During the countdown the slider shows still, with the first glow lit.
+		local waiting = k == nil and passes[1] ~= nil and t < passes[1].t0
+		pace.bar.Visible = k ~= nil or waiting
 		speed.Visible = k ~= nil
 		tapArea.Visible = k ~= nil or (burstState ~= nil and not burstState.tapped)
 		if k then
 			local p = passes[k]
 			placeMarker(pace, PaceMeter.position(p, t), p.center, false)
+		elseif waiting then
+			placeMarker(pace, PaceMeter.position(passes[1], passes[1].t0), passes[1].center, false)
 		end
 		-- Finished passes feed the speed meter (missed or doubled count 0).
 		while paceState.done < #passes and passes[paceState.done + 1].t1 <= t do
@@ -600,8 +710,9 @@ RunService.RenderStepped:Connect(function()
 			local j = paceState.done
 			local s = if paceState.tapsByPass[j] == 1 then PaceMeter.tapScore(passes[j], paceState.firstTap[j]) else 0
 			if not paceState.tapsByPass[j] and j > 1 then
-				feedback.Text = "Miss"
-				showResultIcon("Miss")
+				feedback.Text = HUD.missedPassLabel
+				showResultIcon(if HUD.missedPassLabel ~= "" then HUD.missedPassLabel else nil)
+				if HUD.missedPassLabel == "" then greyGlow() end
 			end
 			table.insert(paceState.recent, s)
 			if #paceState.recent > GameConfig.pace.speedFillPasses then table.remove(paceState.recent, 1) end
@@ -626,7 +737,7 @@ RunService.RenderStepped:Connect(function()
 			end
 		elseif t > burstState.close then
 			if burstState.race == cueRace then cue(t, "vo_stretch") end -- "Down the stretch they come!"
-			if riding and not burstState.tapped then feedback.Text = "Missed the Final Burst!" end
+			if riding and not burstState.tapped then feedback.Text = "Finish strong!" end -- riders only
 			burst.bar.Visible, burstTitle.Visible = false, false
 			burstState = nil
 		end
@@ -682,6 +793,39 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	-- stack), "Into the far turn!" as the field enters the final far turn, your hoofbeats while you ride.
 	cueVolume, cueRider, cueCourse = if riding then 1 else 0.5, riding, courseId or "dirt"
 	gallop(false)
+	keyHintShown = false
+	cheerArrow = nil
+	-- "3, 2, 1" over the gate with a soft drum tick each, then "GO!" with the bell (D-055).
+	local countFrom = GameConfig.gateCountdownSeconds
+	local countRace = cueRace
+	local function showCount(text: string)
+		if countRace ~= cueRace or not (riding or not RaceState.watchHidden) then return end
+		countLabel.Text = text
+		countLabel.Visible = true
+		local size = if riding then 140 else 80
+		if reducedMotion() then
+			countLabel.TextSize = size
+			countLabel.TextTransparency = 0.7
+			TweenService:Create(countLabel, TweenInfo.new(0.2), { TextTransparency = 0 }):Play()
+		else
+			countLabel.TextTransparency = 0
+			countLabel.TextSize = size * 0.6
+			TweenService:Create(countLabel, TweenInfo.new(0.25, Enum.EasingStyle.Back), { TextSize = size }):Play()
+		end
+		task.delay(0.75, function()
+			if countLabel.Text == text and countRace == cueRace then
+				TweenService:Create(countLabel, TweenInfo.new(0.2), { TextTransparency = 1 }):Play()
+			end
+		end)
+	end
+	for k = countFrom, 1, -1 do
+		local at = start - k
+		if at > serverNow() - 0.25 then
+			task.delay(math.max(0, at - serverNow()), showCount, tostring(k))
+			cue(at, "count_tick")
+		end
+	end
+	task.delay(math.max(0, start - serverNow()), showCount, "GO!")
 	cue(start, "gate_bell")
 	cue(start + 0.25, "vo_off")
 	if riding and Sound then
@@ -699,9 +843,12 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	end
 	if riding then
 		setJumping(false)
+		-- The camera moves into the saddle at "3", once the server has seated you.
 		local id = cueRace
-		task.delay(math.max(0, start - serverNow() - 1), function()
-			if id == cueRace and seated() then rideCamera(true) end -- only once you're in the saddle
+		task.spawn(function()
+			task.wait(math.max(0, start - countFrom - serverNow()))
+			while id == cueRace and not seated() and serverNow() < start + 1 do task.wait(0.05) end
+			if id == cueRace and seated() then rideCamera(true) end
 		end)
 	end
 	task.spawn(function()
@@ -816,11 +963,17 @@ remotes.LiveChances.OnClientEvent:Connect(function(_seg, live, courseId)
 				arrowUntil = os.clock() + 2
 			end
 		end
-		if lane.id == myId then
+		if lane.id == myId and HUD.boardShowsChance then -- off by default: the badge arrow says it (D-055)
 			local delta = math.round((live[i] - (before[i] or 0)) * 100)
 			local sign = delta >= 0 and "+" or ""
 			status.Text = string.format("%s: %d%% (%s%d)", ThemePack.words.winChance, math.round(live[i] * 100), sign, delta)
 		end
+	end
+	-- Watching: the rider you cheered gets an up or down arrow on the board.
+	local cheered = RaceState.cheeredLane
+	if not riding and cheered and before[cheered] and live[cheered] and math.abs(live[cheered] - before[cheered]) > 0.003 then
+		cheerArrow = { up = live[cheered] > before[cheered], untilT = os.clock() + 3 }
+		renderBoard()
 	end
 end)
 
@@ -876,6 +1029,7 @@ remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace)
 end)
 
 local function showResults(summary, raceId: number)
+	if not rideReport and RaceState.watchHidden then return end -- a spectator who didn't see the finish
 	if raceId ~= cueRace then -- the HUD has moved on to another race
 		if RaceState.resultsPending then
 			RaceState.resultsPending = false

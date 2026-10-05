@@ -37,7 +37,7 @@ local Leagues = require(Shared:WaitForChild("Leagues"))
 local Style = require(Shared:WaitForChild("Style"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
-local COUNTDOWN = 3
+local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
 local LATENCY_GRACE = 0.35 -- wait after a segment closes for late packets
 local COURSE_ORDER = { "dirt", "turf" }
 local SURFACE = { dirt = "Dirt", turf = "Turf" }
@@ -579,7 +579,7 @@ local function runRace(c, players: { Player })
 		local partial = {}
 		for i, lane in session.lanes do
 			if not lane.isBot then
-				partial[i] = (PaceMeter.score(done, cur.taps[tonumber(lane.id)] or {}))
+				partial[i] = (PaceMeter.score(done, cur.taps[tonumber(lane.id)] or {}, GameConfig.pace.bounceSeconds))
 			end
 		end
 		shownLive = session:previewLive(seg, partial)
@@ -610,7 +610,7 @@ local function runRace(c, players: { Player })
 			for _, p in players do
 				local res = session:scorePace(tostring(p.UserId), seg, cur.taps[p.UserId] or {})
 				if res then
-					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, cur.taps[p.UserId] or {}, 80)
+					greatTaps[p.UserId] = (greatTaps[p.UserId] or 0) + PaceMeter.countAtLeast(segPasses, cur.taps[p.UserId] or {}, 80, GameConfig.pace.bounceSeconds)
 					local list = errors[p.UserId] or {}
 					for _, e in res.errors do table.insert(list, e) end
 					errors[p.UserId] = list
