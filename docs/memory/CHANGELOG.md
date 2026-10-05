@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: training rides (T2): server-scored Sprint Lane and Mud Splash from 10 Hz samples, course picker with Quick train, 3-2-1, glowing next hoop, hoofprints, lap dots, phone Jump button, end card with stars, stat bar and ribbons; TrainingRiders and CourseProps collision groups; Rides.horseOf returns the horse id (D-053)
 - 2026-10-05 — feat: Training Ground (T1): training oval with a hill, Sprint Lane hoops, practice gate, paddock south gate and path, Mud Splash gymkhana, picture signs; TrainingCourses geometry (D-053)
 - 2026-10-05 — docs: debates 009 (training rides) and 010 (race steering); D-053 and D-054
 - 2026-10-05 — fix: running legs review: legs never drift, gait cross-fade, rest at race end, fitted saddle cloth (lane numbers in races), smooth normals, fallbacks

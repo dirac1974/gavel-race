@@ -230,6 +230,351 @@ local function trainingGroundTests(check: (boolean, string) -> (), close: (numbe
 	check(signsOk, "a picture sign for every course, off the path, inside the training areas")
 end
 
+-- Training rides (D-053, T2): server scoring from synthetic sample paths.
+local function trainingRideTests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local TR = require("../../game/src/shared/TrainingRide")
+	local Training = require("../../game/src/shared/Training")
+	local CFG = GameConfig.training
+	local HZ = CFG.sampleHz
+	local T0 = 20000 * 86400 + 3600
+	local sp = TC.courses.speed
+	local gr = TC.courses.grit
+
+	-- Sprint Lane paths: ride the oval from the start at `speed`, with `latAt(progress)`.
+	local function hoopLateral(p: number): number
+		-- through the middle of every hoop: straight lines between consecutive hoops
+		local prevS, prevL = 0, sp.posts[#sp.posts].lateral
+		for _, hp in sp.hoops do
+			local l = sp.posts[hp.post].lateral
+			if p <= hp.s then
+				return prevL + (l - prevL) * (p - prevS) / (hp.s - prevS)
+			end
+			prevS, prevL = hp.s, l
+		end
+		return prevL
+	end
+	local function latByD(d: number): number
+		local posts = sp.posts
+		for k = 1, #posts do
+			local a, b = posts[k], posts[(k % #posts) + 1]
+			local span = (b.d - a.d) % TC.LAP
+			local into = (d - a.d) % TC.LAP
+			if into <= span then return a.lateral + (b.lateral - a.lateral) * into / span end
+		end
+		return 0
+	end
+	local function ovalRide(latAt: (number) -> number, opts: any?)
+		local o = opts or {}
+		local speed = o.speed or CFG.gallop
+		local dirn = o.backwards and -1 or 1
+		local out = {}
+		local k = 0
+		local total = o.distance or (sp.finish + 8)
+		while true do
+			local p = speed * k / HZ
+			if p > total then break end
+			local x, z = TC.ovalPoint(sp.startD + dirn * p + (o.from or 0), latAt(p))
+			table.insert(out, { t = k / HZ, x = x, y = 0, z = z })
+			k += 1
+		end
+		return out
+	end
+
+	local perfect = ovalRide(hoopLateral)
+	local kept, bad = TR.validate(perfect, function(x, z) return TC.onCourse("speed", x, z) end, CFG)
+	check(bad == 0 and #kept == #perfect, "an honest gallop keeps every sample")
+	local raw, detail = TR.scoreSpeed(kept, CFG)
+	check(raw == 100 and detail.hoops == 18, string.format("perfect Sprint Lane scores 100 (%d hoops)", detail.hoops))
+	check(detail.finishT ~= nil and close(detail.finishT, sp.finish / CFG.gallop, 0.05), "finish time at three laps")
+	local tr = TR.tracker("speed")
+	local finishedAt = nil
+	for _, s in perfect do
+		if TR.feed(tr, s, CFG) and not finishedAt then finishedAt = s.t end
+	end
+	check(tr.finished and close(tr.finishT :: number, sp.finish / CFG.gallop, 0.05) and finishedAt ~= nil, "the live tracker finishes after three laps")
+	check(TR.laps(tr) == 3 and TR.nextHoop(tr) == nil, "three lap dots, no hoop left")
+	local tr2 = TR.tracker("speed")
+	check(TR.nextHoop(tr2) == sp.hoops[1] and TR.laps(tr2) == 0, "the first hoop glows first")
+	local res = TR.run("speed", perfect, CFG, tr.finishT)
+	check(res.score == 100 and res.stars == 3 and res.ribbon == "gold" and res.underPar and not res.flagged, "perfect ride: 3 stars, gold")
+	local slow = TR.finalize(100, 0, res.par + 1, TC.idealSeconds("speed"), CFG)
+	check(slow.ribbon == "silver" and slow.stars == 3, "gold needs under par; over par is silver")
+
+	-- Missed hoops: the first lap on the inside edge misses all six.
+	local missLap = ovalRide(function(p: number): number
+		local f = math.clamp((p - TC.LAP) / 40, 0, 1)
+		return -11 * (1 - f) + hoopLateral(p) * f
+	end)
+	local mk = TR.validate(missLap, function(x, z) return TC.onCourse("speed", x, z) end, CFG)
+	local mraw, md = TR.scoreSpeed(mk, CFG)
+	check(md.hoops == 12 and close(mraw, 100 * 12 / 18, 1e-9), "missed hoops just don't count (12 of 18)")
+	local mres = TR.finalize(mraw, 0, 44, TC.idealSeconds("speed"), CFG)
+	check(mres.stars == 2 and mres.ribbon == "bronze", "66.7: two stars and a bronze ribbon for finishing")
+	check(TR.finalize(20, 0, 44, 43, CFG).stars == 1 and TR.finalize(60, 0, 44, 43, CFG).stars == 2
+		and TR.finalize(90, 0, 44, 43, CFG).stars == 3 and TR.finalize(75, 0, 44, 43, CFG).ribbon == "silver", "star and ribbon thresholds")
+
+	-- Reversed and out-of-order crossings don't count.
+	local back = ovalRide(function(p: number): number return latByD(sp.startD - p) end, { backwards = true, distance = TC.LAP })
+	local bk = TR.validate(back, nil, CFG)
+	local braw = TR.scoreSpeed(bk, CFG)
+	local reversed = 0
+	for _, post in sp.posts do
+		for _, x in TR.crossings(bk, post.gate) do
+			if x.dir < 0 then reversed += 1 end
+		end
+	end
+	check(braw == 0 and reversed == 6, "riding the oval backwards crosses every hoop in reverse and scores 0")
+	local h2 = sp.posts[2]
+	local skip = {}
+	for k = 0, 12 do
+		local x, z = TC.ovalPoint(h2.d - 30 + k * 4.6, h2.lateral)
+		table.insert(skip, { t = k / HZ, x = x, y = 0, z = z })
+	end
+	local sraw = TR.scoreSpeed(TR.validate(skip, nil, CFG), CFG)
+	local fwd = TR.crossings(skip, h2.gate)
+	check(#fwd == 1 and fwd[1].dir == 1 and sraw == 0, "hoop 2 ridden before hoop 1 (out of order) doesn't count")
+	local twice = {}
+	local h1 = sp.posts[1]
+	for k, step in { -10, -5, 0, 5, 10, 5, 0, -5, -10, -5, 0, 5, 10 } do
+		local x, z = TC.ovalPoint(h1.d + step, 0)
+		table.insert(twice, { t = (k - 1) / HZ, x = x, y = 0, z = z })
+	end
+	local tw = TR.validate(twice, nil, CFG)
+	local _, twd = TR.scoreSpeed(tw, CFG)
+	check(twd.hoops == 1, "back and forth through a hoop counts it once")
+	-- Round the outside of hoop 1, then back through it the wrong way: right place, wrong way.
+	local wrongWay = {}
+	local function addAt(d: number, lat: number)
+		local x, z = TC.ovalPoint(d, lat)
+		table.insert(wrongWay, { t = #wrongWay / HZ, x = x, y = 0, z = z })
+	end
+	for d = sp.startD, h1.d + 6, 4 do addAt(d, 9) end
+	for lat = 9, 0, -3 do addAt(h1.d + 6, lat) end
+	for d = h1.d + 4, h1.d - 8, -4 do addAt(d, 0) end
+	local _, wwd = TR.scoreSpeed(TR.validate(wrongWay, nil, CFG), CFG)
+	local wwx = TR.crossings(wrongWay, h1.gate)
+	check(#wwx == 1 and wwx[1].dir == -1 and wwd.hoops == 0, "a hoop ridden through backwards doesn't count")
+
+	-- Validation: teleports and anything over 53 studs/s are discarded.
+	local line = {}
+	for k = 0, 19 do table.insert(line, { t = k / HZ, x = 850 - k * 4.6, y = 0, z = -55 }) end
+	local spike = table.clone(line)
+	spike[10] = { t = spike[10].t, x = spike[10].x, y = 0, z = -55 + 30 }
+	local vk, vb = TR.validate(spike, nil, CFG)
+	check(#vk == 18 and close(vb, 2 / 20, 1e-9), "a teleport spike drops it and the sample after")
+	check(vk[10].gap == false, "a plausible move over dropped samples (jitter) still counts")
+	local jump = table.clone(line)
+	for k = 11, 20 do jump[k] = { t = line[k].t, x = line[k].x - 40, y = 0, z = -55 } end
+	local jk, jb = TR.validate(jump, nil, CFG)
+	check(close(jb, 1 / 20, 1e-9) and jk[11].gap == true, "a teleport ahead is dropped and marks a gap")
+	check(#TR.crossings(jk, { ax = 785, az = -100, bx = 785, bz = 100, nx = -1, nz = 0 }) == 0, "nothing counts across a teleport")
+	local hop = table.clone(line)
+	hop[10] = { t = hop[10].t, x = hop[10].x, y = 13, z = -55 }
+	local _, hb = TR.validate(hop, nil, CFG)
+	check(close(hb, 2 / 20, 1e-9), "a 13-stud jump between samples is a teleport")
+	local fast = {}
+	for k = 0, 19 do table.insert(fast, { t = k / HZ, x = 850 - k * 5.4, y = 0, z = -55 }) end
+	local _, fb = TR.validate(fast, nil, CFG)
+	check(close(fb, 19 / 20, 1e-9), "54 studs/s is too fast: every step dropped")
+	local okFast = {}
+	for k = 0, 19 do table.insert(okFast, { t = k / HZ, x = 850 - k * 5.2, y = 0, z = -55 }) end
+	local _, ob = TR.validate(okFast, nil, CFG)
+	check(ob == 0, "52 studs/s is fine")
+	local _, offb = TR.validate(line, function(x, z) return x > 820 end, CFG)
+	check(close(offb, 13 / 20, 1e-9), "samples off the course are dropped")
+	check(#TR.crossings(vk, { ax = 805, az = -100, bx = 805, bz = 100, nx = -1, nz = 0 }) == 1, "a crossing over a jitter drop still counts")
+
+	-- More than 10% dropped: the floor when enforcing, a normal score while log-only.
+	local jittery = table.clone(perfect)
+	for k = 7, #jittery - 1, 14 do
+		local s = jittery[k]
+		jittery[k] = { t = s.t, x = s.x + 25, y = 0, z = s.z }
+	end
+	local enforce = table.clone(CFG)
+	enforce.enforceFloor = true
+	local logOnly = TR.run("speed", jittery, CFG, 43.5)
+	local floored = TR.run("speed", jittery, enforce, 43.5)
+	check(logOnly.flagged and not logOnly.floored and logOnly.score > 80, string.format("log-only: flagged (%.0f%% dropped) but scored %.0f", logOnly.badShare * 100, logOnly.score))
+	check(floored.flagged and floored.floored and floored.score == 0 and floored.stars == 1 and floored.ribbon == "bronze",
+		"enforcing: scored at the 0.5 floor with a normal end card")
+	local fewDrops = table.clone(perfect)
+	fewDrops[50] = { t = fewDrops[50].t, x = fewDrops[50].x + 25, y = 0, z = fewDrops[50].z }
+	local fd = TR.run("speed", fewDrops, enforce, 43.5)
+	check(not fd.flagged and fd.score == 100, "a couple of drops are harmless even when enforcing")
+
+	-- Mud Splash: walk the route (lope, canter in the pole lane), hopping each log.
+	local function gritRide(opts: any?)
+		local o = opts or {}
+		local pts = table.clone(gr.route.points)
+		local last, prev = pts[#pts], pts[#pts - 1]
+		local dx, dz = last.x - prev.x, last.z - prev.z
+		local len = math.sqrt(dx * dx + dz * dz)
+		table.insert(pts, { x = last.x + dx / len * 6, z = last.z + dz / len * 6 }) -- ride on past the finish
+		local out = {}
+		local x, z = pts[1].x, pts[1].z
+		local seg, t = 2, 0
+		local function yAt(px: number, pz: number): number
+			if not o.hop then return 0 end
+			for _, e in gr.elements do
+				if e.kind == "log" and math.abs(pz - e.z) < 3 and math.abs(px - e.x) < 6.5 then
+					return TC.RIDE_HOP * (1 - ((px - e.x) / 6.5) ^ 2)
+				end
+			end
+			return 0
+		end
+		local function offset(px: number, pz: number): number
+			return if o.shift then o.shift(px, pz) else 0
+		end
+		table.insert(out, { t = 0, x = x, y = yAt(x, z), z = z })
+		while seg <= #pts do
+			local remaining = (o.speed or TC.speedAt("grit", x, z)) / HZ
+			while remaining > 0 and seg <= #pts do
+				local bx, bz = pts[seg].x, pts[seg].z
+				local ddx, ddz = bx - x, bz - z
+				local l = math.sqrt(ddx * ddx + ddz * ddz)
+				if l <= remaining then
+					x, z, remaining, seg = bx, bz, remaining - l, seg + 1
+				else
+					x, z, remaining = x + ddx / l * remaining, z + ddz / l * remaining, 0
+				end
+			end
+			t += 1 / HZ
+			table.insert(out, { t = t, x = x, y = yAt(x, z), z = z + offset(x, z) })
+		end
+		return out
+	end
+	local clean = gritRide({ hop = true })
+	local gk, gb = TR.validate(clean, function(x, z) return TC.onCourse("grit", x, z) end, CFG)
+	local graw, gd = TR.scoreGrit(gk, CFG)
+	check(gb == 0 and graw == 100 and gd.mud == 4 and gd.logs == 3 and gd.poles == 4,
+		string.format("perfect Mud Splash scores 100 (%d mud, %d logs, %d poles)", gd.mud, gd.logs, gd.poles))
+	check(gd.finishT ~= nil and close(gd.finishT, TC.idealSeconds("grit"), 1.0), "finishes at about its ideal time")
+	local gtr = TR.tracker("grit")
+	for _, s in clean do TR.feed(gtr, s, CFG) end
+	check(gtr.finished and gtr.next == #gr.elements + 1, "the live tracker passes every piece and finishes")
+	local gres = TR.run("grit", clean, CFG, gtr.finishT)
+	check(gres.score == 100 and gres.ribbon == "gold" and gres.stars == 3, "clean gymkhana: gold")
+	local grounded = gritRide({ hop = false })
+	local graw2, gd2 = TR.scoreGrit(TR.validate(grounded, nil, CFG), CFG)
+	check(gd2.logs == 0 and gd2.mud == 4 and gd2.poles == 4 and close(graw2, 64, 1e-9), "logs ridden through without a hop don't score (no penalty)")
+	-- Wrong side of the poles: mirror the weave.
+	local poleZ = gr.laneZ(4)
+	local wrong = gritRide({ hop = true, shift = function(px: number, pz: number): number
+		if math.abs(pz - poleZ) < 6 and px > gr.laneX[1] and px < gr.laneX[2] then return 2 * (poleZ - pz) end
+		return 0
+	end })
+	local _, gd3 = TR.scoreGrit(TR.validate(wrong, nil, CFG), CFG)
+	check(gd3.poles == 0 and gd3.mud == 4 and gd3.logs == 3, "poles passed on the wrong side don't count")
+	-- Wide of a puddle: lane 1 ridden 8 studs north misses Mud1 only.
+	local wide = gritRide({ hop = true, shift = function(px: number, pz: number): number
+		if math.abs(pz - gr.laneZ(1)) < 0.01 and px > gr.laneX[1] then return -8 end
+		return 0
+	end })
+	local _, gd4 = TR.scoreGrit(TR.validate(wide, nil, CFG), CFG)
+	check(gd4.mud == 3 and not gd4.got.Mud1 and gd4.got.Mud2, "a puddle ridden round doesn't count; the rest do")
+	-- Individual cases: a hop seen only between samples still counts; a pole through its middle doesn't.
+	local log = gr.elements[2]
+	local hopPath = {
+		{ t = 0, x = log.x + 4.2, y = 0.5, z = log.z },
+		{ t = 0.1, x = log.x + 1.4, y = 2.8, z = log.z },
+		{ t = 0.2, x = log.x - 1.4, y = 2.9, z = log.z },
+		{ t = 0.3, x = log.x - 4.2, y = 0.4, z = log.z },
+	}
+	local hx = TR.crossings(hopPath, log.gate)
+	check(#hx == 1 and hx[1].dir == 1 and TR.cleared(hopPath, hx[1], log, CFG.grit), "airborne over the log: clean hop")
+	local lowPath = table.clone(hopPath)
+	for i, s in lowPath do lowPath[i] = { t = s.t, x = s.x, y = 0.2, z = s.z } end
+	check(not TR.cleared(lowPath, TR.crossings(lowPath, log.gate)[1], log, CFG.grit), "on the ground over the log: no hop")
+	local early = { { t = 0, x = log.x + 9, y = 3, z = log.z }, { t = 0.1, x = log.x + 6, y = 2, z = log.z },
+		{ t = 0.2, x = log.x + 3.1, y = 0, z = log.z }, { t = 0.3, x = log.x - 0.2, y = 0, z = log.z } }
+	check(not TR.cleared(early, TR.crossings(early, log.gate)[1], log, CFG.grit), "a hop that lands before the log doesn't count")
+	local pole = gr.elements[5]
+	local through = { { t = 0, x = pole.x + 3, y = 0, z = pole.z }, { t = 0.1, x = pole.x - 3, y = 0, z = pole.z } }
+	local sideZ = pole.weaveZ
+	local around = { { t = 0, x = pole.x + 3, y = 0, z = sideZ }, { t = 0.1, x = pole.x - 3, y = 0, z = sideZ } }
+	local otherZ = 2 * pole.z - sideZ
+	local wrongSide = { { t = 0, x = pole.x + 3, y = 0, z = otherZ }, { t = 0.1, x = pole.x - 3, y = 0, z = otherZ } }
+	check(#TR.crossings(through, pole.gate) == 0 and #TR.crossings(around, pole.gate) == 1 and #TR.crossings(wrongSide, pole.gate) == 0,
+		"a pole counts only when passed on its side, not through it")
+	local mud = gr.elements[1]
+	local splash = { { t = 0, x = mud.x - 9, y = 0, z = mud.z + 5 }, { t = 0.1, x = mud.x - 6.5, y = 0, z = mud.z + 5 } }
+	local _, sd = TR.scoreGrit(splash, CFG)
+	check(sd.mud == 1 and sd.got.Mud1, "one sample inside a puddle splashes it")
+	-- The finish only counts after a fair part of the course.
+	local f = gr.finish
+	local rush = { { t = 1, x = f.ax + 3, y = 0, z = (f.az + f.bz) / 2 }, { t = 1.1, x = f.ax - 1, y = 0, z = (f.az + f.bz) / 2 } }
+	local _, rd = TR.scoreGrit(rush, CFG)
+	local rtr = TR.tracker("grit")
+	for _, s in rush do TR.feed(rtr, s, CFG) end
+	check(rd.finishT == nil and not rtr.finished, "crossing the finish early doesn't end the ride")
+
+	-- Session limits.
+	local hist = {}
+	local ok1 = TR.rateCheck(hist, 1000, CFG)
+	table.insert(hist, 1000)
+	local ok2, why2 = TR.rateCheck(hist, 1000 + CFG.sessionGapSeconds - 0.5, CFG)
+	local ok3 = TR.rateCheck(hist, 1000 + CFG.sessionGapSeconds, CFG)
+	check(ok1 and not ok2 and why2 == "gap" and ok3, "sessions at least 4 s apart")
+	local full = {}
+	for k = 1, CFG.maxSessionsPerHour do table.insert(full, 5000 + k * 10) end
+	local ok4, why4 = TR.rateCheck(full, 5000 + CFG.maxSessionsPerHour * 10 + 30, CFG)
+	local ok5 = TR.rateCheck(full, 5000 + 10 + 3600 + 1, CFG)
+	check(not ok4 and why4 == "hour" and ok5 and #full == CFG.maxSessionsPerHour - 1, "at most 40 an hour; old ones drop off")
+
+	-- Gain: the D-040 formula and weekly cap, quality = 0.5 + 0.5 × score / 100, no Energy.
+	local gh = Horse.starter("h1", "Pepper", "black", makeRng(11), T0)
+	local energy = gh.energy
+	local expect = math.floor(Training.gain(gh, "speed", 100, T0) * 10 + 0.5) / 10
+	local qh = Horse.starter("h6", "Dot", "bay", makeRng(16), T0)
+	qh.training = { week = -1, gained = 0, lastAt = T0 }
+	qh.stats.speed = qh.potential.speed - 10
+	local half = Training.gain(qh, "speed", 0, T0) / Training.gain(qh, "speed", 100, T0)
+	local g1 = TR.applyGain(gh, "speed", 100, T0)
+	check(close(half, 0.5, 1e-9) and close(g1.gained, expect, 1e-9) and g1.rested and g1.capped == nil
+		and close(g1.after, g1.before + g1.gained, 1e-9), "a ride gains through the training formula (rested)")
+	check(gh.energy == energy, "training rides cost no Energy")
+	local guard = 0
+	local last = g1
+	while last.capped == nil and guard < 20 do
+		guard += 1
+		last = TR.applyGain(gh, "accel", 100, T0 + guard * 60)
+	end
+	local speedNow = gh.stats.speed
+	local capped = TR.applyGain(gh, "speed", 100, T0 + 3600)
+	check(last.capped == "week" and capped.capped == "week" and capped.gained == 0 and gh.stats.speed == speedNow
+		and close(Training.gainedThisWeek(gh, T0), Training.WEEKLY_CAP, 1e-9), "after the weekly cap rides gain nothing")
+	local fullH = Horse.starter("h2", "Comet", "grey", makeRng(12), T0)
+	fullH.stats.grit = fullH.potential.grit
+	check(TR.applyGain(fullH, "grit", 100, T0).capped == "full", "at Potential: as high as it goes")
+	check(TR.quickScore(100, CFG) == 70 and 0.5 + 0.5 * TR.quickScore(100, CFG) / 100 == CFG.quickQualityCap
+		and TR.quickScore(40, CFG) == 40, "Quick train quality capped at 0.85")
+
+	-- Ribbons and best runs on the horse, saved and repaired.
+	local rh = Horse.starter("h3", "Biscuit", "bay", makeRng(13), T0)
+	local nr1 = TR.record(rh, "speed", { ribbon = "silver", score = 80, seconds = 47.04 })
+	local nr2 = TR.record(rh, "speed", { ribbon = "bronze", score = 50, seconds = 45 })
+	local nr3, nb3 = TR.record(rh, "speed", { ribbon = "silver", score = 80, seconds = 46 })
+	check(nr1 and not nr2 and not nr3 and nb3 and rh.ribbons.speed == "silver" and rh.trainingBest.speed.score == 80
+		and rh.trainingBest.speed.seconds == 46, "best ribbon kept; best run by score, then time")
+	local saved = Profile.new(T0)
+	Profile.addHorse(saved, rh)
+	local bare = Horse.starter("h4", "Maple", "chestnut", makeRng(14), T0)
+	bare.ribbons = { speed = "gold", grit = "platinum", luck = "gold" }
+	bare.trainingBest = { speed = { score = 120, seconds = "41.5" }, grit = "junk", accel = { score = 0 / 0, seconds = 3 } }
+	Profile.addHorse(saved, bare)
+	local plain = Horse.starter("h5", "Pip", "grey", makeRng(15), T0)
+	Profile.addHorse(saved, plain)
+	local loaded = Profile.migrate(saved, T0)
+	local a, b, c = loaded.horses[1], loaded.horses[2], loaded.horses[3]
+	check(a.ribbons.speed == "silver" and a.trainingBest.speed.seconds == 46, "ribbons and best runs survive a save")
+	check(b.ribbons.speed == "gold" and b.ribbons.grit == nil and b.ribbons.luck == nil and b.trainingBest.speed.score == 100
+		and b.trainingBest.speed.seconds == 41.5 and b.trainingBest.grit == nil and b.trainingBest.accel == nil, "migration repairs bad ribbons and runs")
+	check(typeof(c.ribbons) == "table" and next(c.ribbons) == nil and typeof(c.trainingBest) == "table", "older horses get empty records")
+	local view = Horse.view(a, T0, GameConfig.energy)
+	check(view.ribbons.speed == "silver" and view.trainingBest.speed.score == 80, "the owner's view shows ribbons and best runs")
+end
+
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
 	local E = GameConfig.energy
 	local T0 = 20000 * 86400 + 3600 -- a fixed day, 01:00 UTC
@@ -874,5 +1219,6 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	end
 
 	trainingGroundTests(check, close)
+	trainingRideTests(check, close)
 
 end

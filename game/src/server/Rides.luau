@@ -4,7 +4,12 @@
 -- The horse is a small Humanoid rig (invisible root + Humanoid, HipHeight) carrying the
 -- uploaded standing and galloping models (both welded on; each client shows one by speed,
 -- RideClient). The rider's client owns the rig's physics and steers it, like a character.
--- Free roaming wins nothing, so the server only checks requests, not movement.
+-- Free roaming wins nothing, so the server only checks requests, not movement; training rides
+-- (D-053) are scored by TrainingService from its own samples of the rig.
+-- Collision groups (CollisionGroups.luau): every ride rig and its rider are in RideHorses.
+-- During a training ride they move to TrainingRiders, which still collides with the world
+-- (Default: ground, rails, fences) but not with other ride horses, course riders or CourseProps.
+-- Rides.horseOf(player) -> (rig, horseId) is the stable way to ask which horse someone rides.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -113,6 +118,13 @@ folder.Parent = workspace
 
 local active: { [Player]: Model } = {}
 local lastCall: { [Player]: number } = {}
+local riderGroups: { [Player]: { [BasePart]: string } } = {} -- the rider's own groups, put back on dismount
+
+local CollisionGroups = require(script.Parent:WaitForChild("CollisionGroups"))
+CollisionGroups.ensure()
+Rides.GROUP = CollisionGroups.RIDE
+Rides.TRAINING_GROUP = CollisionGroups.TRAINING
+local setGroup = CollisionGroups.set
 
 local CallHorse = Profiles.remote("CallHorse")   -- client -> server: bring my horse and ride
 local GetOff = Profiles.remote("GetOff")         -- client -> server: off my horse
@@ -160,6 +172,7 @@ local function build(player: Player, h, at: CFrame): Model
 	local rig = Instance.new("Model")
 	rig.Name = "Ride_" .. player.UserId
 	rig:SetAttribute("Owner", player.UserId)
+	rig:SetAttribute("HorseId", h.id)
 	rig:SetAttribute("HorseName", h.name)
 
 	local root = Instance.new("Part")
@@ -264,13 +277,42 @@ local function build(player: Player, h, at: CFrame): Model
 	label.Text = h.name
 	label.Parent = tag
 
+	setGroup(rig, Rides.GROUP)
 	rig.Parent = folder
 	pcall(function() root:SetNetworkOwner(player) end)
 	return rig
 end
 
-function Rides.horseOf(player: Player): Model?
-	return active[player]
+-- The ride rig a player is on and the id of its horse (nil, nil when not riding).
+function Rides.horseOf(player: Player): (Model?, string?)
+	local rig = active[player]
+	if not rig then return nil, nil end
+	return rig, rig:GetAttribute("HorseId")
+end
+
+-- Is the player sitting in their own ride horse's saddle?
+function Rides.isSeated(player: Player): boolean
+	local rig = active[player]
+	local seat = rig and rig:FindFirstChild("Saddle")
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	return seat ~= nil and humanoid ~= nil and seat.Occupant == humanoid
+end
+
+-- Training rides: put the rig and its rider in TrainingRiders (on) or back in RideHorses.
+function Rides.setTraining(player: Player, on: boolean)
+	local group = if on then Rides.TRAINING_GROUP else Rides.GROUP
+	local rig = active[player]
+	if rig then setGroup(rig, group) end
+	local c = player.Character
+	if rig and c and riderGroups[player] then setGroup(c, group) end
+end
+
+local function restoreRider(player: Player)
+	local saved = riderGroups[player]
+	riderGroups[player] = nil
+	for p, g in saved or {} do
+		if p.Parent then p.CollisionGroup = g end
+	end
 end
 
 -- Off the horse and send it home. Safe to call any time.
@@ -278,6 +320,7 @@ function Rides.dismount(player: Player)
 	local rig = active[player]
 	active[player] = nil
 	takeOffHelmet(player.Character)
+	restoreRider(player)
 	if not rig then return end
 	local seat = rig:FindFirstChild("Saddle")
 	local occupant = seat and seat.Occupant
@@ -316,6 +359,15 @@ function Rides.call(player: Player): (boolean, string?)
 	local at = CFrame.lookAt(base, base + look.Unit)
 	local rig = build(player, h, at)
 	active[player] = rig
+	-- The rider joins the horse's collision group while riding.
+	local saved = {}
+	for _, d in character:GetDescendants() do
+		if d:IsA("BasePart") then
+			saved[d] = d.CollisionGroup
+			d.CollisionGroup = Rides.GROUP
+		end
+	end
+	riderGroups[player] = saved
 	local data2 = Profiles.get(player)
 	if data2 then
 		addCloth(rig, Style.worn(data2, "cloth"))
@@ -369,12 +421,13 @@ function Rides.start()
 		Rides.dismount(player)
 		lastCall[player] = nil
 	end)
-	-- A change of active horse (or losing it) sends the current ride home.
+	-- A change of active horse (or losing it) sends the current ride home (by id: two horses
+	-- can share a name).
 	Profiles.Changed.Event:Connect(function(player: Player)
 		local rig = active[player]
 		local data = Profiles.get(player)
 		local h = data and Profile.activeHorse(data)
-		if rig and (not h or h.name ~= rig:GetAttribute("HorseName")) then Rides.dismount(player) end
+		if rig and (not h or h.id ~= rig:GetAttribute("HorseId")) then Rides.dismount(player) end
 	end)
 end
 

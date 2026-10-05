@@ -419,15 +419,16 @@ function TC.parSeconds(key: string): number
 	return TC.idealSeconds(key) * CFG.parFactor
 end
 
--- Picture signs (WorldScene builds them; the client puts a prompt on the open ones). The three
--- oval courses stand either side of the path into the Training Ground, facing riders coming
--- from the paddock; Mud Splash stands in the arena by its start, with a pointer by the path.
+-- Picture signs (WorldScene builds them, readable from both sides; the client puts a "Ride"
+-- prompt in front of the open ones). The three oval courses stand either side of the path into
+-- the Training Ground, facing riders coming from the paddock; Mud Splash stands in the arena
+-- by its start, facing in, with a pointer by the path.
 TC.signs = {
 	{ course = "speed", x = 738, z = -78, lookX = 0, lookZ = -1 },
 	{ course = "stamina", x = 724, z = -78, lookX = 0, lookZ = -1 },
 	{ course = "accel", x = 782, z = -78, lookX = 0, lookZ = -1 },
 	{ course = "grit", x = 796, z = -78, lookX = 0, lookZ = -1, pointer = true },
-	{ course = "grit", x = 700, z = -295, lookX = 0, lookZ = -1 },
+	{ course = "grit", x = 700, z = -295, lookX = 0, lookZ = 1 },
 }
 TC.SIGN_SIZE = { w = 12, h = 9 }
 

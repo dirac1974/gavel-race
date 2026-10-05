@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
+local CollisionGroups = require(script.Parent:WaitForChild("CollisionGroups"))
 
 local WorldScene = {}
 
@@ -480,8 +481,8 @@ end
 -- The training oval south of the paddock (rails, dirt, the hill on the south straight, Sprint
 -- Lane hoops, the practice gate in the infield), the path from the paddock's south gate, the
 -- Mud Splash gymkhana in the paddock arena and the picture signs. Geometry: TrainingCourses.
--- Hoops, poles and logs never collide, so nobody snags on them; each rider's client lights the
--- next one for itself.
+-- Hoops, poles, logs and finish posts are CourseProps: they never collide with a horse, so
+-- nobody snags on them. Each rider's client lights the next one for itself.
 local DIRT = Color3.fromHex("C69C6D")
 local MUD = Color3.fromHex("6B4A2E")
 local HOOP_COLOURS = { Color3.fromHex("E5484D"), Color3.fromHex("FF9F1C"), Color3.fromHex("17A398"),
@@ -490,6 +491,12 @@ local HOOP_COLOURS = { Color3.fromHex("E5484D"), Color3.fromHex("FF9F1C"), Color
 local function ghostPart(props, parent: Instance): BasePart
 	props.CanCollide, props.CanQuery, props.CanTouch = false, false, false
 	return part(props, parent)
+end
+
+-- A course prop (CourseProps group, never collides).
+local function prop(props, parent: Instance): BasePart
+	props.CollisionGroup = CollisionGroups.PROPS
+	return ghostPart(props, parent)
 end
 
 -- A picture sign on two posts: a big emoji, the course name and a short line, both sides.
@@ -618,13 +625,13 @@ local function buildOval(f: Instance)
 		local half, postH = p.width / 2, 7
 		local colour = HOOP_COLOURS[((p.index - 1) % #HOOP_COLOURS) + 1]
 		for _, s in { -1, 1 } do
-			ghostPart({ Name = "Post", Size = Vector3.new(0.7, postH, 0.7), Color = C.white, CFrame = CFrame.new(base + n * s * half + Vector3.new(0, postH / 2, 0)) }, m)
+			prop({ Name = "Post", Size = Vector3.new(0.7, postH, 0.7), Color = C.white, CFrame = CFrame.new(base + n * s * half + Vector3.new(0, postH / 2, 0)) }, m)
 		end
 		local prev = base + n * half + Vector3.new(0, postH, 0)
 		for k = 1, 8 do
 			local a = math.pi * k / 8
 			local pt = base + n * (half * math.cos(a)) + Vector3.new(0, postH + half * math.sin(a), 0)
-			ghostPart({ Name = "Ring", Size = Vector3.new(0.7, 0.7, (pt - prev).Magnitude + 0.3), Color = if k % 2 == 0 then C.white else colour,
+			prop({ Name = "Ring", Size = Vector3.new(0.7, 0.7, (pt - prev).Magnitude + 0.3), Color = if k % 2 == 0 then C.white else colour,
 				CFrame = CFrame.lookAt((prev + pt) / 2, pt) }, m)
 			prev = pt
 		end
@@ -655,7 +662,7 @@ local function buildOval(f: Instance)
 		end
 		ghostPart({ Name = "FlagLine", Size = Vector3.new(0.8, 0.2, flag.bz - flag.az), Color = C.white,
 			CFrame = CFrame.new(flagX, GROUND_Y + 0.14, gz) }, f)
-		part({ Name = "FlagPole", Size = Vector3.new(0.5, 9, 0.5), Color = C.white, CFrame = CFrame.new(flagX, GROUND_Y + 4.5, flag.az - 1.5) }, f)
+		prop({ Name = "FlagPole", Size = Vector3.new(0.5, 9, 0.5), Color = C.white, CFrame = CFrame.new(flagX, GROUND_Y + 4.5, flag.az - 1.5) }, f)
 		wedge({ Name = "Flag", Size = Vector3.new(0.1, 2.4, 3.4), Color = C.gold, CanCollide = false,
 			CFrame = CFrame.new(flagX + 1.7, GROUND_Y + 7.6, flag.az - 1.5) * CFrame.Angles(0, math.pi / 2, 0) }, f)
 	end
@@ -674,11 +681,11 @@ local function buildGymkhana(f: Instance)
 		if e.kind == "mud" then
 			local r = e.rect
 			local w, d = r[3] - r[1], r[4] - r[2]
-			ghostPart({ Name = "Mud", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d, d), Color = MUD, Material = Enum.Material.Mud,
+			prop({ Name = "Mud", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d, d), Color = MUD, Material = Enum.Material.Mud,
 				CFrame = CFrame.new(e.x - (w - d) / 2, GROUND_Y + 0.14, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
-			ghostPart({ Name = "Mud", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d, d), Color = MUD, Material = Enum.Material.Mud,
+			prop({ Name = "Mud", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d, d), Color = MUD, Material = Enum.Material.Mud,
 				CFrame = CFrame.new(e.x + (w - d) / 2, GROUND_Y + 0.15, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
-			ghostPart({ Name = "Puddle", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d * 0.6, d * 0.6), Color = C.water,
+			prop({ Name = "Puddle", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d * 0.6, d * 0.6), Color = C.water,
 				Material = Enum.Material.Glass, Transparency = 0.35, CFrame = CFrame.new(e.x, GROUND_Y + 0.17, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
 		elseif e.kind == "log" then
 			local base = Vector3.new(e.x, GROUND_Y, e.z)
@@ -691,23 +698,24 @@ local function buildGymkhana(f: Instance)
 				for _, d in lm:GetDescendants() do
 					if d:IsA("BasePart") then d.CanCollide, d.CanQuery, d.CanTouch = false, false, false end
 				end
+				CollisionGroups.set(lm, CollisionGroups.PROPS)
 				lm.Parent = m
 			else
 				local dia = 1.4
-				ghostPart({ Name = "Log", Shape = Enum.PartType.Cylinder, Size = Vector3.new(TC.LOG_HALF * 2, dia, dia), Color = C.trunk,
+				prop({ Name = "Log", Shape = Enum.PartType.Cylinder, Size = Vector3.new(TC.LOG_HALF * 2, dia, dia), Color = C.trunk,
 					Material = Enum.Material.Wood, CFrame = CFrame.new(e.x, GROUND_Y + logH - dia / 2, e.z) * CFrame.Angles(0, math.pi / 2, 0) }, m)
 				for _, s in { -1, 1 } do
-					ghostPart({ Name = "Stump", Size = Vector3.new(1, logH - dia / 2, 1), Color = C.wood, Material = Enum.Material.Wood,
+					prop({ Name = "Stump", Size = Vector3.new(1, logH - dia / 2, 1), Color = C.wood, Material = Enum.Material.Wood,
 						CFrame = CFrame.new(e.x, GROUND_Y + (logH - dia / 2) / 2, e.z + s * (TC.LOG_HALF - 1)) }, m)
 				end
 			end
 		else
 			local stripes = { C.red, C.white, C.red }
 			for k, colour in stripes do
-				ghostPart({ Name = "Pole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 0.6, 0.6), Color = colour,
+				prop({ Name = "Pole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 0.6, 0.6), Color = colour,
 					CFrame = CFrame.new(e.x, GROUND_Y + 1 + (k - 1) * 2, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
 			end
-			ghostPart({ Name = "PoleBase", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 2.2, 2.2), Color = C.white,
+			prop({ Name = "PoleBase", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 2.2, 2.2), Color = C.white,
 				CFrame = CFrame.new(e.x, GROUND_Y + 0.2, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
 		end
 		m.Parent = gy
@@ -723,9 +731,9 @@ local function buildGymkhana(f: Instance)
 	local fx, fz = fin.ax, (fin.az + fin.bz) / 2
 	local halfW = (fin.bz - fin.az) / 2 - 2
 	for _, s in { -1, 1 } do
-		ghostPart({ Name = "FinishPost", Size = Vector3.new(0.8, 11, 0.8), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 5.5, fz + s * halfW) }, gy)
+		prop({ Name = "FinishPost", Size = Vector3.new(0.8, 11, 0.8), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 5.5, fz + s * halfW) }, gy)
 	end
-	local banner = ghostPart({ Name = "FinishBanner", Size = Vector3.new(0.4, 2.4, halfW * 2), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 10, fz) }, gy)
+	local banner = prop({ Name = "FinishBanner", Size = Vector3.new(0.4, 2.4, halfW * 2), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 10, fz) }, gy)
 	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face
@@ -743,6 +751,7 @@ local function buildGymkhana(f: Instance)
 end
 
 local function buildTrainingGround(root: Instance)
+	CollisionGroups.ensure()
 	local f = Instance.new("Folder")
 	f.Name = "TrainingGround"
 	local TC = TrainingCourses
