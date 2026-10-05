@@ -61,7 +61,13 @@ ChooseStarter.OnServerEvent:Connect(function(player: Player, coat: any, first: a
 	Profiles.changed(player) -- the client says hello to the new horse
 end)
 
+local lastActive: { [Player]: number } = {}
 SetActiveHorse.OnServerEvent:Connect(function(player: Player, id: any)
+	if os.clock() - (lastActive[player] or 0) < 3 then
+		Profiles.notify(player, "One moment…", "heart")
+		return
+	end
+	lastActive[player] = os.clock()
 	local data = Profiles.get(player)
 	if not data or typeof(id) ~= "string" then return end
 	if Profile.setActive(data, id) then Profiles.changed(player) end

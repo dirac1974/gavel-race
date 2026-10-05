@@ -495,6 +495,14 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(not Market.tame(tp, "dun", makeRng(5), T0 + 60), "one new friend a day")
 	check(Market.tame(tp, "zebra", makeRng(6), T0 + 86400), "tomorrow again (unknown coats become a wild one)")
 	check(table.find(Market.WILD_COATS, tp.horses[2].coat) ~= nil, "wild coats only")
+	local mx, mz = Market.wildPosition(WorldLayout.meadow, 2, 12345.6)
+	local mx2, mz2 = Market.wildPosition(WorldLayout.meadow, 2, 12345.6)
+	local inMeadow = true
+	for k = 0, 40 do
+		local x, z = Market.wildPosition(WorldLayout.meadow, 3, k * 3.7)
+		if (x - WorldLayout.meadow.x) ^ 2 + (z - WorldLayout.meadow.z) ^ 2 > WorldLayout.meadow.radius ^ 2 then inMeadow = false end
+	end
+	check(mx == mx2 and mz == mz2 and inMeadow, "wild horses: same place for everyone, always in the meadow")
 	-- full stable
 	local fp = Profile.new(T0)
 	for k = 1, Market.MAX_HORSES do Profile.addHorse(fp, Horse.starter(Profile.newHorseId(fp), "H" .. k, "bay", rng, T0)) end
