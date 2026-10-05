@@ -52,3 +52,5 @@ Date: YYYY-MM-DD · Status: Proposed | Decided (D-NNN)
 5. **005 — Diamond store v1 catalog**: exact items and prices within D-002a.
 6. **006 — Social layer**: stable clubs, Derby Day, spectating (cheering decided in D-019), visiting stables.
 7. ~~007 — Race taps and macros~~: decided as D-022 (stride stretches). Record: [007](007-race-taps-and-macros.md).
+8. ~~009 — Training rides~~: decided as D-053. Record: [009](009-training-rides.md).
+9. ~~010 — Race steering~~: decided as D-054. Record: [010](010-race-steering.md).

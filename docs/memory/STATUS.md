@@ -19,17 +19,18 @@ Last updated: 2026-10-05
 
 1. **Studio playtest of the world** (David): `game/PLAYTEST.md`, every section; enable API access in Game Settings → Security to test saving. Fix what breaks.
 2. **Sound effects**: generate and upload the 15 effects once the ElevenLabs key has Sound Effects access (docs/audio/AUDIO_PLAN.md); the code already plays them when their ids arrive. Then listen in Studio and tune `LEVEL` in `Sound.luau`.
-3. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
-4. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
-5. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
-6. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
-7. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
-8. ~~Diamond store~~: built (D-050). David to create the three developer products and paste their ids into `DiamondProducts.luau`.
-9. **Cross-server Cup finals and Derby Day** (D-036 later).
-10. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
-11. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.
-12. **Performance pass**: StreamingEnabled check, model counts on phones (58 models in ReplicatedStorage), trees and fences.
-
+3. **Training rides** (D-053): Training Ground and oval (T1), server-scored Sprint Lane + Mud Splash (T2), Gate Break + Hill Climb (T3), ghosts / Ride together / server Quick Train (T4). Plan: docs/debates/009. David asked for this 2026-10-05 ("You should run around with the horse").
+4. **Race steering** (D-054): Python trip model + calibration (S0), rail coordinates + random posts (S1), Smart Steer on the server (S2), rider controls (S3), replays and results (S4). Plan: docs/debates/010. David asked for this 2026-10-05.
+5. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
+6. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
+7. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
+8. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
+9. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
+10. ~~Diamond store~~: built (D-050). David to create the three developer products and paste their ids into `DiamondProducts.luau`.
+11. **Cross-server Cup finals and Derby Day** (D-036 later).
+12. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
+13. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.
+14. **Performance pass**: StreamingEnabled check, model counts on phones (58 models in ReplicatedStorage), trees and fences.
 ## Done
 
 - 2026-10-05: sound (D-052): `Sound.luau` with race cues, UI pops, care and job sounds, Sound On/Off setting; 8 announcer lines generated (29 ElevenLabs credits) and uploaded to Roblox (all approved); sound effects waiting on the key permission.
