@@ -11,9 +11,7 @@ SHARED = ROOT / "game" / "src" / "shared"
 def png_size(path: Path) -> tuple[int, int]:
     """Width and height from the PNG header (stdlib only; CI has no Pillow)."""
     data = path.read_bytes()[:24]
-    assert data[:8] == b"PNG
-
-", path
+    assert data[:8] == bytes.fromhex("89504e470d0a1a0a"), path
     return struct.unpack(">II", data[16:24])
 
 
