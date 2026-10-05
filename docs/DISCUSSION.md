@@ -35,3 +35,19 @@ Response: odds locked from base `q` before the gates. Gavel only edits `p'`. Win
 ## Request 5 — repo
 
 Create a GitHub repo and include memory documents summarizing the concept, discussion, and solution.
+
+## Request 6 — game plan and policy check (2026-10-04)
+
+Plan a kid-friendly Roblox game around the gavel race with two currencies (earned Green Cash, Robux-bought Diamonds). Research found Roblox bans simulated gambling, including bets with unbuyable currency. Response: keep the odds math as the race engine, pay locked purses by finish, no wagering; Diamonds never affect win chance.
+
+## Request 7 — re-examine the math
+
+Running v1 showed longshots rewarded regardless of play, negative probabilities in ~49% of random races, unequal rounding, and a stake-dependent margin. Response: v2 with an exponential tilt, cash purses `B / q`, no noise, flat place prizes.
+
+## Request 8 — skill relative to the race
+
+Suggestion: compare skill to the average for that specific race to make the game more variable. Response: adopted. Noted that the tilt is shift-invariant, so this matches league-median centering except at clamp edges; upsets are driven by `T` (how often) and `κ` (who earns them).
+
+## Request 9 — autonomous agent team
+
+Set up implementation, testing, and review agents that keep all decisions in memory documents and update the repo autonomously, plus Roblox research and expert designer agents that debate as the game develops. Response: CLAUDE.md, 13 subagents, memory docs, debate protocol, test suite, CI. Tests caught an overstated rounding claim in V2_PROPOSAL, now corrected (D-010).
