@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-05 — feat: Training Ground (T1): training oval with a hill, Sprint Lane hoops, practice gate, paddock south gate and path, Mud Splash gymkhana, picture signs; TrainingCourses geometry (D-053)
 - 2026-10-05 — docs: debates 009 (training rides) and 010 (race steering); D-053 and D-054
 - 2026-10-05 — fix: running legs review: legs never drift, gait cross-fade, rest at race end, fitted saddle cloth (lane numbers in races), smooth normals, fallbacks
 - 2026-10-05 — feat: running legs: standing horses split into body and legs, walk/trot/gallop cycles on races, rides and wild horses (D-051)

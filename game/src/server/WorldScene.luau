@@ -2,7 +2,7 @@
 -- WorldScene: builds the world around the racecourse from parts (D-035, WorldLayout):
 -- Fair Street with its fountain, lamps and bunting; the Race Board, Feed & Seed, Vet,
 -- Training Paddock and Market Corral; Barn Lane with 20 fenced stable plots; the Trail loop
--- with the meadow; trees. Uploaded models (ReplicatedStorage.RaceModels) replace the
+-- with the meadow; the Training Ground with its oval and the paddock gymkhana (D-053); trees. Uploaded models (ReplicatedStorage.RaceModels) replace the
 -- part-built buildings and props when they've loaded; otherwise the parts stay.
 -- Barns and horses inside each plot are built by StableService.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -11,6 +11,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
 
 local WorldScene = {}
 
@@ -368,23 +370,18 @@ local function buildPlaces(root: Instance)
 		WorldScene.fence(f, x0, z0, p.x - gate / 2, z0)
 		WorldScene.fence(f, p.x + gate / 2, z0, x1, z0)
 		WorldScene.fence(f, x1, z0, x1, z1)
-		WorldScene.fence(f, x1, z1, x0, z1)
+		-- the south fence has a gate to the Training Ground (D-053)
+		local south = WorldLayout.PADDOCK_SOUTH_GATE
+		WorldScene.fence(f, x1, z1, south.x + south.width / 2, z1)
+		WorldScene.fence(f, south.x - south.width / 2, z1, x0, z1)
+		for _, s in { -1, 1 } do
+			part({ Name = "GatePost", Size = Vector3.new(1.4, 7, 1.4), Color = C.woodLight, Material = Enum.Material.Wood,
+				CFrame = CFrame.new(south.x + s * south.width / 2, GROUND_Y + 3.5, z1) }, f)
+		end
 		WorldScene.fence(f, x0, z1, x0, z0)
 		part({ Name = "Arena", Size = Vector3.new(p.w - 2, 0.2, p.d - 2), Color = Color3.fromHex("D9B98A"), Material = Enum.Material.Sand,
 			CFrame = CFrame.new(p.x, GROUND_Y + 0.06, (z0 + z1) / 2) }, f)
-		for k = 0, 5 do
-			part({ Name = "Cone", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 1.4, 1.4), Color = C.orange,
-				CFrame = CFrame.new(x0 + 30 + k * 22, GROUND_Y + 1.2, z0 + 40) * CFrame.Angles(0, 0, math.pi / 2) }, f)
-		end
-		for k = 0, 2 do
-			local jx, jz = x0 + 40 + k * 45, z0 + 100
-			if WorldScene.placeModel(f, "log_jump", CFrame.new(jx, GROUND_Y, jz)) then continue end
-			for _, dx in { -5, 5 } do
-				part({ Name = "JumpPost", Size = Vector3.new(0.8, 4, 0.8), Color = C.white, CFrame = CFrame.new(jx + dx, GROUND_Y + 2, jz) }, f)
-			end
-			part({ Name = "JumpPole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(10, 0.6, 0.6), Color = if k % 2 == 0 then C.red else C.gold,
-				CFrame = CFrame.new(jx, GROUND_Y + 2.4, jz) }, f)
-		end
+		-- The arena holds the Mud Splash gymkhana (built with the Training Ground).
 		WorldScene.sign(f, Vector3.new(p.x + gate / 2 + 8, GROUND_Y + 7, z0 - 0.8), Vector3.new(0, 0, -1), "Training Paddock", "⭐", 18, 4)
 	end
 	-- Market Corral (Stage 8).
@@ -479,6 +476,308 @@ local function buildTrail(root: Instance)
 	return f
 end
 
+-- Training Ground (D-053) -------------------------------------------------------------------
+-- The training oval south of the paddock (rails, dirt, the hill on the south straight, Sprint
+-- Lane hoops, the practice gate in the infield), the path from the paddock's south gate, the
+-- Mud Splash gymkhana in the paddock arena and the picture signs. Geometry: TrainingCourses.
+-- Hoops, poles and logs never collide, so nobody snags on them; each rider's client lights the
+-- next one for itself.
+local DIRT = Color3.fromHex("C69C6D")
+local MUD = Color3.fromHex("6B4A2E")
+local HOOP_COLOURS = { Color3.fromHex("E5484D"), Color3.fromHex("FF9F1C"), Color3.fromHex("17A398"),
+	Color3.fromHex("56B4E9"), Color3.fromHex("B497FF"), Color3.fromHex("46C46A") }
+
+local function ghostPart(props, parent: Instance): BasePart
+	props.CanCollide, props.CanQuery, props.CanTouch = false, false, false
+	return part(props, parent)
+end
+
+-- A picture sign on two posts: a big emoji, the course name and a short line, both sides.
+local function pictureSign(parent: Instance, x: number, z: number, look: Vector3, emoji: string, title: string, line: string, color: Color3)
+	local size = TrainingCourses.SIGN_SIZE
+	local m = Instance.new("Model")
+	m.Name = "Sign_" .. title
+	local pos = Vector3.new(x, GROUND_Y, z)
+	local across = Vector3.new(-look.Z, 0, look.X)
+	local boardH = size.h - 2.5
+	for _, s in { -1, 1 } do
+		part({ Name = "Post", Size = Vector3.new(0.8, size.h, 0.8), Color = C.wood, Material = Enum.Material.Wood,
+			CFrame = CFrame.new(pos + across * s * (size.w / 2 - 0.8) + Vector3.new(0, size.h / 2, 0)) }, m)
+	end
+	local centre = pos + Vector3.new(0, 2.5 + boardH / 2, 0)
+	local board = part({ Name = "Board", Size = Vector3.new(size.w, boardH, 0.6), Color = color,
+		CFrame = CFrame.lookAt(centre, centre + look) }, m)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = face
+		sg.CanvasSize = Vector2.new(size.w * 40, boardH * 40)
+		sg.LightInfluence = 0.2
+		sg.Parent = board
+		local rows = { { emoji, 0, 0.5 }, { title, 0.5, 0.28 }, { line, 0.78, 0.2 } }
+		for _, row in rows do
+			local l = Instance.new("TextLabel")
+			l.BackgroundTransparency = 1
+			l.Position = UDim2.fromScale(0.04, row[2])
+			l.Size = UDim2.fromScale(0.92, row[3])
+			l.Font = Enum.Font.FredokaOne
+			l.TextScaled = true
+			l.TextColor3 = C.ink
+			l.Text = row[1]
+			l.Parent = sg
+		end
+	end
+	local outline = Instance.new("SelectionBox")
+	outline.Adornee = board
+	outline.LineThickness = 0.08
+	outline.Color3 = C.ink
+	outline.SurfaceTransparency = 1
+	outline.Parent = board
+	m.Parent = parent
+	return m
+end
+
+-- One rail segment that may climb (the hill): a post at the start, two rails along the slope.
+local function railSegment(parent: Instance, a: Vector3, b: Vector3, endPost: boolean)
+	local len = (b - a).Magnitude
+	if len < 0.5 then return end
+	part({ Name = "Post", Size = Vector3.new(0.8, 5, 0.8), Color = C.white, CFrame = CFrame.new(a + Vector3.new(0, 2.5, 0)) }, parent)
+	if endPost then
+		part({ Name = "Post", Size = Vector3.new(0.8, 5, 0.8), Color = C.white, CFrame = CFrame.new(b + Vector3.new(0, 2.5, 0)) }, parent)
+	end
+	for _, y in { 2, 4 } do
+		local p0, p1 = a + Vector3.new(0, y, 0), b + Vector3.new(0, y, 0)
+		part({ Name = "Rail", Size = Vector3.new(0.4, 0.6, len), Color = C.white, CFrame = CFrame.lookAt((p0 + p1) / 2, p1) }, parent)
+	end
+end
+
+local function buildOval(f: Instance)
+	local TC = TrainingCourses
+	local O = GameConfig.training.oval
+	local S, R, W = O.straight, O.radius, O.width
+	local TURN = math.pi * R
+	local outerR, innerR = R + W / 2, R - W / 2
+	-- Dirt in a stadium shape with the infield grass on top (flat layers never collide; the
+	-- horse runs on the ground under them).
+	for _, sx in { -1, 1 } do
+		ghostPart({ Name = "Dirt", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, outerR * 2, outerR * 2), Color = DIRT,
+			Material = Enum.Material.Ground, CFrame = CFrame.new(O.cx + sx * S / 2, GROUND_Y + 0.04, O.cz) * CFrame.Angles(0, 0, math.pi / 2) }, f)
+		ghostPart({ Name = "Infield", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, innerR * 2, innerR * 2), Color = C.plotGrass,
+			Material = Enum.Material.Grass, CFrame = CFrame.new(O.cx + sx * S / 2, GROUND_Y + 0.08, O.cz) * CFrame.Angles(0, 0, math.pi / 2) }, f)
+	end
+	ghostPart({ Name = "Dirt", Size = Vector3.new(S, 0.2, outerR * 2), Color = DIRT, Material = Enum.Material.Ground,
+		CFrame = CFrame.new(O.cx, GROUND_Y + 0.04, O.cz) }, f)
+	ghostPart({ Name = "Infield", Size = Vector3.new(S, 0.2, innerR * 2), Color = C.plotGrass, Material = Enum.Material.Grass,
+		CFrame = CFrame.new(O.cx, GROUND_Y + 0.08, O.cz) }, f)
+
+	-- The hill (berm) on the south straight: ramp up, flat top, ramp down. It's real ground.
+	local H = TC.HILL
+	local zc = O.cz + R
+	local xa = O.cx - S / 2 + H.u0
+	local width = H.halfWidth * 2
+	local function solid(props)
+		props.Color, props.Material = DIRT, Enum.Material.Ground
+		return props
+	end
+	local yMid = GROUND_Y + H.height / 2
+	local upC = Vector3.new(xa + H.ramp / 2, yMid, zc)
+	wedge(solid({ Name = "HillUp", Size = Vector3.new(width, H.height, H.ramp), CFrame = CFrame.lookAt(upC, upC - Vector3.new(1, 0, 0)) }), f)
+	part(solid({ Name = "HillTop", Size = Vector3.new(H.top, H.height, width), CFrame = CFrame.new(xa + H.ramp + H.top / 2, yMid, zc) }), f)
+	local downC = Vector3.new(xa + H.ramp + H.top + H.ramp / 2, yMid, zc)
+	wedge(solid({ Name = "HillDown", Size = Vector3.new(width, H.height, H.ramp), CFrame = CFrame.lookAt(downC, downC + Vector3.new(1, 0, 0)) }), f)
+
+	-- Rails just outside the dirt, following the hill; a gap in both on the north straight
+	-- where the path comes in (and leads on into the infield).
+	local rails = Instance.new("Folder")
+	rails.Name = "Rails"
+	rails.Parent = f
+	local gapD0, gapD1 = O.cx + S / 2 - TC.ENTRY.x1, O.cx + S / 2 - TC.ENTRY.x0
+	for _, lat in { TC.RAIL_LATERAL, -TC.RAIL_LATERAL } do
+		local function at(d: number): Vector3
+			local x, z = TC.ovalPoint(d, lat)
+			return Vector3.new(x, GROUND_Y + TC.surfaceHeight(d), z)
+		end
+		local runs = { { 0, gapD0, 6 }, { gapD1, S, 2 }, { S, S + TURN, 12 }, { S + TURN, 2 * S + TURN, 8 }, { 2 * S + TURN, TC.LAP, 12 } }
+		for i, run in runs do
+			local d0, d1, n = run[1], run[2], run[3]
+			for k = 0, n - 1 do
+				local a, b = d0 + (d1 - d0) * k / n, d0 + (d1 - d0) * (k + 1) / n
+				railSegment(rails, at(a), at(b), i == 1 and k == n - 1)
+			end
+		end
+	end
+
+	-- Sprint Lane hoops: an arch three horses wide.
+	local hoops = Instance.new("Folder")
+	hoops.Name = "Hoops"
+	hoops.Parent = f
+	for _, p in TC.courses.speed.posts do
+		local m = Instance.new("Model")
+		m.Name = "Hoop" .. p.index
+		local base = Vector3.new(p.x, GROUND_Y + p.y, p.z)
+		local n = Vector3.new(p.nx, 0, p.nz)
+		local half, postH = p.width / 2, 7
+		local colour = HOOP_COLOURS[((p.index - 1) % #HOOP_COLOURS) + 1]
+		for _, s in { -1, 1 } do
+			ghostPart({ Name = "Post", Size = Vector3.new(0.7, postH, 0.7), Color = C.white, CFrame = CFrame.new(base + n * s * half + Vector3.new(0, postH / 2, 0)) }, m)
+		end
+		local prev = base + n * half + Vector3.new(0, postH, 0)
+		for k = 1, 8 do
+			local a = math.pi * k / 8
+			local pt = base + n * (half * math.cos(a)) + Vector3.new(0, postH + half * math.sin(a), 0)
+			ghostPart({ Name = "Ring", Size = Vector3.new(0.7, 0.7, (pt - prev).Magnitude + 0.3), Color = if k % 2 == 0 then C.white else colour,
+				CFrame = CFrame.lookAt((prev + pt) / 2, pt) }, m)
+			prev = pt
+		end
+		m.Parent = hoops
+	end
+	-- Start / finish line for the oval courses.
+	do
+		local c = TC.courses.speed
+		local x, z, tx, tz = TC.ovalPoint(c.startD, 0)
+		local mid = Vector3.new(x, GROUND_Y + 0.12, z)
+		ghostPart({ Name = "StartLine", Size = Vector3.new(W, 0.2, 0.8), Color = C.white,
+			CFrame = CFrame.lookAt(mid, mid + Vector3.new(tx, 0, tz)) }, f)
+	end
+
+	-- Gate Break: the practice gate in the infield, its lane, the flag and the loop back.
+	do
+		local c = TC.courses.accel
+		local gz = c.start.z
+		local flag = c.flag
+		local flagX = flag.ax
+		strip(f, c.stall[1] - 6, gz, flagX + 10, gz, 10, DIRT, Enum.Material.Ground, 0.1)
+		local pos = Vector3.new(c.start.x, GROUND_Y, gz)
+		if not WorldScene.placeModel(f, "gate_stall", CFrame.lookAt(pos, pos + Vector3.new(1, 0, 0)) * CFrame.new(0, 0, 1)) then
+			for _, s in { -1, 1 } do
+				part({ Name = "StallSide", Size = Vector3.new(8, 6, 0.6), Color = C.white, CFrame = CFrame.new(c.start.x, GROUND_Y + 3, gz + s * 3) }, f)
+			end
+			part({ Name = "StallTop", Size = Vector3.new(8, 0.8, 6.6), Color = C.red, CFrame = CFrame.new(c.start.x, GROUND_Y + 6.4, gz) }, f)
+		end
+		ghostPart({ Name = "FlagLine", Size = Vector3.new(0.8, 0.2, flag.bz - flag.az), Color = C.white,
+			CFrame = CFrame.new(flagX, GROUND_Y + 0.14, gz) }, f)
+		part({ Name = "FlagPole", Size = Vector3.new(0.5, 9, 0.5), Color = C.white, CFrame = CFrame.new(flagX, GROUND_Y + 4.5, flag.az - 1.5) }, f)
+		wedge({ Name = "Flag", Size = Vector3.new(0.1, 2.4, 3.4), Color = C.gold, CanCollide = false,
+			CFrame = CFrame.new(flagX + 1.7, GROUND_Y + 7.6, flag.az - 1.5) * CFrame.Angles(0, math.pi / 2, 0) }, f)
+	end
+end
+
+local function buildGymkhana(f: Instance)
+	local TC = TrainingCourses
+	local G = TC.courses.grit
+	local gy = Instance.new("Folder")
+	gy.Name = "Gymkhana"
+	gy.Parent = f
+	local logH = GameConfig.training.grit.logHeight
+	for _, e in G.elements do
+		local m = Instance.new("Model")
+		m.Name = e.name
+		if e.kind == "mud" then
+			local r = e.rect
+			local w, d = r[3] - r[1], r[4] - r[2]
+			ghostPart({ Name = "Mud", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d, d), Color = MUD, Material = Enum.Material.Mud,
+				CFrame = CFrame.new(e.x - (w - d) / 2, GROUND_Y + 0.14, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
+			ghostPart({ Name = "Mud", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d, d), Color = MUD, Material = Enum.Material.Mud,
+				CFrame = CFrame.new(e.x + (w - d) / 2, GROUND_Y + 0.15, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
+			ghostPart({ Name = "Puddle", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, d * 0.6, d * 0.6), Color = C.water,
+				Material = Enum.Material.Glass, Transparency = 0.35, CFrame = CFrame.new(e.x, GROUND_Y + 0.17, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
+		elseif e.kind == "log" then
+			local base = Vector3.new(e.x, GROUND_Y, e.z)
+			local cf = CFrame.lookAt(base, base + Vector3.new(e.dir, 0, 0)) -- the model's long side lies across the lane
+			local lm = WorldScene.model("log_jump")
+			if lm then
+				local _, size = lm:GetBoundingBox()
+				if size.Y > 0.1 then lm:ScaleTo(lm:GetScale() * logH / size.Y) end
+				lm:PivotTo(cf)
+				for _, d in lm:GetDescendants() do
+					if d:IsA("BasePart") then d.CanCollide, d.CanQuery, d.CanTouch = false, false, false end
+				end
+				lm.Parent = m
+			else
+				local dia = 1.4
+				ghostPart({ Name = "Log", Shape = Enum.PartType.Cylinder, Size = Vector3.new(TC.LOG_HALF * 2, dia, dia), Color = C.trunk,
+					Material = Enum.Material.Wood, CFrame = CFrame.new(e.x, GROUND_Y + logH - dia / 2, e.z) * CFrame.Angles(0, math.pi / 2, 0) }, m)
+				for _, s in { -1, 1 } do
+					ghostPart({ Name = "Stump", Size = Vector3.new(1, logH - dia / 2, 1), Color = C.wood, Material = Enum.Material.Wood,
+						CFrame = CFrame.new(e.x, GROUND_Y + (logH - dia / 2) / 2, e.z + s * (TC.LOG_HALF - 1)) }, m)
+				end
+			end
+		else
+			local stripes = { C.red, C.white, C.red }
+			for k, colour in stripes do
+				ghostPart({ Name = "Pole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 0.6, 0.6), Color = colour,
+					CFrame = CFrame.new(e.x, GROUND_Y + 1 + (k - 1) * 2, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
+			end
+			ghostPart({ Name = "PoleBase", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 2.2, 2.2), Color = C.white,
+				CFrame = CFrame.new(e.x, GROUND_Y + 0.2, e.z) * CFrame.Angles(0, 0, math.pi / 2) }, m)
+		end
+		m.Parent = gy
+	end
+	-- The canter zone: a darker lane with turtle signs at both ends.
+	local zone = G.slowZone
+	ghostPart({ Name = "CanterZone", Size = Vector3.new(zone[3] - zone[1], 0.2, zone[4] - zone[2] - 2), Color = Color3.fromHex("C9A877"),
+		Material = Enum.Material.Sand, CFrame = CFrame.new((zone[1] + zone[3]) / 2, GROUND_Y + 0.1, (zone[2] + zone[4]) / 2) }, gy)
+	-- Start line and the finish arch.
+	local startX, z1 = G.laneX[1], G.laneZ(1)
+	ghostPart({ Name = "StartLine", Size = Vector3.new(0.8, 0.2, G.laneGap - 4), Color = C.white, CFrame = CFrame.new(startX, GROUND_Y + 0.14, z1) }, gy)
+	local fin = G.finish
+	local fx, fz = fin.ax, (fin.az + fin.bz) / 2
+	local halfW = (fin.bz - fin.az) / 2 - 2
+	for _, s in { -1, 1 } do
+		ghostPart({ Name = "FinishPost", Size = Vector3.new(0.8, 11, 0.8), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 5.5, fz + s * halfW) }, gy)
+	end
+	local banner = ghostPart({ Name = "FinishBanner", Size = Vector3.new(0.4, 2.4, halfW * 2), Color = C.white, CFrame = CFrame.new(fx, GROUND_Y + 10, fz) }, gy)
+	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = face
+		sg.CanvasSize = Vector2.new(halfW * 80, 96)
+		sg.Parent = banner
+		local l = Instance.new("TextLabel")
+		l.Size = UDim2.fromScale(1, 1)
+		l.BackgroundTransparency = 1
+		l.Font = Enum.Font.FredokaOne
+		l.TextScaled = true
+		l.TextColor3 = C.ink
+		l.Text = "🏁 Finish 🏁"
+		l.Parent = sg
+	end
+end
+
+local function buildTrainingGround(root: Instance)
+	local f = Instance.new("Folder")
+	f.Name = "TrainingGround"
+	local TC = TrainingCourses
+	local O = GameConfig.training.oval
+	-- The path from the paddock's south gate to the gap in the oval's rails.
+	local gateX = WorldLayout.PADDOCK_SOUTH_GATE.x
+	local link = WorldLayout.trainingLink
+	strip(f, gateX, link[2] + 4, gateX, O.cz - O.radius - O.width / 2 - 2, WorldLayout.TRAINING_PATH_WIDTH, C.lane, Enum.Material.Ground)
+	-- A name board over the path where it reaches the ground.
+	do
+		local z = link[4] - 2
+		local half = WorldLayout.TRAINING_PATH_WIDTH / 2 + 2
+		for _, s in { -1, 1 } do
+			part({ Name = "ArchPost", Size = Vector3.new(1.2, 14, 1.2), Color = C.woodLight, Material = Enum.Material.Wood,
+				CFrame = CFrame.new(gateX + s * half, GROUND_Y + 7, z) }, f)
+		end
+		WorldScene.sign(f, Vector3.new(gateX, GROUND_Y + 12.5, z), Vector3.new(0, 0, -1), "Training Ground", "⭐", half * 2 + 2, 3.5, C.woodLight)
+	end
+	buildOval(f)
+	buildGymkhana(f)
+	-- Picture signs (the open courses get a "Ride" prompt from the client).
+	local signs = Instance.new("Folder")
+	signs.Name = "Signs"
+	signs.Parent = f
+	for _, s in TC.signs do
+		local c = TC.courses[s.course]
+		local open = GameConfig.training.courses[s.course] == true
+		local line = if s.pointer then "In the paddock ⬆" elseif open then "Ride!" else "Coming soon"
+		local colour = if open then C.white else Color3.fromHex("EDE4D3")
+		pictureSign(signs, s.x, s.z, Vector3.new(s.lookX, 0, s.lookZ), c.emoji, c.name, line, colour)
+	end
+	f.Parent = root
+	return f
+end
+
 -- Is (x, z) clear of streets, buildings, plots and the trail (for trees)?
 local function clear(x: number, z: number, margin: number): boolean
 	local r = { x - margin, z - margin, x + margin, z + margin }
@@ -502,6 +801,7 @@ local function clear(x: number, z: number, margin: number): boolean
 	end
 	local m = WorldLayout.meadow
 	if (x - m.x) ^ 2 + (z - m.z) ^ 2 < (m.radius + margin) ^ 2 then return false end
+	if WorldLayout.overlaps(r, WorldLayout.trainingLink) then return false end -- the path to the Training Ground
 	return true
 end
 
@@ -563,6 +863,7 @@ function WorldScene.build(): Folder
 	buildPlaces(root)
 	buildLane(root)
 	buildTrail(root)
+	buildTrainingGround(root)
 	buildTrees(root)
 	root.Parent = workspace
 	built = root
@@ -572,7 +873,7 @@ end
 -- Rebuild Fair Street buildings once uploaded models load (they replace the part versions).
 function WorldScene.rebuildPlaces()
 	if not built then return end
-	for _, name in { "FairStreet", "Places", "BarnLane", "Trail" } do
+	for _, name in { "FairStreet", "Places", "BarnLane", "Trail", "TrainingGround" } do
 		local old = built:FindFirstChild(name)
 		if old then old:Destroy() end
 	end
@@ -580,6 +881,7 @@ function WorldScene.rebuildPlaces()
 	buildPlaces(built)
 	buildLane(built)
 	buildTrail(built)
+	buildTrainingGround(built)
 end
 
 WorldScene.GROUND_Y = GROUND_Y

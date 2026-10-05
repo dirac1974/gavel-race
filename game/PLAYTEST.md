@@ -115,6 +115,17 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] Vet: the "Check-up" prompt → pick a horse → Health Passport with five stamp slots → tap with the heartbeat (the heart pulses); first visit stamps "First check-up", the next day's visit reveals Potential.
 - [ ] Stable Board: horse cards suggest "Next: train <stat>" when training is ready; daily and weekly jobs for training and check-ups appear in the mix.
 
+## Training rides (D-053)
+
+The Training Ground (T1):
+- [ ] The Training Paddock's south fence has a gate in the middle; a dirt path runs south from it under a "⭐ Training Ground" board to the training oval. No trees on the path.
+- [ ] Picture signs stand either side of the path near the oval: 💨 Sprint Lane ("Ride!"), ⛰️ Hill Climb and 🚦 Gate Break ("Coming soon"), and 💦 Mud Splash ("In the paddock ⬆"). Each reads from both sides.
+- [ ] The oval: white rails on both sides of a 24-stud dirt track, a green infield, a gap in both rails where the path comes in. You can't ride through a rail.
+- [ ] The hill on the far (south) straight is gentle: the horse rides up and over it at a gallop without leaving the ground for long or catching on anything; the rails follow it.
+- [ ] Six coloured hoops (arches three horses wide) stand on the track, one on top of the hill; your horse and rider pass under the top of every arch and never bump a post.
+- [ ] The practice gate stands in the infield with a dirt lane and a yellow flag 120 studs along it.
+- [ ] The paddock arena holds the gymkhana: four mud puddles, three low logs (well under the horse's hop), four red-and-white poles in a darker "canter" lane, a white start line by the north-west corner and a 🏁 Finish arch near the south-west corner. Nothing in the arena stops your horse (poles and logs never collide). Walking from the street gate to the south gate never meets a log.
+
 ## Race Board and two courses (Stage 4, D-036)
 
 - [ ] RACE! (or the Race Board prompt) opens the picker: two cards, Dirt course and Turf course, each with league, distance, surface, weather, eight lane dots and "Open / Filling / Starts in Ns / Racing now".

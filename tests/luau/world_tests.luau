@@ -1,5 +1,6 @@
 --!strict
--- Tests for the world modules: Horse, Profile, NameGen (Stage 1), WorldLayout (Stage 2).
+-- Tests for the world modules: Horse, Profile, NameGen (Stage 1), WorldLayout (Stage 2), the
+-- Training Ground and training rides (D-053).
 local Horse = require("../../game/src/shared/Horse")
 local Profile = require("../../game/src/shared/Profile")
 local NameGen = require("../../game/src/shared/NameGen")
@@ -20,6 +21,213 @@ local function makeRng(seed0: number)
 			return lo + math.floor(nextNumber() * (hi - lo + 1))
 		end,
 	}
+end
+
+-- Training Ground (D-053, T1): its own function, as the main test function is near Luau's
+-- local-register limit.
+local function trainingGroundTests(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
+	local W = WorldLayout
+	local street = { W.STREET_X0, W.STREET_Z - W.STREET_WIDTH / 2, W.STREET_X1, W.STREET_Z + W.STREET_WIDTH / 2 }
+	local lane = { W.LANE_X - W.LANE_WIDTH / 2, W.LANE_Z0, W.LANE_X + W.LANE_WIDTH / 2, W.LANE_Z1 }
+	local course = { -1000, -2000, 640, 2000 }
+	local TC = require("../../game/src/shared/TrainingCourses")
+	local TCfg = GameConfig.training
+	local ground = W.placeRect("trainingGround") :: { number }
+	local paddockR = W.placeRect("paddock") :: { number }
+	local link = W.trainingLink
+	local function inside(r: { number }, x: number, z: number, m: number?): boolean
+		local mm = m or 0
+		return x >= r[1] + mm and x <= r[3] - mm and z >= r[2] + mm and z <= r[4] - mm
+	end
+	check(ground[1] == 650 and ground[3] == 950 and ground[2] == -70 and ground[4] == 70, "Training Ground covers x 650-950, z -70 to 70")
+	-- No overlap with other places, plots, the street, the lane or the Trail.
+	local tgOk = true
+	for _, rect in { ground, link } do
+		if not W.inBounds(rect) or W.overlaps(rect, street) or W.overlaps(rect, lane) or W.overlaps(rect, course) then tgOk = false end
+		for i = 1, W.PLOT_COUNT do
+			if W.overlaps(rect, W.plotRect(i)) then tgOk = false end
+		end
+		for key in W.places do
+			local pr = W.placeRect(key)
+			if pr and key ~= "trainingGround" and W.overlaps(rect, pr) then tgOk = false end
+		end
+		local pts = W.trail
+		for k = 1, #pts - 1 do
+			for s = 0, 20 do
+				local x = pts[k].x + (pts[k + 1].x - pts[k].x) * s / 20
+				local z = pts[k].z + (pts[k + 1].z - pts[k].z) * s / 20
+				if inside(rect, x, z, -60) then tgOk = false end
+			end
+		end
+		local m = W.meadow
+		if inside(rect, m.x, m.z, -(m.radius + 20)) then tgOk = false end
+	end
+	check(tgOk, "Training Ground and its path clear of places, plots, streets, the racecourse and the Trail")
+	check(link[1] < W.PADDOCK_SOUTH_GATE.x - W.TRAINING_PATH_WIDTH / 2 and link[3] > W.PADDOCK_SOUTH_GATE.x + W.TRAINING_PATH_WIDTH / 2
+		and link[2] == paddockR[4] and link[4] == ground[2], "the path runs from the paddock's south fence to the Training Ground")
+	local gateX = W.PADDOCK_SOUTH_GATE.x
+	check(gateX - W.PADDOCK_SOUTH_GATE.width / 2 > paddockR[1] + 10 and gateX + W.PADDOCK_SOUTH_GATE.width / 2 < paddockR[3] - 10
+		and TC.ENTRY.x0 < gateX - W.TRAINING_PATH_WIDTH / 2 and TC.ENTRY.x1 > gateX + W.TRAINING_PATH_WIDTH / 2,
+		"south gate in the paddock fence lines up with the gap in the oval's rails")
+
+	-- The oval: geometry round trip, fits the ground, rails clear of the edge.
+	local O = TCfg.oval
+	check(close(TC.LAP, 2 * O.straight + 2 * math.pi * O.radius, 1e-9) and close(TC.LAP, 665.575, 0.01), "oval lap ~666 studs")
+	local roundTrip, fits = true, true
+	for k = 0, 199 do
+		local d = TC.LAP * k / 200
+		for _, lat in { -TC.RAIL_LATERAL, -6, 0, 7, TC.RAIL_LATERAL } do
+			local x, z, tx, tz, nx, nz = TC.ovalPoint(d, lat)
+			local d2, l2 = TC.ovalProject(x, z)
+			if math.abs(TC.wrap(d2 - d)) > 1e-6 or math.abs(l2 - lat) > 1e-6 then roundTrip = false end
+			if math.abs(tx * tx + tz * tz - 1) > 1e-9 or math.abs(tx * nx + tz * nz) > 1e-9 then roundTrip = false end
+			if not inside(ground, x, z, 1) then fits = false end
+		end
+	end
+	check(roundTrip, "ovalPoint and ovalProject agree; tangent and normal are unit and square")
+	check(fits, "oval rails sit inside the Training Ground")
+	-- Counter-clockwise like the racecourse: the north straight heads west, then the turn bends south.
+	local _, _, tx0, _ = TC.ovalPoint(10, 0)
+	local _, _, _, tz1 = TC.ovalPoint(O.straight + 30, 0)
+	check(tx0 < 0 and tz1 > 0, "the oval runs counter-clockwise (left turns)")
+	check(TC.surfaceHeight(TC.courses.speed.posts[4].d) == TCfg.stamina.hill and TC.surfaceHeight(50) == 0
+		and TC.surfaceHeight(O.straight + math.pi * O.radius + 40) > 0, "the hill rises on the south straight only")
+	local gentle = true
+	for k = 0, 400 do
+		local d = TC.LAP * k / 400
+		if math.abs(TC.surfaceHeight(d + 0.5) - TC.surfaceHeight(d - 0.5)) > 0.2 then gentle = false end -- under ~11°
+	end
+	check(gentle, "the hill is gentle (slope under 0.2)")
+
+	-- Sprint Lane hoops lie on the track surface, inside the rails, spaced round the lap.
+	local sp = TC.courses.speed
+	local hoopsOk = #sp.posts == TCfg.speed.hoopsPerLap and #sp.hoops == TCfg.speed.laps * TCfg.speed.hoopsPerLap
+	for _, p in sp.posts do
+		local d2, l2 = TC.ovalProject(p.x, p.z)
+		if math.abs(TC.wrap(d2 - p.d)) > 1e-6 or math.abs(l2 - p.lateral) > 1e-6 then hoopsOk = false end
+		if math.abs(p.lateral) + p.width / 2 > O.width / 2 then hoopsOk = false end
+		if p.y ~= TC.surfaceHeight(p.d) or p.y ~= TC.groundHeight(p.x, p.z) then hoopsOk = false end
+		local gw = math.sqrt((p.gate.bx - p.gate.ax) ^ 2 + (p.gate.bz - p.gate.az) ^ 2)
+		if math.abs(gw - TCfg.speed.hoopWidth) > 1e-9 then hoopsOk = false end
+	end
+	for i = 2, #sp.hoops do
+		if sp.hoops[i].s <= sp.hoops[i - 1].s then hoopsOk = false end
+	end
+	if sp.hoops[1].s <= 0 or sp.hoops[#sp.hoops].s >= sp.finish then hoopsOk = false end
+	check(hoopsOk, "18 hoops, 10 studs wide, on the track surface, in order between start and finish")
+	check(sp.posts[4].y == TCfg.stamina.hill, "one hoop sits on top of the hill")
+
+	-- Gate Break: the practice gate, its lane and loop stay in the infield.
+	local ac = TC.courses.accel
+	local infieldOk = true
+	for _, pt in ac.route.points do
+		local _, lat = TC.ovalProject(pt.x, pt.z)
+		if lat > -O.width / 2 - 4 or not inside(ground, pt.x, pt.z, 5) then infieldOk = false end
+	end
+	if not (ac.stall[1] < ac.start.x and ac.start.x < ac.stall[3]) then infieldOk = false end
+	check(infieldOk, "practice gate, lane and loop inside the infield")
+	check(close(ac.flag.ax - ac.stall[3], TCfg.accel.dash, 1e-9), "the flag is the dash length from the gate")
+
+	-- Hill Climb: Pip is deterministic, keeps to the track and to its pace range.
+	local p1, p2 = TC.ponyAt(42, 12.3), TC.ponyAt(42, 12.3)
+	local p3 = TC.ponyAt(43, 12.3)
+	check(p1.x == p2.x and p1.z == p2.z and p1.speed == p2.speed, "ponyAt is deterministic for a seed")
+	check(p1.x ~= p3.x or p1.lateral ~= p3.lateral, "different seeds weave differently")
+	local ponyOk, last = true, -math.huge
+	for _, seed in { 1, 7, 99, 123456, 2147483000 } do
+		last = -math.huge
+		for k = 0, 600 do
+			local t = k * 0.1
+			local pp = TC.ponyAt(seed, t)
+			if not TC.onOval(pp.x, pp.z, -2) then ponyOk = false end
+			if pp.speed < TCfg.stamina.ponyMin - 1e-9 or pp.speed > TCfg.stamina.ponyMax + 1e-9 then ponyOk = false end
+			if pp.s < last then ponyOk = false end
+			if math.abs(pp.y - TC.surfaceHeight(pp.d)) > 1e-9 then ponyOk = false end
+			last = pp.s
+		end
+	end
+	check(ponyOk, "Pip stays on the track, between 30 and 42 studs/s, always going forward")
+	local s0 = TC.ponyAt(5, 0)
+	local _, sl = TC.ovalProject(s0.x, s0.z)
+	check(close(s0.s, (TCfg.stamina.ringNear + TCfg.stamina.ringFar) / 2, 1e-9) and math.abs(sl) < 1e-6, "Pip starts in the middle of the ring ahead of you")
+
+	-- Mud Splash: every gymkhana piece inside the arena, on the route, logs low and clear of the walkway.
+	local gr = TC.courses.grit
+	local counts = { mud = 0, log = 0, pole = 0 }
+	local points, gymOk = 0, true
+	local function nearRoute(x: number, z: number): number
+		local best = math.huge
+		local pts = gr.route.points
+		for k = 2, #pts do
+			local ax, az, bx, bz = pts[k - 1].x, pts[k - 1].z, pts[k].x, pts[k].z
+			local dx, dz = bx - ax, bz - az
+			local t = math.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1)
+			best = math.min(best, math.sqrt((x - ax - dx * t) ^ 2 + (z - az - dz * t) ^ 2))
+		end
+		return best
+	end
+	for _, e in gr.elements do
+		counts[e.kind] += 1
+		points += e.points
+		if not inside(paddockR, e.x, e.z, 8) then gymOk = false end
+		if e.rect and not (inside(paddockR, e.rect[1], e.rect[2], 5) and inside(paddockR, e.rect[3], e.rect[4], 5)) then gymOk = false end
+		if e.gate and not (inside(paddockR, e.gate.ax, e.gate.az, 5) and inside(paddockR, e.gate.bx, e.gate.bz, 5)) then gymOk = false end
+		if e.kind == "pole" then
+			if math.abs(nearRoute(e.x, e.z) - TC.POLE_REACH.weave) > 1 then gymOk = false end -- the route weaves round it
+		elseif nearRoute(e.x, e.z) > 0.5 then
+			gymOk = false
+		end
+		if e.kind == "log" and math.abs(e.x - gateX) < W.PADDOCK_SOUTH_GATE.width / 2 + 5 then gymOk = false end
+	end
+	for _, pt in gr.route.points do
+		if not inside(paddockR, pt.x, pt.z, 3) then gymOk = false end
+	end
+	check(gymOk, "gymkhana pieces inside the arena and on the route; logs clear of the gate-to-gate walkway")
+	check(counts.mud == TCfg.grit.mud and counts.log == TCfg.grit.logs and counts.pole == TCfg.grit.poles and close(points, 100, 1e-9),
+		"4 puddles, 3 logs, 4 poles worth 100 points")
+	check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, 42 * 42 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
+	check(TCfg.grit.airborne < TC.RIDE_HOP - 1, "a hop clears the log-height test")
+	local slowOk = true
+	for _, e in gr.elements do
+		local inZone = TC.inRect(gr.slowZone, e.x, e.z)
+		if (e.kind == "pole") ~= inZone then slowOk = false end
+	end
+	check(slowOk and TC.speedAt("grit", gr.elements[5].x, gr.elements[5].z) == TCfg.canter
+		and TC.speedAt("grit", gr.elements[1].x, gr.elements[1].z) == TCfg.grit.pace
+		and TC.speedAt("speed", 800, -55) == TCfg.gallop, "poles (only) sit in the canter zone")
+	check(TC.onCourse("grit", gr.start.x, gr.start.z) and TC.onCourse("speed", sp.start.x, sp.start.z)
+		and not TC.onCourse("speed", 800, 0) and TC.inArea("speed", 800, 0) and not TC.inArea("speed", 760, -200),
+		"course bounds: the infield is off the Sprint Lane course but inside its area")
+
+	-- Ideal times at the configured speeds (35-50 s per D-053).
+	for _, key in TC.ORDER do
+		local ideal = TC.idealSeconds(key)
+		check(ideal >= 35 and ideal <= 50, string.format("%s ideal time %.1f s is 35-50 s", key, ideal))
+		check(close(TC.parSeconds(key), ideal * TCfg.parFactor, 1e-9), key .. " par")
+	end
+	local stamOk = true
+	for seed = 1, 40 do
+		local ideal = TC.idealSeconds("stamina", seed * 7919)
+		if ideal < 35 or ideal > 50 then stamOk = false end
+	end
+	check(stamOk, "Hill Climb is 35-50 s for any seed")
+
+	-- Picture signs: one per course, standing in the path's rect, the ground or the arena.
+	local seen = {}
+	local signsOk = true
+	for _, s in TC.signs do
+		seen[s.course] = true
+		local half = TC.SIGN_SIZE.w / 2
+		local r = { s.x - half, s.z - half, s.x + half, s.z + half }
+		local okIn = inside(link, r[1], s.z, 0) and inside(link, r[3], s.z, 0)
+			or inside(ground, s.x, s.z, 1) or inside(paddockR, r[1], s.z, 1) and inside(paddockR, r[3], s.z, 1)
+		if not okIn then signsOk = false end
+		if math.abs(s.x - gateX) < W.TRAINING_PATH_WIDTH / 2 + half and inside(link, s.x, s.z, 0) then signsOk = false end -- not on the path
+	end
+	for _, key in TC.ORDER do
+		if not seen[key] then signsOk = false end
+	end
+	check(signsOk, "a picture sign for every course, off the path, inside the training areas")
 end
 
 return function(check: (boolean, string) -> (), close: (number, number, number) -> boolean)
@@ -664,4 +872,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		-- a snap (the bug) was 20-42°.
 		check(w2 <= steady * 1.15, string.format("Gallop toggle %d->%d doesn't snap the legs (worst %.1f°)", ramp[1], ramp[2], w2))
 	end
+
+	trainingGroundTests(check, close)
+
 end
