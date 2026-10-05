@@ -92,11 +92,12 @@ function Training.train(h: any, stat: string, score: number, now: number): (bool
 	return true, g, msg
 end
 
--- Vet check-up: +1 bond once a day; the next stamp on a new day. Returns (ok, message, stamp?).
-function Training.checkup(h: any, score: number, now: number): (boolean, string, string?)
+-- Vet check-up: +1 bond once a day; the next stamp on a new day.
+-- Returns (ok, message, stamp?, counted): counted is true only for the first visit of the day.
+function Training.checkup(h: any, score: number, now: number): (boolean, string, string?, boolean)
 	ensure(h)
 	local today = now // 86400
-	if h.vetDay == today then return true, h.name .. " is healthy and happy! See you tomorrow", nil end
+	if h.vetDay == today then return true, h.name .. " is healthy and happy! See you tomorrow", nil, false end
 	h.vetDay = today
 	h.bond = math.clamp((h.bond or 0) + 1, 0, 100)
 	local stamp = nil
@@ -109,9 +110,9 @@ function Training.checkup(h: any, score: number, now: number): (boolean, string,
 	if stamp then h.stamps[stamp] = true end
 	local good = if score >= 70 then "Great listening! " else ""
 	if stamp then
-		return true, good .. "New Health Passport stamp: " .. Training.STAMP_LABELS[stamp] .. "!", stamp
+		return true, good .. "New Health Passport stamp: " .. Training.STAMP_LABELS[stamp] .. "!", stamp, true
 	end
-	return true, good .. h.name .. " is healthy and happy! +1 bond", nil
+	return true, good .. h.name .. " is healthy and happy! +1 bond", nil, true
 end
 
 return Training

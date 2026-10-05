@@ -280,3 +280,8 @@ if not openEvent then
 	openEvent.Parent = HudEvents
 end
 openEvent.Event:Connect(function() if gui.Enabled then close() else open() end end)
+
+-- Your queued race starting closes the picker.
+game:GetService("Players").LocalPlayer:GetAttributeChangedSignal("Racing"):Connect(function()
+	if game:GetService("Players").LocalPlayer:GetAttribute("Racing") and gui.Enabled then close() end
+end)

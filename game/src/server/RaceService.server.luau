@@ -264,7 +264,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 	local h, why = rideable(player, if typeof(horseId) == "string" then horseId else nil)
 	if not h then
 		Profiles.notify(player, why, "zzz_resting")
-		QueueStatus:FireClient(player, false, 0, nil, c.id)
+		if not inLine[player] then QueueStatus:FireClient(player, false, 0, nil, c.id) end
 		return
 	end
 	if inLine[player] == c then
@@ -378,6 +378,7 @@ local function runRace(c, players: { Player })
 	end
 	players = riders
 	if #players == 0 then return end
+	newCard(c) -- the board shows the next race on this course while this one runs
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
 	local coats = {}
 	for i, lane in lanes do coats[i] = coatOf[lane.id] end -- bots keep the default coats
@@ -429,6 +430,7 @@ local function runRace(c, players: { Player })
 				riding[p] = c
 				p:SetAttribute("Racing", true)
 				Rides.dismount(p) -- off your own horse before the race horse
+				TrackScene.dismount(p.Character) -- and off the other course's horse after its race
 				c.scene:seatRider(i, p.Character)
 			end
 		end
@@ -450,7 +452,7 @@ local function runRace(c, players: { Player })
 	local racing = true
 	task.spawn(function()
 		local period = 1 / GameConfig.offsetsPerSecond
-		while racing do
+		while racing and (c.current == cur or c.current == nil) do
 			local w = RaceShape.blendWeight(now(), tFar, postEnd, GameConfig.raceShape.blendPower)
 			RaceOffsets:FireAllClients(session:displayOffsets(shownLive, w, GameConfig.raceShape), c.id)
 			task.wait(period)
@@ -623,7 +625,6 @@ local function courseLoop(c)
 				end
 			end
 		end
-		newCard(c)
 		publishCards()
 		task.wait(5) -- results screen
 		if #c.queue > 0 then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end

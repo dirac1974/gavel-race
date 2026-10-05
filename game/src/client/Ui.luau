@@ -71,17 +71,9 @@ function Ui.screen(name: string, order: number?): ScreenGui
 	return gui
 end
 
--- A paper card with an ink outline and a soft drop shadow.
+-- A paper card with an ink outline and a chunky darker lip along the bottom (drawn inside the
+-- card, so list and grid layouts see exactly one item per card).
 function Ui.card(parent: Instance, size: UDim2, pos: UDim2, color: Color3?): Frame
-	local shadow = Instance.new("Frame")
-	shadow.Name = "Shadow"
-	shadow.Size = size
-	shadow.Position = pos + UDim2.fromOffset(0, 5)
-	shadow.BackgroundColor3 = Ui.colors.ink
-	shadow.BackgroundTransparency = 0.75
-	shadow.BorderSizePixel = 0
-	Ui.corner(shadow, 18)
-	shadow.Parent = parent
 	local f = Instance.new("Frame")
 	f.Size = size
 	f.Position = pos
@@ -89,13 +81,18 @@ function Ui.card(parent: Instance, size: UDim2, pos: UDim2, color: Color3?): Fra
 	f.BorderSizePixel = 0
 	Ui.corner(f, 18)
 	Ui.stroke(f, 3)
+	local lip = Instance.new("Frame")
+	lip.Name = "Lip"
+	lip.AnchorPoint = Vector2.new(0, 1)
+	lip.Position = UDim2.fromScale(0, 1)
+	lip.Size = UDim2.new(1, 0, 0, 7)
+	lip.BackgroundColor3 = Ui.colors.ink
+	lip.BackgroundTransparency = 0.82
+	lip.BorderSizePixel = 0
+	lip.ZIndex = 0
+	Ui.corner(lip, 18)
+	lip.Parent = f
 	f.Parent = parent
-	-- keep the shadow with the card
-	f:GetPropertyChangedSignal("Position"):Connect(function() shadow.Position = f.Position + UDim2.fromOffset(0, 5) end)
-	f:GetPropertyChangedSignal("Size"):Connect(function() shadow.Size = f.Size end)
-	f:GetPropertyChangedSignal("Visible"):Connect(function() shadow.Visible = f.Visible end)
-	f:GetPropertyChangedSignal("AnchorPoint"):Connect(function() shadow.AnchorPoint = f.AnchorPoint end)
-	f.Destroying:Connect(function() shadow:Destroy() end)
 	return f
 end
 
