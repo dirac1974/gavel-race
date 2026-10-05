@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import gavel_race_v2 as m  # noqa: E402
 import race_rating as rr  # noqa: E402
 import stride as st  # noqa: E402
+import pace_meter as pm  # noqa: E402
 
 
 class ListRng:
@@ -86,8 +87,26 @@ def main() -> None:
         stride_cases.append({"spec": spec, "uniforms": uniforms, "start": start, "beats": beats, "taps": taps,
                              "score": st.score(beats, taps, spec["half"]),
                              "gaps": st.gap_errors(beats, taps, spec["half"])})
+    pace_cases = []
+    for _ in range(120):
+        spec = {"sweepSeconds": rng.choice([1.1, 1.3, 1.6, 2.0, 2.4]), "speedDrift": rng.choice([0.0, 0.08, 0.15]),
+                "shiftMin": 2, "shiftMax": 3, "centerRange": rng.choice([0.0, 0.5, 0.6])}
+        start = round(rng.uniform(0, 100), 3)
+        duration = rng.choice([12.0, 20.0, 36.0])
+        uniforms = [rng.random() for _ in range(400)]
+        passes = pm.schedule(ListRng(uniforms), start, duration, spec["sweepSeconds"], spec["speedDrift"],
+                             spec["shiftMin"], spec["shiftMax"], spec["centerRange"])
+        sd = rng.choice([0.01, 0.05, 0.12])
+        taps = [pm.ideal_time(p) + rng.gauss(0, sd) for p in passes if rng.random() > 0.15]
+        taps += [rng.uniform(start, start + duration) for _ in range(rng.choice([0, 2, 6]))]
+        taps.sort()
+        mean, errs, single = pm.score(passes, taps)
+        pace_cases.append({"spec": spec, "start": start, "duration": duration, "uniforms": uniforms,
+                           "passes": [p._asdict() for p in passes], "taps": taps, "score": mean, "errors": errs,
+                           "single": single})
     out = ROOT / "tests" / "fixtures" / "race_math.json"
-    out.write_text(json.dumps({"cases": cases, "windows": windows, "ratings": ratings_cases, "stride": stride_cases}))
+    out.write_text(json.dumps({"cases": cases, "windows": windows, "ratings": ratings_cases, "stride": stride_cases,
+                               "pace": pace_cases}))
     print(f"wrote {len(cases)} cases to {out.relative_to(ROOT)}")
 
 

@@ -74,6 +74,23 @@ for c, sc in data.stride do
 	end
 end
 
+local PaceMeter = require("../../game/src/shared/PaceMeter")
+for c, pc in data.pace do
+	local passes = PaceMeter.schedule(listRng(pc.uniforms), pc.start, pc.duration, pc.spec)
+	check(#passes == #pc.passes, `pace case {c}: pass count {#passes} vs {#pc.passes}`)
+	for k = 1, math.min(#passes, #pc.passes) do
+		local a, b = passes[k], pc.passes[k]
+		check(close(a.t0, b.t0, 1e-9) and close(a.t1, b.t1, 1e-9) and a.dir == b.dir and close(a.center, b.center, 1e-12),
+			`pace case {c}: pass {k}`)
+	end
+	local s, errs, single = PaceMeter.score(pc.passes, pc.taps)
+	check(close(s, pc.score, 1e-9), `pace case {c}: score {s} vs {pc.score}`)
+	check(single == pc.single and #errs == #pc.errors, `pace case {c}: one-tap passes`)
+	for k = 1, math.min(#errs, #pc.errors) do
+		check(close(errs[k], pc.errors[k], 1e-9), `pace case {c}: error {k}`)
+	end
+end
+
 for _, w in data.windows do
 	check(close(RaceMath.windowScore(w.d), w.s, 1e-9), `windowScore({w.d})`)
 end

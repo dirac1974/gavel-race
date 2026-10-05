@@ -2,6 +2,7 @@
 
 Newest first. One line per commit.
 
+- 2026-10-04 — feat: continuous pace slider and speed meter, bigger Final Burst, first-person riding (D-026); Churchill Downs racecourse (D-027)
 - 2026-10-04 — feat: oval racecourse with one-lap races and smooth client-side horse motion (D-025)
 - 2026-10-04 — feat: racing players ride their horse as the jockey (D-024); fix: ground, spawn and boundary walls
 - 2026-10-04 — feat: playtest art in the game: uploads (LlamaWorks), UI atlas, AssetService, TrackScene, client art; darker dapple grey

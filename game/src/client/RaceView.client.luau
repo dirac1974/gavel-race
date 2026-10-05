@@ -1,9 +1,10 @@
 --!nonstrict
--- RaceView: animates the horses round the oval on every client (D-025), so they gallop
+-- RaceView: animates the horses round the racecourse on every client (D-025, D-027), so they gallop
 -- smoothly instead of stepping with server updates. Everyone gets the same timeline from
 -- the server (start time, expected end, live chances, finish order), so all screens show
 -- the same race. Riders are welded to their horse's saddle and move with it.
---   During the race: all horses advance together to ~95% of the lap by the expected end;
+--   During the race: all horses advance together along the race plan for the distance,
+--   reaching about a second short of the line when the Final Burst closes;
 --   the likelier winners (live win chance) edge ahead, eased in so nobody lurches.
 --   Run-in: when the result arrives, horses cross the line in finish order, one by one.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -12,13 +13,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local OvalTrack = require(Shared:WaitForChild("OvalTrack"))
+local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 
-local CFG = OvalTrack.default
+local CFG = TrackLayout.churchill
 local LEAD_SCALE = 0.25      -- lap fraction of lead per unit of (win chance - fair share)
-local CRUISE_END = 0.95      -- where the field is when the Final Burst closes
+local MAX_BEFORE_RESULT = 0.995 -- nobody crosses the line before the result is known
 local BOB_HZ, BOB_STUDS = 1.8, 0.3
 local FIRST_CROSS, CROSS_GAP = 1.0, 0.25 -- run-in: winner crosses after 1 s, the rest 0.25 s apart
 
@@ -39,25 +40,29 @@ end
 local function place(i: number, p: number, bob: number)
 	local horse = horseModel(i)
 	if not horse then return end
-	local x, z, dx, dz = OvalTrack.lanePoint(CFG, i, p)
+	local x, z, dx, dz = TrackLayout.lanePoint(CFG, race.plan, i, p)
 	local pos = Vector3.new(x, bob, z)
 	horse:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz)))
 end
 
 local function cruise(t: number): number
 	local span = math.max(1, race.finishEst - race.start)
-	return CRUISE_END * math.clamp((t - race.start) / span, 0, 1)
+	return race.cruiseEnd * math.clamp((t - race.start) / span, 0, 1)
 end
 
 -- Progress of lane i during the race (before the result): shared pace plus its lead,
 -- with the lead growing in over the first third of the lap.
 local function racing(i: number, t: number): number
 	local b = cruise(t)
-	return math.max(0, b + race.offset[i] * math.min(1, b / 0.3))
+	return math.clamp(b + race.offset[i] * math.min(1, b / 0.3), 0, MAX_BEFORE_RESULT)
 end
 
-remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, _cond, finishEst)
-	race = { start = start, finishEst = finishEst or (start + 40), lanes = #laneList, offset = {}, target = {}, runIn = nil }
+remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, cond, finishEst)
+	local plan = TrackLayout.plan(CFG, TrackLayout.distances[cond and cond.distance or "Sprint"] or TrackLayout.distances.Sprint)
+	-- At the expected end (the burst closing) horses are about burstBeforeLine seconds from the line.
+	local cruiseEnd = 1 - GameConfig.raceSpeedStudsPerSecond * GameConfig.burstBeforeLineSeconds / plan.lengths[1]
+	race = { start = start, finishEst = finishEst or (start + 60), plan = plan, cruiseEnd = cruiseEnd,
+		lanes = #laneList, offset = {}, target = {}, runIn = nil }
 	for i = 1, #laneList do
 		race.offset[i], race.target[i] = 0, 0
 	end

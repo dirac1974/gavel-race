@@ -225,3 +225,19 @@ Template:
 - Alternatives: the 200-stud straight (David: too short, should be an oval); server-side tweening (steps with network updates, jittery for riders).
 - Links: game/src/shared/OvalTrack.luau, game/src/server/TrackScene.luau, game/src/client/RaceView.client.luau
 
+## D-026 — Continuous pace slider, first-person riding, bigger Final Burst
+- Date: 2026-10-04
+- Status: Accepted
+- Decided by: David ("no pauses in the race for the clicks... I like the bar slider better than the horseshoe... a fill amount to the speed meter... make the ending boost bigger and more colorful"; "the player should have a front view as if they are on the horse")
+- Decision: riders tap a slider for the whole race, with no pauses. The marker sweeps back and forth; each pass takes one tap, scored `100 (1 - distance from the target)`; a pass with no tap or two taps scores 0, so mashing scores about 0. The glowing target moves to a new spot every 2–3 passes and each pass's speed varies by up to ±15% (David's earlier anti-macro idea), so a fixed-interval clicker scores below an average kid (simulated 59 vs 75; good player 93; random 48). A speed meter fills from the last 5 passes. Scoring is grouped into three back-to-back checkpoints for live win chances, then the Final Burst (same slider idea, one tap, counts double) on a much bigger rainbow meter with a pulsing gold rim and "FINAL BURST ×2". Riders see the race in first person from the saddle by default and can zoom out to third person. Detection (D-022) now uses tap time minus the target-crossing moment; same flag rule and ladder.
+- Supersedes: D-022's stride stretches for riders (the Stride module stays for Clap Along, D-020). The design council had rejected a plain repeating slider as auto-clicker-friendly; the moving target and speed drift address that.
+- Links: game/src/shared/PaceMeter.luau, src/pace_meter.py, game/src/client/RaceController.client.luau
+
+## D-027 — Churchill Downs racecourse; race length follows distance
+- Date: 2026-10-04
+- Status: Accepted (provisional for the distance-to-league mapping)
+- Decided by: David ("model the track layout like a famous race track... Santa Anita, or the Kentucky Derby... maybe a 2 min race is ok"); team (details)
+- Decision: the track is modelled on Churchill Downs at full scale (1 stud ≈ 1 ft): a one-mile dirt oval, 80 ft wide, quarter-mile straights, homestretch 1,234.5 ft to the finish, run counter-clockwise; turf course inside; grandstand with the Twin Spires along the homestretch, clubhouse at the first turn, infield Big Board, rose garden by the finish, barns on the backside, furlong poles and the finish pole on the inside rail. Races run at about 56 ft/s and the distance condition sets the length: Sprint 6f ~69 s (gate on the backstretch), Mile ~94 s, Classic 1¼ mi ~1:57 (gate at the top of the stretch, as in the Kentucky Derby), Marathon 1½ mi ~2:21. The gate sits straight across a straight, so outer lanes run slightly further. Rookie runs Sprint and Mile only (provisional: shorter races for new players).
+- Supersedes: D-025's small oval.
+- Links: game/src/shared/TrackLayout.luau, game/src/server/TrackScene.luau, game/src/client/RaceView.client.luau, game/default.project.json
+

@@ -3,18 +3,35 @@
   "tree": {
     "$className": "DataModel",
     "Workspace": {
-      "Ground": {
+      "GroundNorth": {
         "$className": "Part",
         "$properties": {
           "Anchored": true,
-          "Size": [300, 1, 400],
+          "Size": [1270, 1, 1257],
           "Color": [0.365, 0.733, 0.29],
           "Material": "Grass",
           "TopSurface": "Smooth",
           "BottomSurface": "Smooth",
           "CFrame": {
             "CFrame": {
-              "position": [0, -1, -120],
+              "position": [25, -1, -628.5],
+              "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+            }
+          }
+        }
+      },
+      "GroundSouth": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [1270, 1, 1257],
+          "Color": [0.365, 0.733, 0.29],
+          "Material": "Grass",
+          "TopSurface": "Smooth",
+          "BottomSurface": "Smooth",
+          "CFrame": {
+            "CFrame": {
+              "position": [25, -1, 628.5],
               "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
             }
           }
@@ -27,7 +44,7 @@
           "Size": [8, 1, 8],
           "CFrame": {
             "CFrame": {
-              "position": [115, -0.4, -24],
+              "position": [506, -0.4, -560],
               "orientation": [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
             }
           },
@@ -45,12 +62,12 @@
           "$className": "Part",
           "$properties": {
             "Anchored": true,
-            "Size": [300, 40, 2],
+            "Size": [1274, 60, 2],
             "Transparency": 1,
             "CanCollide": true,
             "CFrame": {
               "CFrame": {
-                "position": [0, 19.5, -321],
+                "position": [25, 29.5, -1259],
                 "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
               }
             }
@@ -60,12 +77,12 @@
           "$className": "Part",
           "$properties": {
             "Anchored": true,
-            "Size": [300, 40, 2],
+            "Size": [1274, 60, 2],
             "Transparency": 1,
             "CanCollide": true,
             "CFrame": {
               "CFrame": {
-                "position": [0, 19.5, 81],
+                "position": [25, 29.5, 1259],
                 "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
               }
             }
@@ -75,12 +92,12 @@
           "$className": "Part",
           "$properties": {
             "Anchored": true,
-            "Size": [2, 40, 400],
+            "Size": [2, 60, 2520],
             "Transparency": 1,
             "CanCollide": true,
             "CFrame": {
               "CFrame": {
-                "position": [-151, 19.5, -120],
+                "position": [-612, 29.5, 0],
                 "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
               }
             }
@@ -90,12 +107,12 @@
           "$className": "Part",
           "$properties": {
             "Anchored": true,
-            "Size": [2, 40, 400],
+            "Size": [2, 60, 2520],
             "Transparency": 1,
             "CanCollide": true,
             "CFrame": {
               "CFrame": {
-                "position": [151, 19.5, -120],
+                "position": [662, 29.5, 0],
                 "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
               }
             }

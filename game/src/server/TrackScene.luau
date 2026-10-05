@@ -1,25 +1,30 @@
 --!nonstrict
--- TrackScene: the oval racecourse for the playtest (D-023 art, D-025 oval).
--- Builds an eight-lane oval from parts (straights plus segmented turns, inner and outer
--- rails), a checkered start/finish line with the finish post, starting stalls at the
--- line, and one horse per lane (uploaded models from ReplicatedStorage.RaceModels, or
--- block placeholders until they load). The server only places horses at the gate; every
--- client animates them round the lap from the race timeline (client/RaceView), so they
--- move smoothly. Racing players ride their lane's horse as the jockey (D-024): each horse
--- carries an invisible saddle Seat, and the default camera follows the rider.
+-- TrackScene: the racecourse, modelled on Churchill Downs (D-027), built from parts.
+--   Main track: one-mile dirt oval, 80 ft wide, white inner and outer rails, run
+--   counter-clockwise; red-and-white furlong poles on the inside rail; the finish pole on
+--   the inside rail with a checkered strip across the track (for kids; Churchill has a wire).
+--   Turf course inside the dirt. Grandstand along the homestretch with the Twin Spires on
+--   its roof, the clubhouse at the first turn, the infield Big Board, a rose garden by the
+--   finish, and the barns on the backside. The starting gate goes wherever the race's
+--   distance puts it (TrackLayout.plan) and clears when the race starts.
+-- One horse per lane (uploaded models from ReplicatedStorage.RaceModels, or block
+-- placeholders until they load). The server only places horses at the gate; every client
+-- animates them from the race timeline (client/RaceView). Racing players ride their
+-- lane's horse as the jockey (D-024): each horse carries an invisible saddle Seat.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local OvalTrack = require(Shared:WaitForChild("OvalTrack"))
+local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local UiAtlas = require(Shared:WaitForChild("UiAtlas"))
 
 local TrackScene = {}
 
-local CFG = OvalTrack.default
+local CFG = TrackLayout.churchill
 local LANES = CFG.lanes
-local TURN_SEGMENTS = 24
+local TURN_SEGMENTS = 40
 local COATS = { "bay", "chestnut", "grey", "black", "palomino", "bay", "chestnut", "grey" }
 -- Lane colours from docs/art/ART_DIRECTION.md (colour-blind-safe set, with numbers).
 local LANE_COLOURS = {
@@ -28,22 +33,42 @@ local LANE_COLOURS = {
 }
 local LIGHT_LANES = { [2] = true, [3] = true, [6] = true } -- dark numbers read better on these
 local DIRT = Color3.fromHex("C68A52")
+local TURF = Color3.fromHex("4AA23C")
 local RAIL = Color3.fromHex("FBFBF5")
+local STAND = Color3.fromHex("E8E4DA")
+local STAND_DARK = Color3.fromHex("9C978C")
+local ROOF = Color3.fromHex("2F5D3A")
+local SPIRE = Color3.fromHex("F4F1EA")
+local SPIRE_CAP = Color3.fromHex("3B4A5A")
+local BRICK = Color3.fromHex("8C4A32")
 
-local root: Folder? = nil
+local venue: Folder? = nil   -- static buildings, built once
+local root: Folder? = nil    -- per race: gate and horses
 local horses: { Model } = {}
 local saddles: { Seat } = {}
 local stalls: { Model } = {}
+local currentPlan = nil
 -- Saddle position on a model, as fractions of its bounding box (gallop pose; tune in Studio).
 local SADDLE_HEIGHT = 0.6     -- of the model's height, measured from the hooves
 local SADDLE_BACK = 0.06      -- of its length, toward the tail (+Z; horses face -Z)
 
-local function part(props): Part
+local function part(props, parent: Instance?): Part
 	local p = Instance.new("Part")
 	p.Anchored = true
 	p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+	p.Material = Enum.Material.SmoothPlastic
 	for k, v in props do p[k] = v end
+	if parent then p.Parent = parent end
 	return p
+end
+
+local function wedge(props, parent: Instance): WedgePart
+	local w = Instance.new("WedgePart")
+	w.Anchored = true
+	w.Material = Enum.Material.SmoothPlastic
+	for k, v in props do w[k] = v end
+	w.Parent = parent
+	return w
 end
 
 local function modelFor(slot: string): Model?
@@ -52,14 +77,175 @@ local function modelFor(slot: string): Model?
 	return if m then m:Clone() else nil
 end
 
+-- Bands round the oval (dirt, turf, rails): two straights and two segmented semicircles.
+local function band(parent: Instance, name: string, rIn: number, rOut: number, height: number, y: number,
+	color: Color3, material: Enum.Material?, collide: boolean?)
+	local L, cx, cz = CFG.straight, CFG.centerX, CFG.centerZ
+	local w, rMid = rOut - rIn, (rIn + rOut) / 2
+	for _, side in { 1, -1 } do
+		part({ Name = name, Size = Vector3.new(w, height, L), Color = color, Material = material or Enum.Material.SmoothPlastic,
+			CanCollide = collide == true, CFrame = CFrame.new(cx + side * rMid, y, cz) }, parent)
+	end
+	local seg = math.pi / TURN_SEGMENTS
+	local length = rOut * seg * 1.04 -- a little overlap so the outer edge has no gaps
+	for _, turn in { { z = cz - L / 2, s = -1 }, { z = cz + L / 2, s = 1 } } do
+		for j = 0, TURN_SEGMENTS - 1 do
+			local a = (j + 0.5) * seg
+			local pos = Vector3.new(cx + rMid * math.cos(a), y, turn.z + turn.s * rMid * math.sin(a))
+			local tangent = Vector3.new(-math.sin(a), 0, turn.s * math.cos(a))
+			part({ Name = name, Size = Vector3.new(w, height, length), Color = color, Material = material or Enum.Material.SmoothPlastic,
+				CanCollide = collide == true, CFrame = CFrame.lookAt(pos, pos + tangent) }, parent)
+		end
+	end
+end
+
+-- A four-sided spire roof from wedges, apex up, base centred on `base` (top of a tower).
+local function pyramid(parent: Instance, base: Vector3, size: number, height: number, color: Color3)
+	for k = 0, 3 do
+		local yaw = k * math.pi / 2
+		-- A WedgePart's upright face is at its back (+Z); turn it to face the centre so the slope faces out.
+		local cf = CFrame.new(base) * CFrame.Angles(0, yaw, 0) * CFrame.new(0, height / 2, size / 4) * CFrame.Angles(0, math.pi, 0)
+		wedge({ Size = Vector3.new(size, height, size / 2), Color = color, CFrame = cf }, parent)
+	end
+end
+
+local function spire(parent: Instance, x: number, z: number, roofY: number)
+	local tower = 14
+	part({ Name = "Spire", Size = Vector3.new(tower, 34, tower), Color = SPIRE, CFrame = CFrame.new(x, roofY + 17, z) }, parent)
+	for k = 0, 3 do -- arched windows, one per face
+		local yaw = k * math.pi / 2
+		part({ Name = "Window", Size = Vector3.new(5, 12, 0.6), Color = SPIRE_CAP, CFrame = CFrame.new(x, roofY + 20, z) * CFrame.Angles(0, yaw, 0) * CFrame.new(0, 0, tower / 2) }, parent)
+	end
+	part({ Name = "Collar", Size = Vector3.new(tower + 2, 2, tower + 2), Color = SPIRE, CFrame = CFrame.new(x, roofY + 35, z) }, parent)
+	pyramid(parent, Vector3.new(x, roofY + 36, z), tower + 1, 30, SPIRE_CAP)
+	part({ Name = "Finial", Shape = Enum.PartType.Ball, Size = Vector3.new(2, 2, 2), Color = Color3.fromHex("D4AF37"), CFrame = CFrame.new(x, roofY + 67, z) }, parent)
+end
+
+local function tree(parent: Instance, x: number, z: number, h: number)
+	part({ Name = "Trunk", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h * 0.5, 2.5, 2.5), Color = Color3.fromHex("6B4A2E"),
+		CFrame = CFrame.new(x, h * 0.25, z) * CFrame.Angles(0, 0, math.pi / 2) }, parent)
+	part({ Name = "Leaves", Shape = Enum.PartType.Ball, Size = Vector3.new(h * 0.6, h * 0.6, h * 0.6), Color = Color3.fromHex("3E8E3A"),
+		Material = Enum.Material.Grass, CFrame = CFrame.new(x, h * 0.65, z) }, parent)
+end
+
+local function buildVenue(): Folder
+	local f = Instance.new("Folder")
+	f.Name = "Venue"
+	local L, cx, cz = CFG.straight, CFG.centerX, CFG.centerZ
+	local rIn, rOut = CFG.railRadius, TrackLayout.outerRadius(CFG)
+
+	-- Main dirt track and its rails.
+	band(f, "Dirt", rIn, rOut, 1, -0.45, DIRT, Enum.Material.Ground)
+	band(f, "InnerRail", rIn - 0.3, rIn + 0.3, 0.6, 3.2, RAIL)
+	band(f, "OuterRail", rOut - 0.3, rOut + 0.3, 0.6, 3.2, RAIL)
+	-- Turf course inside, with its own rails.
+	local tOut = rIn - CFG.turfGap
+	local tIn = tOut - CFG.turfWidth
+	band(f, "Turf", tIn, tOut, 1, -0.47, TURF, Enum.Material.Grass)
+	band(f, "TurfRail", tOut - 0.25, tOut + 0.25, 0.5, 3, RAIL)
+	band(f, "TurfRail", tIn - 0.25, tIn + 0.25, 0.5, 3, RAIL)
+
+	-- Furlong poles on the inside rail (every 660 ft back from the finish), red and white.
+	local r1 = TrackLayout.laneRadius(CFG, 1)
+	for k = 1, 7 do
+		local x, z = TrackLayout.atDistance(CFG, rIn - 1.5, CFG.finishFromTop - k * 660 * (rIn / r1))
+		part({ Name = "FurlongPole", Size = Vector3.new(0.8, 9, 0.8), Color = Color3.fromHex("C8102E"), CFrame = CFrame.new(x, 4.5, z) }, f)
+		part({ Name = "FurlongBand", Size = Vector3.new(0.9, 1.5, 0.9), Color = Color3.new(1, 1, 1), CFrame = CFrame.new(x, 6.5, z) }, f)
+	end
+
+	-- Finish: the pole on the inside rail, a checkered strip across the dirt, and the post model.
+	local x0, x1, lineZ = TrackLayout.finishLine(CFG)
+	for k = 0, math.floor((x1 - x0) / 2) - 1 do
+		for row = 0, 1 do
+			part({ Name = "Finish", Size = Vector3.new(2, 0.05, 2), CanCollide = false,
+				Color = if (k + row) % 2 == 0 then Color3.new(1, 1, 1) else Color3.fromRGB(28, 31, 38),
+				CFrame = CFrame.new(x0 + 1 + k * 2, 0.08, lineZ - 1 + row * 2) }, f)
+		end
+	end
+	part({ Name = "FinishPole", Size = Vector3.new(1, 16, 1), Color = Color3.fromHex("C8102E"), CFrame = CFrame.new(x0 - 1.5, 8, lineZ) }, f)
+	part({ Name = "FinishDisc", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 6, 6), Color = Color3.new(1, 1, 1),
+		CFrame = CFrame.new(x0 - 1.5, 15, lineZ) * CFrame.Angles(0, math.pi / 2, 0) }, f)
+	local post = modelFor("finish_post")
+	if post then
+		post:PivotTo(CFrame.new(x1 + 4, 0, lineZ) * CFrame.Angles(0, math.pi / 2, 0))
+		post.Parent = f
+	end
+
+	-- Grandstand along the homestretch, facing the track (-X), centred on the finish line.
+	local standZ0, standZ1 = lineZ - 300, lineZ + 600
+	local standLen, standMid = standZ1 - standZ0, (standZ0 + standZ1) / 2
+	local apron = rOut + 18
+	part({ Name = "Apron", Size = Vector3.new(18, 0.6, standLen + 60), Color = Color3.fromHex("BDB6A8"),
+		Material = Enum.Material.Concrete, CFrame = CFrame.new(rOut + 9, -0.2, standMid) }, f)
+	local tiers = 7
+	for k = 0, tiers - 1 do
+		local depth = 14
+		local height = 6 + k * 6
+		part({ Name = "StandTier", Size = Vector3.new(depth, height, standLen), Color = if k % 2 == 0 then STAND else STAND_DARK,
+			Material = Enum.Material.Concrete, CFrame = CFrame.new(apron + depth * (k + 0.5), height / 2, standMid) }, f)
+	end
+	local backX = apron + 14 * tiers
+	local roofY = 6 + tiers * 6 + 24
+	part({ Name = "StandBack", Size = Vector3.new(16, roofY, standLen), Color = BRICK, Material = Enum.Material.Brick,
+		CFrame = CFrame.new(backX + 8, roofY / 2, standMid) }, f)
+	for z = standZ0 + 40, standZ1 - 40, 80 do -- roof columns
+		part({ Name = "Column", Size = Vector3.new(2, roofY - 8, 2), Color = STAND, CFrame = CFrame.new(apron + 30, 6 + (roofY - 8) / 2 + 2, z) }, f)
+	end
+	part({ Name = "Roof", Size = Vector3.new(backX + 16 - (apron + 24), 3, standLen + 10), Color = ROOF,
+		CFrame = CFrame.new((apron + 24 + backX + 16) / 2, roofY, standMid) }, f)
+	-- The Twin Spires, on the roof near the finish line.
+	spire(f, backX - 18, lineZ - 32, roofY + 1.5)
+	spire(f, backX - 18, lineZ + 32, roofY + 1.5)
+
+	-- Clubhouse beyond the finish, toward the first turn.
+	part({ Name = "Clubhouse", Size = Vector3.new(90, 46, 160), Color = BRICK, Material = Enum.Material.Brick,
+		CFrame = CFrame.new(rOut + 75, 23, standZ0 - 110) }, f)
+	part({ Name = "ClubhouseRoof", Size = Vector3.new(96, 3, 166), Color = ROOF, CFrame = CFrame.new(rOut + 75, 47.5, standZ0 - 110) }, f)
+
+	-- Infield: the Big Board facing the grandstand, and a rose garden by the finish.
+	local boardX, boardZ = cx - 120, lineZ + 120
+	for _, dz in { -55, 55 } do
+		part({ Name = "BoardLeg", Size = Vector3.new(4, 40, 4), Color = Color3.fromHex("3A3F4B"), CFrame = CFrame.new(boardX, 20, boardZ + dz) }, f)
+	end
+	local board = part({ Name = "BigBoard", Size = Vector3.new(4, 60, 170), Color = Color3.fromHex("1C1F26"), CFrame = CFrame.new(boardX, 70, boardZ) }, f)
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Right -- +X, toward the grandstand
+	sg.CanvasSize = Vector2.new(850, 300)
+	sg.Parent = board
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.fromScale(1, 1)
+	title.BackgroundTransparency = 1
+	title.Text = "GIDDY-UP!"
+	title.Font = Enum.Font.GothamBlack
+	title.TextScaled = true
+	title.TextColor3 = Color3.fromHex("FFD34D")
+	title.Parent = sg
+	for k = 0, 23 do -- rose garden in the grass between the turf course and the dirt
+		local x = tOut + 4 + (k % 6) * 4
+		local z = lineZ - 30 + math.floor(k / 6) * 5
+		part({ Name = "Rose", Shape = Enum.PartType.Ball, Size = Vector3.new(3, 3, 3), Color = Color3.fromHex("B3122E"), CFrame = CFrame.new(x, 1.5, z) }, f)
+	end
+
+	-- The backside: barns outside the backstretch.
+	for k = 0, 5 do
+		local z = cz - L / 2 + 120 + k * 200
+		part({ Name = "Barn", Size = Vector3.new(36, 14, 150), Color = Color3.fromHex("F2EFE6"), CFrame = CFrame.new(cx - rOut - 50, 7, z) }, f)
+		part({ Name = "BarnRoof", Size = Vector3.new(40, 2, 154), Color = ROOF, CFrame = CFrame.new(cx - rOut - 50, 15, z) }, f)
+	end
+	for k = 0, 9 do -- trees round the outside of the turns
+		local a = (k + 0.5) / 10 * math.pi
+		tree(f, cx + (rOut + 70) * math.cos(a), cz - L / 2 - (rOut + 70) * math.sin(a), 30)
+		tree(f, cx - (rOut + 70) * math.cos(a), cz + L / 2 + (rOut + 70) * math.sin(a), 30)
+	end
+
+	f.Parent = workspace
+	return f
+end
+
 local function placeholderHorse(i: number): Model
 	local m = Instance.new("Model")
-	local body = part({ Size = Vector3.new(1.8, 3.5, 7), Color = Color3.fromRGB(120, 72, 40), CanCollide = false, Name = "Body" })
-	body.CFrame = CFrame.new(0, 3.5, 0)
-	body.Parent = m
-	local head = part({ Size = Vector3.new(1.4, 1.6, 2.4), Color = Color3.fromRGB(110, 66, 36), CanCollide = false, Name = "Head" })
-	head.CFrame = CFrame.new(0, 5.6, -4)
-	head.Parent = m
+	part({ Size = Vector3.new(1.8, 3.5, 7), Color = Color3.fromRGB(120, 72, 40), CanCollide = false, Name = "Body", CFrame = CFrame.new(0, 3.5, 0) }, m)
+	part({ Size = Vector3.new(1.4, 1.6, 2.4), Color = Color3.fromRGB(110, 66, 36), CanCollide = false, Name = "Head", CFrame = CFrame.new(0, 5.6, -4) }, m)
 	m.WorldPivot = CFrame.new(0, 0, 0)
 	m:SetAttribute("SaddleY", 5.3) -- top of the block body
 	m.Name = "Placeholder" .. i
@@ -72,6 +258,7 @@ local function badge(i: number): BillboardGui
 	gui.Size = UDim2.fromOffset(44, 44)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, 8.5, 0)
 	gui.AlwaysOnTop = true
+	gui.MaxDistance = 400
 	local rect = UiAtlas["lane_" .. i]
 	local imageId = rect and ReplicatedStorage:GetAttribute("UiSheet_" .. rect.sheet)
 	if imageId then
@@ -98,60 +285,24 @@ local function badge(i: number): BillboardGui
 	return gui
 end
 
--- Lane i's CFrame at progress p, standing on the dirt, facing the way it runs.
+-- Lane i's CFrame at progress p of the current race, standing on the dirt, facing its way.
 function TrackScene.laneCFrame(i: number, p: number): CFrame
-	local x, z, dx, dz = OvalTrack.lanePoint(CFG, i, p)
+	local x, z, dx, dz = TrackLayout.lanePoint(CFG, currentPlan, i, p)
 	local pos = Vector3.new(x, 0, z)
 	return CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
 end
 
--- Straights and segmented turns for one band of the oval (the dirt, or a rail).
-local function buildBand(folder: Instance, name: string, rIn: number, rOut: number, height: number, y: number,
-	color: Color3, material: Enum.Material?)
-	local L, cx, cz = CFG.straight, CFG.centerX, CFG.centerZ
-	local w, rMid = rOut - rIn, (rIn + rOut) / 2
-	local collide = name ~= "Dirt"
-	for _, side in { 1, -1 } do
-		part({ Name = name, Size = Vector3.new(w, height, L), Color = color, Material = material or Enum.Material.SmoothPlastic,
-			CanCollide = collide, CFrame = CFrame.new(cx + side * rMid, y, cz) }).Parent = folder
+-- Per race: the gate where this distance starts, and the horses in it.
+function TrackScene.build(plan)
+	if not venue or not venue.Parent then
+		Lighting.ClockTime = 15
+		venue = buildVenue()
 	end
-	local seg = math.pi / TURN_SEGMENTS
-	local length = rOut * seg * 1.06 -- a little overlap so the outer edge has no gaps
-	-- Far turn bulges toward -Z (s = -1), near turn toward +Z (s = 1); same geometry as OvalTrack.
-	for _, turn in { { z = cz - L / 2, s = -1 }, { z = cz + L / 2, s = 1 } } do
-		for j = 0, TURN_SEGMENTS - 1 do
-			local a = (j + 0.5) * seg
-			local pos = Vector3.new(cx + rMid * math.cos(a), y, turn.z + turn.s * rMid * math.sin(a))
-			local tangent = Vector3.new(-math.sin(a), 0, turn.s * math.cos(a))
-			part({ Name = name, Size = Vector3.new(w, height, length), Color = color, Material = material or Enum.Material.SmoothPlastic,
-				CanCollide = collide, CFrame = CFrame.lookAt(pos, pos + tangent) }).Parent = folder
-		end
-	end
-end
-
-function TrackScene.build()
+	currentPlan = plan
 	if root then root:Destroy() end
 	local folder = Instance.new("Folder")
 	folder.Name = "RaceTrack"
-	local rIn, rOut = CFG.innerRadius, OvalTrack.outerRadius(CFG)
-	buildBand(folder, "Dirt", rIn, rOut, 1, -0.45, DIRT, Enum.Material.Ground)
-	buildBand(folder, "InnerRail", rIn - 0.3, rIn + 0.3, 0.6, 3, RAIL)
-	buildBand(folder, "OuterRail", rOut - 0.3, rOut + 0.3, 0.6, 3, RAIL)
-
-	-- Checkered start/finish line across the home straight, and the finish post outside it.
-	local x0, x1, lineZ = OvalTrack.startLine(CFG)
-	for k = 0, math.floor((x1 - x0) / 2) - 1 do
-		for row = 0, 1 do
-			part({ Name = "Finish", Size = Vector3.new(2, 0.05, 2), CanCollide = false,
-				Color = if (k + row) % 2 == 0 then Color3.new(1, 1, 1) else Color3.fromRGB(28, 31, 38),
-				CFrame = CFrame.new(x0 + 1 + k * 2, 0.08, lineZ - 1 + row * 2) }).Parent = folder
-		end
-	end
-	local post = modelFor("finish_post")
-	if post then
-		post:PivotTo(CFrame.new(x1 + 3, 0, lineZ) * CFrame.Angles(0, math.pi / 2, 0))
-		post.Parent = folder
-	end
+	folder:SetAttribute("Distance", plan.distance)
 
 	stalls = {}
 	for i = 1, LANES do
@@ -210,10 +361,11 @@ function TrackScene.seatRider(i: number, character: Model?): boolean
 	return true
 end
 
--- After a race: everyone off, standing at the spawn beside the finish line.
+-- After a race: everyone off, standing on the apron by the finish line.
 function TrackScene.dismountAll()
 	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
-	local base = if spawn then spawn.CFrame else CFrame.new(115, 0, -24)
+	local _, _, lineZ = TrackLayout.finishLine(CFG)
+	local base = if spawn then spawn.CFrame else CFrame.new(TrackLayout.outerRadius(CFG) + 12, 0, lineZ)
 	for i, saddle in saddles do
 		local humanoid = saddle.Occupant
 		if humanoid then
