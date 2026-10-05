@@ -47,7 +47,7 @@ Date: YYYY-MM-DD · Status: Proposed | Decided (D-NNN)
 
 1. **001 — Gavel meter feel**: speed per league, zone width, one vs. two zones, feedback after each tap, accessibility settings.
 2. **002 — First 10 minutes**: onboarding from join to first race and first win; what a new player owns at minute 10.
-3. **003 — Energy system**: races per horse per day, regen speed, how care restores it, without becoming a paywall.
+3. ~~003 — Energy system~~: decided directly as D-015; reopen only if playtests show problems.
 4. **004 — Breeding and rarity**: what is inherited, mutation odds, how foals grow, keeping it free of paid randomness.
 5. **005 — Diamond store v1 catalog**: exact items and prices within D-002a.
 6. **006 — Social layer**: stable clubs, Derby Day, spectating, visiting stables.

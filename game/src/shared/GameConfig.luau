@@ -32,6 +32,19 @@ GameConfig.botScoreMean = 50
 GameConfig.botScoreSd = 15
 GameConfig.botRatingSpread = 6                   -- bots rated within ± this of the human median
 
+-- Energy (D-015). Gates entry only; never affects Rating or win chance.
+GameConfig.energy = {
+	maxPerRacer = 5,
+	costPerCashRace = 1,
+	regenSeconds = 20 * 60,        -- +1 every 20 minutes, offline too
+	careTopUps = { feed = 1, groom = 1 },
+	careCooldownSeconds = 2 * 60 * 60,
+	freeLeagues = { Rookie = true }, -- Rookie races cost no Energy
+}
+
+-- Prize ribbons for the UI (D-016). Never "place", "show", or "payout".
+GameConfig.ribbons = { "Blue", "Red", "Yellow", "White" }
+
 GameConfig.scoreLabels = {
 	{ min = 95, label = "Perfect" },
 	{ min = 80, label = "Great" },

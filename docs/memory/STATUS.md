@@ -15,16 +15,17 @@ Last updated: 2026-10-04
 
 ## Backlog (top = next)
 
-1. **Debate 002 — first 10 minutes** (onboarding), then **003 — Energy system**.
+1. **Debate 002 — first 10 minutes** (onboarding). Energy is decided (D-015); debate 003 is retired.
 2. **DataStore layer**: profile schema (horses, stable, currencies), session locking, retries; pure serialization tested under Lune.
 3. **Matchmaking**: league queues, Rating bands, party rule (D-006), bot fill.
 4. **Anti-cheat**: flag sustained S > 95, tap-rate checks, server-side logging.
 5. **Race presentation**: horses moving on a track, animation driven by the drawn finish order.
-6. **Economy sim v2**: add Energy, training, sinks, and Diamonds to `sims/economy.py`.
+6. **Economy sim v2**: add Energy (D-015) with 1, 2, and 3 horses, plus training, sinks, and Diamonds, to `sims/economy.py`.
 7. **Training and Potential**: how stats grow toward each racer's Potential cap; mirror in Python and Luau.
 
 ## Done
 
+- 2026-10-04: Energy (D-015), prizes and exactas (D-016), Diamond limits amended (D-002a).
 - 2026-10-04: Race Rating formula (D-014) in Python and Luau; prototype races now use random conditions and starter stats.
 - 2026-10-04: Studio playtest checklist; economy simulator; Stakes thresholds (D-013).
 - 2026-10-04: gavel meter, race session, Rojo prototype, Luau tests, syntax checks, debate 001.
