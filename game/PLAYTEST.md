@@ -285,6 +285,11 @@ This week's course (T5):
 - [ ] The Trail bridge sits on the ground; the Race Board's board fits its wooden frame.
 - [ ] Still on a race horse after your race: Ride or Map says "Tap Done first".
 
+## Rail coordinates and drawn posts (steering S1, D-054)
+- [ ] Posts are drawn: over a few races your horse starts from different stalls, not always the inside one, and other riders too. Lane badges, saddle-cloth numbers and the race strip's numbers still match the stall each horse left from. Nothing on screen announces a draw.
+- [ ] Horses level with each other stay side by side through the turns (abreast across the track), instead of outer horses drifting ahead or behind on the bends. On the straights nothing changes.
+- [ ] Everything else looks and plays as before: the gate, horses easing out, gaps, the order across the line (the result), the race map's oval dot following your horse, and replays showing each horse in its own lane.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

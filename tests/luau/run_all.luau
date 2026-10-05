@@ -169,6 +169,16 @@ do
 				s += seg.length
 			end
 			check(close(s, g.lockS, 1e-6), `trip geometry {course} {name}: segments reach the lock`)
+			-- TrackLayout.phaseA (S1) gives src/trip.py's phase A: the same segments and lock.
+			local pa = TrackLayout.phaseA(cfg, plan)
+			check(#pa.segments == #g.segments, `phaseA {course} {name}: segment count {#pa.segments} vs {#g.segments}`)
+			for k = 1, math.min(#pa.segments, #g.segments) do
+				local a, b = pa.segments[k], g.segments[k]
+				check(a.kind == b.kind and close(a.start, b.start, 1e-9) and close(a.length, b.length, 1e-9),
+					`phaseA {course} {name}: segment {k}`)
+			end
+			check(close(pa.lockS, g.lockS, 1e-9) and close(pa.turnLength, g.turnLength, 1e-9) and close(pa.length, g.length, 1e-9),
+				`phaseA {course} {name}: lock {pa.lockS} vs {g.lockS}`)
 		end
 	end
 end
@@ -176,6 +186,7 @@ end
 -- Game modules ---------------------------------------------------------------
 require("./game_tests")(check, close)
 require("./world_tests")(check, close)
+require("./steering_tests")(check, close)
 
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

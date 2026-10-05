@@ -56,6 +56,11 @@ GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own scr
 GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
+-- Race steering (D-054). S1 needs only the post draw; S2 adds the rest of the block (src/trip.py
+-- CONFIG is the reference for those values).
+GameConfig.steering = {
+	drawPosts = true, -- posts drawn at random at the gate; false = the old humans-first lanes
+}
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.
 GameConfig.raceView = {

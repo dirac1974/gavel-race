@@ -396,10 +396,12 @@ function TrackScene.course(id: string, cfg): any
 	return c
 end
 
--- Lane i's CFrame at progress p of this course's race, standing on the track, facing its way.
-function Course:laneCFrame(i: number, p: number): CFrame
-	local x, z, dx, dz = TrackLayout.lanePoint(self.cfg, self.plan, i, p)
-	local pos = Vector3.new(x, 0, z)
+-- Lane i's CFrame at progress p of this course's race (s = p * railLength along the lane-1 path,
+-- at lane position x, default its post: D-054), standing on the track, facing its way.
+function Course:laneCFrame(i: number, p: number, x: number?): CFrame
+	local s = p * TrackLayout.railLength(self.cfg, self.plan)
+	local px, pz, dx, dz = TrackLayout.railPoint(self.cfg, self.plan, s, x or i)
+	local pos = Vector3.new(px, 0, pz)
 	return CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
 end
 
