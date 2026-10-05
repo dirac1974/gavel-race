@@ -29,6 +29,7 @@ local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local RaceShape = require(Shared:WaitForChild("RaceShape"))
 local Trip = require(Shared:WaitForChild("Trip"))
 local TripBaseline = require(Shared:WaitForChild("TripBaseline"))
+local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
@@ -66,7 +67,7 @@ local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst s
 local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances, course
 local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results, course
 local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
-local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, [trip stars, places gained by the trip,] course (D-033, D-054)
+local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, [trip stars, places gained by the trip (riders with the steering buttons),] course (D-033, D-054)
 local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on, lock time (server time), course (D-054)
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, course (D-054 S3)
@@ -844,12 +845,10 @@ local function runRace(c, players: { Player })
 		local i = session:laneIndex(tostring(p.UserId))
 		if i then
 			local stars = if S[i] >= 85 then 3 elseif S[i] >= 65 then 2 elseif S[i] >= 40 then 1 else 0
-			if trip then -- your trip (D-054): stars, and places it gained (the results line comes in S4)
-				RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i],
-					Trip.stars(session.tau[i], GameConfig.steering), session:tripGain(i), c.id)
-			else
-				RideReport:FireClient(p, stars, session:ridingGain(i), placeOf[i], c.id)
-			end
+			-- Your trip (D-054): stars, and places it gained, for riders who had the buttons.
+			local tripStars = if trip and steers[p] then Trip.stars(session.tau[i], GameConfig.steering) else nil
+			local tripGain = if tripStars then session:tripGain(i) else nil
+			RideReport:FireClient(p, table.unpack(ResultsText.reportArgs(stars, session:ridingGain(i), placeOf[i], c.id, tripStars, tripGain)))
 		end
 	end
 	recordIntegrity(players, errors, matched)

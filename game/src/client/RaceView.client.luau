@@ -240,6 +240,8 @@ remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt,
 	if not race then return end
 	race.steering = enabled == true
 	race.lockAt = lockAt
+	local rec = RaceState.recording
+	if race.steering and rec and rec.course == (courseId or "dirt") then rec.lockAt = lockAt end -- the replay's lock marker
 	if race.steering then
 		for i = 1, race.lanes do race.from[i], race.to[i] = race.offset[i], race.offset[i] end
 	end
