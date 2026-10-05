@@ -546,7 +546,7 @@ Template:
     - The server scores it in `PaceMeter.score`, mirrored in `src/pace_meter.py` (parity tests). The client applies the same rule to its labels.
     - Ignored taps are never used as timing samples. (Tallying them in the integrity log waits for the anti-cheat tooling, STATUS backlog.)
     - Simulated with 15% of taps bouncing: Rookie 66 → 77.5 (77 with no bounces). Mashers still score ≤ 4.2 in every league. The fixed-interval clicker stays at 59.
-  - **Gate countdown:**
+  - **Gate countdown:** (the drum tick, `count_tick`, is in the sound list but silent until the sound effects are generated and uploaded)
     - Big "3", "2", "1" at the centre over the existing 3 s before the gate, one per second on the server clock, each with a soft drum tick. The bell rings with **"GO!"**, then "And they're off!".
     - Drum, not bell, because D-054's lane lock uses bell ticks.
     - The camera moves into the saddle at "3". The slider shows still, with the first glow lit.
@@ -560,7 +560,7 @@ Template:
   - **Spectator range** (amends D-041):
     - A non-rider follows a race only within **250 studs** of that course's outer edge, the same range as race sound (D-052). Once following, they keep it until 300 studs, so nothing flickers at the edge.
     - **Busy rule:** no race HUD, cheer strip or results card during a training ride, a care or training game, or while a full-screen panel is open (shops, My Horses, Stable Board, Map). The HUD appears when the kid is done, if still in range.
-    - A spectator gets a results card only if they followed the finish.
+    - A spectator gets a results card only if they followed the finish (checked when the card appears, about 2.4 s after the line).
     - As built: following is decided when the race starts (within 250 studs); the HUD then hides while busy or beyond 300 studs and comes back when the kid is done. A kid who walks up mid-race sees the next race.
     - Far away there is nothing: no toast and no badge. The Race Board on Fair Street is the far view (D-041).
   - **Running-order board** (amends D-030/D-032; answers OPEN_QUESTIONS #1 provisionally):

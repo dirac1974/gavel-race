@@ -252,7 +252,7 @@ PaceTap.OnServerEvent:Connect(function(player: Player, claimed: any)
 		list = {}
 		cur.taps[player.UserId] = list
 	end
-	if #list < cur.maxTaps then table.insert(list, t) end -- extra taps would score 0 anyway
+	if #list < cur.maxTaps then table.insert(list, t) end -- room for a bounce per pass (D-055); more would score 0 anyway
 end)
 
 BurstTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
@@ -554,7 +554,7 @@ local function runRace(c, players: { Player })
 	end
 	local cur = {
 		session = session, seg = 1, kind = "pace", open = tStart, close = preLast,
-		taps = {}, allowances = snapshotAllowances(players), maxTaps = #passes * 2 + 10,
+		taps = {}, allowances = snapshotAllowances(players), maxTaps = #passes * 3 + 10,
 	}
 	c.current = cur
 	publishCards()

@@ -467,7 +467,7 @@ local function boardLanes(racing: boolean): { number }
 		if i then table.insert(list, i) end
 	end
 	if myLaneIndex or not RaceState.phone() or #list <= HUD.spectatorBoardRowsPhone then return list end
-	local mine = RaceState.cheeredLane
+	local mine = RaceState.myCheer()
 	local short, hasMine = {}, false
 	for r = 1, HUD.spectatorBoardRowsPhone - 1 do
 		table.insert(short, list[r])
@@ -486,7 +486,7 @@ local function renderBoard()
 		if lane then
 			local you = lane.id == myId and "  ◀ YOU" or ""
 			local star = ""
-			if i == RaceState.cheeredLane then
+			if i == RaceState.myCheer() then
 				star = " ★"
 				if cheerArrow and cheerArrow.untilT > t then star ..= if cheerArrow.up then " ▲" else " ▼" end
 			end
@@ -677,7 +677,7 @@ RunService.RenderStepped:Connect(function()
 		showBoard = false -- spectators on a phone: after the cheer strip closes
 	end
 	board.Visible = showBoard
-	status.Visible = not (RaceState.watchHidden and RaceState.active)
+	status.Visible = not RaceState.watchHidden or player:GetAttribute("InLine") == true
 	if not RaceState.active then placeBadge.Visible = false end
 	if RaceState.active and os.clock() - lastHud > 0.2 then
 		lastHud = os.clock()
@@ -728,7 +728,8 @@ RunService.RenderStepped:Connect(function()
 	if burstState then
 		local rel = t - burstState.open
 		if rel >= 0 and t <= burstState.close then
-			burst.bar.Visible, burstTitle.Visible = true, true
+			local shown = riding or not RaceState.watchHidden -- not over the barn (D-055)
+			burst.bar.Visible, burstTitle.Visible = shown, shown
 			local spec = burstState.spec
 			placeMarker(burst, BurstMeter.position(rel, spec.sweepSeconds, spec.phase),
 				BurstMeter.targetCenter(rel, spec), spec.twoTargets)
@@ -795,6 +796,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	gallop(false)
 	keyHintShown = false
 	cheerArrow = nil
+	countLabel.Visible = false
 	-- "3, 2, 1" over the gate with a soft drum tick each, then "GO!" with the bell (D-055).
 	local countFrom = GameConfig.gateCountdownSeconds
 	local countRace = cueRace
@@ -813,14 +815,14 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 			TweenService:Create(countLabel, TweenInfo.new(0.25, Enum.EasingStyle.Back), { TextSize = size }):Play()
 		end
 		task.delay(0.75, function()
-			if countLabel.Text == text and countRace == cueRace then
+			if countLabel.Text == text then
 				TweenService:Create(countLabel, TweenInfo.new(0.2), { TextTransparency = 1 }):Play()
 			end
 		end)
 	end
 	for k = countFrom, 1, -1 do
 		local at = start - k
-		if at > serverNow() - 0.25 then
+		if at > serverNow() - 0.9 then -- a late start event still shows "3" (a moment late)
 			task.delay(math.max(0, at - serverNow()), showCount, tostring(k))
 			cue(at, "count_tick")
 		end
@@ -970,7 +972,7 @@ remotes.LiveChances.OnClientEvent:Connect(function(_seg, live, courseId)
 		end
 	end
 	-- Watching: the rider you cheered gets an up or down arrow on the board.
-	local cheered = RaceState.cheeredLane
+	local cheered = RaceState.myCheer()
 	if not riding and cheered and before[cheered] and live[cheered] and math.abs(live[cheered] - before[cheered]) > 0.003 then
 		cheerArrow = { up = live[cheered] > before[cheered], untilT = os.clock() + 3 }
 		renderBoard()

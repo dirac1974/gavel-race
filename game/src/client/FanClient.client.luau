@@ -114,8 +114,10 @@ local function setShown(barWanted: boolean, clapWanted: boolean)
 	clap.Visible = clapOn and not RaceState.watchHidden
 end
 local function share()
-	RaceState.cheeredLane = watching and watching.cheered or nil
-	RaceState.cheerOpen = watching ~= nil and watching.cheerOpen and not watching.cheered and barOn
+	local live = watching ~= nil and not watching.finished
+	RaceState.cheeredLane = if live then watching.cheered else nil
+	RaceState.cheeredCourse = if live then watching.course else nil
+	RaceState.cheerOpen = live and watching.cheerOpen and not watching.cheered and barOn
 end
 
 local function showChips(laneList)
@@ -150,6 +152,11 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, _co
 	end
 	if not RaceState.consider(courseId, laneList, start) then return end
 	if watching and watching.cheered and not watching.finished then return end -- keep clapping for your horse
+	if watching and watching.finished then -- the last race you watched is over
+		watching = nil
+		setShown(false, false)
+		share()
+	end
 	local anyRider = false
 	for _, lane in laneList do
 		if not lane.isBot then anyRider = true end
@@ -190,6 +197,7 @@ end)
 remotes.RaceFinished.OnClientEvent:Connect(function(_summary, courseId)
 	if watching and watching.course == courseId then
 		watching.finished = true
+		share()
 		task.delay(3, function()
 			if watching and watching.finished then
 				setShown(false, false)

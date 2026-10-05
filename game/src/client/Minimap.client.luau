@@ -213,7 +213,7 @@ RunService.RenderStepped:Connect(function(dt)
 	-- Steps aside for the Final Burst, while a spectator is busy or out of range, and on a phone
 	-- while the cheer strip is open (D-055).
 	gui.Enabled = RaceState.active and plan ~= nil and not RaceState.burstShowing and not RaceState.watchHidden
-		and not (RaceState.cheerOpen and RaceState.phone())
+		and not (RaceState.cheerOpen and (RaceState.phone() or RaceState.stripCoversMap()))
 	if not gui.Enabled then return end
 	mapScale.Scale = RaceState.hudScale()
 	local n = math.min(RaceState.lanes, 8)

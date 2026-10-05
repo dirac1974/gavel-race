@@ -27,7 +27,8 @@ RaceState.holdFocus = false     -- it's your own card: a new race on that course
 RaceState.burstShowing = false  -- the Final Burst bar is up (the race map steps aside)
 RaceState.myHome = false        -- your horse is past the line and pulling up (hoofbeats stop)
 RaceState.watchHidden = false   -- watching: the HUD is hidden (busy, or walked out of range)
-RaceState.cheeredLane = nil     -- watching: the lane you cheered for (FanClient)
+RaceState.cheeredLane = nil     -- watching: the lane you cheered for (FanClient)...
+RaceState.cheeredCourse = nil   -- ...in a race on this course
 RaceState.cheerOpen = false     -- watching: the cheer strip is still open (FanClient)
 
 -- Race HUD size on small screens (D-055): the board, place badge, results card and race map
@@ -76,6 +77,20 @@ function RaceState.busy(): boolean
 	return false
 end
 
+-- The lane you cheered for, if it's in the race the HUD follows.
+function RaceState.myCheer(): number?
+	if RaceState.cheeredCourse ~= nil and RaceState.cheeredCourse == RaceState.focus then return RaceState.cheeredLane end
+	return nil
+end
+
+-- The cheer strip (560 px at the top centre) would cover the race map (top right): on phones,
+-- and on screens narrower than strip plus map side by side (a tablet), the map steps aside.
+function RaceState.stripCoversMap(): boolean
+	local camera = workspace.CurrentCamera
+	if not camera then return false end
+	return camera.ViewportSize.X < 592 + 640 * RaceState.hudScale()
+end
+
 -- A phone-sized screen (short side 500 px or less).
 function RaceState.phone(): boolean
 	local camera = workspace.CurrentCamera
@@ -100,6 +115,7 @@ function RaceState.consider(courseId: string?, laneList, start: number): boolean
 		RaceState.focus = courseId
 	elseif RaceState.focus == courseId then
 		RaceState.focus = nil -- the last race followed on this course is over; this one isn't followed
+		RaceState.active = false -- (it may still be pulling up)
 	end
 	if mine then RaceState.myCourse = courseId end
 	return focus

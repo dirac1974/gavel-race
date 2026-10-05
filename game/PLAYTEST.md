@@ -208,7 +208,7 @@ Turn on **Game Settings → Security → Enable Studio Access to API Services** 
 - [ ] The horse that crosses the line first is the winner on the results card, every race. Riding in lane 1, you are not always out in front.
 - [ ] No horse slows down, stops or slides backwards at the checkpoints or the Final Burst. Legs stay in a gallop the whole race.
 - [ ] Horses ease out of the gate, and the stalls clear as the bell rings.
-- [ ] "3", "2", "1", then "GO!" with the bell. The camera is in the saddle from "3". Taps before the bell do nothing.
+- [ ] "3", "2", "1", then "GO!" with the bell. The camera is in the saddle from "3". Taps before the bell do nothing. (The drum tick is silent until the sound effects are uploaded.)
 - [ ] A quick double tap (a finger bounce) still scores; a real second tap later in the pass says "One tap!". A pass you don't tap shows no word, only a grey glow; a very early or late tap says "Early" or "Late".
 - [ ] Only Space, Enter, click, touch, gamepad A or R2 tap. W, the arrow keys, I and O don't; the first other key shows "Tap: SPACE or click" once.
 - [ ] Riding: no running-order board, no win %; the race map, place badge and badge arrow show where you are. The place badge doesn't flicker after a Great tap.

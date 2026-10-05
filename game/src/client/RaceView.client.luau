@@ -138,10 +138,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		race.offset[i], race.target[i] = 0, 0
 		if lane.id == myId then race.myLane = i end
 	end
-	local wasFocus = RaceState.focus == courseId
-	local focus = RaceState.consider(courseId, laneList, start)
+	local focus = RaceState.consider(courseId, laneList, start) -- a stale focus ends its HUD there
 	races[courseId] = race
-	if wasFocus and not focus then RaceState.active = false end -- the race it replaces may still be pulling up
 	if focus then
 		RaceState.active, RaceState.final, RaceState.plan, RaceState.lanes = true, false, plan, #laneList
 		RaceState.progress, RaceState.place, RaceState.order = {}, {}, {}
