@@ -840,7 +840,7 @@ Template:
 ## D-057 — Natural steering, boxed in and brushes
 
 - Date: 2026-10-05
-- Status: Accepted (provisional)
+- Status: Accepted (provisional). Built N1–N6 (2026-10-06); not yet played in Studio (see "Built" below)
 - Decided by: team, debate 012. All four agreed after one rebuttal round on the motion rules, boxed in and the brush rule. The glide time split 2–2 (moderator chose 1.0 s), and so did the body-turn gain; the brush cap split 3–1. David asked for steering that "looks natural, sort of like a real horse moving", no zig-zag, horses that are "boxed in" when surrounded, and the team to consider bumping that slows the bumper "a little".
 - Decision:
   - **Natural motion (the same for players, Smart Steer and bots; Trip runs it on the server):**
@@ -914,6 +914,35 @@ Template:
     - mashers: 80% / 64%, mean 0.0032;
     - rail riders and ditherers: 0.
   - Griefing (strangers who tapped exactly like the kid; the kid's own trip, final rules): shadow −0.0011, crew of 3 +0.0011, bumper −0.0007. The same strangers riding for the rail without targeting anyone: −0.0013 and −0.0020. Targeting gains nothing.
+- Built (N1–N6, 2026-10-06; not yet played in Studio). The numbers are in docs/research/steering-calibration.md; the stage notes follow. Final values:
+  - **Glide:**
+    - `glide = "eased"`: `laneSpeedMax = 1.5` lanes/s (9 ft/s) and `laneAccel = 4.5` lanes/s² (27 ft/s²). One lane takes 1.0 s, two 1.6 s, three 2.3 s, four 3.0 s.
+    - `chainWindow = 0.3` lane; `glideReserveFeet = 6`.
+    - The 0.8 s switch is `laneSpeedMax = 1.667`, `laneAccel = 5.56`.
+  - **No zig-zag:** `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5` within `weaveWindowSeconds = 7`, `pressBounceSeconds = 0.2`. After the lock, make-room moves are planned ahead, with the same gaps.
+  - **Body:**
+    - the turn is the drift (`yawGain = 1`), at most 10°, smoothed over 0.15 s;
+    - the lean is 0.12° per ft/s², at most 3°;
+    - your press's look cue is 3°, relaxing over 0.3 s, and never for a press the server will ignore or hold;
+    - the chase camera stays on the track heading.
+  - **Boxed in:**
+    - `blockedPress = "wait"`: outward presses wait 1.5 s, then drop with a 4° wobble; inward presses wait until room, or tuck back at once within 24 ft.
+    - Out ▶ greys after 0.2 s blocked; ◀ In greys only when tuck-back can't help.
+    - "No room yet" after 1 s, at most once per 10 s and never within 2 s of another chip; "Gap!" after a wait of 0.5 s or more.
+    - No penalty.
+  - **Brushes:**
+    - `brush = "repeat"`, `brushPresses = 3`: the third press toward a horse alongside (within 8 ft, alongside for 0.3 s), within 2 s of the first, while it waits, with no tuck-back.
+    - The mover pays 0.002 τ after `brushFree = 1`, at most `brushMaxCharged = 3` (0.006 a race), and steadies back 4 ft (2 ft/s back) for 1 s. The bumped horse never pays.
+    - Drawn: lean 1 ft and nod 2° over 0.4 s on a sine squared; a late brush restarts (`brushLateSeconds = 1/30`).
+    - The first brush ever brings the one-time tip "Bump! Press once, then wait for a gap".
+  - **Calibration** (live and d057, the same config): every D-054 τ target and every D-057 target pass in every course × distance.
+    - Casual riders are charged in 0.0% of races, press-again kids in ≤ 0.8%, the masher in 56%.
+    - Griefing gates hold (own trip for the Smart Steer and rail kids; brush charges for every kid but the masher).
+    - The shadow finding is open for David (REVIEW_QUEUE).
+  - **On screen** (overlap report, every mode): 0 overlaps, fall-back ≤ 19.3 ft/s, the finish order right, 0–2 late full-lane moves per 960 races, no after-lock reversal within 3.5 s.
+  - **Switch-back:** eight keys (`Trip.d054Config` / `trip.d054_config()`; recipe in PLAYTEST "Natural steering (D-057)" → 5). The D-054 baseline, report and parity runs are kept. Every other D-057 key already holds its D-057 value in `D057_OFF` (`brushPresses` 3 included, since N6), where nothing reads it while the switches are off.
+  - **Not built:** the optional head split, a later art option. It needs `split_legs.py` to cut a Head piece, re-uploaded horse meshes and a HorseLegs head joint (`headTurnDeg`), and it can't be checked without Studio. It would move the look cue and the nod to the head.
+  - **Next:** David's Studio playtest (PLAYTEST "Natural steering (D-057)", phones first), then a call on the shadow finding.
 - N1 (2026-10-06, model engineer, revised after the PR #48 review): the Python model and sims, switched off. Details and numbers are in docs/research/steering-calibration.md ("Natural steering (D-057), stage N1").
   - **Built:**
     - Every rule is in `src/trip.py` behind `trip.CONFIG` keys with the plan's `GameConfig.steering` names, all off. The game, `TripBaseline.luau`, `trip_baseline.json`, `steering_report.json` and `trip.json` stay byte for byte as before; a full `sims/steering.py --write` reproduces them.

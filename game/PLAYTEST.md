@@ -307,55 +307,129 @@ To see the buttons on a new profile, ride 3 races first (or set `totals.races` t
 - [ ] **Keyboard:** A or ← moves you in, D or → out, while you tap Space. Your character never walks, steering keys never show "Tap: SPACE or click", and **the camera stays put** when you press ← or → (they steer instead of turning the camera). In your first three races, ← → turn the camera as before.
 - [ ] **Gamepad:** D-pad left and right steer, and so does a flick of the left stick (one lane per flick; let the stick come back to the middle before the next). A and R2 still tap.
 - [ ] **No steering press ever scores as a tap:** press only ◀ ▶ (or A/D, or the D-pad) through a few passes: no tap word, the speed meter dips as for untapped passes, and the Final Burst is never spent.
-- [ ] Since natural steering (D-057 N3): your horse's head and body turn a little toward your press at once, and the sideways move starts a moment later with the server's answer, even with lag (network simulator at 200 ms). It never ends up in a lane the server didn't give it and never snaps back: mash ◀, press twice quickly, and press In then Out; your horse always settles where the others see it. If the lane has no room, it eases back and tucks in instead. (With the D-054 switch-back, `glide = "linear"`, your horse starts gliding the moment you press, as before.)
+- [ ] How your horse answers a press (the look cue, smooth glides, waits, brushes) is checked in "Natural steering (D-057)" below.
 - [ ] **Smart Steer:** after a press your horse is left alone for 5 s, then heads in before the turns again, never out (a rider who took the rail keeps it). With Settings → Smart Steer Off, your horse changes lane only when you press.
 - [ ] **The lock:** three soft bell ticks (silent until `lock_tick` is uploaded), then "Lanes locked!" at the far turn on every distance. The buttons grey, then fade before the Final Burst. With Reduced Motion on, nothing pops or shakes.
 - [ ] **Chips:** "Saved ground!" leaving a turn on the rail (after you've steered that race); "Tucked in!" with wind lines while you sit behind a horse in your lane (at most 3 a race); "The rail is shorter on turns ◀" when you steer yourself and are wide going into a turn (at most twice a race). No chip ever says you lost a place, and nothing counts down.
 - [ ] Steering counts now (`GameConfig.steering.scale = 1`): at the lock the arrow on your place badge may move a little. The results card's trip line is checked in the next section.
 - [ ] Output prints one `[Trip]` line per race at the lock (riders' posts, Smart Steer or not, tau, how presses were answered). A rider leaving mid-race goes to Smart Steer, with no errors.
 
-## Natural steering (D-057 N3)
-The motion and press rules are on for every horse: players, Smart Steer and bots. Watch from the chase view, from the side, and in a 3x replay.
+## Natural steering (D-057)
+D-057 is on for every horse: players, Smart Steer and bots. It brings S-curve lane changes, a body turn, no zig-zag, the boxed-in arrows and chips, and brushes. The pass and fail lines come from the plan (`docs/plans/natural-steering.md`, section D).
+- **Who:** kids aged 8–11 on phones first, then keyboard and gamepad.
+- **Profiles:** testers need the buttons. Ride 3 races first, or set `totals.races` to 3.
+- **How to test:** don't explain the arrows before the first races; ask the questions after.
+
+### 1. Kids on phones (ages 8–11)
+- [ ] **Natural look** (playtest 1): three races with mashing riders, in the chase view and a 3x replay.
+  - **Pass:** no tester says "zig-zag", "wiggle", "slide" or "snap", and at least 2 of 3 say it looks "like real horses".
+  - **Fail:** a tester points out a horse swerving a whole lane just before the line.
+- [ ] **Blind 0.8 vs 1.0 s** (playtest 2): the same kid rides two races at each glide, in random order.
+  - The 0.8 s glide is `laneSpeedMax = 1.667` and `laneAccel = 5.56`, set in a test place's `GameConfig.steering`.
+  - **Pass for 1.0 s:** kids can't tell the two apart better than chance, or don't prefer 0.8 s. Otherwise switch: set both values in `GameConfig.steering` and `trip.CONFIG`, then run `python sims/steering.py --write`.
+- [ ] **Boxed in** (playtest 3): after 3 races with the buttons, ask "What does the grey arrow mean?" and "What happened when you were stuck?".
+  - **Pass:** at least 60% answer "can't go that way", "a horse is there", or "waited or eased back for a gap", and nobody says they were "punished".
+  - **Fail:** more than 30% of kids press again while the ring fills, or any kid says the arrows "stopped working".
+- [ ] **Brushes** (playtest 4): two kids side by side; one keeps pressing into the other (three presses).
+  - **Pass:** the bumper can say "I bumped, I slowed down".
+  - The first brush shows "Bump! Press once, then wait for a gap", once per player.
+  - **Fail:** more than 1 in 10 bumped kids get upset (watch, or ask), even at no cost. Then set `brushCost = 0`, and `brush = "off"` if it persists.
+  - **Fail:** kids call the bumper's cost unfair.
+- [ ] **Load** (playtest 5): the same kids race on D-057 and on D-054 (the switch-back below, in a test place).
+  - **Fail:** the slider score S drops more than 2 points on average with D-057.
+- [ ] **Latency** (playtest 6): a phone on a throttled link, 0.25 s each way.
+  - **Pass:** the look cue shows on the press frame, and there's no sideways snap-back in 50 presses.
+  - **Fail:** a tester notices a "fake start" in 50 presses into blocked lanes.
+- [ ] **Phone layout:**
+  - the grey look, the 🐎 icon and the wait ring fit inside the buttons' safe area (no clipping near a notch);
+  - the chips ("No room yet", "Gap!", the bump tip) sit above the buttons and can be read at a glance.
+
+### 2. Keyboard and gamepad
+- [ ] A/D, the arrows, the D-pad and stick flicks give the same look cue, ring, wobble and chips as the on-screen buttons. A press into a blocked side shows on the on-screen arrow.
+- [ ] Mashing a key or the D-pad is as calm as mashing the buttons: one quick change of mind, then the horse holds its line.
+- [ ] Two quick presses into a horse beside you never brush; a third does.
+
+### 3. In Studio
+Watch from the chase view, from the side, and in a 3x replay. Brushes need Studio Test with 2 players.
+
+**Motion**
 - [ ] **Smooth lane changes:** a horse eases into a lane change, glides, and eases out (about 1 s a lane, 1.6 s for two). No horse slides sideways at a constant speed, starts or stops with a jerk, or reverses in the middle of a glide.
-- [ ] **The horse angles into the move:** its body turns toward where it is going (a few degrees, never more than 10) and leans slightly into the move, then straightens as it lands. It never looks like it is skidding or drifting sideways.
-- [ ] **No snaps:** the body never jumps round at the far-turn bell, as a glide lands, when a replay starts, or at the finish line.
-- [ ] **Your press:** your horse turns its head and body slightly toward the press at once (about 3 degrees), on your screen only. If the lane is free, the move follows smoothly; if it has to wait, the turn relaxes within a moment and nothing else happens. Nobody else's screen shows the look. Presses the horse can't act on yet (again within a blink, against a lane change under way, straight back after landing) show no look, so mashing never shakes the head side to side.
-- [ ] **At the lock:** a press made just before "Lanes locked!" may start its slide just after the chip shows (the server took it in time; your screen shows the server a moment late). That's expected, not a bug.
-- [ ] **No zig-zag:** mash ◀ ▶ as fast as you can for 10 s. The horse makes at most one quick change of mind, then holds its line for a few seconds; it never wiggles back and forth. Mashing should feel calm, not twitchy.
-- [ ] **No late swerves:** watch the last 2 s before the line in a dozen races. No horse swerves a whole lane right at the finish; horses that need room move over early, in one smooth move. After "Lanes locked!", a horse that moved over doesn't swing back within a few seconds.
-- [ ] **Two lanes at once:** press ◀ twice quickly: the horse glides two lanes in one smooth move, no stop in between.
-- [ ] **Lag:** with the network simulator at 200 ms and with packet jitter, lane changes still look smooth on every screen: no stutter, no stall-then-catch-up, no horse jerking back.
-- [ ] **The chase camera** stays on the track's heading: when your horse angles into a lane change, the camera doesn't swing with it (more than about 3 degrees is a fail). If it does, the fix is a track-aligned camera subject (plan N3).
-- [ ] **Replays:** "Whole race ×3" and "Watch the finish" show the same smooth glides and the same turn and lean, slowed down too.
-- [ ] **Logs:** the `[Trip]` line at the lock ends with "held by the reverse or weave gap N, waits dropped N".
-- [ ] Back to D-054 in a test place: the seven keys in REVIEW_QUEUE ("D-057 (N3: switch-back)"), then `python sims/steering.py --write` for the baseline; glides are 0.6 s and linear again, bodies don't turn or lean, there's no look cue, and your own glide starts on the press, as before D-057.
+- [ ] **Two lanes at once:** press ◀ twice quickly; the horse glides two lanes in one smooth move, with no stop in between.
+- [ ] **The body turns into the move:** a few degrees toward where the horse is going (never more than 10), with a slight lean, then it straightens as it lands. It never looks like it's skidding or drifting sideways. Nothing snaps: not at the far-turn bell, as a glide lands, when a replay starts, or at the line.
+- [ ] **Your press:**
+  - Your horse's head and body turn about 3 degrees toward the press at once, on your screen only.
+  - If the lane is free, the move follows smoothly, even with the network simulator at 200 ms. If it must wait, the turn relaxes within a moment.
+  - Presses the horse can't act on yet show no look: again within a blink, against a lane change under way, straight back after landing, or in the second after your own brush. So mashing never shakes the head.
+  - Your horse never ends up in a lane the server didn't give it, and never snaps back.
+- [ ] **No zig-zag:** mash ◀ ▶ as fast as you can for 10 s. The horse makes at most one quick change of mind, then holds its line for a few seconds while the ring fills; it never wiggles back and forth.
+- [ ] **At the lock:**
+  - A press made just before "Lanes locked!" may start its slide just after the chip, because your screen shows the server a moment late. That's expected.
+  - After the lock, horses that need room move over early in one smooth move. Watch the last 2 s before the line in a dozen races: none swerves a whole lane, and a horse that moved over doesn't swing back within a few seconds.
+- [ ] **Lag:** with the network simulator at 200 ms and packet jitter, lane changes still look smooth on every screen: no stutter, no stall-then-catch-up, no horse jerking back.
+- [ ] **Chase-camera yaw:** the camera follows the track's heading, not the horse's body.
+  - On the backstretch, change lanes a few times while watching the rail and the horizon in the chase view.
+  - **Fail:** the camera visibly swings more than 3 degrees on a lane change.
+  - To measure it, paste this into the command bar in the client view during a Test, then change lanes on a straight: `local c=workspace.CurrentCamera local l game:GetService("RunService").RenderStepped:Connect(function() local v=c.CFrame.LookVector local y=math.deg(math.atan2(-v.X,-v.Z)) if l and math.abs(y-l)>0.2 then print(("camera yaw %.1f"):format(y)) end l=y end)`. On a straight, the printed yaw must stay within 3 degrees through the glide.
+  - If it fails, try `steerView.yawGain = 0.7`, or a track-aligned camera subject (plan N3).
 
-## Boxed in (D-057 N4)
-From your 4th race on (the buttons are shown). Spectators and a rider's first 3 races see none of this.
-- [ ] **Out ▶ greys** (soft grey, a small 🐎 on its top edge) a moment after a horse settles beside you on the outside, and comes back as soon as there's room. A horse sweeping past doesn't make it blink. It never turns red and makes no buzz, and pressing it still works (the press waits).
-- [ ] **◀ In greys only when you're truly trapped** (a horse inside and no gap to ease back into, rare). When a horse is inside but you could ease back behind it, ◀ In stays normal, and pressing it eases you back and slips you in ("Tucked in!").
-- [ ] **Nothing greys at the rail or the outside lane:** pressing ◀ on the rail just does nothing, as before.
-- [ ] **Wait ring:** press ◀ with a horse inside and no gap: a thin ring lights round ◀ while it waits, then the horse moves in when a gap opens ("Gap!" with a soft chime if it waited half a second or more; not after easing back, where "Tucked in!" says it). Mashing ◀ ▶ never earns a string of "Gap!" chimes. Press Out ▶ with a horse outside: the ring fills across Out ▶ over 1.5 s; if no gap comes, the arrow wobbles gently once and the press is forgotten. No sound. With Reduced Motion on: no wobble, no breathing ring.
-- [ ] **"No room yet"** appears above the buttons after a second of waiting, at most once every 10 s, and never right after another chip. It never says "boxed in", never mentions points or a cost, and never hurries you.
-- [ ] **Keyboard and gamepad:** A/D, the arrows, the D-pad and stick flicks into a blocked side give the same ring, wobble and chips on the on-screen buttons.
-- [ ] **Phone:** the grey look, the 🐎 icon and the ring fit inside the buttons' safe area (no clipping near a notch), and the chip sits above the buttons.
+**Boxed in** (riders with the buttons only; spectators and a rider's first 3 races see none of this)
+- [ ] **Out ▶ greys** (soft grey, a small 🐎 on its top edge) a moment after a horse settles beside you on the outside, and comes back as soon as there's room. A horse sweeping past doesn't make it blink. It never turns red or buzzes, and pressing it still works (the press waits).
+- [ ] **◀ In greys only when you're truly trapped:** a horse inside and no gap to ease back into, which is rare. When you could ease back behind the horse inside, ◀ In stays normal, and pressing it eases you back and slips you in ("Tucked in!"). Nothing greys at the rail or the outside lane.
+- [ ] **Waiting:**
+  - **Inward:** press ◀ with a horse inside and no gap. A thin ring lights round ◀ while it waits, then the horse moves in when a gap opens, with "Gap!" and a soft chime if it waited half a second or more. There's no "Gap!" after easing back, because "Tucked in!" says it.
+  - **Outward:** press Out ▶ with a horse outside. The ring fills across Out ▶ over 1.5 s; if no gap comes, the arrow wobbles gently once and the press is forgotten, silently.
+  - Mashing never earns a string of "Gap!" chimes.
+  - With Reduced Motion on: no wobble, no breathing ring.
+- [ ] **"No room yet"** shows above the buttons after a second of waiting, at most once every 10 s, and never right after another chip. It never says "boxed in", mentions points or a cost, or hurries you.
 - [ ] **At "Lanes locked!"** the boxed-in look clears and the buttons go the usual locked grey.
-- [ ] **Grown-ups page:** "Horses can get boxed in, like in real racing: they wait for a gap or ease back to find one. There's no penalty for being boxed in; a horse held wide just runs a little farther." It sits right under the steering line, after "How races work" and before the Diamonds lines.
 
-## Brushes (D-057 N5)
-Stage two riders side by side (Studio Test with 2 players), both past their first 3 races.
-- [ ] **A brush:** with a horse right beside you and no gap to slip into behind it, press toward it three times within 2 s (the first press waits, the second is the same try). Your horse leans a little toward it (about a foot) and nods, eases back a few feet, and can't steer for a second; the other horse only nods and keeps its place. The lean starts and ends softly (no jump on the first frame). A soft tick plays at your horse (silent until `count_tick` is uploaded). Nothing stumbles, flinches or looks hurt; no flash, no text over the horses.
-- [ ] **Pressing again never brushes** (N5 review): press toward the horse, then once more half a second or a second later, as a kid does when nothing seems to happen. The press just waits; no lean, no tick. One press never brushes either, nor does pressing again many seconds later. Bots and Smart Steer never brush.
-- [ ] **The lock:** no brush starts after the lock. A brush from the last moment before it can still be drawn just after "Lanes locked!" shows (your screen runs a moment behind the server), never later than that.
-- [ ] **Your screen:** the first brush you ever have shows the tip "Bump! Press once, then wait for a gap" (once per player, never again, even in a new session). After that, "No room yet" at most (never more than once in 10 s, and never right after another chip). Either one shows as your horse leans, not before. No blame, no cost words. The other rider sees nothing about it.
-- [ ] **No look cue while steadying:** right after your brush, pressing again doesn't turn your horse's head toward the press for a second.
-- [ ] **No wobble** on the arrow when a brush clears a press that was waiting.
-- [ ] **Smooth:** the horse that brushed eases back without a jerk (no snap backwards), and the horses never draw through each other.
-- [ ] **Results:** no brush line on the card; the "Good trip" stars may be a little lower after several brushes. The bumped rider's card is unchanged.
-- [ ] **Replays** show the lean and the nods, no text.
-- [ ] **Logs:** the `[Trip]` line lists brushes and the cost per rider, with how many went into each other horse (`brushes 3 (into post 4 x2, post 6 x1)`). The plan's griefing fail line counts one rider brushing the same horse 3+ times.
-- [ ] **A late brush** (network simulator at 300 ms, with packet jitter): a brush that reaches your screen late still starts from the beginning (no horse snapping a foot sideways); one that arrives after its moment has passed isn't drawn at all.
-- [ ] **Grown-ups page:** "A brush costs the horse that bumped a tiny bit (a third of a point at most), never the horse that was bumped."
+**Brushes** (two riders side by side)
+- [ ] **A brush:** with a horse right beside you and no gap to slip into behind it, press toward it three times within 2 s. The first press waits; the second is the same try.
+  - Your horse leans about a foot toward the other horse, nods, eases back a few feet and can't steer for a second. The lean starts and ends softly.
+  - The other horse only nods and keeps its place.
+  - A soft tick plays at your horse (silent until `count_tick` is uploaded).
+  - Nothing stumbles, flinches or looks hurt; no flash, no text over the horses.
+- [ ] **Pressing again never brushes:** press toward the horse, then once more half a second or a second later, as a kid does when nothing seems to happen. The press just waits. One press never brushes, nor does pressing again many seconds later. Bots and Smart Steer never brush.
+- [ ] **Your screen:**
+  - Your first brush ever shows "Bump! Press once, then wait for a gap", once per player, never again (not in a new session either). After that, "No room yet" at most, under its limits.
+  - The chip shows as your horse leans, not before. No blame, no cost words; the other rider sees nothing.
+  - A brush that clears a waiting press doesn't wobble the arrow.
+- [ ] **No brush starts after the lock.** One from the last moment before it can still be drawn just after "Lanes locked!" shows, never later.
+- [ ] **A late brush** (network simulator at 300 ms with jitter): a brush that reaches your screen late still starts from the beginning, with no horse snapping a foot sideways. One that arrives after its moment has passed isn't drawn at all.
+- [ ] **Smooth:** the horse that brushed eases back without a jerk, and horses never draw through each other.
+- [ ] **Results:** no brush line on the card; "Good trip" may be a star lower after several brushes. The bumped rider's card is unchanged.
+
+**Replays, logs, grown-ups**
+- [ ] **Replays:** "Whole race ×3" and "Watch the finish" show the same smooth glides, the turn and lean, and the brushes' lean and nods, slowed down too, with no text.
+- [ ] **Logs:** the `[Trip]` line at the lock gives each rider's post, tau, brushes with how many went into each other horse (`brushes 3 (into post 4 x2, post 6 x1)`) and cost. It ends with the presses' answers, "held by the reverse or weave gap N, waits dropped N".
+- [ ] **Grown-ups page** (right under the steering line, after "How races work" and before the Diamonds lines):
+  - "Horses can get boxed in, like in real racing: they wait for a gap or ease back to find one. There's no penalty for being boxed in; a horse held wide just runs a little farther."
+  - "A rider who keeps pressing into a horse alongside makes the two brush shoulders. A brush costs the horse that bumped a tiny bit (a third of a point at most), never the horse that was bumped. Bots and Smart Steer never bump."
+
+### 4. A week of logs (playtest 7 and the plan's risk lines)
+- [ ] **Brush charges:** fail if riders with the buttons are charged in more than 5% of races (a `[Trip]` cost above 0). The sims expect under 1% for kids who press once and again, and about half for mashers.
+- [ ] **Griefing:** fail if one rider brushes the same horse 3 or more times (`into post N x3`) in more than 1% of races.
+- [ ] **Chip spam:** fail if riders with the buttons see more than 2 "No room yet" per race on average. Count them in the phone sessions, since the chip is client-only.
+- [ ] **Sluggish glide:** fail if more than 20% of glides get a second same-way press before they land. Watch it in the sessions; the `[Trip]` line's queued answers are a rough guide. Then try the 0.8 s glide.
+- [ ] **Also record:** reversals held by the gaps per race, waits dropped, brushes and charges per race, τ by post, the Smart Steer kid's mean, and how often τ hits the clamp.
+
+### 5. The switch-back to D-054
+Try it in a test place first. The quick switches:
+- **Brushes off:** `brush = "off"`. The baseline doesn't change (Smart Steer never brushes).
+- **Visual-only brushes:** `brushCost = 0`.
+- **The 0.8 s glide:** see playtest 2.
+
+The whole switch-back:
+1. In `GameConfig.steering` (`game/src/shared/GameConfig.luau`) **and** `CONFIG` (`src/trip.py`), set eight keys (exactly what `Trip.d054Config` and `trip.d054_config()` build):
+   - `glide = "linear"`, `chainWindow = 0`, `reverseGapSeconds = 0`, `weaveGapSeconds = 0`;
+   - `pressBounceSeconds = 0`, `glideReserveFeet = 0`, `blockedPress = "d054"`, `brush = "off"`.
+2. Regenerate:
+   - `python sims/steering.py --write` (about 50 minutes on 12 cores). `TripBaseline.luau` then equals the table in `tests/fixtures/trip_baseline_d054.json`.
+   - `python tests/fixtures/make_fixtures.py --d057`.
+   - `tests/test_trip_d057.py`'s game-config tests then need pointing at D-054. `tests/test_trip.py` already holds the D-054 config to every D-054 promise.
+3. Check in Studio:
+   - glides are 0.6 s and linear again; bodies don't turn or lean; there's no look cue; your own glide starts on the press, as before D-057.
+   - The boxed-in arrows still read the server's side states. `steerHud.greyArrows = false` and `steerHud.waitRing = false` turn them off.
 
 ## Replays and results (steering S4, D-054)
 Plan section D, from your 4th race on (the buttons are shown):
