@@ -76,7 +76,7 @@ local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on cha
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
-RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), [lane positions,] course
+RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), [lane positions, server time,] course
 RaceOffsets.Parent = remotes
 local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst, course
 local JoinRace = makeRemote("JoinRace")           -- client -> server: want (bool), course id?, horse id?
@@ -663,8 +663,9 @@ local function runRace(c, players: { Player })
 			end
 			for answer, count in trip.answers do table.insert(answers, answer .. " " .. count) end
 			table.sort(answers)
-			print(string.format("[Trip] %s %s locked at %.1f s: %s; requests: %s", c.id, cond.distance, trip.lockT,
-				table.concat(parts, ", "), if #answers > 0 then table.concat(answers, ", ") else "none"))
+			print(string.format("[Trip] %s %s locked at %.1f s: %s; requests: %s; held by the reverse or weave gap %d, waits dropped %d",
+				c.id, cond.distance, trip.lockT, table.concat(parts, ", "), if #answers > 0 then table.concat(answers, ", ") else "none",
+				trip.gapHeld or 0, trip.waitDropped or 0))
 			-- The chances shown pick tau up at once (when the lock comes before checkpoint 1, as it
 			-- can in a Sprint, the checkpoint's own update carries it).
 			if session.closed > 0 then LiveChances:FireAllClients(session.closed, shownLive, c.id) end
@@ -680,22 +681,27 @@ local function runRace(c, players: { Player })
 			end
 			return
 		end
-		-- Steering: the screen shows what the server sends, at sendHz all race: Trip's gaps and lanes
-		-- up to the lock; after it, the race shape's gaps as the screen eases them, held so no horse
-		-- runs through another, with make-room lanes (Trip.frame). Lanes go out when they change and
-		-- once a second (a dropped packet is harmless).
-		local last = now()
-		local sentLanes, lanesAt = nil, -math.huge
+		-- Steering: the screen shows what the server sends, all race: Trip's gaps and lanes up to the
+		-- lock, one sample for every fixed tick (the loop wakes about every 0.117 s, so it steps and
+		-- sends each tick that has come due, and none is skipped); after it, the race shape's gaps as
+		-- the screen eases them, held so no horse runs through another, with make-room lanes
+		-- (Trip.frame), one sample a wake. Lanes go out when they change, on the two samples after,
+		-- and once a second (a dropped packet is harmless). Every sample carries the server time its
+		-- state stands for, and the screen draws by that time, not by arrival (Playback, D-057 N3):
+		-- before the lock tStart + tick * dt (Trip's state after `tick` ticks; up to one tick ahead of
+		-- now, which the screen's lag estimate absorbs); before the gate, now (nothing moves); after
+		-- the lock, now, with the make-room step taken from the last sample's time, so the samples'
+		-- spacing is exactly how far they moved.
+		local lastStamp = tStart
+		local sentLanes, lanesAt, resend = nil, -math.huge, 0
 		local sentOwn: { [Player]: { number } } = {}
-		while alive() do
-			local t = now()
-			advanceTrip(t)
-			local w = RaceShape.blendWeight(t, tFar, postEnd, GameConfig.raceShape.blendPower)
-			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, t - last, t - tStart)
-			last = t
+		local function send(stamp: number, frameDt: number)
+			local w = RaceShape.blendWeight(stamp, tFar, postEnd, GameConfig.raceShape.blendPower)
+			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, frameDt, stamp - tStart)
+			lastStamp = stamp
 			-- Each rider with the buttons hears about their own lane when it changes, up to the lock:
-			-- the lane taken, where it ends, the last press answered (their screen's prediction
-			-- starts from it and ends on the answer: SteerPredict).
+			-- the lane taken, where it ends, the last press answered (their screen's look cue and, with
+			-- D-054's linear glide, its prediction: SteerPredict).
 			if not trip.locked then
 				for p in steers do
 					local i = session:laneIndex(tostring(p.UserId))
@@ -709,17 +715,38 @@ local function runRace(c, players: { Player })
 					end
 				end
 			end
-			local changed = sentLanes == nil or t - lanesAt >= 1
+			local changed = sentLanes == nil or stamp - lanesAt >= 1
 			if not changed and lanes then
 				for i, x in lanes do
 					if x ~= sentLanes[i] then changed = true end
 				end
 			end
-			if changed and lanes then
-				sentLanes, lanesAt = lanes, t
-				RaceOffsets:FireAllClients(offsets, lanes, c.id)
+			if changed then resend = 2 end -- (and on the next two samples: a dropped packet can't strand a lane)
+			if (changed or resend > 0) and lanes then
+				if not changed then resend -= 1 end
+				sentLanes, lanesAt = lanes, stamp
+				RaceOffsets:FireAllClients(offsets, lanes, stamp, c.id)
 			else
-				RaceOffsets:FireAllClients(offsets, c.id)
+				RaceOffsets:FireAllClients(offsets, stamp, c.id)
+			end
+		end
+		while alive() do
+			local t = now()
+			if t < tStart then
+				send(t, 0)
+			else
+				while not trip.locked and tStart + trip.tick * trip.dt <= t and alive() do
+					local tick = trip.tick
+					advanceTrip(tStart + tick * trip.dt) -- exactly the next tick (or the lock)
+					if trip.locked then break end
+					if trip.tick == tick then break end -- (nothing stepped: never spin)
+					send(tStart + trip.tick * trip.dt, 0)
+				end
+				if trip.locked then
+					local base = math.max(lastStamp, tStart + trip.tick * trip.dt) -- (the lock's tick, right after it)
+					local stamp = math.max(t, base)
+					send(stamp, stamp - base)
+				end
 			end
 			task.wait(1 / GameConfig.steering.sendHz)
 		end

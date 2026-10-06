@@ -4,15 +4,16 @@
 -- runs under Lune.
 --
 -- Mirrors src/trip.py line by line; tests/luau/trip_tests.luau replays tests/fixtures/trip.json
--- (D-054) and tests/luau/trip_d057_tests.luau replays tests/fixtures/trip_d057.json (D-057 on);
--- both must agree to 1e-9 (D-012). Mirror
+-- (the game's config) and tests/luau/trip_d057_tests.luau replays tests/fixtures/trip_d057.json
+-- (D-057 in full, brushes on, and the switch-back to D-054); both must agree to 1e-9 (D-012). Mirror
 -- rules: lanes visited in index order; every sort uses a total key (offset, then lane position,
 -- then index); step, lock and tau use only + - * /, comparisons, min, max, abs and sqrt (sqrt is
 -- correctly rounded in Luau and CPython alike; only the D-057 eased glide uses it); "never" times
 -- are -1e9 (and 1e9 for "no horse alongside"); fixed ticks t = k * dt.
 --
--- D-057 (natural steering, boxed in, brushes; stage N2) sits behind GameConfig.steering keys, all
--- off there, so the game runs D-054 exactly until N3 flips them (glide = "eased", ...).
+-- D-057 (natural steering, boxed in, brushes) sits behind GameConfig.steering keys: N2 ported the
+-- rules switched off, N3 switched the motion and press rules on (brushes stay off until N5).
+-- Trip.d054Config is the switch-back.
 --
 -- Coordinates (rail coordinates, D-054 S1): s = feet along the lane-1 path from the gate (the
 -- pace is speed * t); off = feet ahead of the pace; x = lane position, 1 (the rail) .. lanes,
@@ -33,18 +34,38 @@ Trip.EPS = EPS
 Trip.LONG_AGO = LONG_AGO
 Trip.NOT_ALONG = NOT_ALONG
 
--- D-057 on (debate 012; src/trip.py's D057): the switches N3 (motion and presses) and N5 (brushes)
--- flip in GameConfig.steering. Trip.d057Config builds that config for the tests and the overlap
--- report.
+-- D-057 on (debate 012; src/trip.py's D057): the switches N3 (motion and presses) flipped in
+-- GameConfig.steering, and N5's brushes. Trip.d057Config builds the full D-057 config (brushes on)
+-- for the tests and the overlap report; Trip.d054Config the switch-back, every D-057 key at its
+-- D-054 value (src/trip.py's D057_OFF).
 Trip.D057 = {
 	glide = "eased", chainWindow = 0.3, reverseGapSeconds = 0.5, weaveGapSeconds = 2.5,
 	pressBounceSeconds = 0.2, glideReserveFeet = 6, blockedPress = "wait", brush = "repeat",
 }
+Trip.D057_OFF = {
+	glide = "linear", laneSpeedMax = 1.5, laneAccel = 4.5, chainWindow = 0, reverseGapSeconds = 0,
+	weaveGapSeconds = 0, weaveWindowSeconds = 7, pressBounceSeconds = 0, glideReserveFeet = 0,
+	blockedPress = "d054", gapWaitSeconds = 1.5, gapWaitInSeconds = 0, tuckAfterSeconds = 0,
+	boxedAheadFeet = 12, brush = "off", brushAlongFeet = 8, brushGraceSeconds = 0.3,
+	brushRepeatSeconds = 2, brushPays = "mover", brushCost = 0.002, brushFree = 1, brushMaxCharged = 3,
+	brushCheckFeet = 4, brushRecoverPerSecond = 2, steadySeconds = 1,
+}
 
-function Trip.d057Config(steering: any): any
+local function copySteering(steering: any): any
 	local cfg = table.clone(steering)
 	cfg.smart, cfg.bots, cfg.stars = table.clone(steering.smart), table.clone(steering.bots), table.clone(steering.stars)
+	return cfg
+end
+
+function Trip.d057Config(steering: any): any
+	local cfg = copySteering(steering)
 	for key, value in Trip.D057 do cfg[key] = value end
+	return cfg
+end
+
+function Trip.d054Config(steering: any): any
+	local cfg = copySteering(steering)
+	for key, value in Trip.D057_OFF do cfg[key] = value end
 	return cfg
 end
 
@@ -888,6 +909,9 @@ function Trip.start(config: any, session: any, track: any, plan: any, baselineRo
 	for i = 1, n do st.recent[i] = {} end
 	st.requestsPerSecond = steer.requestsPerSecond
 	st.answers = {}
+	-- For the [Trip] log line (D-057): rider presses the other way held by a reverse or weave gap,
+	-- and rider presses that waited for room and dropped (an outward press after gapWaitSeconds).
+	st.gapHeld, st.waitDropped = 0, 0
 	return st
 end
 
@@ -936,11 +960,24 @@ function Trip.advance(st: any, live: { number }, t: number): boolean
 			table.insert(due, { p[1], p[2] })
 			table.insert(seqs, p[4])
 		end
+		local held, wanted, wantTgt, pressed = {}, {}, {}, {}
+		for k, p in due do
+			local i, d = p[1], p[2]
+			local g = Trip.reverseGap(st, i, tt)
+			held[k] = g > 0 and st.lastDir[i] ~= 0 and d ~= st.lastDir[i]
+				and (st.x[i] ~= st.tgt[i] or tt - st.arrivedAt[i] < g - EPS)
+			pressed[i] = true
+		end
+		for i in st.riderKind or {} do wanted[i], wantTgt[i] = st.want[i], st.tgt[i] end
 		local answers = Trip.step(st, live, due, tt, st.dt)
 		for k, a in answers do
 			st.answers[a] = (st.answers[a] or 0) + 1
 			local i = due[k][1]
 			st.ack[i] = math.max(st.ack[i], seqs[k])
+			if held[k] and a == "queued" then st.gapHeld += 1 end
+		end
+		for i, w in wanted do
+			if w ~= 0 and st.want[i] == 0 and st.tgt[i] == wantTgt[i] and not pressed[i] then st.waitDropped += 1 end
 		end
 		st.tick += 1
 	end

@@ -30,6 +30,39 @@ function ReplayTrip.laneAt(rec: any, a: any, b: any, f: number, i: number): numb
 	return xa + (xb - xa) * f
 end
 
+-- Horse i's lane position between frames k - 1 and k (fraction f) on a smooth curve through the
+-- recorded lanes (D-057 N3): a monotone cubic using the frames either side (k - 2 and k + 1), so a
+-- replayed lane change keeps the S-curve it had live (no corner at each 10 Hz frame, even in slow
+-- motion) and never swings past a lane. Frames without lanes (older recordings) use the post.
+local function laneOf(frames: { any }, j: number, i: number, post: number): (number, number)
+	local fr = frames[math.clamp(j, 1, #frames)]
+	return (fr.x and fr.x[i]) or post, fr.t
+end
+
+-- The tangent at a frame between slopes a and b: their harmonic mean, 0 where the curve turns
+-- (Fritsch and Butland), which keeps every piece monotone.
+local function tangent(a: number, b: number): number
+	if a * b <= 0 then return 0 end
+	return 2 / (1 / a + 1 / b)
+end
+
+function ReplayTrip.laneCurve(rec: any, k: number, f: number, i: number): number
+	local frames = rec.frames
+	local post = (rec.lane and rec.lane[i]) or i
+	local x1, t1 = laneOf(frames, k - 1, i, post)
+	local x2, t2 = laneOf(frames, k, i, post)
+	local h = t2 - t1
+	if k <= 1 or h <= 0 then return x2 end
+	local x0, t0 = laneOf(frames, k - 2, i, post)
+	local x3, t3 = laneOf(frames, k + 1, i, post)
+	local d1 = (x2 - x1) / h
+	local d0 = if t1 > t0 then (x1 - x0) / (t1 - t0) else d1
+	local d2 = if t3 > t2 then (x3 - x2) / (t3 - t2) else d1
+	local m1, m2 = tangent(d0, d1), tangent(d1, d2)
+	local f2, f3 = f * f, f * f * f
+	return (2 * f3 - 3 * f2 + 1) * x1 + (f3 - 2 * f2 + f) * h * m1 + (-2 * f3 + 3 * f2) * x2 + (f3 - f2) * h * m2
+end
+
 -- Events of one kind, in recorded order (none for an old recording).
 function ReplayTrip.events(rec: any, kind: string): { any }
 	local out = {}

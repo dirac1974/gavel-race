@@ -219,6 +219,12 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 - **`Replay.client.luau`:** SteerPose from consecutive recorded frames (with `timeScale`), so replays turn and lean too. Recordings from before D-057 work unchanged.
 - **Tests:** SteerPose pure tests; the overlap report (N2 gate) on the live config, with the jitter row (`jitter=0.03`) now gated; `steering_tests`/`steer_controls_tests` updated; the policy guard and syntax check.
 - **Logs:** the `[Trip]` line adds reversals refused by the gaps and waits that dropped.
+- **As built (2026-10-06; DECISIONS D-057 N3 note, REVIEW_QUEUE "N3" rows):**
+  - `Playback.luau` (shared, pure) plays the samples back by their server stamps for RaceView and the overlap report alike; RaceService stamps each sample with the time its state stands for. The jitter rows pass and are gated.
+  - The pose lives in `SteerPose.luau` (`step` plus `angles` for the CFrame sign); the look cue's state is `SteerPredict.look` / `lookDir`.
+  - SteerPredict's D-054 prediction stays for the linear glide, and RaceView draws the linear glide exactly as D-054 did, so the switch-back is D-054 on screen too (the D-054 overlap reports print what main printed).
+  - Not built: the 150-stud pose cut-off (the legs have none; the pose is one CFrame multiply). The camera stays Follow; the swing check is in PLAYTEST.
+  - The sims' default profile is the game's config (`live`); `d054` keeps the D-054 baseline and report for the switch-back.
 
 ### N4. Boxed-in UI (roblox-engineer)
 

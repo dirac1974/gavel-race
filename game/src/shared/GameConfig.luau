@@ -85,25 +85,25 @@ GameConfig.steering = {
 	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
 	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
 	requestsPerSecond = 8,         -- S3, game only: a rider's steering requests past this a second are dropped
-	-- D-057 natural steering (N2): every switch off, so races are D-054 exactly; N3 flips glide,
-	-- chainWindow, reverseGapSeconds, weaveGapSeconds, pressBounceSeconds, glideReserveFeet and
-	-- blockedPress, N5 brush (trip.D057 in src/trip.py). Values that only matter once their switch
-	-- is on already hold D-057's numbers.
-	glide = "linear",              -- "eased": S-curve lane changes (1.0 s a lane); "linear": D-054's 0.6 s
+	-- D-057 natural steering: N3 switched the motion and press rules on (src/trip.py's CONFIG is
+	-- the same). Back to D-054: glide = "linear", chainWindow = 0, reverseGapSeconds = 0,
+	-- weaveGapSeconds = 0, pressBounceSeconds = 0, glideReserveFeet = 0, blockedPress = "d054"
+	-- (Trip.d054Config; REVIEW_QUEUE has the whole switch-back). Brushes stay off until N5.
+	glide = "eased",               -- "eased": S-curve lane changes (1.0 s a lane); "linear": D-054's 0.6 s
 	laneSpeedMax = 1.5,            -- eased: top sideways speed, lanes/s (9 ft/s)
 	laneAccel = 4.5,               -- eased: sideways acceleration and braking, lanes/s^2 (27 ft/s^2)
-	chainWindow = 0,               -- D-057 0.3: a same-way change may start this close (lanes) to landing
-	reverseGapSeconds = 0,         -- D-057 0.5: a change the other way starts this long after landing
-	weaveGapSeconds = 0,           -- D-057 2.5: ...or this long, for a second reversal within the window
+	chainWindow = 0.3,             -- a same-way change may start this close (lanes) to landing (D-054 0)
+	reverseGapSeconds = 0.5,       -- a change the other way starts this long after landing (D-054 0)
+	weaveGapSeconds = 2.5,         -- ...or this long, for a second reversal within the window (D-054 0)
 	weaveWindowSeconds = 7,        -- (debate 012: 5; 7 since the N1 review)
-	pressBounceSeconds = 0,        -- D-057 0.2: a press the same way this soon after the last counts once
-	glideReserveFeet = 0,          -- D-057 6: a horse gliding into a lane keeps this much more room
-	blockedPress = "d054",         -- "wait" (D-057) or "d054": a press into a lane with no room
+	pressBounceSeconds = 0.2,      -- a press the same way this soon after the last counts once (D-054 0)
+	glideReserveFeet = 6,          -- a horse gliding into a lane keeps this much more room (D-054 0)
+	blockedPress = "wait",         -- "wait" (D-057) or "d054": a press into a lane with no room
 	gapWaitSeconds = 1.5,          -- wait: an outward press waits this long for room, then drops
 	gapWaitInSeconds = 0,          -- wait: an inward press that can't tuck back drops after this (0 = waits)
 	tuckAfterSeconds = 0,          -- wait: an inward press tucks back after this long without room
 	boxedAheadFeet = 12,           -- boxed in: no room either side and a horse this close ahead (reported)
-	brush = "off",                 -- "repeat" (D-057): a second press into a horse alongside brushes it
+	brush = "off",                 -- "repeat" (D-057, N5): a second press into a horse alongside brushes it
 	brushAlongFeet = 8,            -- alongside = within this many feet lengthwise in the next lane...
 	brushGraceSeconds = 0.3,       -- ...for at least this long
 	brushRepeatSeconds = 2,        -- the second press comes within this long of the waiting one (0 = any time)
@@ -131,6 +131,17 @@ GameConfig.steerHud = {
 	tipsPerRace = 2,         -- ...at most this often a race
 	hideAfterLockSeconds = 2.5, -- the greyed buttons fade this long after "Lanes locked!"
 }
+-- How a race horse's body moves through a lane change (D-057 N3; SteerPose). Every horse in a
+-- steering race, on every screen; the look cue only on your own horse, on your screen.
+GameConfig.steerView = {
+	yawGain = 1,             -- the body turns with its true drift (atan of sideways / forward speed) x this
+	yawMaxDeg = 10,          -- ...at most this far (a 9 ft/s glide at 56 ft/s is 9 degrees)
+	yawSmoothSeconds = 0.15, -- sideways speed and acceleration are smoothed over this long
+	leanDegPerFtps2 = 0.12,  -- the body leans into the move: degrees per ft/s^2 of sideways acceleration...
+	leanMaxDeg = 3,          -- ...at most this far
+	lookDeg = 3,             -- your own press: turn this far toward it at once...
+	lookRelaxSeconds = 0.3,  -- ...and relax over this long if the press waits
+}
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.
 GameConfig.raceView = {
@@ -141,6 +152,15 @@ GameConfig.raceView = {
 	nudgeRiseSeconds = 0.15,  -- a good tap's nudge on your own horse eases in...
 	nudgeFallSeconds = 0.6,   -- ...and back out
 	settleSeconds = 0.6,      -- after the line, legs ease to standing before the race ends
+	-- Steering races (D-057 N3; Playback): the screen draws the server's samples a little behind
+	-- the newest, by their server timestamps, so a jittery link never stalls or lurches a horse.
+	playback = {
+		marginSeconds = 0.05,      -- delay beyond the longest recent lag and one send interval
+		slew = 0.04,               -- the playback clock runs at most 4% fast or slow to change its delay
+		rateChangePerSecond = 0.2, -- ...and changes its rate at most this fast
+		lagReleasePerSecond = 0.02, -- a lag spike's extra delay drains this fast
+		gain = 2,                  -- clock rate change per second of delay error
+	},
 }
 GameConfig.gateCountdownSeconds = 3 -- "3, 2, 1" over the gate, then "GO!" with the bell (D-055)
 -- Race screen (D-055).

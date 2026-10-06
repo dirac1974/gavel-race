@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Generate Python reference fixtures for the Luau parity tests.
 
-Writes tests/fixtures/race_math.json and tests/fixtures/trip.json; with --d057 also
+Writes tests/fixtures/race_math.json, tests/fixtures/trip.json and tests/fixtures/trip_d054.json
+(TRIP_D054_RUNS runs on the D-054 switch-back, trip.d054_config() with the D-054 baseline, so
+Trip.luau's D-054 path keeps full parity); with --d057 also
 tests/fixtures/trip_d057.json (about 7 MB; CI passes --d057, tests/test_luau_parity.py does when
 its inputs changed, and tests/luau/trip_d057_tests.luau replays it against Trip.luau).
 Deterministic (fixed seeds).
 race_math.json is append-only: new sections draw from their own generators, so the original
-sections stay byte-for-byte the same. trip.json is D-054 (it records the config without the
-D-057 keys, which are all off); trip_d057.json is D-057 switched on.
+sections stay byte-for-byte the same. trip.json is the game's config (trip.CONFIG; since N3
+D-057's motion and press rules, brushes off); trip_d057.json is D-057 in full (brushes on), with
+runs on other settings, the D-054 switch-back among them.
 """
 
 import json
@@ -136,6 +139,9 @@ def main(argv=None) -> None:
     trip_out = ROOT / "tests" / "fixtures" / "trip.json"
     trip_out.write_text(json.dumps(trip_fixture()))
     print(f"wrote {TRIP_RUNS} trip runs to {trip_out.relative_to(ROOT)}")
+    d054_out = ROOT / "tests" / "fixtures" / "trip_d054.json"
+    d054_out.write_text(json.dumps(trip_d054_fixture()))
+    print(f"wrote {TRIP_D054_RUNS} D-054 trip runs to {d054_out.relative_to(ROOT)}")
     if "--d057" not in argv:
         return
     d057 = trip_d057_fixture()
@@ -183,16 +189,17 @@ def extra_cases():
     return out
 
 
-def trip_run(k, baseline, geometry):
-    """One scripted phase-A run from its own seed (so a test can build any subset)."""
+def trip_run(k, baseline, geometry, base=None):
+    """One scripted phase-A run from its own seed (so a test can build any subset), on base
+    (trip.CONFIG by default)."""
     rng = random.Random(20261007 * 1000 + k)
     course = trip.COURSE_ORDER[k % 2]
     distance = trip.DISTANCE_ORDER[(k // 2) % 4]
     geo = geometry[course][distance]
-    cfg = trip.CONFIG
+    cfg = trip.CONFIG if base is None else base
     override = TRIP_OVERRIDES[k % len(TRIP_OVERRIDES)] if k >= 8 else None
     if override:
-        cfg = json.loads(json.dumps(trip.CONFIG))
+        cfg = json.loads(json.dumps(cfg))
         for key, value in override.items():
             node = cfg
             parts = key.split(".")
@@ -256,22 +263,37 @@ def trip_run(k, baseline, geometry):
     return run
 
 
-def trip_fixture(only=None):
-    """Scripted phase-A runs for the Trip.luau parity test (S2). Lane indices in intents are
+def trip_fixture(only=None, base=None, baseline=None):
+    """Scripted phase-A runs for the Trip.luau parity test (S2), on base (trip.CONFIG, the game's
+    config, by default; tests pass trip.d054_config() to check the D-054 runs are still what they
+    were before D-057, with baseline = the D-054 table; trip_baseline.json's by default). Lane
+    indices in intents are
     1-based; x values are lane positions (1 = the rail). Each intent is [tick, lane, dir];
     several can share a tick (applied in list order). live = q before switchTick, p1 from it.
     After the lock, afterLock presses are stepped once (all "locked", nothing changes).
     Snapshots of x, off and tgt every SNAPSHOT_EVERY ticks and on the last tick. geometry
     holds each course and distance's gate and phase A for the TrackLayout check in run_all."""
-    baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]
+    if baseline is None:
+        baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]
     geometry = {c: {d: trip.phase_a(c, d) for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
-    runs = [trip_run(k, baseline, geometry) for k in (only if only is not None else range(TRIP_RUNS))]
+    cfg = trip.CONFIG if base is None else base
+    runs = [trip_run(k, baseline, geometry, cfg) for k in (only if only is not None else range(TRIP_RUNS))]
     geo_out = {c: {d: {key: geometry[c][d][key] for key in ("segments", "lockS", "turnLength", "length", "r1", "gate")}
                    for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
     finish = {c: trip.COURSES[c]["finishFromTop"] for c in trip.COURSE_ORDER}
-    return {"cfg": trip.config_record(trip.CONFIG), "race": trip.RACE, "geometry": geo_out, "finishFromTop": finish,
+    return {"cfg": trip.config_record(cfg), "race": trip.RACE, "geometry": geo_out, "finishFromTop": finish,
             "distances": trip.DISTANCES, "baseline": baseline, "runs": runs}
 
+
+
+TRIP_D054_RUNS = 20  # the switch-back's parity runs (runs 8-19 cycle TRIP_OVERRIDES)
+
+
+def trip_d054_fixture():
+    """trip.json's first TRIP_D054_RUNS runs on the D-054 config (the switch-back, N3) with the D-054
+    baseline: Trip.luau's D-054 path stays at parity now that the game runs D-057."""
+    baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline_d054.json").read_text())["baseline"]
+    return trip_fixture(only=range(TRIP_D054_RUNS), base=trip.d054_config(), baseline=baseline)
 
 
 # ---------------------------------------------------------------- D-057 (stage N1, for the N2 port)
@@ -279,13 +301,13 @@ def trip_fixture(only=None):
 TRIP_D057_RUNS = 50
 D057_SNAPSHOT_EVERY = 20
 # Runs k >= 8 cycle through these on top of the D-057 config, so every switch's other branch is
-# replayed too.
+# replayed too; the last is the whole switch-back to D-054 (N3).
 D057_OVERRIDES = [None] * 8 + [
     {"brushPays": "both"}, {"brushPays": "bumped"}, {"gapWaitInSeconds": 3.0}, {"tuckAfterSeconds": 0.5},
     {"glide": "linear"}, {"brush": "off"}, {"scale": 0.5}, {"weaveGapSeconds": 0.0},
     {"laneSpeedMax": 1.667, "laneAccel": 5.56}, {"chainWindow": 0.0}, {"glideReserveFeet": 0.0},
     {"pressBounceSeconds": 0.0}, {"brushRepeatSeconds": 0.0}, {"blockedPress": "d054"}, {"gapWaitSeconds": 0.0},
-    {"brushPays": "none"}, {"reverseGapSeconds": 0.0},
+    {"brushPays": "none"}, {"reverseGapSeconds": 0.0}, dict(trip.D057_OFF),
 ]
 D057_STYLES = ("casual", "masher", "ditherer", "double", "bounce")
 
@@ -550,8 +572,9 @@ def trip_d057_fixture(only=None):
     arrivedAt, manualAt, smartBlockAt, lastPressAt, lastPressDir, wantAt, lastChange, lastDir),
     each side's state ("free", "tuck", "blocked"), boxed, noTuckInside and boxedNoTuck. Results add brushes,
     charged, charges (brush_charge), events ([tick, mover, other, dir], 1-based) and tau with the
-    brush term. cfg = the D-057 config; defaults = trip.CONFIG with every key (D-054 values),
-    what GameConfig.steering holds until N3; a run with other settings carries its whole cfg.
+    brush term. cfg = the D-057 config; defaults = trip.CONFIG with every key, what
+    GameConfig.steering holds (since N3 D-057's motion and press rules, brushes off); a run with
+    other settings carries its whole cfg.
     Each config also comes as exact decimal strings (cfgExact, defaultsExact)."""
     baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]
     geometry = {c: {d: trip.phase_a(c, d) for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}

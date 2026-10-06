@@ -22,10 +22,11 @@ trip = trip_values(st); t_i = tau(trip, posts, baseline_row(table, course, dista
 brush=brush_charges(st)). The exponent becomes kappa * R + c + tau (live_chances(..., extra) in
 gavel_race_v2).
 
-D-057 (natural steering, boxed in, brushes) is built in stage N1 with every rule switched off in
-CONFIG, so the model, the generated baseline and every D-054 fixture are unchanged. D057 holds
-the switches that turn it on (N3 flips the motion and press rules, N5 the brushes);
-d057_config() builds that config for the sims and the fixtures.
+D-057 (natural steering, boxed in, brushes): N1 built every rule switched off; N3 switched the
+motion and press rules on in CONFIG (the eased glide, chaining, the reverse and weave gaps, the
+press bounce, the glide reserve and wait-for-room presses). Brushes stay off until N5. D057 holds
+every switch; d057_config() builds the full D-057 config (brushes on) and d054_config() the
+D-054 one (every D-057 switch off: the switch-back, and the config of files made before D-057).
 """
 
 from __future__ import annotations
@@ -75,23 +76,23 @@ CONFIG: Dict = {
     "stars": [0.015, -0.005],     # trip three-star and two-star thresholds
     "laneBand": 0.9,              # horses closer than this (in lanes) share a lane
     "tuckReleasePerSecond": 4.0,  # a tuck-back fades this fast once nothing is blocked
-    # ---- D-057 (N1): every switch off, so the model is D-054 bit for bit. D057 below turns them
-    # on. Values that only matter once their switch is on already hold D-057's numbers. ----
-    "glide": "linear",            # "eased": S-curve (D-057); "linear": one lane per laneSeconds (D-054)
+    # ---- D-057: N3 switched the motion and press rules on (D-054 values in D057_OFF, the
+    # switch-back: d054_config()). Brushes stay off until N5. ----
+    "glide": "eased",             # "eased": S-curve (D-057); "linear": one lane per laneSeconds (D-054)
     "laneSpeedMax": 1.5,          # eased: top sideways speed, lanes/s (9 ft/s)
     "laneAccel": 4.5,             # eased: sideways acceleration and braking, lanes/s^2 (27 ft/s^2)
-    "chainWindow": 0.0,           # D-057 0.3: a same-way change may start this close (lanes) to landing
-    "reverseGapSeconds": 0.0,     # D-057 0.5: a change the other way starts this long after landing
-    "weaveGapSeconds": 0.0,       # D-057 2.5: ...or this long, for a second reversal within the window
+    "chainWindow": 0.3,           # a same-way change may start this close (lanes) to landing (D-054 0)
+    "reverseGapSeconds": 0.5,     # a change the other way starts this long after landing (D-054 0)
+    "weaveGapSeconds": 2.5,       # ...or this long, for a second reversal within the window (D-054 0)
     "weaveWindowSeconds": 7.0,    # N1 review: 7 (D-057 said 5); every masher cell under 8 reversals a minute
-    "pressBounceSeconds": 0.0,    # D-057 0.2: a press the same way this soon after the last counts once
-    "glideReserveFeet": 0.0,      # D-057 6: a horse gliding into a lane keeps this much more room
-    "blockedPress": "d054",       # "wait" (D-057) or "d054": a press into a lane with no room
+    "pressBounceSeconds": 0.2,    # a press the same way this soon after the last counts once (D-054 0)
+    "glideReserveFeet": 6.0,      # a horse gliding into a lane keeps this much more room (D-054 0)
+    "blockedPress": "wait",       # "wait" (D-057) or "d054": a press into a lane with no room
     "gapWaitSeconds": 1.5,        # wait: an outward press waits this long for room, then drops
     "gapWaitInSeconds": 0.0,      # wait: an inward press that can't tuck back drops after this (0 = waits)
     "tuckAfterSeconds": 0.0,      # wait: an inward press tucks back after this long without room
     "boxedAheadFeet": 12.0,       # boxed in: no room either side and a horse this close ahead (reported)
-    "brush": "off",               # "repeat" (D-057): a second press into a horse alongside brushes it
+    "brush": "off",               # "repeat" (D-057, N5): a second press into a horse alongside brushes it
     "brushAlongFeet": 8.0,        # alongside = within this many feet lengthwise in the next lane...
     "brushGraceSeconds": 0.3,     # ...for at least this long (the rider saw it, whatever the lag)
     "brushRepeatSeconds": 2.0,    # the second press comes within this long of the first (0 = any time)
@@ -105,8 +106,8 @@ CONFIG: Dict = {
 }
 
 # The D-057 keys with their D-054 (off) values, in CONFIG's order. A literal, never read from
-# CONFIG: once N3 switches D-057 on in CONFIG, files recorded before D-057 must still read as
-# D-054 (config_from_record) and a D-057 config must still record its keys (config_record).
+# CONFIG: with D-057 on in CONFIG (N3), files recorded before D-057 still read as D-054
+# (config_from_record) and a D-057 config records its keys (config_record).
 D057_OFF: Dict = {
     "glide": "linear", "laneSpeedMax": 1.5, "laneAccel": 4.5, "chainWindow": 0.0, "reverseGapSeconds": 0.0,
     "weaveGapSeconds": 0.0, "weaveWindowSeconds": 7.0, "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0,
@@ -125,7 +126,7 @@ D057: Dict = {
 
 
 def d057_config(base: Optional[Dict] = None) -> Dict:
-    """A copy of base (CONFIG by default) with D-057 switched on."""
+    """A copy of base (CONFIG by default) with D-057 switched on, brushes included."""
     cfg = copy.deepcopy(CONFIG if base is None else base)
     for key in D057_KEYS:
         if key in D057:
@@ -133,12 +134,25 @@ def d057_config(base: Optional[Dict] = None) -> Dict:
     return cfg
 
 
+def d054_config(base: Optional[Dict] = None) -> Dict:
+    """A copy of base (CONFIG by default) with every D-057 key at its D-054 value: the switch-back."""
+    cfg = copy.deepcopy(CONFIG if base is None else base)
+    for key in D057_KEYS:
+        cfg[key] = copy.deepcopy(D057_OFF[key])
+    return cfg
+
+
+def d057_on(cfg: Dict) -> bool:
+    """Any D-057 key away from its D-054 value."""
+    return any(cfg.get(k) != D057_OFF[k] for k in D057_KEYS)
+
+
 def config_record(cfg: Dict) -> Dict:
     """The config as generated files record it. While every D-057 key holds its D-054 value the
     keys are left out, so files made before D-057 (trip_baseline.json, steering_report.json,
     trip.json) stay current byte for byte; once any is switched on the whole config is recorded
     and those files must be regenerated."""
-    if all(cfg.get(k) == D057_OFF[k] for k in D057_KEYS):
+    if not d057_on(cfg):
         return {k: copy.deepcopy(v) for k, v in cfg.items() if k not in D057_OFF}
     return copy.deepcopy(cfg)
 

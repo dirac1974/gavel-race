@@ -1,8 +1,10 @@
 """Race steering trip model (D-054, stage S0): src/trip.py, the exponent extra in
-gavel_race_v2.live_chances, the generated post baseline, the calibration targets and the
-parity fixtures. Full-size calibration runs live in sims/steering.py (--write stores them in
-tests/fixtures/steering_report.json); the tests here assert that report and re-check it on
-small runs."""
+gavel_race_v2.live_chances, the D-054 post baseline, the calibration targets and the parity
+fixtures. Since N3 the game runs D-057's motion and press rules (tests/test_trip_d057.py);
+these tests hold the D-054 config, trip.d054_config(), the switch-back, to everything D-054
+promised. Full-size D-054 calibration runs live in sims/steering.py --profile d054 (--write
+stores tests/fixtures/trip_baseline_d054.json and steering_report_d054.json); the tests here
+assert that report and re-check it on small runs."""
 
 import copy
 import hashlib
@@ -27,7 +29,7 @@ sys.path.insert(0, str(ROOT / "tests" / "fixtures"))
 import make_fixtures  # noqa: E402
 import steering  # noqa: E402
 
-CFG = trip.CONFIG
+CFG = trip.d054_config()  # D-054, the switch-back (N3 switched the game to D-057's motion)
 RACE = trip.RACE
 DT = 1.0 / CFG["tickHz"]
 
@@ -516,7 +518,7 @@ def test_swapping_luck_leaves_tau_and_chances_unchanged():
     geo = trip.phase_a("dirt", "Marathon")
     setup = steering.race_setup(steering.race_seed(5, 3, 1), "Marathon")
     pols = ["rail", "bot", "bot", "never", "bot", "bot", "scripted", "bot"]
-    row = steering.load_baseline()["baseline"]["dirt"]["Marathon"]
+    row = steering.load_baseline("d054")["baseline"]["dirt"]["Marathon"]
     mcfg = m.Config(T=18)
     R = m.skills(setup["s1"], mcfg)
     luck_rng = random.Random(11)
@@ -525,8 +527,8 @@ def test_swapping_luck_leaves_tau_and_chances_unchanged():
     results = []
     for luck_vector, noise_seed in ((luck, 1), (swapped, 2)):
         random.seed(noise_seed)  # anything else drawn in the process must not matter either
-        res = steering.run_race(geo, setup, pols)
-        tau = trip.tau(res["trip"], list(range(1, 9)), row)
+        res = steering.run_race(geo, setup, pols, CFG)
+        tau = trip.tau(res["trip"], list(range(1, 9)), row, CFG)
         p = m.live_chances(setup["q"], R, mcfg, tau)
         finish = sorted(range(8), key=lambda i: (luck_vector[i] / p[i], i))
         results.append((tau, p, finish))
@@ -545,14 +547,15 @@ def test_same_inputs_same_outputs():
 
 @pytest.fixture(scope="module")
 def report():
-    return steering.load_report()
+    return steering.load_report("d054")
 
 
 def test_stored_report_is_current_and_meets_every_target(report):
-    """sims/steering.py --write stores the full run (600 races per course x distance). It must
-    be made with today's config and baseline and pass every acceptance target in every cell."""
-    data = steering.load_baseline()
-    assert report["config"] == trip.config_record(trip.CONFIG)
+    """sims/steering.py --profile d054 --write stores the full D-054 run (600 races per course x
+    distance). It must be made with the D-054 config and baseline and pass every acceptance
+    target in every cell."""
+    data = steering.load_baseline("d054")
+    assert report["config"] == trip.config_record(CFG)
     assert report["baselineSeed"] == data["seed"] and report["baselineRaces"] == data["races"]
     assert report["mixWeight"] == data["mixWeight"] == steering.MIX_WEIGHT
     assert report["races"] >= 600
@@ -579,7 +582,7 @@ def test_small_run_meets_the_targets_on_every_course():
     between -0.02 and -0.01, a casual rider's inward presses reach their lane within 3 s at
     least 70% of the time, and draft is at most 40% of the positive trip (pooled; per cell in
     the stored full report)."""
-    table = steering.load_baseline()["baseline"]
+    table = steering.load_baseline("d054")["baseline"]
     pos_d = pos_g = 0.0
     for course in trip.COURSE_ORDER:
         for distance in ("Sprint", "Classic"):
@@ -595,15 +598,15 @@ def test_small_run_meets_the_targets_on_every_course():
                 for pol in ("smart", "rail", "never", "scripted"):
                     pols = ["bot"] * 8
                     pols[f] = pol
-                    res = steering.run_race(geo, setup, pols)
-                    taus[pol] = trip.tau(res["trip"], steering.posts(), row)[f]
+                    res = steering.run_race(geo, setup, pols, CFG)
+                    taus[pol] = trip.tau(res["trip"], steering.posts(), row, CFG)[f]
                     if pol == "scripted":
                         ok += res["reach"][0]
                         n += res["reach"][1]
                 diff.append(taus["rail"] - taus["smart"])
                 never.append(taus["never"])
-                res = steering.run_race(geo, setup, ["bot"] * 8)
-                bots.append((trip.tau(res["trip"], steering.posts(), row), res["draft"], res["ground"]))
+                res = steering.run_race(geo, setup, ["bot"] * 8, CFG)
+                bots.append((trip.tau(res["trip"], steering.posts(), row, CFG), res["draft"], res["ground"]))
             assert 0.01 <= sum(diff) / len(diff) <= 0.03, (course, distance, sum(diff) / len(diff))
             assert -0.02 <= sum(never) / len(never) <= -0.01, (course, distance, sum(never) / len(never))
             assert ok / n >= 0.70, (course, distance, ok / n)
@@ -623,7 +626,7 @@ def test_small_run_meets_the_targets_on_every_course():
 def test_small_run_smart_kid_among_bots_matches_the_stored_report(report):
     """A Smart Steer kid at every post among bots (dirt Sprint, 20 races, 160 samples) agrees
     with the stored full-run mean, which the report test holds to 0 +- 0.003 in every cell."""
-    table = steering.load_baseline()["baseline"]
+    table = steering.load_baseline("d054")["baseline"]
     stored = {(r["course"], r["distance"]): r for r in report["summary"]["rows"]}
     course, distance = "dirt", "Sprint"
     cell = steering.cells().index((course, distance))
@@ -633,8 +636,8 @@ def test_small_run_smart_kid_among_bots_matches_the_stored_report(report):
     for k in range(20):
         setup = steering.race_setup(steering.race_seed(4343, cell, k), distance)
         for p in range(8):
-            res = steering.run_race(geo, setup, steering.smart_at(p))
-            taus.append(trip.tau(res["trip"], steering.posts(), row)[p])
+            res = steering.run_race(geo, setup, steering.smart_at(p), CFG)
+            taus.append(trip.tau(res["trip"], steering.posts(), row, CFG)[p])
     mu = sum(taus) / len(taus)
     se = math.sqrt(sum((t - mu) ** 2 for t in taus) / (len(taus) - 1) / len(taus))
     assert abs(mu - stored[(course, distance)]["smart_among_bots"]) <= 4 * se + 0.0005
@@ -643,15 +646,16 @@ def test_small_run_smart_kid_among_bots_matches_the_stored_report(report):
 # ---------------------------------------------------------------- generated baseline files
 
 def test_baseline_files_are_current():
-    data = steering.load_baseline()
-    assert data["config"] == trip.config_record(trip.CONFIG), (
-        "GameConfig.steering mirror changed: run python sims/steering.py --write")
+    """The D-054 baseline (the switch-back's: a live --write with the D-054 config reproduces
+    it). The game's table is tests/test_trip_d057.py's."""
+    data = steering.load_baseline("d054")
+    assert data["config"] == trip.config_record(CFG), (
+        "the D-054 config changed: run python sims/steering.py --profile d054 --write")
     assert data["race"] == trip.RACE
     assert data["races"] >= 2000 and data["calibrationPasses"] == steering.CALIBRATION_PASSES
     for course in trip.COURSE_ORDER:
         for distance in trip.DISTANCE_ORDER:
             assert len(data["baseline"][course][distance]) == 8
-    assert steering.BASELINE_LUAU.read_text() == steering.render_luau(data)
 
 
 @pytest.mark.parametrize("course,distance", [("dirt", "Sprint"), ("turf", "Mile"), ("dirt", "Marathon")])
@@ -660,8 +664,8 @@ def test_regenerating_the_baseline_matches(course, distance):
     race, the mix and the calibration passes) on the first races of a cell reproduces the
     stored probe exactly, so python sims/steering.py --write reproduces the checked-in files.
     The other cells' probes are checked by the same code (stored for all eight)."""
-    data = steering.load_baseline()
-    assert steering.probe_cell(course, distance) == data["probe"]["baseline"][course][distance]
+    data = steering.load_baseline("d054")
+    assert steering.probe_cell(course, distance, CFG) == data["probe"]["baseline"][course][distance]
 
 
 # ---------------------------------------------------------------- parity fixtures
@@ -723,46 +727,45 @@ def test_trip_fixture_replays_exactly():
                                                       "laps": 0}
 
 
-# ---------------------------------------------------------------- D-057 off: D-054 bit for bit
+# ---------------------------------------------------------------- the switch-back: D-054 bit for bit
 
-def test_d057_rules_are_all_off_by_default():
-    """N1 adds every D-057 rule switched off: CONFIG holds D-054's behaviour, and the files made
-    before D-057 record the config without the new keys (trip.config_record)."""
+def test_d054_config_switches_every_d057_rule_off():
+    """trip.d054_config() is CONFIG with every D-057 key at its D-054 value (D057_OFF): the
+    switch-back. Files made with it record the config without the D-057 keys
+    (trip.config_record), as every file made before D-057 did."""
     off = {"glide": "linear", "chainWindow": 0.0, "reverseGapSeconds": 0.0, "weaveGapSeconds": 0.0,
            "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0, "blockedPress": "d054", "brush": "off"}
     for key, value in off.items():
         assert CFG[key] == value, key
     assert set(trip.D057) == set(off)
-    assert all(CFG[k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
+    assert all(CFG[k] == trip.D057_OFF[k] for k in trip.D057_KEYS) and not trip.d057_on(CFG)
+    assert all(CFG[k] == trip.CONFIG[k] for k in CFG if k not in trip.D057_KEYS)
     record = trip.config_record(CFG)
     assert list(record) == [k for k in CFG if k not in trip.D057_KEYS]
-    assert record == steering.load_baseline()["config"] == steering.load_report()["config"]
+    assert record == steering.load_baseline("d054")["config"] == steering.load_report("d054")["config"]
     assert trip.config_from_record(record) == CFG
+    assert trip.d054_config()["smart"] is not trip.CONFIG["smart"]  # a copy: changing it never touches CONFIG
 
 
-def test_records_survive_the_n3_flip(monkeypatch):
-    """D057_OFF is a literal of the D-054 values, not read from CONFIG. After N3 switches D-057 on
-    in CONFIG (simulated here), a D-057 config still records every D-057 key, and a record made
-    before D-057 (no D-057 keys) still reads back as D-054, never as "eased"."""
+def test_records_survive_the_n3_flip():
+    """D057_OFF is a literal of the D-054 values, not read from CONFIG. With D-057 on in CONFIG
+    (N3, brushes still off), a D-057 config records every D-057 key, and a record made before
+    D-057 (no D-057 keys) still reads back as D-054, never as "eased"."""
     old_record = trip.config_record(CFG)
-    for key, value in trip.D057.items():
-        if key != "brush":  # N3 flips everything but the brushes (N5)
-            monkeypatch.setitem(trip.CONFIG, key, value)
     assert trip.D057_OFF["glide"] == "linear" and trip.D057_OFF["blockedPress"] == "d054"
     flipped = trip.config_record(trip.CONFIG)
-    assert all(k in flipped for k in trip.D057_KEYS) and flipped["glide"] == "eased"
+    assert all(k in flipped for k in trip.D057_KEYS) and flipped["glide"] == "eased" and flipped["brush"] == "off"
     back = trip.config_from_record(old_record)
     assert all(back[k] == trip.D057_OFF[k] for k in trip.D057_KEYS) and back["glide"] == "linear"
     assert trip.config_record(back) == old_record
 
 
 def test_d054_trip_fixture_runs_are_byte_identical_to_before_d057():
-    """The D-054 parity runs (trip.json) regenerate byte for byte as they did before N1: the
-    hash of eight runs' JSON and of the recorded config, taken from trip.json made at main
-    7abfa27. The Luau parity test replays the whole regenerated file against Trip.luau, which
-    has no D-057 code yet."""
+    """The D-054 parity runs regenerate byte for byte as they did before N1: the hash of eight
+    runs' JSON (with the D-054 config and baseline, the switch-back) and of the recorded config,
+    taken from trip.json made at main 7abfa27, before any D-057 code."""
     picks = [0, 9, 25, 50, 75, 100, 151, 199]
-    fx = make_fixtures.trip_fixture(only=picks)
+    fx = make_fixtures.trip_fixture(only=picks, base=CFG, baseline=steering.load_baseline("d054")["baseline"])
     h = hashlib.sha256()
     for run in fx["runs"]:
         h.update(json.dumps(run).encode())
@@ -771,9 +774,10 @@ def test_d054_trip_fixture_runs_are_byte_identical_to_before_d057():
     assert cfg_hash == "92644721342ce41db521740efcc806dcb20f1973aea3445a99ffbd01db8e40ed"
 
 
-def test_default_config_never_takes_a_d057_path():
-    """With the D-054 config a race never bounces, steadies, brushes or reverses late, and the
-    D-057 state stays at rest: no sideways speed, no brushes, no steadying back."""
+def test_d054_config_never_takes_a_d057_path():
+    """With the D-054 config (the switch-back) a race never bounces, steadies, brushes or
+    reverses late, and the D-057 state stays at rest: no sideways speed, no brushes, no
+    steadying back."""
     for seed in range(4):
         rng = random.Random(seed)
         course, distance = steering.cells()[seed * 2]

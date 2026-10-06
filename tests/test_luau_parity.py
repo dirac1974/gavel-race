@@ -16,9 +16,10 @@ FIXTURES = ROOT / "tests" / "fixtures"
 FIXTURE_INPUTS = [
     ROOT / "src" / "trip.py", ROOT / "src" / "gavel_race_v2.py", ROOT / "src" / "race_rating.py",
     ROOT / "src" / "stride.py", ROOT / "src" / "pace_meter.py", FIXTURES / "make_fixtures.py",
-    FIXTURES / "trip_baseline.json",
+    FIXTURES / "trip_baseline.json", FIXTURES / "trip_baseline_d054.json",
 ]
-FIXTURE_OUTPUTS = [FIXTURES / "race_math.json", FIXTURES / "trip.json", FIXTURES / "trip_d057.json"]
+FIXTURE_OUTPUTS = [FIXTURES / "race_math.json", FIXTURES / "trip.json", FIXTURES / "trip_d054.json",
+                   FIXTURES / "trip_d057.json"]
 STAMP = FIXTURES / ".fixtures.sha256"
 
 

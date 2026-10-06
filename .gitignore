@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 tests/fixtures/race_math.json
 tests/fixtures/trip.json
+tests/fixtures/trip_d054.json
 tests/fixtures/trip_d057.json
 tests/fixtures/.fixtures.sha256
 

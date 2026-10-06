@@ -11,8 +11,11 @@
 --   finish plays at normal speed, with a photo-finish still when it was close.
 --   Overlays: REPLAY letterbox, your tap shapes as they happened, a pulse when your burst
 --   landed, "+N" when you gained places. No tap pad, no race-again or shop prompts.
---   Steering (D-054 S4): horses run in the lanes recorded on this screen (ReplayTrip.laneAt; older
---   recordings use the posts). A rider who had the ◀ ▶ buttons sees their line up to the lock drawn
+--   Steering (D-054 S4): horses run in the lanes recorded on this screen, on a smooth curve through
+--   them (ReplayTrip.laneCurve; older recordings use the posts), turning and leaning through lane
+--   changes as they did live with the eased glide (SteerPose, from the replayed lanes and progress,
+--   D-057 N3; none with D-054's linear glide, the switch-back). A rider
+--   who had the ◀ ▶ buttons sees their line up to the lock drawn
 --   on the track behind their horse as a gold ribbon, green with chevrons through the turns where
 --   they saved ground, wind lines while they were tucked in, and "Lanes locked!" as they pass the
 --   lock marker (a bar across the track at the far-turn entry, shown in every steering race).
@@ -27,6 +30,8 @@ local GuiService = game:GetService("GuiService")
 local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local TrackLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrackLayout"))
 local ReplayTrip = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ReplayTrip"))
+local SteerPose = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SteerPose"))
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -34,6 +39,7 @@ if not okSound then Sound = nil end
 
 local player = Players.LocalPlayer
 local HORSE_LENGTH = 8
+local POSED = GameConfig.steering.glide == "eased" -- bodies turn and lean (D-057); not with D-054's linear glide
 local RESULT_ART = { Perfect = "label_perfect", Great = "label_great", Good = "label_good", Okay = "label_okay", Miss = "label_miss" }
 
 local function reducedMotion(): boolean
@@ -220,16 +226,17 @@ local camBtn = button("Behind", UDim2.new(1, -290, 0.015, 0), UDim2.fromOffset(1
 -- Playback ---------------------------------------------------------------------------
 local playing = nil -- { rec, mode, clock, quarterT, crossT, endT, slowFrom, eventIdx, lastPlace, view, frozenUntil }
 
+-- The frames around t, the fraction between them, and the later one's index.
 local function frameAt(rec, t: number)
 	local frames = rec.frames
-	if t <= frames[1].t then return frames[1], frames[1], 0 end
+	if t <= frames[1].t then return frames[1], frames[1], 0, 1 end
 	for k = 2, #frames do
 		if frames[k].t >= t then
 			local a, b = frames[k - 1], frames[k]
-			return a, b, (t - a.t) / math.max(1e-6, b.t - a.t)
+			return a, b, (t - a.t) / math.max(1e-6, b.t - a.t), k
 		end
 	end
-	return frames[#frames], frames[#frames], 0
+	return frames[#frames], frames[#frames], 1, #frames -- (past the last frame: on it, f = 1)
 end
 
 local function stop()
@@ -288,7 +295,9 @@ local function start(mode: string)
 		eventIdx = 1, view = "side", frozenUntil = nil, lastPlace = nil, photoChecked = false,
 		subject = rec.myLane or winner or 1, -- a spectator's replay follows the winner
 		strips = buildTrip(rec), stripIdx = 1, lockShown = false,
+		pose = {}, lastProgress = {}, -- SteerPose per horse, fresh: the first frame turns nobody
 	}
+	for i = 1, rec.lanes do playing.pose[i] = SteerPose.new() end
 	-- "Watch the finish" starts after the lock: no "Lanes locked!" then.
 	playing.lockShown = rec.lockAt ~= nil and playing.clock > rec.lockAt + 0.5
 	-- skip events before the start point
@@ -327,16 +336,34 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, _start, _c
 	end
 end)
 
--- Places every horse at time t; returns their progress and lane positions.
-local function placeAll(rec, t: number, speed: number?)
-	local a, b, f = frameAt(rec, t)
+-- Places every horse at time t (raceDt = race seconds since the last frame); returns their
+-- progress and lane positions.
+local function placeAll(rec, t: number, speed: number?, raceDt: number)
+	local a, b, f, k = frameAt(rec, t)
 	local progress, lanes = {}, {}
+	local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
+	local railLength = TrackLayout.railLength(cfg, rec.plan)
 	for i = 1, rec.lanes do
 		local p = (a[i] or 0) + ((b[i] or 0) - (a[i] or 0)) * f
 		progress[i] = p
 		-- Recorded lane positions (D-054): per frame when steering moved them, else the posts.
-		lanes[i] = ReplayTrip.laneAt(rec, a, b, f, i)
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i])
+		lanes[i] = ReplayTrip.laneCurve(rec, k, f, i)
+		-- The body turns and leans as it did live (SteerPose): forward speed from the replayed
+		-- progress, in race time, so a 3x or slow-motion replay turns the same way.
+		local yaw, roll = 0, 0
+		local last = playing.lastProgress[i]
+		if POSED and last and raceDt > 0 then
+			local forward = (p - last) * railLength / raceDt
+			yaw, roll = SteerPose.step(playing.pose[i], GameConfig.steerView, lanes[i], raceDt, forward, cfg.laneWidth, 0)
+		elseif POSED then -- the first frame: start at the sideways speed the recording has here (no flick mid-glide)
+			local a0, b0, f0, k0 = frameAt(rec, t - 0.05)
+			local before = ReplayTrip.laneCurve(rec, k0, f0, i)
+			local p0 = (a0[i] or 0) + ((b0[i] or 0) - (a0[i] or 0)) * f0
+			yaw, roll = SteerPose.prime(playing.pose[i], GameConfig.steerView, lanes[i], (lanes[i] - before) * cfg.laneWidth / 0.05,
+				(p - p0) * railLength / 0.05)
+		end
+		playing.lastProgress[i] = p
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i], yaw, roll)
 	end
 	return progress, lanes
 end
@@ -360,7 +387,7 @@ RunService.RenderStepped:Connect(function(dt)
 	if playing.clock >= playing.slowFrom and playing.clock < playing.crossT then speed = 0.5 end
 	playing.clock += dt * speed
 	local t = playing.clock
-	local progress, lanes = placeAll(rec, t, speed)
+	local progress, lanes = placeAll(rec, t, speed, dt * speed)
 	local me = rec.myLane
 
 	-- Camera.
@@ -381,11 +408,15 @@ RunService.RenderStepped:Connect(function(dt)
 		local pivot = horse:GetPivot()
 		local target = pivot.Position + Vector3.new(0, 4, 0)
 		-- Side view from just outside the outer rail (broadcast angle), so no horse runs through it.
+		-- The camera follows the track's heading at the horse, never its body turn or lean (D-057).
 		local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
 		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, lanes[subject] or subject) + 12 -- its lane now
+		local _, _, dx, dz = TrackLayout.railPoint(cfg, rec.plan, (progress[subject] or 0) * TrackLayout.railLength(cfg, rec.plan),
+			lanes[subject] or subject)
+		local look, right = Vector3.new(dx, 0, dz), Vector3.new(-dz, 0, dx)
 		local eye = if playing.view == "side"
-			then target + pivot.RightVector * outside + Vector3.new(0, 6, 0)
-			else target - pivot.LookVector * 18 + Vector3.new(0, 7, 0)
+			then target + right * outside + Vector3.new(0, 6, 0)
+			else target - look * 18 + Vector3.new(0, 7, 0)
 		camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(eye, target), math.min(1, dt * 4))
 	end
 

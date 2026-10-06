@@ -76,6 +76,35 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	local older = { frames = { { t = 1, [1] = 0.1 }, { t = 1.1, [1] = 0.2 } } }
 	check(ReplayTrip.laneAt(old, old.frames[1], old.frames[2], 0.5, 1) == 6 and ReplayTrip.laneAt(older, older.frames[1], older.frames[2], 0.5, 1) == 1,
 		"recordings without lanes: the post, else the lane number")
+	-- The replay's smooth curve through the recorded lanes (D-057 N3): through every frame, never past
+	-- a lane, smooth (no corner at a frame), and older recordings on their posts.
+	local glideFrames = {}
+	for k = 0, 20 do
+		local tt = k * 0.1
+		local u = math.clamp((tt - 0.5) / 1.0, 0, 1) -- a 1.0 s S-curve from lane 3 to lane 2 from t = 0.5
+		glideFrames[k + 1] = { t = tt, [1] = 0.01 * k, x = { 3 - (3 * u * u - 2 * u * u * u) } }
+	end
+	local glideRec = { frames = glideFrames, lane = { 3 } }
+	local throughOk, insideOk, smoothOk, lastSlope = true, true, true, nil
+	for k = 2, #glideFrames do
+		if math.abs(ReplayTrip.laneCurve(glideRec, k, 0, 1) - glideFrames[k - 1].x[1]) > 1e-12
+			or math.abs(ReplayTrip.laneCurve(glideRec, k, 1, 1) - glideFrames[k].x[1]) > 1e-12 then
+			throughOk = false
+		end
+		for step = 0, 9 do
+			local f = step / 10
+			local xc = ReplayTrip.laneCurve(glideRec, k, f, 1)
+			local lo, hi = math.min(glideFrames[k - 1].x[1], glideFrames[k].x[1]), math.max(glideFrames[k - 1].x[1], glideFrames[k].x[1])
+			if xc < lo - 1e-12 or xc > hi + 1e-12 then insideOk = false end
+			local slope = (ReplayTrip.laneCurve(glideRec, k, f + 0.05, 1) - xc) / 0.005
+			if lastSlope and math.abs(slope - lastSlope) > 0.5 then smoothOk = false end
+			lastSlope = slope
+		end
+	end
+	check(throughOk and insideOk, "replay lanes run through every recorded frame and never past a lane")
+	check(smoothOk, "...on a smooth curve (no corner at the 10 Hz frames, even in slow motion)")
+	check(ReplayTrip.laneCurve(old, 2, 0.5, 1) == 6 and ReplayTrip.laneCurve(older, 2, 0.5, 1) == 1 and ReplayTrip.laneCurve(rec, 1, 0, 1) == 2,
+		"older recordings: the post, else the lane number; before the first frame, the first frame")
 	check(ReplayTrip.ribbon(old, 1) == nil and ReplayTrip.ribbon(older, 1) == nil and not ReplayTrip.tuckedAt(older, 1)
 		and #ReplayTrip.events(older, "saved") == 0, "an old recording draws no line, no wind lines, no chevrons, and nothing errors")
 	-- A rider's race recorded with the same builders the race uses: 40 frames from t = 0, a turn from
@@ -114,7 +143,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		and string.find(rc, "RaceState.recording.steer = true", 1, true) ~= nil
 		and string.find(rc, "ResultsText.tripLine(rideReport.tripStars, STEER.scale)", 1, true) ~= nil,
 		"the race records lanes, the lock, saved turns, tucked spans and the buttons; the card asks ResultsText")
-	check(string.find(replay, "ReplayTrip.laneAt(rec, a, b, f, i)", 1, true) ~= nil and string.find(replay, "lanes[subject] or subject", 1, true) ~= nil
+	check(string.find(replay, "ReplayTrip.laneCurve(rec, k, f, i)", 1, true) ~= nil and string.find(replay, "lanes[subject] or subject", 1, true) ~= nil
 		and string.find(replay, "RaceState.finishFollowed()", 1, true) ~= nil and string.find(replay, "RaceState.restHorses(rec.course, rec.lanes)", 1, true) ~= nil,
 		"Replay places by recorded lanes, frames the camera on the lane now, keeps the D-055 handover and the legs' rest")
 	for _, src in { replay, rc, fs.readFile("game/src/shared/ResultsText.luau") } do
