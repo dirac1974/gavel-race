@@ -248,6 +248,10 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
   - GrownUps: "Horses can get boxed in, like in real racing. They wait for a gap or ease back to find one. Being boxed in never costs points."
   - The ghost-thumb tip is unchanged.
 - **Tests:** `SteerPredict.sideState` cases; chip rate limits as a pure helper (`SteerChips`) with tests; arrow-state table tests.
+- **As built (2026-10-06; DECISIONS D-057 N4 note, REVIEW_QUEUE "N4" rows):**
+  - The side states come from the server (`Trip.riderLane`, using `Trip.sideState`), carried by `SteerLane` as `(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, courseId)`. There is no client `SteerPredict.sideState`, so the arrows never disagree with the server. `"edge"` (the rail, the outside) never greys.
+  - The arrow mapping and the wobble and "Gap!" detection live in `SteerHud`; the chip limits live in `SteerChips`. Both are pure and tested in `steer_hud_tests.luau`.
+  - Good-news chips always show; only "No room yet" gives way to `chipMinGap`.
 
 ### N5. Brushes on (model-engineer + roblox-engineer)
 

@@ -1051,6 +1051,32 @@ Template:
     - The D-054 switch-back (`d054`, with the D-054 baseline): the four D-054 reports (bots; 2 riders predicting at 0.1 s and 0.25 s; 3 riders on manual) print exactly what main prints. Its jitter row still fails as D-054 always did (608 races falling back at 22.2 ft/s): the linear glide keeps D-054's arrival-timed drawing.
     - A second seed family (3,840 races: the game's config, own screen at 0.1 s, jitter, own screen at 0.25 s with jitter) passes every gate too (0–1 late moves a row).
     - Second review: the report also judges the order in which the horses cross the line on the drawn screen (each horse's pace plus drawn offset reaching the race length); right in every race of every mode. RaceService now steps and sends every fixed tick before the lock (the loop wakes about every 0.117 s, so about one tick in seven used to go unsent); `trip_d054.json` (20 runs on the switch-back, the D-054 baseline) keeps Trip.luau's D-054 path at parity in CI; resting horses (the race ends or aborts, a replay closes) straightens their bodies; a long frame gap can't overshoot the playback delay.
+- N4 (2026-10-06, roblox engineer): the boxed-in UI, for riders with the buttons.
+  - **What the rider hears.** `SteerLane` is now `(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, courseId)`, course id last. It is built by `Trip.riderLane` and sent on change, up to the lock, to riders with the buttons only.
+    - `wait` is the direction of a press waiting for room; `waitAt` is the race time it started waiting.
+    - `tucking` says whether a tuck-back is under way.
+    - Each side is `"free"`, `"tuck"` (inward only: no room, but tuck-back finds a slot), `"blocked"` (a horse is in the way and tuck-back can't help) or `"edge"` (the rail or the outside). The server works it out (`Trip.sideState`, at parity with Python) rather than the client from its drawn lanes, as the plan had it, so the arrows never disagree with what the server will do.
+  - **The arrows** (`SteerHud`, pure):
+    - Out ▶ greys, with a small 🐎 icon, while a horse leaves no room outside. ◀ In greys only when `"blocked"` (D-057's "trapped"), never when `"tuck"`, so it never greys a button that still works at once.
+    - Grey arrows still take presses. No buzz, no red.
+    - A press waiting for room shows a 3 px ring in the button's colour: lit (breathing gently; steady under Reduced Motion) for an inward press, filling over `gapWaitSeconds` (1.5 s) for an outward one.
+    - An outward press that drops after its wait makes its arrow wobble ±4° over 0.2 s, with no sound; none under Reduced Motion. A wait you cancel by pressing the other way doesn't wobble.
+  - **The chips** (`SteerChips`, pure):
+    - "No room yet" once a press has waited 1 s with no move and no tuck-back; once per wait, at most once per 10 s, and never within 2 s of another steering chip.
+    - "Gap!" with `tap_good` when a wait of at least 0.5 s ends in the move.
+    - Good-news chips ("Saved ground!", "Tucked in!", "Gap!", the turn tip, "Lanes locked!") always show, and only "No room yet" gives way to them.
+  - **Who sees it:** only riders with the buttons. Spectators and a rider's first 3 races hear no `SteerLane`, and the HUD needs `shown`. The buttons show for every input, so keyboard and gamepad riders get the same arrows, ring, wobble and chips.
+  - **Grown-ups page:** "Horses can get boxed in, like in real racing. They wait for a gap or ease back to find one. Being boxed in never costs points."
+  - **Calls made where the plan was open** (in REVIEW_QUEUE):
+    - The side states come from the server.
+    - Nothing greys at the rail or the outside: there's no horse there, so a grey arrow with a horse icon would be wrong. Those presses are refused quietly, as in D-054.
+    - Good-news chips always show.
+    - The wobble only follows a drop by the server.
+    - The outward ring fills straight across, not round the edge (Roblox UI has no radial fill without an image).
+  - **Measured over 6 whole fields of pressing horses** (`steer_hud_tests`):
+    - ◀ In greyed in 3,017 rider-ticks, always with `Trip.noTuckInside`, and never in any of the 6,003 tuck-back states.
+    - Out ▶ greyed exactly when its side was `"blocked"` (9,320), and never at the edge.
+  - The overlap report is unchanged in every mode.
 - Alternatives:
   - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.
   - **Body turn 1.5× the drift, capped at 12°** (Engagement, Competitive): a horse drawn turning more than it moves reads as skidding.

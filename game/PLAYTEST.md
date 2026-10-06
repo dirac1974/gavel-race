@@ -330,6 +330,18 @@ The motion and press rules are on for every horse: players, Smart Steer and bots
 - [ ] **Logs:** the `[Trip]` line at the lock ends with "held by the reverse or weave gap N, waits dropped N".
 - [ ] Back to D-054 in a test place: the seven keys in REVIEW_QUEUE ("D-057 (N3: switch-back)"), then `python sims/steering.py --write` for the baseline; glides are 0.6 s and linear again, bodies don't turn or lean, there's no look cue, and your own glide starts on the press, as before D-057.
 
+## Boxed in (D-057 N4)
+From your 4th race on (the buttons are shown). Spectators and a rider's first 3 races see none of this.
+- [ ] **Out ▶ greys** (soft grey, a small 🐎 in its corner) while a horse is beside you on the outside, and comes back as soon as there's room. It never turns red and makes no buzz, and pressing it still works (the press waits).
+- [ ] **◀ In greys only when you're truly trapped** (a horse inside and no gap to ease back into, rare). When a horse is inside but you could ease back behind it, ◀ In stays normal, and pressing it eases you back and slips you in ("Tucked in!").
+- [ ] **Nothing greys at the rail or the outside lane:** pressing ◀ on the rail just does nothing, as before.
+- [ ] **Wait ring:** press ◀ with a horse inside and no gap: a thin ring lights round ◀ while it waits, then the horse moves in when a gap opens ("Gap!" with a soft chime if it waited half a second or more). Press Out ▶ with a horse outside: the ring fills across Out ▶ over 1.5 s; if no gap comes, the arrow wobbles gently once and the press is forgotten. No sound. With Reduced Motion on: no wobble, no breathing ring.
+- [ ] **"No room yet"** appears above the buttons after a second of waiting, at most once every 10 s, and never right after another chip. It never says "boxed in", never mentions points or a cost, and never hurries you.
+- [ ] **Keyboard and gamepad:** A/D, the arrows, the D-pad and stick flicks into a blocked side give the same ring, wobble and chips on the on-screen buttons.
+- [ ] **Phone:** the grey look, the 🐎 icon and the ring fit inside the buttons' safe area (no clipping near a notch), and the chip sits above the buttons.
+- [ ] **At "Lanes locked!"** the boxed-in look clears and the buttons go the usual locked grey.
+- [ ] **Grown-ups page:** "Horses can get boxed in, like in real racing. They wait for a gap or ease back to find one. Being boxed in never costs points."
+
 ## Replays and results (steering S4, D-054)
 Plan section D, from your 4th race on (the buttons are shown):
 - [ ] **Results:** under "You rode ★★☆" comes "Good trip ★★☆" (one to three stars, never none). "Your trip gained you N places!" shows inside the card only when your trip gained places, with "Your riding gained you N places!" above it when riding did too. No line ever says you lost a place.

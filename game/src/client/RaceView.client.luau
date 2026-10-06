@@ -241,8 +241,9 @@ function RaceState.predictSteer(dir: number, seq: number): boolean
 	return SteerPredict.press(race.predict, race.own, dir, seq, os.clock())
 end
 
--- Your own lane from the server (riders with the buttons, on change, up to the lock).
-remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack, courseId)
+-- Your own lane from the server (riders with the buttons, on change, up to the lock). The boxed-in
+-- fields (a waiting press, tuck-back, each side's room) are RaceController's (D-057 N4).
+remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack, _wait, _waitAt, _tucking, _inSide, _outSide, courseId)
 	local race = races[courseId or "dirt"]
 	if race and race.own then race.own.srv = { tgt = tgt, dest = dest, ack = ack } end
 end)

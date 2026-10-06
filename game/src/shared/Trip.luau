@@ -915,6 +915,28 @@ function Trip.start(config: any, session: any, track: any, plan: any, baselineRo
 	return st
 end
 
+-- What a rider with the buttons hears about their own lane (SteerLane, D-054 S3 and D-057 N4),
+-- Luau only: the lane taken (tgt), where it ends once every waiting press is done (dest), the last
+-- press answered (ack), a press waiting for room (wait: its direction, 0 if none; waitAt: the race
+-- time it started waiting), whether a tuck-back is under way (tucking), and each side's room
+-- (inSide, outSide): "free", "tuck" (inward: no room, but tuck-back finds a slot), "blocked" (a
+-- horse is in the way and tuck-back can't help) or "edge" (the rail or the outside: no lane there).
+-- Fills `out` (no allocation) and returns it.
+local function riderSide(st: any, i: number, d: number): string
+	local lane = st.tgt[i] + d
+	if lane < 1 or lane > st.lanes then return "edge" end
+	return Trip.sideState(st, i, d)
+end
+
+function Trip.riderLane(st: any, i: number, out: any): any
+	out.tgt, out.dest, out.ack = st.tgt[i], Trip.laneAfter(st, i), if st.ack then st.ack[i] else 0
+	out.wait = st.want[i]
+	out.waitAt = if st.want[i] ~= 0 then st.wantAt[i] else 0
+	out.tucking = st.tucking[i] == true
+	out.inSide, out.outSide = riderSide(st, i, -1), riderSide(st, i, 1)
+	return out
+end
+
 -- A SteerRequest from a player (S3), checked as it arrives: the player rides in this race (a
 -- rider's lane, never a bot's), it's before the lock, dir is -1 (in) or 1 (out), seq rises, and
 -- the rider has sent fewer than requestsPerSecond in the last second (spam is dropped). A request

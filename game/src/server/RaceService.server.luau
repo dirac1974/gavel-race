@@ -72,7 +72,7 @@ local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on,
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
-local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, course (D-054 S3)
+local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, course (D-054 S3, D-057 N4)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
@@ -694,23 +694,29 @@ local function runRace(c, players: { Player })
 		-- spacing is exactly how far they moved.
 		local lastStamp = tStart
 		local sentLanes, lanesAt, resend = nil, -math.huge, 0
-		local sentOwn: { [Player]: { number } } = {}
+		local sentOwn: { [Player]: any } = {}
+		local scratchOwn = {}
 		local function send(stamp: number, frameDt: number)
 			local w = RaceShape.blendWeight(stamp, tFar, postEnd, GameConfig.raceShape.blendPower)
 			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, frameDt, stamp - tStart)
 			lastStamp = stamp
-			-- Each rider with the buttons hears about their own lane when it changes, up to the lock:
-			-- the lane taken, where it ends, the last press answered (their screen's look cue and, with
-			-- D-054's linear glide, its prediction: SteerPredict).
+			-- Each rider with the buttons (and nobody else) hears about their own lane when it changes,
+			-- up to the lock (Trip.riderLane): the lane taken, where it ends, the last press answered
+			-- (their screen's look cue and, with D-054's linear glide, its prediction: SteerPredict),
+			-- a press waiting for room and since when, tuck-back, and each side's room (the grey
+			-- arrows, the wait ring, the wobble and the chips: SteerHud, SteerChips, D-057 N4).
 			if not trip.locked then
 				for p in steers do
 					local i = session:laneIndex(tostring(p.UserId))
 					if i and p.Parent then
-						local own = { trip.tgt[i], Trip.laneAfter(trip, i), trip.ack[i] }
 						local was = sentOwn[p]
-						if not was or was[1] ~= own[1] or was[2] ~= own[2] or was[3] ~= own[3] then
-							sentOwn[p] = own
-							SteerLane:FireClient(p, own[1], own[2], own[3], c.id)
+						local own = Trip.riderLane(trip, i, scratchOwn)
+						if not was or was.tgt ~= own.tgt or was.dest ~= own.dest or was.ack ~= own.ack or was.wait ~= own.wait
+							or was.waitAt ~= own.waitAt or was.tucking ~= own.tucking or was.inSide ~= own.inSide
+							or was.outSide ~= own.outSide then
+							sentOwn[p] = table.clone(own)
+							SteerLane:FireClient(p, own.tgt, own.dest, own.ack, own.wait, own.waitAt, own.tucking, own.inSide,
+								own.outSide, c.id)
 						end
 					end
 				end
