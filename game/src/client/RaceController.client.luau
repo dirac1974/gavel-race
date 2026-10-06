@@ -31,6 +31,8 @@ local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local RaceInput = require(Shared:WaitForChild("RaceInput"))
 local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local ReplayTrip = require(Shared:WaitForChild("ReplayTrip"))
+local SteerHud = require(Shared:WaitForChild("SteerHud"))
+local SteerChips = require(Shared:WaitForChild("SteerChips"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -637,6 +639,13 @@ end
 -- left-stick flick (RaceInput). None of them is a tap (D-055). Chips above the buttons say what
 -- steering did ("Saved ground!", "Tucked in!" with wind lines) and give a gentle tip when you're
 -- wide into a turn; never a lost place, never a countdown.
+-- Boxed in (D-057 N4, from the server's SteerLane: SteerHud, SteerChips): Out ▶ greys, with a small
+-- horse icon, while a horse leaves no room outside; ◀ In greys only when tuck-back can't help.
+-- Grey arrows still take presses (no buzz, no red). A press waiting for room shows a thin ring on
+-- its arrow (lit inward, filling outward); an outward press that drops after its wait makes its
+-- arrow wobble gently (none under Reduced Motion). "No room yet" after a second of waiting (at most
+-- once per 10 s), "Gap!" when a wait ends in the move. The buttons show for every input, so keys
+-- and the gamepad get the same arrows, ring, wobble and chips.
 -- The buttons, chips and tip live in their own screen inside the device's safe area (clear of a
 -- notch), drawn over RaceUI so a press on them never reaches the tap area.
 local steerGui = Instance.new("ScreenGui")
@@ -653,6 +662,10 @@ steerPad.ZIndex = 8
 steerPad.Visible = false
 steerPad.Parent = steerGui
 local BUTTON_COLOUR, LOCKED_COLOUR = Color3.fromHex("F4EFE6"), Color3.fromRGB(170, 170, 170)
+local GREY_COLOUR = Color3.fromRGB(SHUD.greyRgb[1], SHUD.greyRgb[2], SHUD.greyRgb[3]) -- a boxed-in arrow (D-057 N4): soft, never red
+-- Per button: the small horse icon (grey: a horse is there), the wait ring and its fill gradient,
+-- and what was last painted (repainted only on a change).
+local arrowUi: { [TextButton]: any } = {}
 local function steerButton(text: string): TextButton
 	local b = Instance.new("TextButton")
 	b.BackgroundColor3 = BUTTON_COLOUR
@@ -673,6 +686,32 @@ local function steerButton(text: string): TextButton
 	stroke.Thickness = 3
 	stroke.Color = Color3.fromHex("1F2430")
 	stroke.Parent = b
+	local icon = Instance.new("TextLabel")
+	icon.BackgroundTransparency = 1
+	icon.Text = "🐎"
+	icon.TextScaled = true
+	icon.Size = UDim2.fromScale(0.3, 0.3)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5) -- on the top edge, clear of the arrow and its text
+	icon.Position = UDim2.fromScale(0.5, 0)
+	icon.ZIndex = 9
+	icon.Visible = false
+	icon.Parent = b
+	local ring = Instance.new("Frame")
+	ring.BackgroundTransparency = 1
+	ring.Size = UDim2.new(1, 10, 1, 10)
+	ring.Position = UDim2.fromOffset(-5, -5)
+	ring.ZIndex = 7
+	ring.Visible = false
+	ring.Parent = b
+	round(ring, UDim.new(0, 22))
+	local ringStroke = Instance.new("UIStroke")
+	ringStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	ringStroke.Thickness = 3
+	ringStroke.Color = BUTTON_COLOUR
+	ringStroke.Parent = ring
+	local ringGrad = Instance.new("UIGradient")
+	ringGrad.Parent = ringStroke
+	arrowUi[b] = { icon = icon, ring = ring, stroke = ringStroke, grad = ringGrad, grey = false, fill = -1 }
 	return b
 end
 local inBtn, outBtn = steerButton("◀ In"), steerButton("Out ▶")
@@ -787,6 +826,7 @@ end
 
 local chipToken = 0
 local function showChip(text: string, seconds: number?)
+	if steer and steer.chips then SteerChips.shown(steer.chips, serverNow() - steer.start) end
 	chipToken += 1
 	local token = chipToken
 	steerChip.Text = text
@@ -812,6 +852,51 @@ local function paintButtons(locked: boolean)
 		b.BackgroundColor3 = if locked then LOCKED_COLOUR else BUTTON_COLOUR
 		b.TextTransparency = if locked then 0.5 else 0
 		b.AutoButtonColor = not locked
+		b.Rotation = 0
+		local ui = arrowUi[b]
+		ui.icon.Visible, ui.ring.Visible, ui.grey, ui.fill = false, false, false, -1
+	end
+end
+
+-- One arrow's boxed-in look (SteerHud): grey with the horse icon, and the wait ring (fill 0..1, -1
+-- none). Repainted only when something changed; the lit ring breathes gently unless Reduced Motion.
+local function fillSequence(f: number): NumberSequence
+	if f >= 0.99 then return NumberSequence.new(0) end
+	if f <= 0.01 then return NumberSequence.new(1) end
+	return NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(f, 0),
+		NumberSequenceKeypoint.new(math.min(f + 0.01, 1), 1), NumberSequenceKeypoint.new(1, 1) })
+end
+local function paintArrow(b: TextButton, arrow: any)
+	local ui = arrowUi[b]
+	if arrow.grey ~= ui.grey then
+		ui.grey = arrow.grey
+		b.BackgroundColor3 = if arrow.grey then GREY_COLOUR else BUTTON_COLOUR
+		b.TextTransparency = if arrow.grey then 0.35 else 0
+		ui.icon.Visible = arrow.grey
+	end
+	local fill = if arrow.ring < 0 then -1 else math.floor(arrow.ring * 20 + 0.5) / 20
+	if fill ~= ui.fill then
+		ui.fill = fill
+		ui.ring.Visible = fill >= 0
+		if fill >= 0 then ui.grad.Transparency = fillSequence(fill) end
+	end
+	if fill >= 1 then
+		ui.stroke.Transparency = if reducedMotion() then 0.1 else 0.1 + 0.25 * (0.5 + 0.5 * math.sin(os.clock() * 3))
+	elseif fill >= 0 then
+		ui.stroke.Transparency = 0.1
+	end
+end
+
+-- A dropped press: its arrow wobbles gently (no sound), none under Reduced Motion.
+local function wobbleArrow(dir: number)
+	if reducedMotion() then return end
+	local b = if dir < 0 then inBtn else outBtn
+	local step = SHUD.wobbleSeconds / 4
+	local seq = { SHUD.wobbleDeg, -SHUD.wobbleDeg, SHUD.wobbleDeg / 2, 0 }
+	for k, angle in seq do
+		task.delay(step * (k - 1), function()
+			TweenService:Create(b, TweenInfo.new(step, Enum.EasingStyle.Sine), { Rotation = angle }):Play()
+		end)
 	end
 end
 
@@ -830,6 +915,7 @@ steerPress = function(dir: number)
 	if t < s.start or (s.lockAt and t >= s.lockAt) then return end
 	s.seq += 1
 	s.lastPress = os.clock()
+	s.pressDir, s.pressAt = dir, t - s.start -- (a wait you cancel by pressing the other way never wobbles)
 	s.pressed = true
 	remotes:WaitForChild("SteerRequest"):FireServer(dir, s.seq)
 	RaceState.predictSteer(dir, s.seq)
@@ -884,6 +970,12 @@ local function updateSteer(t: number, dt: number)
 		wind.Visible, thumb.Visible = false, false
 		return
 	end
+	-- Boxed in (D-057 N4): the arrows from the server's word on your own lane, and "No room yet".
+	local raceNow = t - s.start
+	local inArrow, outArrow = SteerHud.arrows(s.hud, s.lane, raceNow, STEER, SHUD, s.shown)
+	paintArrow(inBtn, inArrow)
+	paintArrow(outBtn, outArrow)
+	if SteerChips.noRoom(s.chips, s.lane, raceNow, SHUD) then showChip("No room yet") end
 	-- The ghost-thumb tip, once, just after the gate.
 	if s.tipAt and t >= s.tipAt then
 		s.tipAt = nil
@@ -1187,7 +1279,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		for k = 1, #geo.turns do acc[k] = { own = 0, field = 0, time = 0, done = false } end
 		steer = { race = cueRace, course = courseId or "dirt", start = start, geo = geo, shown = false, smart = true,
 			locked = false, seq = 0, lastPress = -math.huge, armed = true, turnAcc = acc, tipped = {}, tips = 0,
-			tuckedFor = 0, tuckedTotal = 0, tuckChips = 0, tuckChipAt = -math.huge, pressed = false }
+			tuckedFor = 0, tuckedTotal = 0, tuckChips = 0, tuckChipAt = -math.huge, pressed = false,
+			hud = SteerHud.new(), chips = SteerChips.new(), lane = nil, pressDir = 0, pressAt = -math.huge }
 	end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
 	status.Text = string.format("%s race: %s%s", league, conditions, if riding then "" else "  (watching)")
@@ -1326,6 +1419,23 @@ remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smar
 	if s.shown and RaceState.recording then RaceState.recording.steer = true end -- the replay draws your line
 	bindSteer(s.shown)
 	armBell(s)
+end)
+-- Your own lane from the server (D-057 N4): only riders with the buttons hear it, so spectators
+-- and a rider's first races show none of this. A dropped wait wobbles its arrow; a wait that ends
+-- in the move says "Gap!".
+remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, stateT, courseId)
+	local s = steer
+	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or not s.shown or s.locked then return end
+	local lane = s.lane or {}
+	lane.tgt, lane.dest, lane.ack, lane.wait, lane.waitAt = tgt, dest, ack, wait or 0, waitAt or 0
+	lane.tucking, lane.inSide, lane.outSide, lane.t = tucking == true, inSide or "free", outSide or "free", stateT or 0
+	s.lane = lane
+	local wobble, gap = SteerHud.message(s.hud, lane, STEER, SHUD, s.pressDir, s.pressAt)
+	if wobble ~= 0 then wobbleArrow(wobble) end
+	if gap then
+		showChip("Gap!")
+		if Sound then Sound.play("tap_good") end
+	end
 end)
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)
 	local s = steer

@@ -130,6 +130,17 @@ GameConfig.steerHud = {
 	wideLanes = 1,           -- the turn tip: this many lanes or more outside Smart Steer's home lane...
 	tipsPerRace = 2,         -- ...at most this often a race
 	hideAfterLockSeconds = 2.5, -- the greyed buttons fade this long after "Lanes locked!"
+	-- Boxed in (D-057 N4; SteerHud, SteerChips): from the server's word on your own lane.
+	greyArrows = true,       -- Out ▶ greys while a horse leaves no room; ◀ In only when tuck-back can't help...
+	greyAfterSeconds = 0.2,  -- ...once its side has been blocked this long on screen (no blinking); back at once
+	greyRgb = { 172, 166, 158 }, -- the grey: soft and warm, about 2:1 against the button's bone white (never red)
+	waitRing = true,         -- a ring on the arrow of a press waiting for room (lit inward, filling outward)
+	noRoomChipAfter = 1,     -- "No room yet" once a press has waited this long with no move or tuck-back...
+	noRoomChipEvery = 10,    -- ...at most this often
+	gapChipAfterWait = 0.5,  -- "Gap!" when a press that waited at least this long starts its move
+	chipMinGap = 2,          -- "No room yet" never comes this soon after another steering chip
+	wobbleDeg = 4,           -- a dropped press's arrow wobbles this far...
+	wobbleSeconds = 0.2,     -- ...for this long (none under Reduced Motion)
 }
 -- How a race horse's body moves through a lane change (D-057 N3; SteerPose). Every horse in a
 -- steering race, on every screen; the look cue only on your own horse, on your screen.
