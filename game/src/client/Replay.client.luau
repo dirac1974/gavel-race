@@ -13,7 +13,8 @@
 --   landed, "+N" when you gained places. No tap pad, no race-again or shop prompts.
 --   Steering (D-054 S4): horses run in the lanes recorded on this screen, on a smooth curve through
 --   them (ReplayTrip.laneCurve; older recordings use the posts), turning and leaning through lane
---   changes as they did live (SteerPose, from the replayed lanes and progress, D-057 N3). A rider
+--   changes as they did live with the eased glide (SteerPose, from the replayed lanes and progress,
+--   D-057 N3; none with D-054's linear glide, the switch-back). A rider
 --   who had the ◀ ▶ buttons sees their line up to the lock drawn
 --   on the track behind their horse as a gold ribbon, green with chevrons through the turns where
 --   they saved ground, wind lines while they were tucked in, and "Lanes locked!" as they pass the
@@ -38,6 +39,7 @@ if not okSound then Sound = nil end
 
 local player = Players.LocalPlayer
 local HORSE_LENGTH = 8
+local POSED = GameConfig.steering.glide == "eased" -- bodies turn and lean (D-057); not with D-054's linear glide
 local RESULT_ART = { Perfect = "label_perfect", Great = "label_great", Good = "label_good", Okay = "label_okay", Miss = "label_miss" }
 
 local function reducedMotion(): boolean
@@ -350,10 +352,10 @@ local function placeAll(rec, t: number, speed: number?, raceDt: number)
 		-- progress, in race time, so a 3x or slow-motion replay turns the same way.
 		local yaw, roll = 0, 0
 		local last = playing.lastProgress[i]
-		if last and raceDt > 0 then
+		if POSED and last and raceDt > 0 then
 			local forward = (p - last) * railLength / raceDt
 			yaw, roll = SteerPose.step(playing.pose[i], GameConfig.steerView, lanes[i], raceDt, forward, cfg.laneWidth, 0)
-		else -- the first frame: start at the sideways speed the recording has here (no flick mid-glide)
+		elseif POSED then -- the first frame: start at the sideways speed the recording has here (no flick mid-glide)
 			local a0, b0, f0, k0 = frameAt(rec, t - 0.05)
 			local before = ReplayTrip.laneCurve(rec, k0, f0, i)
 			local p0 = (a0[i] or 0) + ((b0[i] or 0) - (a0[i] or 0)) * f0

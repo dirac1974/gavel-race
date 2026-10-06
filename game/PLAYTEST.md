@@ -319,7 +319,8 @@ The motion and press rules are on for every horse: players, Smart Steer and bots
 - [ ] **Smooth lane changes:** a horse eases into a lane change, glides, and eases out (about 1 s a lane, 1.6 s for two). No horse slides sideways at a constant speed, starts or stops with a jerk, or reverses in the middle of a glide.
 - [ ] **The horse angles into the move:** its body turns toward where it is going (a few degrees, never more than 10) and leans slightly into the move, then straightens as it lands. It never looks like it is skidding or drifting sideways.
 - [ ] **No snaps:** the body never jumps round at the far-turn bell, as a glide lands, when a replay starts, or at the finish line.
-- [ ] **Your press:** your horse turns its head and body slightly toward the press at once (about 3 degrees), on your screen only. If the lane is free, the move follows smoothly; if it has to wait, the turn relaxes within a moment and nothing else happens. Nobody else's screen shows the look.
+- [ ] **Your press:** your horse turns its head and body slightly toward the press at once (about 3 degrees), on your screen only. If the lane is free, the move follows smoothly; if it has to wait, the turn relaxes within a moment and nothing else happens. Nobody else's screen shows the look. Presses the horse can't act on yet (again within a blink, against a lane change under way, straight back after landing) show no look, so mashing never shakes the head side to side.
+- [ ] **At the lock:** a press made just before "Lanes locked!" may start its slide just after the chip shows (the server took it in time; your screen shows the server a moment late). That's expected, not a bug.
 - [ ] **No zig-zag:** mash ◀ ▶ as fast as you can for 10 s. The horse makes at most one quick change of mind, then holds its line for a few seconds; it never wiggles back and forth. Mashing should feel calm, not twitchy.
 - [ ] **No late swerves:** watch the last 2 s before the line in a dozen races. No horse swerves a whole lane right at the finish; horses that need room move over early, in one smooth move. After "Lanes locked!", a horse that moved over doesn't swing back within a few seconds.
 - [ ] **Two lanes at once:** press ◀ twice quickly: the horse glides two lanes in one smooth move, no stop in between.
@@ -327,7 +328,7 @@ The motion and press rules are on for every horse: players, Smart Steer and bots
 - [ ] **The chase camera** stays on the track's heading: when your horse angles into a lane change, the camera doesn't swing with it (more than about 3 degrees is a fail). If it does, the fix is a track-aligned camera subject (plan N3).
 - [ ] **Replays:** "Whole race ×3" and "Watch the finish" show the same smooth glides and the same turn and lean, slowed down too.
 - [ ] **Logs:** the `[Trip]` line at the lock ends with "held by the reverse or weave gap N, waits dropped N".
-- [ ] Back to D-054 in a test place: the seven keys in REVIEW_QUEUE ("D-057 (N3: switch-back)"), then `python sims/steering.py --write` for the baseline; glides are 0.6 s and linear again, and your own glide starts on the press.
+- [ ] Back to D-054 in a test place: the seven keys in REVIEW_QUEUE ("D-057 (N3: switch-back)"), then `python sims/steering.py --write` for the baseline; glides are 0.6 s and linear again, bodies don't turn or lean, there's no look cue, and your own glide starts on the press, as before D-057.
 
 ## Replays and results (steering S4, D-054)
 Plan section D, from your 4th race on (the buttons are shown):

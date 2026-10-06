@@ -206,6 +206,26 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local out = Playback.lerp({}, { 1, 2 }, { 3, 6 }, 1)
 	check(out[1] == 3 and out[2] == 6 and Playback.lerp({}, { 1 }, { 3 }, 0.5)[1] == 2, "lerp: exactly the later sample at f = 1")
 
+	-- A kid mashing ◀ ▶ at random, 4 presses a second, from its own screen (whole races, the game's
+	-- config, 0.1 s link): the look cue stays calm. It swings the body from one side to the other
+	-- under 0.5 times a second (0.55 before the PR #50 review's gating), and never turns the body more
+	-- than 3 degrees beyond its drift.
+	local simulateRace = require("./race_overlap")
+	local flips, cueSeconds, excess, cues = 0, 0, 0, 0
+	for ci, course in { "dirt", "turf" } do
+		for di, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
+			local res = simulateRace(course, distance, 8800 + 100 * ci + 10 * di, nil, { predict = true, ownStyle = "masher" })
+			local o = res.own :: any
+			flips += o.cueFlips
+			cueSeconds += o.cueSeconds
+			excess = math.max(excess, o.cueExcess)
+			cues += o.looks
+		end
+	end
+	check(cues > 0 and flips / cueSeconds < 0.5 and excess <= math.rad(3) + 1e-9,
+		string.format("mashing at 4 presses a second: the look cue swings side to side %.2f times a second (%d cues), at most %.1f deg beyond the drift",
+			flips / cueSeconds, cues, math.deg(excess)))
+
 	-- Bots, Smart Steer and riders glide the same way: Trip's eased lanes played back give every
 	-- horse the same body motion (a whole race, every horse, through the jittery link).
 	local track = require("../../game/src/shared/TrackLayout")

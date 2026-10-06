@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Generate Python reference fixtures for the Luau parity tests.
 
-Writes tests/fixtures/race_math.json and tests/fixtures/trip.json; with --d057 also
+Writes tests/fixtures/race_math.json, tests/fixtures/trip.json and tests/fixtures/trip_d054.json
+(TRIP_D054_RUNS runs on the D-054 switch-back, trip.d054_config() with the D-054 baseline, so
+Trip.luau's D-054 path keeps full parity); with --d057 also
 tests/fixtures/trip_d057.json (about 7 MB; CI passes --d057, tests/test_luau_parity.py does when
 its inputs changed, and tests/luau/trip_d057_tests.luau replays it against Trip.luau).
 Deterministic (fixed seeds).
@@ -137,6 +139,9 @@ def main(argv=None) -> None:
     trip_out = ROOT / "tests" / "fixtures" / "trip.json"
     trip_out.write_text(json.dumps(trip_fixture()))
     print(f"wrote {TRIP_RUNS} trip runs to {trip_out.relative_to(ROOT)}")
+    d054_out = ROOT / "tests" / "fixtures" / "trip_d054.json"
+    d054_out.write_text(json.dumps(trip_d054_fixture()))
+    print(f"wrote {TRIP_D054_RUNS} D-054 trip runs to {d054_out.relative_to(ROOT)}")
     if "--d057" not in argv:
         return
     d057 = trip_d057_fixture()
@@ -279,6 +284,16 @@ def trip_fixture(only=None, base=None, baseline=None):
     return {"cfg": trip.config_record(cfg), "race": trip.RACE, "geometry": geo_out, "finishFromTop": finish,
             "distances": trip.DISTANCES, "baseline": baseline, "runs": runs}
 
+
+
+TRIP_D054_RUNS = 20  # the switch-back's parity runs (runs 8-19 cycle TRIP_OVERRIDES)
+
+
+def trip_d054_fixture():
+    """trip.json's first TRIP_D054_RUNS runs on the D-054 config (the switch-back, N3) with the D-054
+    baseline: Trip.luau's D-054 path stays at parity now that the game runs D-057."""
+    baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline_d054.json").read_text())["baseline"]
+    return trip_fixture(only=range(TRIP_D054_RUNS), base=trip.d054_config(), baseline=baseline)
 
 
 # ---------------------------------------------------------------- D-057 (stage N1, for the N2 port)

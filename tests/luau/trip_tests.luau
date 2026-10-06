@@ -75,93 +75,112 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		for i, s in list do out[i] = tonumber(s) :: number end
 		return out
 	end
-	local function runConfig(run: any): any
-		local cfg = table.clone(GameConfig.steering)
+	-- base = the config the file was made with, from GameConfig's literals: GameConfig.steering for
+	-- trip.json, Trip.d054Config of it for trip_d054.json (the switch-back, N3).
+	local function runConfig(fx: any, base: any, run: any): any
+		local cfg = table.clone(base)
 		cfg.drawPosts = nil
 		cfg.requestsPerSecond = nil
-		cfg.scale = data.cfg.scale -- the fixture's scale, whatever the game ships
+		cfg.scale = fx.cfg.scale -- the fixture's scale, whatever the game ships
 		cfg.smart = table.clone(cfg.smart)
 		if run.cfg then -- a run with other settings: copy the ones that differ (simple values)
 			for key, value in run.cfg do
-				if type(value) ~= "table" and value ~= data.cfg[key] then cfg[key] = value end
+				if type(value) ~= "table" and value ~= fx.cfg[key] then cfg[key] = value end
 			end
 			for key, value in run.cfg.smart do
-				if value ~= data.cfg.smart[key] then cfg.smart[key] = value end
+				if value ~= fx.cfg.smart[key] then cfg.smart[key] = value end
 			end
 		end
 		return cfg
 	end
 	local dt = 1 / GameConfig.steering.tickHz
-	local full = runConfig({}) -- GameConfig.steering at the fixture's scale, every key
-	local runsOk, answersOk, snapsOk, lockOk, tripOk = 0, true, true, true, true
-	for r, run in data.runs do
-		local cfg = runConfig(run)
-		local q, p1, uniforms = exactList(run.exact.q), exactList(run.exact.p1), exactList(run.exact.uniforms)
-		local track = TrackLayout.courses[run.course]
-		local plan = TrackLayout.plan(track, TrackLayout.distances[run.distance])
-		local geo = TrackLayout.phaseA(track, plan)
-		local byTick: { [number]: { { number } } } = {}
-		for _, intent in run.intents do
-			local tick = intent[1]
-			byTick[tick] = byTick[tick] or {}
-			table.insert(byTick[tick], { intent[2], intent[3] })
-		end
-		local st = Trip.new(run.posts, q, uniforms, geo, cfg, run.kinds, race)
-		local answers = {}
-		local snapIndex = 1
-		for tick = 0, run.ticks - 1 do
-			local live = if tick < run.switchTick then q else p1
-			for _, a in Trip.step(st, live, byTick[tick] or {}, tick * dt, dt) do table.insert(answers, a) end
-			if tick % 10 == 0 or tick == run.ticks - 1 then
-				local snap = run.snapshots[snapIndex]
-				snapIndex += 1
-				if not snap or snap.tick ~= tick then
-					snapsOk = false
-				else
-					for i = 1, st.n do
-						if not (close(st.x[i], snap.x[i], 1e-9) and close(st.off[i], snap.off[i], 1e-9) and st.tgt[i] == snap.tgt[i]) then
-							if snapsOk then print(`trip run {r} tick {tick} lane {i}: x {st.x[i]} vs {snap.x[i]}, off {st.off[i]} vs {snap.off[i]}`) end
-							snapsOk = false
+	local full = runConfig(data, GameConfig.steering, {}) -- GameConfig.steering at the fixture's scale, every key
+	local function replay(fx: any, base: any): (number, boolean, boolean, boolean, boolean)
+		local runsOk, answersOk, snapsOk, lockOk, tripOk = 0, true, true, true, true
+		for r, run in fx.runs do
+			local cfg = runConfig(fx, base, run)
+			local q, p1, uniforms = exactList(run.exact.q), exactList(run.exact.p1), exactList(run.exact.uniforms)
+			local track = TrackLayout.courses[run.course]
+			local plan = TrackLayout.plan(track, TrackLayout.distances[run.distance])
+			local geo = TrackLayout.phaseA(track, plan)
+			local byTick: { [number]: { { number } } } = {}
+			for _, intent in run.intents do
+				local tick = intent[1]
+				byTick[tick] = byTick[tick] or {}
+				table.insert(byTick[tick], { intent[2], intent[3] })
+			end
+			local st = Trip.new(run.posts, q, uniforms, geo, cfg, run.kinds, race)
+			local answers = {}
+			local snapIndex = 1
+			for tick = 0, run.ticks - 1 do
+				local live = if tick < run.switchTick then q else p1
+				for _, a in Trip.step(st, live, byTick[tick] or {}, tick * dt, dt) do table.insert(answers, a) end
+				if tick % 10 == 0 or tick == run.ticks - 1 then
+					local snap = run.snapshots[snapIndex]
+					snapIndex += 1
+					if not snap or snap.tick ~= tick then
+						snapsOk = false
+					else
+						for i = 1, st.n do
+							if not (close(st.x[i], snap.x[i], 1e-9) and close(st.off[i], snap.off[i], 1e-9) and st.tgt[i] == snap.tgt[i]) then
+								if snapsOk then print(`trip run {r} tick {tick} lane {i}: x {st.x[i]} vs {snap.x[i]}, off {st.off[i]} vs {snap.off[i]}`) end
+								snapsOk = false
+							end
 						end
 					end
 				end
 			end
-		end
-		if #answers ~= #run.answers then answersOk = false end
-		for k = 1, math.min(#answers, #run.answers) do
-			if answers[k] ~= run.answers[k] then answersOk = false end
-		end
-		for i = 1, st.n do
-			if not close(st.x[i], run.lockX[i], 1e-9) then lockOk = false end
-		end
-		Trip.lock(st)
-		local before = { x = table.clone(st.x), ground = table.clone(st.ground), draft = table.clone(st.draft) }
-		local lateIntents = {}
-		for _, li in run.afterLock do table.insert(lateIntents, { li[1], li[2] }) end
-		local late = Trip.step(st, p1, lateIntents, run.ticks * dt, dt)
-		if #late ~= #run.afterLockAnswers then lockOk = false end
-		for k, a in late do
-			if a ~= "locked" or a ~= run.afterLockAnswers[k] then lockOk = false end
-		end
-		if not (deepEqual(before.x, st.x, 0) and deepEqual(before.ground, st.ground, 0) and deepEqual(before.draft, st.draft, 0)) then
-			lockOk = false
-		end
-		local tr = Trip.tripValues(st)
-		local tau = Trip.tau(tr, run.posts, data.baseline[run.course][run.distance], cfg)
-		for i = 1, st.n do
-			if not (close(tr[i], run.trip[i], 1e-9) and close(tau[i], run.tau[i], 1e-9)
-				and close(st.ground[i], run.ground[i], 1e-9) and close(st.draft[i], run.draft[i], 1e-9)
-				and Trip.stars(tau[i], cfg) == run.stars[i]) then
-				tripOk = false
+			if #answers ~= #run.answers then answersOk = false end
+			for k = 1, math.min(#answers, #run.answers) do
+				if answers[k] ~= run.answers[k] then answersOk = false end
 			end
+			for i = 1, st.n do
+				if not close(st.x[i], run.lockX[i], 1e-9) then lockOk = false end
+			end
+			Trip.lock(st)
+			local before = { x = table.clone(st.x), ground = table.clone(st.ground), draft = table.clone(st.draft) }
+			local lateIntents = {}
+			for _, li in run.afterLock do table.insert(lateIntents, { li[1], li[2] }) end
+			local late = Trip.step(st, p1, lateIntents, run.ticks * dt, dt)
+			if #late ~= #run.afterLockAnswers then lockOk = false end
+			for k, a in late do
+				if a ~= "locked" or a ~= run.afterLockAnswers[k] then lockOk = false end
+			end
+			if not (deepEqual(before.x, st.x, 0) and deepEqual(before.ground, st.ground, 0) and deepEqual(before.draft, st.draft, 0)) then
+				lockOk = false
+			end
+			local tr = Trip.tripValues(st)
+			local tau = Trip.tau(tr, run.posts, fx.baseline[run.course][run.distance], cfg)
+			for i = 1, st.n do
+				if not (close(tr[i], run.trip[i], 1e-9) and close(tau[i], run.tau[i], 1e-9)
+					and close(st.ground[i], run.ground[i], 1e-9) and close(st.draft[i], run.draft[i], 1e-9)
+					and Trip.stars(tau[i], cfg) == run.stars[i]) then
+					tripOk = false
+				end
+			end
+			runsOk += 1
 		end
-		runsOk += 1
+		return runsOk, answersOk, snapsOk, lockOk, tripOk
 	end
+	local runsOk, answersOk, snapsOk, lockOk, tripOk = replay(data, GameConfig.steering)
 	check(runsOk == #data.runs and #data.runs == 200, "all 200 trip.json runs replayed")
 	check(answersOk, "Trip answers every press as src/trip.py does")
 	check(snapsOk, "lanes, offsets and targets match src/trip.py every 10 ticks (1e-9)")
 	check(lockOk, "lanes at the lock match; presses after the lock are refused and change nothing")
 	check(tripOk, "ground, draft, trip, tau and stars match src/trip.py (1e-9)")
+	-- The D-054 switch-back keeps full parity too (trip_d054.json: 20 runs on trip.d054_config(),
+	-- the D-054 baseline; its config is recorded without the D-057 keys, all at their D-054 values).
+	local d054 = serde.decode("json", fs.readFile("tests/fixtures/trip_d054.json"))
+	local back = Trip.d054Config(GameConfig.steering)
+	local backRecord = table.clone(back)
+	backRecord.drawPosts, backRecord.requestsPerSecond, backRecord.scale = nil, nil, nil
+	for _, key in D057_KEYS do backRecord[key] = nil end
+	local d054Cfg = table.clone(d054.cfg)
+	d054Cfg.scale = nil
+	check(deepEqual(backRecord, d054Cfg, 0), "Trip.d054Config(GameConfig.steering) is trip.d054_config()")
+	local r54, a54, s54, l54, t54 = replay(d054, back)
+	check(r54 == #d054.runs and #d054.runs >= 20 and a54 and s54 and l54 and t54,
+		`all {#d054.runs} trip_d054.json runs (the switch-back) replay to 1e-9: answers, lanes, the lock, trip, tau, stars`)
 
 	-- Guards: a bad lane index errors (Python raises).
 	do

@@ -93,11 +93,12 @@ function Playback.advance(b: Buffer, now: number, dt: number): number?
 		if lag > (b.lag :: number) then b.lag = lag end
 	end
 	if dt > 0 then
-		b.lag = math.max((b.lag :: number) - cfg.lagReleasePerSecond * dt, math.min(b.lastLag, b.lag :: number))
+		local h = math.min(dt, 0.1) -- (a long frame gap, a window restored, never overshoots the delay)
+		b.lag = math.max((b.lag :: number) - cfg.lagReleasePerSecond * h, math.min(b.lastLag, b.lag :: number))
 		local want = 1 + math.clamp((delay - target(b)) * cfg.gain, -cfg.slew, cfg.slew)
-		local step = cfg.rateChangePerSecond * dt
+		local step = cfg.rateChangePerSecond * h
 		b.rate += math.clamp(want - b.rate, -step, step)
-		delay += (1 - b.rate) * dt -- play = now - delay advances at `rate`
+		delay += (1 - b.rate) * h -- play = now - delay advances at `rate`
 	end
 	local play = now - delay
 	local newest = b.samples[n].T

@@ -31,6 +31,14 @@
 --     late half-lane steps, and reversals after the lock with the gap to the one before.
 --   jitter = extra random delay on each message to the client, 0..jitter s (in order, as
 --     RemoteEvents arrive), from its own generator. The playback absorbs it.
+--   Two finish checks: the order of the drawn offsets at the last frame (orderOk), and the order in
+--   which the horses cross the line on the drawn screen (crossOrderOk: each horse's drawn feet,
+--   RaceView's pace plus its drawn offset, reaching the race length; the screen keeps drawing until
+--   every horse has crossed).
+--   ownStyle = "masher" (with predict): rider 1 mashes ◀ ▶ at random, 4 presses a second, instead
+--     of the press patterns. With the eased glide rider 1's horse is posed as RaceView poses it
+--     (SteerPose with the look cue), and the report counts how often the look cue swings the body
+--     from one side to the other, and how far the body ever turns beyond its drift.
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -45,6 +53,7 @@ local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 local baselineD054: any = nil -- the D-054 table (the switch-back regenerates TripBaseline to it), loaded once
 local SteerPredict = require("../../game/src/shared/SteerPredict")
+local SteerPose = require("../../game/src/shared/SteerPose")
 local Playback = require("../../game/src/shared/Playback")
 
 local SIDE, LENGTH = 0.5, 6 -- overlap: closer than this sideways (lanes) and lengthwise (feet)
@@ -70,13 +79,14 @@ end
 -- the longest a single prediction was drawn (s), presses / predicted = presses sent / presses that
 -- started a glide at once.
 export type Own = { overlapsBefore: number, overlapsAfter: number, apartMax: number, apartAtLock: number,
-	timeouts: number, longestPrediction: number, presses: number, predicted: number, looks: number, lookMax: number }
+	timeouts: number, longestPrediction: number, presses: number, predicted: number, looks: number, lookMax: number,
+	cueFlips: number, cueSeconds: number, cueExcess: number }
 export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean,
 	lineOrder: { number }, result: { number }, answers: { [string]: number }, halfSteps: number,
 	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own?,
 	reversals: { [string]: { count: number, seconds: number, minGap: number } }, accelBefore: number, accelAfter: number,
 	brushes: number, boxedTicks: number, riderTicks: number, afterMoves: number, lateMoves: number, lateHalfSteps: number,
-	afterReversals: number, afterReversalsWithin: number, afterMinGap: number }
+	afterReversals: number, afterReversalsWithin: number, afterMinGap: number, crossOrderOk: boolean, crossOrder: { number } }
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local d057 = opts ~= nil and opts.d057 == true
@@ -154,7 +164,28 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local stats: Stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {},
 		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil,
 		reversals = {}, accelBefore = 0, accelAfter = 0, brushes = 0, boxedTicks = 0, riderTicks = 0,
-		afterMoves = 0, lateMoves = 0, lateHalfSteps = 0, afterReversals = 0, afterReversalsWithin = 0, afterMinGap = math.huge }
+		afterMoves = 0, lateMoves = 0, lateHalfSteps = 0, afterReversals = 0, afterReversalsWithin = 0, afterMinGap = math.huge,
+		crossOrderOk = true, crossOrder = {} }
+	-- Each horse's crossing on the drawn screen: RaceView's pace (a quick ease out of the gate, then a
+	-- steady gallop reaching the race length at tFinish) plus its drawn offset.
+	local len1 = plan.lengths[1]
+	local gateTau = cfgGame.raceView.gateEaseSeconds
+	local paceV = len1 / (tFinish - gateTau * (1 - math.exp(-tFinish / gateTau)))
+	local function paceFeet(t: number): number
+		if t <= 0 then return 0 end
+		return paceV * (t - gateTau * (1 - math.exp(-t / gateTau)))
+	end
+	local crossAt, lastFeet = table.create(n, math.huge), table.create(n, -math.huge)
+	local function watchLine(t: number)
+		local base = paceFeet(t)
+		for i = 1, n do
+			local feet = base + offset[i]
+			if crossAt[i] == math.huge and feet >= len1 and lastFeet[i] > -math.huge then
+				crossAt[i] = t - FRAME * (feet - len1) / math.max(feet - lastFeet[i], 1e-9)
+			end
+			lastFeet[i] = feet
+		end
+	end
 	-- Every horse's lane moves (the trip's before the lock, the shown lanes' after it): direction,
 	-- lane, and when it last turned, for the after-lock counts.
 	local moveTgt, moveDir, moveRev = table.clone(trip.tgt), table.create(n, 0), table.create(n, -math.huge)
@@ -187,8 +218,14 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	-- linear glide the newest sample's)
 	local view = { me = me, lanes = cfgGame.lanes, x = if eased then lane else laneTarget, off = offset, srv = nil, cfg = steer }
 	local own: Own = { overlapsBefore = 0, overlapsAfter = 0, apartMax = 0, apartAtLock = 0, timeouts = 0, longestPrediction = 0,
-		presses = 0, predicted = 0, looks = 0, lookMax = 0 }
+		presses = 0, predicted = 0, looks = 0, lookMax = 0, cueFlips = 0, cueSeconds = 0, cueExcess = 0 }
 	local lookSince: number? = nil
+	-- (eased) rider 1's body on its own screen (RaceView's SteerPose with the look cue): cueFlips =
+	-- times the look cue swung the body from one side to the other (its cue amount past half on the
+	-- other side), cueSeconds = time it could (gate to lock), cueExcess = the most the body ever
+	-- turned beyond its drift (radians).
+	local ownPose, cueSide = SteerPose.new(), 0
+	local masher = opts ~= nil and opts.ownStyle == "masher"
 	local apartFor, sentOwn = 0, nil
 	local presses, nextPattern, mySeq = {}, if predict then 1 + 2 * pressRng:NextNumber() else math.huge, 0 -- presses = { { at, dir } } still to make
 	local seg = 1
@@ -379,6 +416,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 				lastVel[i], lastLane[i] = vel, lane[i]
 			end
 			stats.frames += 1
+			watchLine(tc)
 			local hits = 0
 			for i = 1, n do
 				for j = i + 1, n do
@@ -398,7 +436,11 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 			end
 			if predict then
 				-- Rider 1 presses (as RaceController: from the gate to the lock it knows from TripInfo).
-				if tc >= nextPattern and tc < trip.lockT then
+				if masher then -- 4 presses a second at random, either side
+					if tc > 1 and tc < trip.lockT and pressRng:NextNumber() < 4 * FRAME then
+						table.insert(presses, { at = tc, dir = if pressRng:NextNumber() < 0.5 then -1 else 1 })
+					end
+				elseif tc >= nextPattern and tc < trip.lockT then
 					local dir = if pressRng:NextNumber() < 0.6 then -1 else 1
 					local u = pressRng:NextNumber()
 					if u < 0.4 then
@@ -432,10 +474,23 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 				end
 				if eased then -- drawn where everyone sees it; the look cue holds until it starts over
 					ownLane = lane[me]
-					if SteerPredict.lookDir(state, view, tc, clientLocked) == 0 then
+					local lookNow = SteerPredict.lookDir(state, view, tc, clientLocked)
+					if lookNow == 0 then
 						if lookSince then own.lookMax = math.max(own.lookMax, tc - (lookSince :: number)) end
 						lookSince = nil
 					end
+					local poseCfg = cfgGame.steerView
+					local yaw = SteerPose.step(ownPose, poseCfg, ownLane, FRAME, cfgGame.raceSpeedStudsPerSecond, laneWidth, lookNow)
+					local maxYaw = math.rad(poseCfg.yawMaxDeg)
+					local drift = math.clamp(math.atan2(ownPose.v, math.max(cfgGame.raceSpeedStudsPerSecond, SteerPose.MIN_FORWARD))
+						* poseCfg.yawGain, -maxYaw, maxYaw)
+					own.cueExcess = math.max(own.cueExcess, math.abs(yaw - drift))
+					if math.abs(ownPose.look) >= 0.5 then
+						local side = if ownPose.look > 0 then 1 else -1
+						if cueSide ~= 0 and side ~= cueSide then own.cueFlips += 1 end
+						cueSide = side
+					end
+					if tc > 1 and tc < trip.lockT then own.cueSeconds += FRAME end
 				else
 					local laneTo = SteerPredict.laneTo(state, view, tc, clientLocked)
 					ownLane += math.clamp(laneTo - ownLane, -glide, glide)
@@ -463,16 +518,58 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		own.longestPrediction = state.longest
 		stats.own = own
 	end
+	local lastFrameOffset = table.clone(offset) -- (the order check below judges the last frame)
+	-- The screen keeps drawing (no new samples) until every horse has crossed the line on it.
+	local tc = k * serverDt
+	local function allCrossed(): boolean
+		for i = 1, n do
+			if crossAt[i] == math.huge then return false end
+		end
+		return true
+	end
+	while not allCrossed() and tc < tFinish + 6 do
+		tc += FRAME
+		while #inbox > 0 and inbox[1].at <= tc + 1e-9 do
+			local m = table.remove(inbox, 1)
+			if m.kind == "offsets" then
+				if eased then
+					Playback.pushOffsets(pb, m.T, tc, m.offsets, m.lanes, laneTarget)
+				else
+					for i = 1, n do from[i], to[i] = offset[i], m.offsets[i] end
+					sampleAt = tc - FRAME
+				end
+			end
+		end
+		if eased then
+			local playAt = Playback.advance(pb, tc, FRAME)
+			if playAt then
+				local a, b, f = Playback.around(pb, playAt :: number)
+				Playback.lerp(offset, a.data.off, b.data.off, f)
+			end
+		else
+			local f = math.clamp((tc - sampleAt) / serverDt, 0, 1)
+			for i = 1, n do offset[i] = from[i] + (to[i] - from[i]) * f end
+		end
+		watchLine(tc)
+	end
+	local crossing = table.create(n)
+	for i = 1, n do crossing[i] = i end
+	table.sort(crossing, function(a: number, b: number): boolean
+		if crossAt[a] ~= crossAt[b] then return crossAt[a] < crossAt[b] end
+		return a < b
+	end)
+	stats.crossOrder = crossing
 	-- The order across the line on screen (offsets at the last frame) against the result.
 	local line = table.create(n)
 	for i = 1, n do line[i] = i end
 	table.sort(line, function(a: number, b: number): boolean
-		if offset[a] ~= offset[b] then return offset[a] > offset[b] end
+		if lastFrameOffset[a] ~= lastFrameOffset[b] then return lastFrameOffset[a] > lastFrameOffset[b] end
 		return a < b
 	end)
 	local result = RaceShape.order(session.luck, session.live)
 	for p = 1, n do
 		if line[p] ~= result[p] then stats.orderOk = false end
+		if crossing[p] ~= result[p] or crossAt[crossing[p]] == math.huge then stats.crossOrderOk = false end
 	end
 	stats.lineOrder, stats.result = line, result
 	stats.halfSteps = trip.halfSteps or 0

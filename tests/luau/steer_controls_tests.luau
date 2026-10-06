@@ -348,6 +348,38 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	local stK = SteerPredict.new()
 	SteerPredict.look(stK, vT, 1, 2, 0)
 	check(SteerPredict.lookDir(stK, vT, 0.1, true) == 0, "eased: the lock ends the cue")
+	-- No cue for a press the server will ignore or hold, so mashing stays calm (PR #50 review).
+	local function settle(st: any, v: any, t: number) SteerPredict.lookDir(st, v, t, false) end
+	local stB = SteerPredict.new()
+	local vB = eview({ tgt = 3, dest = 3, ack = 0 }, { 3, 6 }, { 0, 0 })
+	settle(stB, vB, 0)
+	check(SteerPredict.look(stB, vB, -1, 1, 0.1) and not SteerPredict.look(stB, vB, 1, 2, 0.15),
+		"eased: the other way while a cue is held shows nothing (the body never swings side to side)")
+	stB.look = nil
+	check(not SteerPredict.look(stB, vB, -1, 3, 0.25), "eased: the same way within pressBounceSeconds of the last cue shows nothing (a bounce)")
+	local stG2 = SteerPredict.new()
+	local vG2 = eview({ tgt = 2, dest = 2, ack = 1 }, { 3, 6 }, { 0, 0 })
+	settle(stG2, vG2, 0)
+	vG2.x[1] = 2.9 -- gliding in
+	settle(stG2, vG2, 0.1)
+	check(not SteerPredict.look(stG2, vG2, 1, 2, 0.12), "eased: against a glide under way, nothing (the server holds it)")
+	vG2.x[1] = 2
+	settle(stG2, vG2, 0.9)
+	settle(stG2, vG2, 0.95) -- landed (as drawn) at 0.95
+	vG2.srv = { tgt = 2, dest = 2, ack = 2 }
+	check(not SteerPredict.look(stG2, vG2, 1, 3, 1.2) and SteerPredict.look(stG2, vG2, 1, 4, 0.95 + STEER.reverseGapSeconds + 0.01),
+		"eased: the other way within reverseGapSeconds of landing, nothing; after it, the cue")
+	-- A second reversal within weaveWindowSeconds waits weaveGapSeconds after landing.
+	stG2.look = nil
+	vG2.x[1] = 2.2
+	settle(stG2, vG2, 1.6) -- the reversal starts over (outward)
+	vG2.x[1] = 3
+	settle(stG2, vG2, 2.5)
+	settle(stG2, vG2, 2.6) -- landed at 2.6
+	vG2.srv = { tgt = 3, dest = 3, ack = 4 }
+	check(not SteerPredict.look(stG2, vG2, -1, 5, 2.6 + STEER.reverseGapSeconds + 0.1)
+		and SteerPredict.look(stG2, vG2, -1, 6, 2.6 + STEER.weaveGapSeconds + 0.01),
+		"eased: a second reversal within the weave window shows no cue until weaveGapSeconds after landing")
 
 	-- Whole races with riders pressing (the game's config: a masher and a ditherer; Smart Steer on
 	-- and off): nobody overlaps on screen -----------------------------------------------------

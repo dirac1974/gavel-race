@@ -19,8 +19,9 @@
 --   D-057 N3): a sample that arrives early or late changes nothing, so the S-curve lane changes
 --   keep their shape on a jittery link. Steering's gaps already grow in from the gate, so the
 --   30% ramp below is skipped for those races.
---   Body (D-057 N3, SteerPose): in a steering race every horse turns with its true drift (at most
---   10 degrees) and leans up to 3 degrees into a lane change, smoothed so nothing snaps. Your own
+--   Body (D-057 N3, SteerPose): with the eased glide every horse in a steering race turns with its
+--   true drift (at most 10 degrees) and leans up to 3 degrees into a lane change, smoothed so
+--   nothing snaps (D-054's linear glide, the switch-back, has no pose, as before D-057). Your own
 --   press turns your horse 3 degrees toward it at once (the look cue, your screen only); the
 --   sideways move itself starts with the server's lane, so a refused press never snaps back. With
 --   the D-054 linear glide (the switch-back) your own lane change starts on your screen the
@@ -101,6 +102,7 @@ local function horseModel(courseId: string?, i: number): Model?
 end
 
 local lastPlaced = setmetatable({}, { __mode = "k" }) -- horse -> { pos, t } for the legs
+local lastBase = setmetatable({}, { __mode = "k" })   -- horse -> its last placement without the pose
 -- A placement further than this from the last one is a jump (a replay starting or seeking), not
 -- a stride: even a 3x replay covers under 35 studs in the longest frame the legs count (0.2 s).
 local JUMP_STUDS = 60
@@ -118,6 +120,7 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?,
 	local px, pz, dx, dz = TrackLayout.railPoint(cfg, plan, p * railLength, x or i)
 	local pos = Vector3.new(px, bob, pz)
 	local cf = CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
+	lastBase[horse] = cf
 	if (yaw and yaw ~= 0) or (roll and roll ~= 0) then
 		local ry, rz = SteerPose.angles(yaw or 0, roll or 0)
 		cf = cf * CFrame.Angles(0, ry, rz) -- (Angles applies Z, then Y: the turn, then the lean in it)
@@ -146,12 +149,15 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?,
 end
 RaceState.placeHorse = place -- the replay uses the same placement
 
--- Legs straight down for every horse on a course (a race or replay has ended).
+-- Legs straight down and the body straight (no turn or lean) for every horse on a course (a race
+-- or replay has ended, or the race was aborted).
 function RaceState.restHorses(courseId: string?, lanes: number)
 	for i = 1, lanes do
 		local horse = horseModel(courseId, i)
 		if horse then
 			lastPlaced[horse] = nil
+			local base = lastBase[horse]
+			if base then horse:PivotTo(base) end
 			HorseLegs.rest(horse)
 		end
 	end
@@ -379,8 +385,8 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			-- The body through lane changes (SteerPose): every horse in a steering race; your own
 			-- press's look cue on your horse (eased glide).
 			local yaw, roll = 0, 0
-			if race.steering then
-				local look = if i == race.myLane and EASED then SteerPredict.lookDir(race.predict, race.own, clock, race.locked) else 0
+			if race.steering and EASED then
+				local look = if i == race.myLane then SteerPredict.lookDir(race.predict, race.own, clock, race.locked) else 0
 				yaw, roll = SteerPose.step(race.pose[i], POSE, race.lane[i], dt, GameConfig.raceSpeedStudsPerSecond * speed,
 					laneWidth, look)
 			end
