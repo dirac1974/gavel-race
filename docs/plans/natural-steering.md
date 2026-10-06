@@ -19,7 +19,7 @@ The prototype (`prototype/` next to this file) is scratch. `trip012.py` is `src/
     - **Chaining:** a second press the same way continues the glide without stopping (from 0.3 lane before arrival). Two lanes take 1.6 s, three 2.3 s, four 3.0 s. One press can wait; an opposite press cancels a waiting one (as D-054).
     - **Commitment:** a glide always finishes.
     - **Reverse gap:** a change the other way starts at least 0.5 s after landing.
-    - **Weave gap:** a second reversal within 5 s of the last one waits 2.5 s after landing.
+    - **Weave gap:** a second reversal within 7 s of the last one waits 2.5 s after landing (5 s in debate 012; 7 s since the N1 review brought every masher cell under 8 reversals a minute).
     - **Bounce:** presses within 0.2 s count once.
     - **Glide reserve:** a horse gliding into a lane keeps 6 ft more room ahead and behind (clearance 14 ft ahead and 16 ft behind it).
     - **The make-room lanes after the lock** (`Trip.cosmetic`) glide on the same curve.
@@ -103,7 +103,7 @@ The prototype (`prototype/` next to this file) is scratch. `trip012.py` is `src/
   - D-054: the promised "no room" shake (never built) becomes a soft 0.2 s wobble when an outward press drops.
 - Config (`GameConfig.steering` unless noted):
   - `glide = "eased"` ("linear" = D-054), `laneSpeedMax = 1.5`, `laneAccel = 4.5`, `chainWindow = 0.3`;
-  - `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 5`, `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`;
+  - `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 7` (5 in debate 012; 7 since the N1 review), `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`;
   - `blockedPress = "wait"` ("d054" = D-054), `gapWaitSeconds = 1.5` (outward), `gapWaitInSeconds = 0` (0 = an inward press waits until room, as D-054), `tuckAfterSeconds = 0`;
   - `brush = "repeat"` ("off" = none), `brushAlongFeet = 8`, `brushGraceSeconds = 0.3`, `brushRepeatSeconds = 2`, `brushPays = "mover"`, `brushCost = 0.002`, `brushFree = 1`, `brushMaxCharged = 3`, `brushCheckFeet = 4`, `brushRecoverPerSecond = 2`, `steadySeconds = 1`;
   - `GameConfig.steerView` (new): `yawGain = 1`, `yawMaxDeg = 10`, `yawSmoothSeconds = 0.15`, `leanDegPerFtps2 = 0.12`, `leanMaxDeg = 3`, `lookDeg = 3`, `lookRelaxSeconds = 0.3`, `brushLeanFeet = 1`, `brushLeanSeconds = 0.4`, `brushNodDeg = 2`, `brushVolume = 0.5`, `headTurnDeg = 0` (the art follow-up sets 12);
@@ -196,7 +196,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 
 ### N3. Flip the server behaviour; motion visuals (roblox-engineer; model-engineer regenerates)
 
-- `GameConfig.steering` and `trip.CONFIG`: `glide = "eased"`, `laneSpeedMax = 1.5`, `laneAccel = 4.5`, `chainWindow = 0.3`, `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 5`, `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`, `blockedPress = "wait"`, `gapWaitSeconds = 1.5`, `gapWaitInSeconds = 0`. Brushes stay `"off"`.
+- `GameConfig.steering` and `trip.CONFIG`: `glide = "eased"`, `laneSpeedMax = 1.5`, `laneAccel = 4.5`, `chainWindow = 0.3`, `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 7` (5 in debate 012; 7 since the N1 review), `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`, `blockedPress = "wait"`, `gapWaitSeconds = 1.5`, `gapWaitInSeconds = 0`. Brushes stay `"off"`.
 - **Regenerate** with `python sims/steering.py --write`: `TripBaseline.luau`, `tests/fixtures/trip_baseline.json`, `steering_report.json` (with the new targets) and the `trip_d057.json` expectations if any default changed. Update `docs/research/steering-calibration.md`.
 - **New shared pure module `game/src/shared/SteerPose.luau`**:
   - `SteerPose.step(state, xPrev, x, dt, forwardSpeed, look)` returns yaw and roll in radians.

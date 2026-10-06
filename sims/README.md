@@ -1,14 +1,15 @@
 # Simulations
 
-## steering.py — race steering baseline and calibration (D-054)
+## steering.py — race steering baseline and calibration (D-054, D-057)
 
 ```bash
 python sims/steering.py                  # acceptance report against the checked-in baseline (~3 min, all cores)
 python sims/steering.py --write          # regenerate tests/fixtures/trip_baseline.json and game/src/shared/TripBaseline.luau first
 python sims/steering.py --set groundPerLaneTurn=0.011 --races 500 --report-races 300   # try a tuning change (nothing written)
+python sims/steering.py --profile d057 --write   # D-057 on: trip_baseline_d057.json + steering_report_d057.json (game files untouched)
 ```
 
-Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the mirror of `GameConfig.steering`) or the course geometry; `tests/test_trip.py` fails while the baseline is stale. Results and tuning history: `docs/research/steering-calibration.md`.
+Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the mirror of `GameConfig.steering`) or the course geometry; `tests/test_trip.py` fails while the baseline is stale. `--profile d057` runs the same pipeline with natural steering switched on (`trip.d057_config()`) and adds the D-057 measures (zig-zag, sideways motion, body yaw, boxed in, brushes, reach per intent, griefing, overlap stress); `tests/test_trip_d057.py` asserts its stored report. Results and tuning history: `docs/research/steering-calibration.md`.
 
 ## economy.py — progression pace and Green Cash per hour
 
