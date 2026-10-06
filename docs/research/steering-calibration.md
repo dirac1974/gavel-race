@@ -16,6 +16,8 @@ By the model engineer, 2026-10-05; revised after the PR #37 review. Python refer
 
 **D-057 (natural steering), stage N1, 2026-10-06:** the rules are in `src/trip.py`, and the numbers with them on are in [Natural steering (D-057), stage N1](#natural-steering-d-057-stage-n1).
 
+**N5 review, 2026-10-06: a press again is the same try.** A brush now needs the third press toward a horse alongside (`brushPresses = 3`). Kids who press again are charged in under 1% of races (48–59% among bots with N1's rule), and a masher still in 56%. Every target passes, and so do the griefing gates, now measured with wanderer, masher and press-again kids too. The shadow finding is not a brush effect. See [The N5 review](#the-n5-review-a-press-again-is-the-same-try).
+
 **Stage N5, 2026-10-06: brushes are on too**, so the game runs D-057 in full. `python sims/steering.py --write` with brushes on reproduces the N3 baseline table and probes exactly (Smart Steer never brushes; only the recorded config changed). The report is the one in [Report with D-057 on](#report-with-d-057-on) (the N1 run with brushes, which is the game's config now): every target passes, casual riders are charged in 0.6% of races (cells 0–1.3%), and the griefing bound holds (−0.0004 to +0.0029).
 
 **Stage N3, 2026-10-06: the game runs D-057's motion and press rules** (brushes stayed off until N5). The game's numbers are in the last section, [The game's config (D-057 on, brushes off), stage N3](#the-games-config-d-057-on-brushes-off-stage-n3). Everything above is now the D-054 config, the switch-back (`trip.d054_config()`): its baseline and report moved to `tests/fixtures/trip_baseline_d054.json` and `steering_report_d054.json` (`python sims/steering.py --profile d054 --write`), and `tests/test_trip.py` still holds it to every D-054 target.
@@ -538,3 +540,73 @@ Other numbers:
 - **Griefing** (own trip, targeted minus untargeted): Smart Steer kid shadow +0.0003, crew +0.0030, bumper +0.0005; rail kid +0.0001, +0.0001, −0.0003.
 
 **On screen** (`tests/luau/overlap_report`, the game's config, 960 races per row; numbers in DECISIONS D-057 N3): no overlaps on any screen, no horse falling back faster than 20 ft/s, the order across the line right, 0–2 full-lane moves in the last 2 s per 960 races (the gate allows 100), no after-lock reversal within 3.5 s, and the drawn sideways acceleration within 31.7 ft/s², also with 0–30 ms of jitter on the link (the screen plays the samples back by their server timestamps, `Playback`).
+
+
+# The N5 review: a press again is the same try
+
+By the model engineer, 2026-10-06. The review of N5 asked for brushes to be rarer for natural pressing. With N1's rule (a brush on the second press toward a horse alongside, within 2 s, while the first waits), a kid who presses again because nothing seemed to happen paid in most races. The rule is now `brushPresses = 3`: the press that brushes is at least the third that way since the first one waiting, still within `brushRepeatSeconds` (2 s), with a horse alongside for `brushGraceSeconds` and no tuck-back. Reproduce the rule table with the measurement script described below, and the report with `python sims/steering.py --write` (the `d057` profile's files are the same run: since N5 `trip.d057_config()` is `trip.CONFIG`, and no step reads the profile).
+
+## The rule options, by kid press pattern
+
+Each kid makes an intent every 2–6 s and presses a random way (the outward kid always outward). The press-again kids press the same way once more after the delay shown. 50 races per course × distance (400 in all) for each scenario: a field of seven bots, and the six griefing scenarios. Each cell is the share of races in which the kid paid for a brush: in the bot field, then the highest over the seven scenarios.
+
+| Rule | Casual | One press | Double-tap 0.1–0.3 s | Again 0.4–0.6 s | Again 0.8–1.2 s | Again 0.3–0.8 s | Again outward 0.3–0.8 s | Wanderer | Masher |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N1: the second press | 0.0 / 0.5% | 0 / 0% | 48 / 65% | 59 / 76% | 58 / 74% | 59 / 77% | 52 / 86% | 14 / 18% | 72 / 86% |
+| A second press within 0.6 s is the same try | 0.0 / 0.2% | 0 / 0% | 0.2 / 0.5% | 38 / 48% | 58 / 74% | 45 / 58% | 30 / 64% | 9 / 12% | 61 / 78% |
+| `brushFree = 2` | 0.0 / 0.5% | 0 / 0% | 39 / 54% | 49 / 64% | 46 / 65% | 49 / 64% | 40 / 80% | 3.5 / 4.5% | 56 / 75% |
+| 0.6 s and `brushFree = 2` | 0 / 0% | 0 / 0% | 0 / 0% | 28 / 32% | 46 / 67% | 34 / 44% | 14 / 46% | 2.0 / 2.2% | 46 / 66% |
+| A second press within 1.0 s is the same try | 0 / 0% | 0 / 0% | 0.2 / 0.5% | 0.5 / 0.8% | 47 / 61% | 0.5 / 1.0% | 0.5 / 1.0% | 4.2 / 5.2% | 50 / 71% |
+| …within 1.3 s | 0 / 0% | 0 / 0% | 0.2 / 0.5% | 0.5 / 0.8% | 0.5 / 1.0% | 0.5 / 1.0% | 0.5 / 1.0% | 1.8 / 2.8% | 40 / 58% |
+| **The third press (chosen)** | **0 / 0%** | **0 / 0%** | **0.0 / 0.2%** | **0.2 / 0.8%** | **0.2 / 0.8%** | **0.2 / 0.8%** | **0.5 / 0.8%** | **0.5 / 0.8%** | **61 / 79%** |
+
+- The bars: casual and press-again kids charged in ≤ 5% of races, the masher still charged in a meaningful share (brushes still teach), and every target still passing.
+- A second press within 0.6 s (the review's first idea) only covers double-taps: a kid who presses again after a second still paid in 58% of races. `brushFree = 2` hardly helps, since these kids brush two or three times a race.
+- A 1.3 s minimum gap meets the bars, but it leaves a 0.7 s window in which a press brushes. A kid who presses again after 1.5 s would pay, and the masher falls to 40%.
+- The third press meets every bar whatever the timing of the second press, and it is the easiest to say: "a rider who keeps pressing". It needs one counter per horse (`same_presses`, `samePresses`), reset when the first press starts waiting.
+- A press-again kid can still brush only when its next intent, the same way, comes within 2 s of an earlier press that is still waiting.
+- Measured with a probe script kept outside the repo (press policies `singles`, `doubles`, `again05`, `again1`, `doubletap`, `outtap` on `sims/steering.py`). `sims/steering.py` keeps `doubletap` as a griefing kid. `tests/test_trip_d057.py` gates it: charged in ≤ 5% of 80 races (a bot field and a crew box), with the masher charged in ≥ 30%.
+
+## The game's report with the third-press rule
+
+Every D-054 τ target, every D-057 target and the griefing gates pass in every course × distance. The baseline table and its probes are identical to N3's and N5's (Smart Steer never brushes); only the recorded config gained `brushPresses`. The τ table, reach, zig-zag, glides, motion, boxed-in time and stress are as in N5 (stress: 0 overlaps in 4,000 races, fall-back 19.0 ft/s, 8,183 brushes).
+
+**Brushes by policy** (one rider among seven bots, 600 races per cell; was with N1's rule):
+
+| Policy | Races with a brush | Charged | Brushes a race | Mean cost |
+| --- | --- | --- | --- | --- |
+| Casual | 0.04% (2.1%) | 0.0% in every cell (0.6%, cells 0–1.3%) | 0.00 | 0 |
+| Wanderer | 6.9% (36%) | 0.4% (13%) | 0.07 | 0.0000 (0.0004) |
+| Masher | 76% (82%) | 56% (66%) | 2.1 | 0.0027 (0.0033), at most 0.006 |
+| Rail, never-steer, ditherer | 0 | 0 | 0 | 0 |
+
+No horse but the mover is ever charged.
+
+## Griefing, with the new kids
+
+200 races per course × distance and scenario (1,600 pooled). Each figure is the kid's own trip (ground + draft − its own brush charge), targeted minus untargeted; in brackets, the part from brush charges.
+
+| Kid | Shadow − rail1 | Crew − rail3 | Bumper − rail1 | Gate |
+| --- | --- | --- | --- | --- |
+| Smart Steer | +0.0003 (0) | +0.0030 (0) | +0.0005 (0) | own trip ≥ −0.001 (pooled and every cell: −0.0007 at worst) |
+| Rail rider | +0.0001 (0) | +0.0001 (0) | −0.0004 (0) | own trip ≥ −0.001 (every cell: −0.0008 at worst) |
+| Wanderer | **−0.0030** (0) | +0.0143 (0) | **−0.0016** (0) | brush part ≥ −0.001 |
+| Press-again (0.3–0.8 s) | +0.0003 (0) | +0.0273 (0) | +0.0023 (0) | brush part ≥ −0.001 |
+| Masher | **−0.0029** (+0.0001) | +0.0292 (−0.0022) | **−0.0015** (−0.0002) | reported (a masher who keeps pressing into a box pays: that's the lesson) |
+
+- **The crew's brush cost on a press-again kid is gone:** the review measured −0.0019 to −0.0031 with N1's rule; it is 0.0000 now.
+- The kid is never charged for a stranger's brush, and a Smart Steer kid is never charged at all.
+- **The gates.** Own trip ≥ −0.001 stays on the Smart Steer and rail kids, the riders D-057's bound was written for. For every kid but the masher, the brush charges that strangers add must stay within −0.001 (`griefing_brushes`). The wanderer's, press-again kid's and masher's own-trip figures are reported. The bold ones are the shadow finding below.
+
+## The shadow finding (not a brush effect)
+
+The review measured, with brushes off, a shadow costing a wanderer kid −0.0027 and a masher kid −0.0023. It isn't about brushes:
+- **Brushes on or off, the same.** Over the same 400 races, the wanderer's shadow figure is −0.0032 with brushes off and −0.0037 with them on. A kid who presses once per intent and never brushes loses more: −0.0050 to a shadow, −0.0033 to a bumper.
+- **What happens.** The shadow sits just inside the kid at the kid's own pace and follows it out. Every inward press meets the shadow (the kid tucks back or waits), while outward presses go through. A kid pressing at random drifts outward: the wanderer is 0.23 lanes wider at the lock and loses 0.0045 more ground on the turns. The draft behind the shadow gives back 0.0012.
+- **Who is safe.** Smart Steer tucks in behind and drafts (+0.0003). A rail rider presses In every 0.3 s and holds the rail (+0.0001). The press-again kid comes out at +0.0003.
+- **Size.** −0.0030 τ is 0.15 of a slider point; the bound is 0.05. The full run's masher figure is noisy (−0.0029 over 1,600 races, −0.0001 over the first 400; its p5 is −0.099).
+- **No small rule fixes it.** A Smart Steer that resumes 2.5 s after a press instead of 5 s cut a 64-race wanderer probe from −0.0082 to −0.0033. That still isn't a fix, and it changes how every pressing kid rides.
+- **Options** (REVIEW_QUEUE "N5 review: shadow finding"):
+  1. Accept it: only riders who press at random lose, about 0.15 of a slider point.
+  2. Smart Steer resumes sooner after a lone press (`smart.resumeSeconds` 5 → 2.5). Re-calibrate and playtest.
+  3. An inward wait survives one outward press (cancelling takes two). This changes the D-057 cancel rule for everyone.

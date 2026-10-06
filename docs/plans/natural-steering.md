@@ -48,7 +48,7 @@ The prototype (`prototype/` next to this file) is scratch. `trip012.py` is `src/
       - "Gap!" (with `tap_good`) when a press that waited at least 0.5 s fires.
     - **No boxed-in cost** (unchanged from D-054). Being boxed costs only its natural cost: you can't reach the rail until you steady back.
   - **Brushes (rule-based contact in Trip; no collision bodies, no Roblox physics):**
-    - **When:** a second press toward a horse alongside (within 8 ft lengthwise in the next lane, alongside for at least 0.3 s), within 2 s of the first press, while the first press still waits and no tuck-back is possible. A first press never brushes, and a re-press many seconds later is a new try.
+    - **When:** a second press (the third since the N5 review: `brushPresses = 3`) toward a horse alongside (within 8 ft lengthwise in the next lane, alongside for at least 0.3 s), within 2 s of the first press, while the first press still waits and no tuck-back is possible. A first press never brushes, and a re-press many seconds later is a new try.
     - **What happens:**
       - The mover leans at most 1 ft toward the other horse over 0.4 s and nods.
       - It steadies back 4 ft (in Trip's offsets, recovering at 2 ft/s) and can't steer for 1 s. Its waiting press clears.
@@ -280,6 +280,12 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
   - The pose is `SteerPose.brush` (a sine out and back over `brushLeanSeconds`: the mover's lean ≤ `brushLeanFeet`, both horses' nod ≤ `brushNodDeg`), drawn only. The replay records the brush when it was drawn.
   - A brush clearing a waiting press never wobbles its arrow (`SteerHud.message`'s `brushAt`).
   - The overlap report gates the brush rows: casual riders charged in ≤ 5% of races, no horse charged for a brush it didn't make.
+- **As built, N5 review (2026-10-06; DECISIONS D-057 N5 review note, REVIEW_QUEUE "N5 review" rows):**
+  - A press again is the same try: a brush needs the third press that way while the first waits (`brushPresses = 3`, N1's rule was the second), still within `brushRepeatSeconds`. Kids who press once and then again (0.1–1.2 s later) are charged in ≤ 1% of races; a masher still in about 60%.
+  - The pose is a sine squared (starts and ends at rest). A brush that reaches a screen over 1/30 s late starts from the beginning then (`brushLateSeconds`); one already past `brushLeanSeconds` isn't drawn, ticked or recorded.
+  - The mover's chip shows as the brush is drawn. A rider's first brush ever brings a one-time tip, "Bump! Press once, then wait for a gap" (`data.flags.bumpTip`). The look cue stays off while your horse steadies.
+  - The `[Trip]` log counts each rider's brushes per other horse (the griefing fail line below).
+  - `bump_soft` is in the audio plan (P1, not made); brushes play `count_tick` until it is uploaded.
 
 ### N6. Docs, playtest checklist, and the optional head split
 
@@ -327,6 +333,6 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 - Mashing ◀ ▶ gives at most one quick change of mind, then the horse holds its line (the ring fills).
 - After "Lanes locked!", horses passing on screen move over early, in one smooth move, and never swerve a whole lane in the last 2 s; a horse that moved over doesn't swing back within 3.5 s.
 - Out ▶ greys beside a horse; ◀ In greys only when it can't tuck back; a press there waits, then drops quietly.
-- A second press into a horse alongside brushes it: lean, nod, a soft tick, the mover drops back a little; the other horse only nods.
-- Bots never brush; nothing brushes after "Lanes locked!".
+- A third press into a horse alongside brushes it (N5 review: a press again is the same try): lean, nod, a soft tick, the mover drops back a little; the other horse only nods.
+- Bots never brush; no brush starts after the lock (one from the last moment before it can be drawn just after "Lanes locked!").
 - Replays show the turns, leans and brushes.

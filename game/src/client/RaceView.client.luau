@@ -126,7 +126,9 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?,
 	lastBase[horse] = cf
 	if (yaw and yaw ~= 0) or (roll and roll ~= 0) or (nod and nod ~= 0) then
 		local ry, rz = SteerPose.angles(yaw or 0, roll or 0)
-		-- (Angles applies Z, then Y, then X: the lean, the turn, and a brush's nod about the turned body)
+		-- (CFrame.Angles(x, y, z) is Rx * Ry * Rz: the nod turns about the track's sideways axis, the
+		-- unturned body's X, then the turn about the nodded up axis, then the lean about the body's length.
+		-- The turn is a few degrees at most, so the nod is all but about the turned body.)
 		cf = cf * CFrame.Angles(SteerPose.nodAngle(nod or 0), ry, rz)
 	end
 	horse:PivotTo(cf)
@@ -284,11 +286,16 @@ remotes.RaceOffsets.OnClientEvent:Connect(function(offsets, a, b, c)
 end)
 
 -- A brush (D-057 N5), stamped with the server time it happened: drawn when the race on screen
--- gets there (the playback time), a soft tick at the mover's horse as it starts.
+-- gets there (the playback time), a soft tick at the mover's horse as it starts. Your own brush
+-- also steadies your horse (steadySeconds): no look cue for presses the server answers "steady".
 remotes:WaitForChild("SteerBrush").OnClientEvent:Connect(function(mover, other, dir, at, courseId)
 	local race = races[courseId or "dirt"]
 	if not race or not race.steering then return end
-	table.insert(race.brushes, { at = at or serverNow(), mover = mover, other = other, dir = dir, started = false })
+	local stamp = at or serverNow()
+	table.insert(race.brushes, { at = stamp, mover = mover, other = other, dir = dir, started = false })
+	if mover == race.myLane and race.own then
+		race.own.steadyUntil = os.clock() + math.max(0, stamp + STEER.steadySeconds - serverNow())
+	end
 end)
 
 -- Steering (D-054): this race's lanes move, and lock at the far turn (server time lockAt).
@@ -365,12 +372,21 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 		end
 		local laneWidth = race.cfg.laneWidth
 		-- Brushes (D-057 N5): each starts when the race on screen reaches it; the mover's horse ticks
-		-- softly, and the replay records it then (what this screen showed).
+		-- softly, the mover's chip shows (RaceState.BrushDrawn), and the replay records it then (what
+		-- this screen showed). One that arrives late starts from the beginning now (its clock restarts
+		-- at the drawn time, so the horse never snaps into the middle of a lean); one the screen is
+		-- already past (brushLeanSeconds) isn't drawn, ticked or recorded at all.
 		local drawnAt = if race.steering and EASED and race.pb.play then race.pb.play else t
 		for k = #race.brushes, 1, -1 do
 			local b = race.brushes[k]
 			local age = drawnAt - b.at
 			if not b.started and age >= 0 then
+				local how = SteerPose.brushStart(age, POSE)
+				if how == "skip" then
+					table.remove(race.brushes, k)
+					continue
+				end
+				if how == "restart" then b.at, age = drawnAt, 0 end
 				b.started = true
 				local horse = horseModel(courseId, b.mover)
 				local part = horse and (horse.PrimaryPart or horse:FindFirstChildWhichIsA("BasePart", true))
@@ -379,6 +395,7 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 				if isFocus and rec and rec.course == courseId then
 					table.insert(rec.events, { t = t, kind = "brush", mover = b.mover, other = b.other, dir = b.dir })
 				end
+				RaceState.BrushDrawn:Fire(courseId, b.mover, b.at)
 			end
 			if age > POSE.brushLeanSeconds + 0.1 then table.remove(race.brushes, k) end
 		end

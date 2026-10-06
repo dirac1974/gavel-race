@@ -62,6 +62,7 @@
   "brushAlongFeet": 8.0,
   "brushGraceSeconds": 0.3,
   "brushRepeatSeconds": 2.0,
+  "brushPresses": 3,
   "brushPays": "mover",
   "brushCost": 0.002,
   "brushFree": 1,

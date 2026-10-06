@@ -47,7 +47,7 @@ local eased = not opts.d054 and (opts.d057 or GameConfig.steering.glide == "ease
 -- D-054: rider 1 presses from its screen (predict) even with no riders asked for.
 if opts.predict and not eased and (opts.riders == nil or opts.riders < 1) then opts.riders = 1 end
 print(string.format("config: %s; %d races per course and distance%s%s%s",
-	if opts.d054 then "D-054 (the switch-back)" elseif opts.d057 then "D-057 with brushes (N5 preview)"
+	if opts.d054 then "D-054 (the switch-back)" elseif opts.d057 then "D-057 in full (Trip.d057Config; the game's config since N5)"
 		else "GameConfig (" .. GameConfig.steering.glide .. " glide, brushes " .. GameConfig.steering.brush .. ")",
 	races, if opts.predict then string.format(", rider 1 on its own screen at %.2f s each way", opts.latency or 0.1) else "",
 	if opts.manual then ", Smart Steer off" else "", if (opts.jitter or 0) > 0 then string.format(", jitter 0-%d ms", math.round(opts.jitter * 1000)) else ""))

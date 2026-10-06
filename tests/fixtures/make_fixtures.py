@@ -307,7 +307,7 @@ D057_OVERRIDES = [None] * 8 + [
     {"glide": "linear"}, {"brush": "off"}, {"scale": 0.5}, {"weaveGapSeconds": 0.0},
     {"laneSpeedMax": 1.667, "laneAccel": 5.56}, {"chainWindow": 0.0}, {"glideReserveFeet": 0.0},
     {"pressBounceSeconds": 0.0}, {"brushRepeatSeconds": 0.0}, {"blockedPress": "d054"}, {"gapWaitSeconds": 0.0},
-    {"brushPays": "none"}, {"reverseGapSeconds": 0.0}, dict(trip.D057_OFF),
+    {"brushPays": "none"}, {"reverseGapSeconds": 0.0}, {"brushPresses": 2}, dict(trip.D057_OFF),
 ]
 D057_STYLES = ("casual", "masher", "ditherer", "double", "bounce")
 
@@ -337,7 +337,8 @@ def _d057_snapshot(st_, tick):
             "want": list(st_.want), "queued": list(st_.queued), "check": list(st_.check),
             "charged": list(st_.charged), "tucking": list(st_.tucking),
             "alongSince": [list(a) for a in st_.along_since], "steadyUntil": list(st_.steady_until),
-            "firstPressAt": list(st_.first_press_at), "lastRevAt": list(st_.last_rev_at),
+            "firstPressAt": list(st_.first_press_at), "samePresses": list(st_.same_presses),
+            "lastRevAt": list(st_.last_rev_at),
             "arrivedAt": list(st_.arrived_at), "manualAt": list(st_.manual_at),
             "smartBlockAt": list(st_.smart_block_at), "lastPressAt": list(st_.last_press_at),
             "lastPressDir": list(st_.last_press_dir), "wantAt": list(st_.want_at),
@@ -397,8 +398,8 @@ def trip_d057_run(k, baseline, geometry):
     """One scripted phase-A run with D-057 on, from its own seed. Riders press in five styles,
     drawn per rider: casual (a press now and then), masher (4 a second, random side), ditherer
     (In, Out, In, Out every 0.2 s), double (a second press the same way 0.2-1.9 s after the
-    first: brushes) and bounce (a second press 0-0.2 s after the first). The presses never read
-    the state."""
+    first, and half the time a third 0.2-1.9 s after that: the third brushes) and bounce (a second
+    press 0-0.2 s after the first). The presses never read the state."""
     rng = random.Random(20261057 * 1000 + k)
     course = trip.COURSE_ORDER[k % 2]
     distance = trip.DISTANCE_ORDER[(k // 2) % 4]
@@ -446,6 +447,10 @@ def trip_d057_run(k, baseline, geometry):
                 by_tick.setdefault(tick, []).append((i, d))
                 if later < ticks:
                     by_tick.setdefault(later, []).append((i, d))
+                if style == "double" and rng.random() < 0.5:  # (N5 review: a third press brushes)
+                    third = later + rng.randint(2, 19)
+                    if third < ticks:
+                        by_tick.setdefault(third, []).append((i, d))
     after_lock = [[rng.randrange(n) + 1, rng.choice([-1, 1])] for _ in range(rng.choice([1, 2, 3]))]
     run = _d057_play(course, distance, posts, kinds, q, p1, uniforms, switch, ticks, cfg,
                      lambda _st, tick: by_tick.get(tick, []), after_lock, baseline, D057_SNAPSHOT_EVERY)
@@ -513,30 +518,34 @@ def trip_d057_edges(baseline):
               _at({100: [(0, -1), (0, -1)], 101: [(0, -1)], 102: [(0, -1)], 110: [(0, 1)], 111: [(0, 1)],
                    140: [(0, 1)], 141: [(0, -1)], 160: [(0, -1)]}), 190, [[1, -1]], baseline),
         # Lane 3 (horse 2) boxed: horse 1 11 ft ahead in its lane, horses alongside in lanes 2
-        # and 4. Out waits 1.5 s and drops; In tucks back and slips in behind; a second In while
-        # tucking never brushes.
+        # and 4. Out waits 1.5 s and drops; In tucks back and slips in behind; a second and a third
+        # In while tucking never brush.
         _edge("boxed-both-sides", [3, 3, 2, 4], ["manual"] * 4, [0.25 + 11 / 320, 0.25, 0.25, 0.25],
-              _at({110: [(1, 1)], 130: [(1, -1)], 132: [(1, -1)]}), 200, [[2, -1], [3, 1]], baseline),
+              _at({110: [(1, 1)], 130: [(1, -1)], 132: [(1, -1)], 134: [(1, -1)]}), 200, [[2, -1], [3, 1]],
+              baseline),
         # Lane 3 (horse 2) boxed with no tuck slot inside: a line of four in lane 2 (no slot within
-        # tuckBackMax), horse 1 ahead, horse 7 outside. Pairs of In presses: brushes 1 (free),
-        # 2, 3, 4 (charged up to the cap); a fifth pair just waits (the cap). Presses while
-        # steadying answer "steady". After the bell: nothing.
+        # tuckBackMax), horse 1 ahead, horse 7 outside. Threes of In presses (the second queues,
+        # the third brushes): brushes 1 (free), 2, 3, 4 (charged up to the cap); a fifth three
+        # just waits (the cap). Presses while steadying answer "steady". After the bell: nothing.
         _edge("trapped-brush-cap", [3, 3, 2, 2, 2, 2, 4], ["manual"] * 7, [1 / 7 + 11 / 320] + [1 / 7] * 6,
-              _at({110: [(1, -1)], 115: [(1, -1)], 118: [(1, -1)], 130: [(1, -1)], 135: [(1, -1)], 150: [(1, -1)],
-                   152: [(1, -1)], 170: [(1, -1)], 172: [(1, -1)], 190: [(1, -1)], 192: [(1, -1)], 194: [(1, 1)],
-                   196: [(1, 1)]}),
+              _at({110: [(1, -1)], 113: [(1, -1)], 116: [(1, -1)], 118: [(1, -1)], 130: [(1, -1)], 133: [(1, -1)],
+                   136: [(1, -1)], 150: [(1, -1)], 153: [(1, -1)], 156: [(1, -1)], 170: [(1, -1)], 173: [(1, -1)],
+                   176: [(1, -1)], 190: [(1, -1)], 192: [(1, -1)], 194: [(1, -1)], 196: [(1, 1)], 198: [(1, 1)]}),
               220, [[2, -1], [2, -1], [7, -1]], baseline),
-        # The same box: a second In 2.1 s after the first is outside brushRepeatSeconds (it queues),
-        # two Outs cancel both, then a fresh pair 1.8 s apart brushes.
+        # The same box: a third In 2.1 s after the first is outside brushRepeatSeconds (no brush;
+        # the second already queued), two Outs cancel both, then a fresh three, the third 1.8 s
+        # after the first, brushes.
         _edge("brush-window", [3, 3, 2, 2, 2, 2, 4], ["manual"] * 7, [1 / 7 + 11 / 320] + [1 / 7] * 6,
-              _at({110: [(1, -1)], 131: [(1, -1)], 133: [(1, 1)], 135: [(1, 1)], 140: [(1, -1)], 158: [(1, -1)]}),
+              _at({110: [(1, -1)], 120: [(1, -1)], 131: [(1, -1)], 133: [(1, 1)], 135: [(1, 1)], 140: [(1, -1)],
+                   149: [(1, -1)], 158: [(1, -1)]}),
               180, [[2, -1]], baseline),
         # The window starts when the waiting press was pressed, even if it queued: horse 1 glides
         # In from lane 4 (10.0 s), presses Out mid-glide (10.5 s, queued for the reverse gap),
         # finds horse 2 alongside in lane 4 when it may move (11.5 s) and presses Out again at
-        # 12.2 s: a brush, 1.7 s after the queued press (2.2 s after the accepted one).
+        # 11.8 s (it queues) and 12.2 s: a brush, 1.7 s after the queued press (2.2 s after the
+        # accepted one).
         _edge("brush-window-queued", [4, 4], ["manual", "manual"], [0.5, 0.5 - 28 / 320],
-              _at({100: [(0, -1)], 105: [(0, 1)], 122: [(0, 1)]}), 150, [[1, 1]], baseline,
+              _at({100: [(0, -1)], 105: [(0, 1)], 118: [(0, 1)], 122: [(0, 1)]}), 150, [[1, 1]], baseline,
               live_after=[0.5, 0.5], switch=95),
         # Out into a horse closing from behind: no brush within brushGraceSeconds of it coming
         # alongside, a brush after.
@@ -550,11 +559,20 @@ def trip_d057_edges(baseline):
         # 8 s before the clubhouse turn): it waits for room, never drops, never brushes.
         _edge("smart-trapped", [3, 2, 2, 2, 2], ["smart"] + ["manual"] * 4, [0.2] * 5, _at({}), 220, [[1, -1]],
               baseline),
-        # Outward press into a horse alongside, pressed again within 2 s: a brush (outward never
-        # tucks back); with brushPays = "bumped" the other horse pays and steadies back instead.
+        # Outward press into a horse alongside, pressed twice more within 2 s: a brush (outward
+        # never tucks back); with brushPays = "bumped" the other horse pays and steadies back instead.
         _edge("brush-out-bumped-pays", [3, 4], ["manual", "manual"], [0.5, 0.5],
-              _at({100: [(0, 1)], 105: [(0, 1)], 108: [(0, 1)]}), 140, [[1, 1]], baseline,
+              _at({100: [(0, 1)], 103: [(0, 1)], 106: [(0, 1)], 108: [(0, 1)]}), 140, [[1, 1]], baseline,
               cfg=_d057_cfg({"brushPays": "bumped"})),
+        # N5 review: a press again is the same try. Into a horse alongside with no tuck slot, two
+        # presses 0.5 s apart just wait (the second queues), however long they wait; a third
+        # within 2 s of the first brushes. With brushPresses = 2 (N1's rule) the second brushes.
+        _edge("press-again", [3, 3, 2, 2, 2, 2, 4], ["manual"] * 7, [1 / 7 + 11 / 320] + [1 / 7] * 6,
+              _at({110: [(1, -1)], 115: [(1, -1)], 150: [(1, 1)], 152: [(1, 1)], 160: [(1, -1)], 165: [(1, -1)],
+                   170: [(1, -1)]}),
+              190, [[2, -1]], baseline),
+        _edge("press-again-n1", [3, 3, 2, 2, 2, 2, 4], ["manual"] * 7, [1 / 7 + 11 / 320] + [1 / 7] * 6,
+              _at({110: [(1, -1)], 115: [(1, -1)]}), 150, [[2, -1]], baseline, cfg=_d057_cfg({"brushPresses": 2})),
         # An inward press that can't tuck back drops after gapWaitInSeconds when that isn't 0.
         _edge("trapped-drop", [3, 2, 2, 2, 2], ["manual"] * 5, [0.2] * 5, _at({100: [(0, -1)]}), 150, [[1, -1]],
               baseline, cfg=_d057_cfg({"gapWaitInSeconds": 3.0})),

@@ -6,11 +6,11 @@
 python sims/steering.py                  # acceptance report against the checked-in baseline (~3 min, all cores)
 python sims/steering.py --write          # regenerate tests/fixtures/trip_baseline.json and game/src/shared/TripBaseline.luau first
 python sims/steering.py --set groundPerLaneTurn=0.011 --races 500 --report-races 300   # try a tuning change (nothing written)
-python sims/steering.py --profile d057 --write   # brushes on too (N5): trip_baseline_d057.json + steering_report_d057.json
+python sims/steering.py --profile d057 --write   # D-057 in full (the live config since N5): trip_baseline_d057.json + steering_report_d057.json
 python sims/steering.py --profile d054 --write   # D-054, the switch-back: trip_baseline_d054.json + steering_report_d054.json
 ```
 
-Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the mirror of `GameConfig.steering`) or the course geometry; the tests fail while a baseline is stale. The default profile, `live`, is `trip.CONFIG`: since N3, D-057's motion and press rules with brushes off; only it writes `TripBaseline.luau`. `--profile d057` adds the brushes (`trip.d057_config()`), and `--profile d054` is the D-054 switch-back (`trip.d054_config()`). With any D-057 switch on the report adds the D-057 measures (zig-zag, sideways motion, body yaw, boxed in, brushes, reach per intent, griefing, overlap stress). `tests/test_trip_d057.py` asserts the live and d057 reports, `tests/test_trip.py` the d054 one. Results and tuning history: `docs/research/steering-calibration.md`.
+Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the mirror of `GameConfig.steering`) or the course geometry; the tests fail while a baseline is stale. The default profile, `live`, is `trip.CONFIG`: since N3, D-057's motion and press rules, and since N5 the brushes; only it writes `TripBaseline.luau`. `--profile d057` is D-057 in full (`trip.d057_config()`, the same config since N5, so the same numbers), and `--profile d054` is the D-054 switch-back (`trip.d054_config()`). With any D-057 switch on the report adds the D-057 measures (zig-zag, sideways motion, body yaw, boxed in, brushes, reach per intent, griefing, overlap stress). The griefing test runs Smart Steer, rail, wanderer, masher and press-again (`doubletap`) kids: own trip is gated for the Smart Steer and rail kids, and the brush charges strangers add for every kid but the masher (N5 review). `tests/test_trip_d057.py` asserts the live and d057 reports, `tests/test_trip.py` the d054 one. Results and tuning history: `docs/research/steering-calibration.md`.
 
 ## economy.py — progression pace and Green Cash per hour
 

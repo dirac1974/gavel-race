@@ -150,6 +150,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 						{ "alongSince", deepEqual(st.alongSince, snap.alongSince, 1e-9) },
 						{ "steadyUntil", nums(st.steadyUntil, snap.steadyUntil, 1e-9) },
 						{ "firstPressAt", nums(st.firstPressAt, snap.firstPressAt, 1e-9) },
+						{ "samePresses", same(st.samePresses, snap.samePresses) },
 						{ "lastRevAt", nums(st.lastRevAt, snap.lastRevAt, 1e-9) },
 						{ "arrivedAt", nums(st.arrivedAt, snap.arrivedAt, 1e-9) },
 						{ "manualAt", nums(st.manualAt, snap.manualAt, 1e-9) },

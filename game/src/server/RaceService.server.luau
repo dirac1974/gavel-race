@@ -70,7 +70,7 @@ local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note
 local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, [trip stars, places gained by the trip (riders with the steering buttons),] course (D-033, D-054)
 local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on, lock time (server time), course (D-054)
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
-local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, course (D-054 S3)
+local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, first-brush tip (D-057 N5), course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
 local SteerBrush = makeRemote("SteerBrush")       -- server -> all: a brush (mover, other, dir, server time, course), D-057 N5
 local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, the state's race time, course (D-054 S3, D-057 N4)
@@ -570,7 +570,7 @@ local function runRace(c, players: { Player })
 	-- alone. While the buttons are hidden everyone has Smart Steer (no kid is left at their post
 	-- with no way to move) and their tau is 0 (they can't affect their trip).
 	local trip = nil
-	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, kind: string } } = {}
+	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string } } = {}
 	local steers: { [Player]: boolean } = {}
 	if GameConfig.steering.enabled then
 		local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
@@ -595,7 +595,7 @@ local function runRace(c, players: { Player })
 	if trip then
 		TripInfo:FireAllClients(true, tStart + trip.lockT, c.id)
 		for p, ctl in controls do
-			SteerControls:FireClient(p, ctl.shown, ctl.smart, ctl.tip, c.id)
+			SteerControls:FireClient(p, ctl.shown, ctl.smart, ctl.tip, ctl.bumpTip, c.id)
 			local data = ctl.tip and Profiles.get(p)
 			if data then -- the ghost-thumb tip shows once
 				data.flags.steerTip = true
@@ -656,11 +656,17 @@ local function runRace(c, players: { Player })
 			TripLocked:FireAllClients(c.id)
 			-- One line for the playtest logs (D-054): each rider's post, steering and tau, and how
 			-- the riders' requests were answered.
+			-- Brushes (D-057 N5) per rider with how many went into each other horse ("into post 4 x2"):
+			-- the plan's griefing line counts one rider brushing the same horse 3+ times.
 			local parts, answers = {}, {}
 			for i, lane in session.lanes do
 				if not lane.isBot then
-					table.insert(parts, string.format("post %d %s tau %.4f brushes %d cost %.3f", i, trip.riderKind[i] or "smart",
-						session.tau[i], trip.brushes[i], Trip.brushCharge(trip, i)))
+					local into = {}
+					for j, count in Trip.brushesInto(trip, i) do table.insert(into, string.format("post %d x%d", j, count)) end
+					table.sort(into)
+					table.insert(parts, string.format("post %d %s tau %.4f brushes %d%s cost %.3f", i, trip.riderKind[i] or "smart",
+						session.tau[i], trip.brushes[i], if #into > 0 then " (into " .. table.concat(into, ", ") .. ")" else "",
+						Trip.brushCharge(trip, i)))
 				end
 			end
 			for answer, count in trip.answers do table.insert(answers, answer .. " " .. count) end
@@ -702,12 +708,30 @@ local function runRace(c, players: { Player })
 		-- stamped with the server time they happened: the mover leans and nods, the other nods, a
 		-- soft tick at the mover's horse, and the mover's chip. Bots and Smart Steer never brush;
 		-- nothing happens after the lock (Trip).
+		-- A rider's first brush ever brings the one-time tip on their screen (SteerControls' bumpTip):
+		-- from then on the profile says it has come.
+		local function bumpTipShown(i: number)
+			local lane = session.lanes[i]
+			if not lane or lane.isBot then return end
+			local p = Players:GetPlayerByUserId(tonumber(lane.id) or 0)
+			local ctl = if p then controls[p] else nil
+			if not p or not ctl or not ctl.bumpTip then return end
+			ctl.bumpTip = false
+			local data = Profiles.get(p)
+			if data then
+				data.flags.bumpTip = true
+				Profiles.changed(p)
+			end
+		end
 		local function sendBrushes()
 			while sentBrushes < #trip.events do
 				sentBrushes += 1
 				local e = trip.events[sentBrushes]
 				-- (stamped as the samples are: the state after its tick)
-				if e[2] == "brush" then SteerBrush:FireAllClients(e[3], e[4], e[5], tStart + e[1] + trip.dt, c.id) end
+				if e[2] == "brush" then
+					SteerBrush:FireAllClients(e[3], e[4], e[5], tStart + e[1] + trip.dt, c.id)
+					bumpTipShown(e[3])
+				end
 			end
 		end
 		local scratchOwn = {}

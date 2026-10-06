@@ -1411,10 +1411,11 @@ end)
 
 -- Steering (D-054 S3): your buttons and Smart Steer for this race (sent to you only), the lock
 -- time, and the lock itself.
-remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smart, tip, courseId)
+remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smart, tip, bumpTip, courseId)
 	local s = steer
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace then return end
 	s.shown, s.smart = shown == true, smart ~= false
+	s.bumpTip = s.shown and bumpTip == true -- (D-057 N5) the one-time tip on your first brush
 	if s.shown and tip then s.tipAt = s.start + 1.5 end
 	if s.shown and RaceState.recording then RaceState.recording.steer = true end -- the replay draws your line
 	bindSteer(s.shown)
@@ -1437,14 +1438,27 @@ remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack,
 		if Sound then Sound.play("tap_good") end
 	end
 end)
--- A brush (D-057 N5): when you were the horse that pressed into another, "No room yet" (under the
--- chips' limits; the other rider hears nothing), and the wait it cleared won't wobble. No cost or
--- blame words anywhere; the results card shows nothing about it.
+-- A brush (D-057 N5): when you were the horse that pressed into another, the wait it cleared won't
+-- wobble (from its arrival: the SteerLane that clears the wait comes right after it), and as your
+-- screen draws it (RaceState.BrushDrawn, with the lean) a chip: the first brush you ever have (it
+-- is free) the one-time tip, "Bump! Press once, then wait for a gap"; after that "No room yet"
+-- under the chips' limits. The other rider hears nothing. No cost or blame words anywhere; the
+-- results card shows nothing about it.
 remotes:WaitForChild("SteerBrush").OnClientEvent:Connect(function(mover, _other, _dir, at, courseId)
 	local s = steer
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
 	s.brushAt = (at or serverNow()) - s.start
-	if SteerChips.brushed(s.chips, s.brushAt, SHUD) then showChip("No room yet") end
+end)
+RaceState.BrushDrawn.Event:Connect(function(courseId, mover, _at)
+	local s = steer
+	if not s or s.course ~= courseId or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
+	local chip = SteerChips.bumped(s.chips, serverNow() - s.start, SHUD, s.bumpTip == true)
+	if chip == "tip" then
+		s.bumpTip = false
+		showChip("Bump! Press once, then wait for a gap", SHUD.tipSeconds)
+	elseif chip == "noRoom" then
+		showChip("No room yet")
+	end
 end)
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)
 	local s = steer

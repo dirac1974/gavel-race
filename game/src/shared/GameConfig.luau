@@ -107,6 +107,7 @@ GameConfig.steering = {
 	brushAlongFeet = 8,            -- alongside = within this many feet lengthwise in the next lane...
 	brushGraceSeconds = 0.3,       -- ...for at least this long
 	brushRepeatSeconds = 2,        -- the second press comes within this long of the waiting one (0 = any time)
+	brushPresses = 3,              -- the press that brushes is at least the third that way since the first (N5 review)
 	brushPays = "mover",           -- "mover" (D-057); "bumped", "both", "none" for the sims
 	brushCost = 0.002,             -- tau per charged brush (own term, after the field mean)
 	brushFree = 1,                 -- the first brushes cost nothing
@@ -157,6 +158,7 @@ GameConfig.steerView = {
 	brushLeanSeconds = 0.4,  -- ...out and back over this long (the nods too)
 	brushNodDeg = 2,         -- a small nod, both horses
 	brushVolume = 0.5,       -- count_tick at half volume, at the mover's horse (silent until uploaded)
+	brushLateSeconds = 1 / 30, -- a brush first drawn later than this into it starts from the beginning then
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.

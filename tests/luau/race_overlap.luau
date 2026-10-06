@@ -227,7 +227,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	-- turned beyond its drift (radians).
 	local ownPose, cueSide = SteerPose.new(), 0
 	local masher = opts ~= nil and opts.ownStyle == "masher"
-	local apartFor, sentOwn = 0, nil
+	local apartFor, sentOwn, sentEvents = 0, nil, 0
 	local presses, nextPattern, mySeq = {}, if predict then 1 + 2 * pressRng:NextNumber() else math.huge, 0 -- presses = { { at, dir } } still to make
 	local seg = 1
 	local lastFrame = 0
@@ -336,6 +336,15 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					moveDir[i], moveTgt[i] = dir, laneNow[i]
 				end
 			end
+			if predict then -- (N5 review) your own brushes, before that tick's lane: RaceView steadies the look cue
+				while sentEvents < #trip.events do
+					sentEvents += 1
+					local e = trip.events[sentEvents]
+					if e[2] == "brush" and e[3] == me then
+						table.insert(inbox, { at = arrival(T), kind = "brush", T = e[1] + trip.dt })
+					end
+				end
+			end
 			if predict and not trip.locked then
 				local ownNow = { trip.tgt[me], Trip.laneAfter(trip, me), trip.ack[me] }
 				if not sentOwn or sentOwn[1] ~= ownNow[1] or sentOwn[2] ~= ownNow[2] or sentOwn[3] ~= ownNow[3] then
@@ -361,6 +370,8 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					end
 				elseif m.kind == "own" then
 					view.srv = { tgt = m.own[1], dest = m.own[2], ack = m.own[3] }
+				elseif m.kind == "brush" then -- as RaceView: no look cue while your horse steadies
+					view.steadyUntil = math.max(tc, m.T + steer.steadySeconds)
 				else
 					clientLocked = true
 				end

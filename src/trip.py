@@ -97,6 +97,8 @@ CONFIG: Dict = {
     "brushAlongFeet": 8.0,        # alongside = within this many feet lengthwise in the next lane...
     "brushGraceSeconds": 0.3,     # ...for at least this long (the rider saw it, whatever the lag)
     "brushRepeatSeconds": 2.0,    # the second press comes within this long of the first (0 = any time)
+    "brushPresses": 3,            # N5 review: the press that brushes is at least the third that way since
+                                  # the first (a press again is the same try; N1: 2)
     "brushPays": "mover",         # "mover" (D-057); "bumped", "both", "none" for the sims
     "brushCost": 0.002,           # tau per charged brush (own term, after the field mean)
     "brushFree": 1,               # the first brushes cost nothing
@@ -114,15 +116,17 @@ D057_OFF: Dict = {
     "weaveGapSeconds": 0.0, "weaveWindowSeconds": 7.0, "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0,
     "blockedPress": "d054", "gapWaitSeconds": 1.5, "gapWaitInSeconds": 0.0, "tuckAfterSeconds": 0.0,
     "boxedAheadFeet": 12.0, "brush": "off", "brushAlongFeet": 8.0, "brushGraceSeconds": 0.3,
-    "brushRepeatSeconds": 2.0, "brushPays": "mover", "brushCost": 0.002, "brushFree": 1, "brushMaxCharged": 3,
-    "brushCheckFeet": 4.0, "brushRecoverPerSecond": 2.0, "steadySeconds": 1.0,
+    "brushRepeatSeconds": 2.0, "brushPresses": 2, "brushPays": "mover", "brushCost": 0.002, "brushFree": 1,
+    "brushMaxCharged": 3, "brushCheckFeet": 4.0, "brushRecoverPerSecond": 2.0, "steadySeconds": 1.0,
 }
 D057_KEYS: Tuple[str, ...] = tuple(D057_OFF)
 
-# D-057 on (debate 012): the switches N3 (motion and presses) and N5 (brushes) flip.
+# D-057 on (debate 012): the switches N3 (motion and presses) and N5 (brushes) flip, and the N5
+# review's brushPresses (3; D057_OFF keeps N1's 2).
 D057: Dict = {
     "glide": "eased", "chainWindow": 0.3, "reverseGapSeconds": 0.5, "weaveGapSeconds": 2.5,
     "pressBounceSeconds": 0.2, "glideReserveFeet": 6.0, "blockedPress": "wait", "brush": "repeat",
+    "brushPresses": 3,
 }
 
 
@@ -311,6 +315,7 @@ class TripState:
         self.last_press_at: List[float] = []      # the last counted press (not a bounce)...
         self.last_press_dir: List[int] = []       # ...and its direction
         self.first_press_at: List[float] = []     # when the press now waiting was made
+        self.same_presses: List[int] = []  # presses that way since then, that one included (brushPresses)
         self.tucking: List[bool] = []     # a tuck-back is under way this tick (SteerLane, N4)
         self.events: List[Tuple] = []     # (t, "brush", mover, other, dir), in order
 
@@ -371,6 +376,7 @@ def new_state(posts: Sequence[int], q: Sequence[float], uniforms: Sequence[float
     st.last_press_at = [LONG_AGO] * n
     st.last_press_dir = [0] * n
     st.first_press_at = [LONG_AGO] * n
+    st.same_presses = [0] * n
     st.tucking = [False] * n
     st.events = []
     smart, bots = cfg["smart"], cfg["bots"]
@@ -427,6 +433,8 @@ def accept_intent(st: TripState, i: int, d: int, t: float) -> str:
     st.manual_at[i] = t
     if t < st.steady_until[i] - EPS:
         return "steady"
+    if st.want[i] == d:
+        st.same_presses[i] = st.same_presses[i] + 1  # pressed again while that press waits
     other = _brush_target(st, i, d, t)
     if other >= 0:
         _brush(st, i, other, d, t)
@@ -450,10 +458,12 @@ def accept_intent(st: TripState, i: int, d: int, t: float) -> str:
         st.want[i] = d
         st.want_at[i] = t
         st.first_press_at[i] = t
+        st.same_presses[i] = 1
         return "accepted"
     if st.queued[i] == 0 and cfg["maxQueued"] >= 1:
         if st.want[i] == 0:
             st.first_press_at[i] = t  # the first press waiting (behind a glide or a reverse gap)
+            st.same_presses[i] = 1
         st.queued[i] = d
         return "queued"
     return "rate"
@@ -682,10 +692,13 @@ def _brush_target(st: TripState, i: int, d: int, t: float) -> int:
     """The horse a press by rider i in direction d brushes, or -1. A brush needs all of:
     brush = "repeat"; fewer than brushFree + brushMaxCharged brushes so far; the mover at rest;
     its first press the same way still waiting (want == d), made at most brushRepeatSeconds ago;
-    a horse alongside on that side for at least brushGraceSeconds; and no tuck-back possible
-    (outward, or inward with no slot within tuckBackMax, and not tucking already). So a first
-    press never brushes, Smart Steer and bots (who never press) never brush, and nothing
-    brushes after the lock (accept_intent refuses first)."""
+    this press at least the brushPresses-th that way since that first one (N5 review: 3, so a
+    press again, the natural "nothing happened" second press, is the same try and never brushes;
+    a brush needs a rider who keeps pressing); a horse alongside on that side for at least
+    brushGraceSeconds; and no tuck-back possible (outward, or inward with no slot within
+    tuckBackMax, and not tucking already). So a first press never brushes, Smart Steer and bots
+    (who never press) never brush, and nothing brushes after the lock (accept_intent refuses
+    first)."""
     cfg = st.cfg
     if cfg["brush"] == "off":
         return -1
@@ -694,6 +707,8 @@ def _brush_target(st: TripState, i: int, d: int, t: float) -> int:
     if st.x[i] != st.tgt[i] or st.want[i] != d:
         return -1
     if cfg["brushRepeatSeconds"] > 0 and t - st.first_press_at[i] > cfg["brushRepeatSeconds"] + EPS:
+        return -1
+    if st.same_presses[i] < cfg["brushPresses"]:
         return -1
     side = 0 if d < 0 else 1
     j = _alongside(st, i, d)

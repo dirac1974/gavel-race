@@ -56,8 +56,9 @@ def field(posts, live, kinds=None, cfg=None, course="dirt", distance="Classic"):
 
 @pytest.fixture(scope="module")
 def fx25():
-    """The generated D-057 parity fixture's runs 0, 3 and 8-24 (every override once) and its
-    edge runs, built once for the module."""
+    """The generated D-057 parity fixture's runs 0, 3 and 8-24 (every override once, but N1's brush
+    rule and the whole switch-back, which run on their own) and its edge runs, built once for the
+    module."""
     return make_fixtures.trip_d057_fixture(only=[0, 3] + list(range(8, 25)))
 
 
@@ -117,6 +118,7 @@ def test_d057_config_turns_on_every_rule_and_records_it():
             CFG["gapWaitInSeconds"]) == (0.2, 6.0, 1.5, 0.0)
     assert (CFG["brushCost"], CFG["brushFree"], CFG["brushMaxCharged"], CFG["brushPays"]) == (0.002, 1, 3, "mover")
     assert (CFG["brushAlongFeet"], CFG["brushGraceSeconds"], CFG["brushRepeatSeconds"]) == (8.0, 0.3, 2.0)
+    assert CFG["brushPresses"] == 3 and trip.D057_OFF["brushPresses"] == 2  # N5 review: a press again never brushes
     assert (CFG["brushCheckFeet"], CFG["brushRecoverPerSecond"], CFG["steadySeconds"]) == (4.0, 2.0, 1.0)
     assert trip.config_record(CFG) == CFG  # anything switched on records the whole config
     assert trip.d057_config(trip.d054_config()) == CFG  # brushes on top of any base
@@ -253,15 +255,15 @@ def test_glide_reserve(edges):
 def test_boxed_in_both_sides(edges):
     """Horse 2 in lane 3: a horse 11 ft ahead in its lane and horses alongside in lanes 2 and 4.
     Out: no room ("blocked", the arrow greys); In: "tuck" (tuck-back can help, the arrow stays
-    lit). Out waits 1.5 s and drops; In tucks back at once and slips in behind; a second In
-    while tucking never brushes."""
+    lit). Out waits 1.5 s and drops; In tucks back at once and slips in behind; a second and a
+    third In while tucking never brush."""
     run = edges["boxed-both-sides"]
     by_tick = {s["tick"]: s for s in run["snapshots"]}
     s = by_tick[110]
     assert s["sides"][1] == ["tuck", "blocked"] and s["boxed"][1] and not s["boxedNoTuck"][1]
     assert not s["noTuckInside"][1]  # the In arrow stays lit: tuck-back can help
     assert by_tick[124]["want"][1] == 1 and by_tick[125]["want"][1] == 0  # dropped at 1.5 s
-    assert by_tick[130]["tucking"][1] and run["answers"] == ["accepted", "accepted", "queued"]
+    assert by_tick[130]["tucking"][1] and run["answers"] == ["accepted", "accepted", "queued", "bounds"]
     assert by_tick[145]["tgt"][1] <= 2 and run["events"] == [] and run["charged"] == [0, 0, 0, 0]
 
 
@@ -304,42 +306,42 @@ def test_side_state_matches_trips_clearance(races):
 # ---------------------------------------------------------------- brushes
 
 def test_brush_cap_steady_and_mover_pays(edges):
-    """Horse 2 (no tuck slot inside) presses In twice within 2 s: a brush (the first free), then
-    2, 3, 4 (charged, up to the cap: 0.006); a fifth second press just queues; presses while
-    steadying answer "steady". Only the mover pays; the horse it brushes (lane 2's leader) never
-    does. After the bell: nothing."""
+    """Horse 2 (no tuck slot inside) presses In three times within 2 s: the second queues, the
+    third brushes (the first brush free), then 2, 3, 4 (charged, up to the cap: 0.006); a fifth
+    three just waits; presses while steadying answer "steady". Only the mover pays; the horse it
+    brushes (lane 2's leader) never does. After the bell: nothing."""
     run = edges["trapped-brush-cap"]
-    assert run["answers"] == ["accepted", "brush", "steady", "accepted", "brush", "accepted", "brush", "accepted",
-                              "brush", "accepted", "queued", "cancelled", "cancelled"]
-    assert run["events"] == [[115, 2, 3, -1], [135, 2, 3, -1], [152, 2, 3, -1], [172, 2, 3, -1]]
+    assert run["answers"] == ["accepted", "queued", "brush", "steady"] + ["accepted", "queued", "brush"] * 3 + [
+        "accepted", "queued", "bounds", "cancelled", "cancelled"]
+    assert run["events"] == [[116, 2, 3, -1], [136, 2, 3, -1], [156, 2, 3, -1], [176, 2, 3, -1]]
     assert run["brushes"] == [0, 4, 0, 0, 0, 0, 0] and run["charged"] == [0, 4, 0, 0, 0, 0, 0]
     assert run["charges"][1] == pytest.approx(0.006, abs=1e-15) and run["charges"].count(0.0) == 6
     assert run["afterLockAnswers"] == ["locked"] * 3
     by_tick = {s["tick"]: s for s in run["snapshots"]}
-    assert by_tick[115]["check"][1] == pytest.approx(4.0 - 0.2)  # steadies back 4 ft, recovering 2 ft/s
-    assert by_tick[115]["want"][1] == 0  # its waiting press cleared
+    assert by_tick[116]["check"][1] == pytest.approx(4.0 - 0.2)  # steadies back 4 ft, recovering 2 ft/s
+    assert by_tick[116]["want"][1] == 0 and by_tick[116]["queued"][1] == 0  # its waiting presses cleared
     assert all(s["check"][2] == 0 for s in run["snapshots"])  # the other horse never steadies
 
 
 def test_brush_window_expires_after_two_seconds(edges):
-    """Before any cap: a second In 2.1 s after the first is a new try (it queues, no brush); a
-    fresh pair 1.8 s apart brushes."""
+    """Before any cap: a third In 2.1 s after the first is too late (no brush); a fresh three,
+    the third 1.8 s after the first, brushes."""
     run = edges["brush-window"]
-    assert run["answers"] == ["accepted", "queued", "cancelled", "cancelled", "accepted", "brush"]
+    assert run["answers"] == ["accepted", "queued", "bounds", "cancelled", "cancelled", "accepted", "queued", "brush"]
     assert run["events"] == [[158, 2, 3, -1]] and run["brushes"][1] == 1
 
 
 def test_brush_window_starts_when_the_waiting_press_was_made(edges):
     """The 2 s window runs from the press now waiting, even when it was queued behind a glide or
     a reverse gap (N1's call; the plan timed it from the last accepted press). Horse 1's Out,
-    queued mid-glide at 10.5 s, waits for the reverse gap and a horse alongside; its second Out
+    queued mid-glide at 10.5 s, waits for the reverse gap and a horse alongside; its third Out
     at 12.2 s brushes: 1.7 s after the queued press, 2.2 s after the accepted In."""
     run = edges["brush-window-queued"]
-    assert run["answers"] == ["accepted", "queued", "brush"]
-    accepted, queued, brushed = (i[0] for i in run["intents"])
+    assert run["answers"] == ["accepted", "queued", "queued", "brush"]
+    accepted, queued, _again, brushed = (i[0] for i in run["intents"])
     assert brushed - queued <= 20 < brushed - accepted
     snap = {s["tick"]: s for s in run["snapshots"]}[brushed - 1]
-    assert snap["firstPressAt"][0] == pytest.approx(queued * DT) and snap["want"][0] == 1
+    assert snap["firstPressAt"][0] == pytest.approx(queued * DT) and snap["want"][0] == 1 and snap["samePresses"][0] == 2
     assert snap["alongSince"][0][1] <= (brushed - 3) * DT + 1e-9  # alongside for brushGraceSeconds
     assert run["events"] == [[brushed, 1, 2, 1]]
 
@@ -354,10 +356,10 @@ def test_smart_steer_wait_clock_only_counts_an_unbroken_wait(edges):
     assert st.smart_block_at[0] == trip.LONG_AGO
 
 
-def test_brush_needs_the_grace_and_a_second_press(edges):
+def test_brush_needs_the_grace_and_a_third_press(edges):
     """Out into a horse closing from behind: the first press waits (never a brush); a second
-    press the tick after the horse comes alongside is inside brushGraceSeconds and queues; a
-    third, 0.4 s after it came alongside, brushes."""
+    press the tick after the horse comes alongside queues (inside brushGraceSeconds, and only the
+    second); a third, 0.4 s after it came alongside, brushes."""
     assert edges["grace"]["answers"] == ["accepted", "queued", "brush"]
     assert edges["grace"]["charged"] == [1, 0]
 
@@ -365,13 +367,25 @@ def test_brush_needs_the_grace_and_a_second_press(edges):
 def test_brush_pays_bumped_switch(edges):
     """brushPays = "bumped" (sims only) charges and steadies the other horse; D-057 ships "mover"."""
     run = edges["brush-out-bumped-pays"]
-    assert run["answers"] == ["accepted", "brush", "steady"] and run["charged"] == [0, 1]
+    assert run["answers"] == ["accepted", "queued", "brush", "steady"] and run["charged"] == [0, 1]
+
+
+def test_a_press_again_is_the_same_try(edges):
+    """N5 review: a second press while the first waits never brushes, however long they wait
+    (the kid pressing again because nothing seemed to happen); a third within brushRepeatSeconds
+    of the first does. N1's rule (brushPresses = 2, kept in the parity fixtures) brushed on the
+    second."""
+    run = edges["press-again"]
+    assert run["answers"] == ["accepted", "queued", "cancelled", "cancelled", "accepted", "queued", "brush"]
+    assert run["events"] == [[170, 2, 3, -1]]
+    n1 = edges["press-again-n1"]
+    assert n1["answers"] == ["accepted", "brush"] and n1["events"] == [[115, 2, 3, -1]]
 
 
 def test_brushes_in_pressing_races(races):
-    """A brush is always a rider's second press the same way within brushRepeatSeconds of an
-    accepted or queued first press; bots and Smart Steer never brush (no press, no brush); the
-    mover pays and nobody else; at most brushFree + brushMaxCharged a race."""
+    """A brush is always at least a rider's third press the same way within brushRepeatSeconds
+    of an accepted or queued first press; bots and Smart Steer never brush (no press, no brush);
+    the mover pays and nobody else; at most brushFree + brushMaxCharged a race."""
     total = 0
     for st, frames, kinds in races:
         presses = {}
@@ -381,6 +395,9 @@ def test_brushes_in_pressing_races(races):
                     total += 1
                     assert kinds[i] != "bot"
                     assert any(d2 == d and a2 in ("accepted", "queued") and tick - t2 <= 20 for t2, d2, a2 in presses[i])
+                    counted = [t2 for t2, d2, a2 in presses[i] if d2 == d and tick - t2 <= 20 and a2 not in (
+                        "bounce", "steady", "locked", "invalid")]
+                    assert len(counted) >= CFG["brushPresses"] - 1
                 presses.setdefault(i, []).append((tick, d, ans))
         assert st.charged == st.brushes
         assert all(b <= CFG["brushFree"] + CFG["brushMaxCharged"] for b in st.brushes)
@@ -421,7 +438,7 @@ def test_brush_term_sits_after_the_field_mean_and_inside_the_clamp():
 
 def test_nothing_changes_after_the_lock():
     st = field([3, 3, 2, 2, 2, 2, 4], [1 / 7 + 11 / 320] + [1 / 7] * 6)
-    play(st, 120, [1 / 7 + 11 / 320] + [1 / 7] * 6, {110: [(1, -1)], 115: [(1, -1)]})
+    play(st, 120, [1 / 7 + 11 / 320] + [1 / 7] * 6, {110: [(1, -1)], 113: [(1, -1)], 116: [(1, -1)]})
     assert st.brushes[1] == 1
     trip.lock(st)
     frozen = copy.deepcopy(st.__dict__)
@@ -482,21 +499,27 @@ def test_d057_fixture_replays_exactly(fx25):
 
 
 def test_d057_fixture_covers_every_rule(fx25):
-    """The generated fixture's runs 0, 3 and 8-24 (every override once) and the edge runs
-    exercise every answer, the brush cap, every side state and both sides of each switch."""
+    """The generated fixture's runs 0, 3 and 8-24 (every override once, but N1's brush rule and the
+    whole switch-back, which run on their own) and the edge runs exercise every answer, the brush
+    cap, every side state and both sides of each switch."""
     fx = fx25
     answers = {a for r in fx["runs"] + fx["edges"] for a in r["answers"]}
     assert {"accepted", "queued", "cancelled", "bounds", "rate", "invalid", "bounce", "steady", "brush"} <= answers
-    assert sum(len(r["events"]) for r in fx["runs"]) > 50
+    assert sum(len(r["events"]) for r in fx["runs"]) > 40  # (46 since the N5 review: a brush needs a third press)
     assert any(max(r["charged"]) >= 4 for r in fx["runs"])  # the cap
     assert {"free", "tuck", "blocked"} <= {s for r in fx["runs"] for snap in r["snapshots"] for pair in snap["sides"]
                                           for s in pair}
     overridden = {k for r in fx["runs"] if "cfg" in r for k in r["cfg"] if r["cfg"][k] != fx["cfg"][k]}
     assert {"glide", "brush", "blockedPress", "brushPays", "chainWindow", "glideReserveFeet", "pressBounceSeconds",
             "weaveGapSeconds", "gapWaitInSeconds", "tuckAfterSeconds"} <= overridden
-    # The whole switch-back is one of the generated runs (the Luau port replays it too).
-    full = make_fixtures.trip_d057_fixture(only=[25])["runs"][0]
+    # The whole switch-back is one of the generated runs (the Luau port replays it too), and so is
+    # N1's brush rule (brushPresses = 2; the N5 review ships 3).
+    overrides = make_fixtures.D057_OVERRIDES
+    full_k, n1_k = overrides.index(dict(trip.D057_OFF)), overrides.index({"brushPresses": 2})
+    assert 8 <= n1_k < full_k < make_fixtures.TRIP_D057_RUNS
+    full, n1 = make_fixtures.trip_d057_fixture(only=[full_k, n1_k])["runs"]
     assert all(full["cfg"][k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
+    assert n1["cfg"]["brushPresses"] == 2 and any(a == "brush" for a in n1["answers"])
 
 
 # ---------------------------------------------------------------- the game's config (N3)
@@ -574,12 +597,20 @@ def test_stored_game_report_probes_replay_exactly(report_live):
 
 
 def test_grief_bound_holds_in_the_stored_game_report(report_live):
-    """With brushes on (N5): strangers who target a kid gain nothing over riding for the rail, and
-    the kid is only ever charged for its own brushes (a Smart Steer kid never)."""
+    """With brushes on (N5): strangers who target a Smart Steer or rail kid gain nothing over riding
+    for the rail; the brush charges they add to any kid but a masher stay within the bound (N5
+    review: a press-again kid boxed in by a crew no longer pays); and a kid is only ever charged
+    for its own brushes (a Smart Steer kid never). Every kid is measured (wanderer, masher and
+    press-again kids since the N5 review)."""
     g = report_live["summary"]["griefing"]
+    assert set(g) == set(steering.GRIEF_KIDS) >= {"wanderer", "masher", "doubletap"}
     for kid in steering.GRIEF_KIDS:
         for target, control in steering.GRIEF_PAIRS:
-            assert g[kid]["pooled"][target + "_minus_" + control] >= steering.TARGETS_D057["griefing"], (kid, target)
+            if kid in steering.GRIEF_TARGET_KIDS:
+                assert g[kid]["pooled"][target + "_minus_" + control] >= steering.TARGETS_D057["griefing"], (kid, target)
+            if kid in steering.GRIEF_BRUSH_KIDS:
+                assert g[kid]["pooled"][target + "_minus_" + control + "_charges"] >= steering.TARGETS_D057["griefing"], (
+                    kid, target)
         for name in steering.GRIEF:
             assert g[kid]["pooled"][name]["kid_charged_not_own"] == 0
     assert all(g["smart"]["pooled"][name]["kid_charged_per_race"] == 0 for name in steering.GRIEF)
@@ -659,6 +690,38 @@ def test_small_run_d057_meets_the_targets():
     assert ok / n >= 0.70, ok / n
 
 
+def test_a_press_again_kid_is_rarely_charged_and_a_masher_still_is():
+    """N5 review: a kid who presses and then presses again 0.3-0.8 s later (nothing seemed to
+    happen) is charged in at most 5% of races, among bots and boxed in by a crew; a masher still
+    pays in most races, so brushes still teach. Two cells, 20 races each (the rule measurement
+    over every cell is in docs/research/steering-calibration.md)."""
+    charged = {"doubletap": 0, "masher": 0}
+    n = 0
+    for cell in (1, 6):  # dirt Mile, turf Classic
+        course, distance = steering.cells()[cell]
+        geo = trip.phase_a(course, distance)
+        for k in range(20):
+            setup = steering.race_setup(steering.race_seed(steering.GRIEF_SEED + 2, cell, k), distance)
+            kid = setup["focal"]
+            others = [i for i in range(8) if i != kid]
+            random.Random(setup["press_seed"] ^ 0x5EED).shuffle(others)
+            for scenario in ("field", "crew"):
+                n += 1
+                for pol in charged:
+                    pols = ["bot"] * 8
+                    pols[kid] = pol
+                    match = {}
+                    if scenario == "crew":
+                        gpols, feet = steering.GRIEF["crew"]
+                        for g, (gp, ft) in enumerate(zip(gpols, feet)):
+                            pols[others[g]] = gp
+                            match[others[g]] = ft
+                    res = steering.run_race(geo, setup, pols, CFG, match=match, focal=kid)
+                    charged[pol] += res["brush_cost"][kid] > 0
+    assert charged["doubletap"] <= 0.05 * n, charged
+    assert charged["masher"] >= 0.3 * n, charged
+
+
 def test_griefing_small_run():
     """Strangers who tapped exactly like a Smart Steer kid and target it (a shadow on its inside,
     a bumper pressing into it) change its own trip (ground + draft) by no more than the same
@@ -702,7 +765,11 @@ def test_grief_bound_holds_in_the_stored_report(report57):
     g = report57["summary"]["griefing"]
     for kid in steering.GRIEF_KIDS:
         for target, control in steering.GRIEF_PAIRS:
-            assert g[kid]["pooled"][target + "_minus_" + control] >= steering.TARGETS_D057["griefing"], (kid, target)
+            if kid in steering.GRIEF_TARGET_KIDS:
+                assert g[kid]["pooled"][target + "_minus_" + control] >= steering.TARGETS_D057["griefing"], (kid, target)
+            if kid in steering.GRIEF_BRUSH_KIDS:
+                assert g[kid]["pooled"][target + "_minus_" + control + "_charges"] >= steering.TARGETS_D057["griefing"], (
+                    kid, target)
         for name in steering.GRIEF:
             assert g[kid]["pooled"][name]["kid_charged_not_own"] == 0
     assert all(g["smart"]["pooled"][name]["kid_charged_per_race"] == 0 for name in steering.GRIEF)

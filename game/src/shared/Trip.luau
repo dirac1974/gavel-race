@@ -35,20 +35,21 @@ Trip.LONG_AGO = LONG_AGO
 Trip.NOT_ALONG = NOT_ALONG
 
 -- D-057 on (debate 012; src/trip.py's D057): the switches N3 (motion and presses) flipped in
--- GameConfig.steering, and N5's brushes. Trip.d057Config builds the full D-057 config (brushes on)
--- for the tests and the overlap report; Trip.d054Config the switch-back, every D-057 key at its
--- D-054 value (src/trip.py's D057_OFF).
+-- GameConfig.steering, N5's brushes and the N5 review's brushPresses (3; D057_OFF keeps N1's 2).
+-- Trip.d057Config builds the full D-057 config (brushes on) for the tests and the overlap report;
+-- Trip.d054Config the switch-back, every D-057 key at its D-054 value (src/trip.py's D057_OFF).
 Trip.D057 = {
 	glide = "eased", chainWindow = 0.3, reverseGapSeconds = 0.5, weaveGapSeconds = 2.5,
 	pressBounceSeconds = 0.2, glideReserveFeet = 6, blockedPress = "wait", brush = "repeat",
+	brushPresses = 3,
 }
 Trip.D057_OFF = {
 	glide = "linear", laneSpeedMax = 1.5, laneAccel = 4.5, chainWindow = 0, reverseGapSeconds = 0,
 	weaveGapSeconds = 0, weaveWindowSeconds = 7, pressBounceSeconds = 0, glideReserveFeet = 0,
 	blockedPress = "d054", gapWaitSeconds = 1.5, gapWaitInSeconds = 0, tuckAfterSeconds = 0,
 	boxedAheadFeet = 12, brush = "off", brushAlongFeet = 8, brushGraceSeconds = 0.3,
-	brushRepeatSeconds = 2, brushPays = "mover", brushCost = 0.002, brushFree = 1, brushMaxCharged = 3,
-	brushCheckFeet = 4, brushRecoverPerSecond = 2, steadySeconds = 1,
+	brushRepeatSeconds = 2, brushPresses = 2, brushPays = "mover", brushCost = 0.002, brushFree = 1,
+	brushMaxCharged = 3, brushCheckFeet = 4, brushRecoverPerSecond = 2, steadySeconds = 1,
 }
 
 local function copySteering(steering: any): any
@@ -160,6 +161,7 @@ function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: a
 		lastPressAt = table.create(n, LONG_AGO),   -- the last counted press (not a bounce)...
 		lastPressDir = table.create(n, 0),         -- ...and its direction
 		firstPressAt = table.create(n, LONG_AGO),  -- when the press now waiting was made
+		samePresses = table.create(n, 0),          -- presses that way since then, that one included (brushPresses)
 		tucking = table.create(n, false),          -- a tuck-back is under way this tick (SteerLane, N4)
 		events = {},                               -- { t, "brush", mover, other, dir }, in order
 	}
@@ -229,6 +231,7 @@ function Trip.acceptIntent(st: any, i: number, d: any, t: number): string
 	st.lastPressDir[i] = d
 	st.manualAt[i] = t
 	if t < st.steadyUntil[i] - EPS then return "steady" end
+	if st.want[i] == d then st.samePresses[i] += 1 end -- pressed again while that press waits
 	local other = brushTarget(st, i, d, t)
 	if other >= 1 then
 		brush(st, i, other, d, t)
@@ -254,11 +257,13 @@ function Trip.acceptIntent(st: any, i: number, d: any, t: number): string
 		st.want[i] = d
 		st.wantAt[i] = t
 		st.firstPressAt[i] = t
+		st.samePresses[i] = 1
 		return "accepted"
 	end
 	if st.queued[i] == 0 and cfg.maxQueued >= 1 then
 		if st.want[i] == 0 then
 			st.firstPressAt[i] = t -- the first press waiting (behind a glide or a reverse gap)
+			st.samePresses[i] = 1
 		end
 		st.queued[i] = d
 		return "queued"
@@ -505,17 +510,20 @@ end
 
 -- The horse a press by rider i in direction d brushes, or 0. A brush needs all of: brush =
 -- "repeat"; fewer than brushFree + brushMaxCharged brushes so far; the mover at rest; its first
--- press the same way still waiting (want == d), made at most brushRepeatSeconds ago; a horse
--- alongside on that side for at least brushGraceSeconds; and no tuck-back possible (outward, or
--- inward with no slot within tuckBackMax, and not tucking already). So a first press never
--- brushes, Smart Steer and bots (who never press) never brush, and nothing brushes after the lock
--- (acceptIntent refuses first).
+-- press the same way still waiting (want == d), made at most brushRepeatSeconds ago; this press at
+-- least the brushPresses-th that way since that first one (N5 review: 3, so a press again is the
+-- same try and never brushes; a brush needs a rider who keeps pressing); a horse alongside on that
+-- side for at least brushGraceSeconds; and no tuck-back possible (outward, or inward with no slot
+-- within tuckBackMax, and not tucking already). So a first press never brushes, Smart Steer and
+-- bots (who never press) never brush, and nothing brushes after the lock (acceptIntent refuses
+-- first).
 brushTarget = function(st: any, i: number, d: number, t: number): number
 	local cfg = st.cfg
 	if cfg.brush == "off" then return 0 end
 	if st.brushes[i] >= cfg.brushFree + cfg.brushMaxCharged then return 0 end
 	if st.x[i] ~= st.tgt[i] or st.want[i] ~= d then return 0 end
 	if cfg.brushRepeatSeconds > 0 and t - st.firstPressAt[i] > cfg.brushRepeatSeconds + EPS then return 0 end
+	if st.samePresses[i] < cfg.brushPresses then return 0 end
 	local side = if d < 0 then 1 else 2
 	local j = alongside(st, i, d)
 	if j < 1 or t - st.alongSince[i][side] < cfg.brushGraceSeconds - EPS then return 0 end
@@ -525,6 +533,16 @@ brushTarget = function(st: any, i: number, d: number, t: number): number
 		if st.off[i] - p <= cfg.tuckBackMax + EPS then return 0 end
 	end
 	return j
+end
+
+-- How many times horse i brushed each other horse this race ({ [j] = count }): the [Trip] log's
+-- per-opponent counts (the plan's griefing line: one rider brushing the same horse 3+ times).
+function Trip.brushesInto(st: any, i: number): { [number]: number }
+	local out = {}
+	for _, e in st.events do
+		if e[2] == "brush" and e[3] == i then out[e[4]] = (out[e[4]] or 0) + 1 end
+	end
+	return out
 end
 
 -- Horse i brushes horse j. The mover's waiting presses clear and it can't steer for steadySeconds.
@@ -860,14 +878,18 @@ end
 -- with the ghost-thumb tip (data.flags.steerTip once shown). kind: "intro" (no buttons yet: Smart
 -- Steer whatever Settings says, and tau 0, since they can't affect their trip), "smart" (buttons,
 -- Smart Steer on) or "manual" (buttons, Smart Steer turned off: lanes change only on presses).
--- A missing profile counts as a first race.
-function Trip.riderControls(data: any?, steer: any): { shown: boolean, smart: boolean, tip: boolean, kind: string }
+-- A missing profile counts as a first race. bumpTip (D-057 N5): the one-time tip on the rider's
+-- first brush is still to come (data.flags.bumpTip once it has come; never with brushes off).
+function Trip.riderControls(data: any?, steer: any): { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string }
 	local races = if data ~= nil and type(data.totals) == "table" then tonumber(data.totals.races) or 0 else 0
 	local shown = data ~= nil and races >= steer.introRaces
 	local off = shown and type(data.settings) == "table" and data.settings.smartSteer == false
 	local kind = if not shown then "intro" elseif off then "manual" else "smart"
-	local seen = data ~= nil and type(data.flags) == "table" and data.flags.steerTip == true
-	return { shown = shown, smart = kind ~= "manual", tip = shown and not seen, kind = kind }
+	local flags = if data ~= nil and type(data.flags) == "table" then data.flags else nil
+	local seen = flags ~= nil and flags.steerTip == true
+	local bumpSeen = flags ~= nil and flags.bumpTip == true
+	return { shown = shown, smart = kind ~= "manual", tip = shown and not seen,
+		bumpTip = shown and not bumpSeen and steer.brush ~= "off", kind = kind }
 end
 
 -- A race's trip, built after the posts are drawn (lane index = post), or nil when steering is
