@@ -1052,30 +1052,31 @@ Template:
     - A second seed family (3,840 races: the game's config, own screen at 0.1 s, jitter, own screen at 0.25 s with jitter) passes every gate too (0–1 late moves a row).
     - Second review: the report also judges the order in which the horses cross the line on the drawn screen (each horse's pace plus drawn offset reaching the race length); right in every race of every mode. RaceService now steps and sends every fixed tick before the lock (the loop wakes about every 0.117 s, so about one tick in seven used to go unsent); `trip_d054.json` (20 runs on the switch-back, the D-054 baseline) keeps Trip.luau's D-054 path at parity in CI; resting horses (the race ends or aborts, a replay closes) straightens their bodies; a long frame gap can't overshoot the playback delay.
 - N4 (2026-10-06, roblox engineer): the boxed-in UI, for riders with the buttons.
-  - **What the rider hears.** `SteerLane` is now `(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, courseId)`, course id last. It is built by `Trip.riderLane` and sent on change, up to the lock, to riders with the buttons only.
-    - `wait` is the direction of a press waiting for room; `waitAt` is the race time it started waiting.
+  - **What the rider hears.** `SteerLane` is now `(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, t, courseId)`, course id last; `t` is the race time the state stands for, so the screen times every wait on the server's clock, never by arrival. It is built by `Trip.riderLane` and sent on change, up to the lock, to riders with the buttons only.
+    - `wait` is the direction of a press waiting for room; `waitAt` is the race time its wait for room starts. A press held by a reverse or weave gap reports the time the hold ends (the model resets its own wait start every tick of the hold), so `waitAt` stays steady.
     - `tucking` says whether a tuck-back is under way.
     - Each side is `"free"`, `"tuck"` (inward only: no room, but tuck-back finds a slot), `"blocked"` (a horse is in the way and tuck-back can't help) or `"edge"` (the rail or the outside). The server works it out (`Trip.sideState`, at parity with Python) rather than the client from its drawn lanes, as the plan had it, so the arrows never disagree with what the server will do.
   - **The arrows** (`SteerHud`, pure):
-    - Out ▶ greys, with a small 🐎 icon, while a horse leaves no room outside. ◀ In greys only when `"blocked"` (D-057's "trapped"), never when `"tuck"`, so it never greys a button that still works at once.
+    - Out ▶ greys, with a small 🐎 icon on its top edge, while a horse leaves no room outside. ◀ In greys only when `"blocked"` (D-057's "trapped"), never when `"tuck"`, so it never greys a button that still works at once. An arrow greys once its side has stayed blocked 0.2 s on screen (`greyAfterSeconds`; a horse sweeping past never blinks it, and it matches the playback's lead on the drawn horses), and comes back at once. The grey is a warm 172/166/158, 2.1:1 against the bone-white button.
     - Grey arrows still take presses. No buzz, no red.
     - A press waiting for room shows a 3 px ring in the button's colour: lit (breathing gently; steady under Reduced Motion) for an inward press, filling over `gapWaitSeconds` (1.5 s) for an outward one.
-    - An outward press that drops after its wait makes its arrow wobble ±4° over 0.2 s, with no sound; none under Reduced Motion. A wait you cancel by pressing the other way doesn't wobble.
+    - An outward press that drops after its wait makes its arrow wobble ±4° over 0.2 s, with no sound; none under Reduced Motion. A wait you cancel by pressing the other way doesn't wobble. The ring and the wobble use the config's outward wait (`gapWaitSeconds`, or D-054's `outwardWaitSeconds` with the switch-back). N5 note: a brush also clears a waiting press, and that must not wobble.
   - **The chips** (`SteerChips`, pure):
     - "No room yet" once a press has waited 1 s with no move and no tuck-back; once per wait, at most once per 10 s, and never within 2 s of another steering chip.
-    - "Gap!" with `tap_good` when a wait of at least 0.5 s ends in the move.
+    - "Gap!" with `tap_good` when a wait for room of at least 0.5 s (server time) ends in the move, unless the wait saw a tuck-back ("Tucked in!" says that one).
     - Good-news chips ("Saved ground!", "Tucked in!", "Gap!", the turn tip, "Lanes locked!") always show, and only "No room yet" gives way to them.
   - **Who sees it:** only riders with the buttons. Spectators and a rider's first 3 races hear no `SteerLane`, and the HUD needs `shown`. The buttons show for every input, so keyboard and gamepad riders get the same arrows, ring, wobble and chips.
-  - **Grown-ups page:** "Horses can get boxed in, like in real racing. They wait for a gap or ease back to find one. Being boxed in never costs points."
+  - **Grown-ups page:** "Horses can get boxed in, like in real racing: they wait for a gap or ease back to find one. There's no penalty for being boxed in; a horse held wide just runs a little farther." (No promise about points: brushes charge the mover in N5.) The page's paragraphs now sort in the order they're written.
   - **Calls made where the plan was open** (in REVIEW_QUEUE):
     - The side states come from the server.
     - Nothing greys at the rail or the outside: there's no horse there, so a grey arrow with a horse icon would be wrong. Those presses are refused quietly, as in D-054.
     - Good-news chips always show.
     - The wobble only follows a drop by the server.
     - The outward ring fills straight across, not round the edge (Roblox UI has no radial fill without an image).
-  - **Measured over 6 whole fields of pressing horses** (`steer_hud_tests`):
-    - ◀ In greyed in 3,017 rider-ticks, always with `Trip.noTuckInside`, and never in any of the 6,003 tuck-back states.
-    - Out ▶ greyed exactly when its side was `"blocked"` (9,320), and never at the edge.
+  - **Measured** (review): the first test only checked `Trip.sideState` against itself. Now `steer_hud_tests` checks behaviour in 12 real fields (varied chances; a masher, a ditherer, a casual rider and a rail seeker). On every tick a rider could press at once, a copy of the trip takes the press and steps a tick, and the arrow shown is the server's state one tick old:
+    - ◀ In: 3,408 presses tried, 891 grey, 1,274 tuck-back states; 0.23% disagree (grey but the press would act, or normal but it wouldn't).
+    - Out ▶: 11,699 presses tried, 4,905 grey; 0.23% disagree.
+  - **Review probe** (48 races, 4 rider styles; 0.45 s one-way lag): "Gap!" per race went from 7.81 / 6.35 / 2.48 / 1.38 (masher / ditherer / casual / rail seeker) to 0.94 / 0 / 0.10 / 0; no "Gap!" after a tuck-back (was 381). SteerLane sends fell from 3.3 to 2.7 per rider-second (steady `waitAt`). Short Out ▶ grey blinks (under 0.3 s) went from 485 server flips (368 of one tick, about 2.5 per rider-race) to 91 on screen (0.47 per rider-race).
   - The overlap report is unchanged in every mode.
 - Alternatives:
   - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.

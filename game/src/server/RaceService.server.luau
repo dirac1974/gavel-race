@@ -72,7 +72,7 @@ local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on,
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
-local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, course (D-054 S3, D-057 N4)
+local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, the state's race time, course (D-054 S3, D-057 N4)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
@@ -710,13 +710,13 @@ local function runRace(c, players: { Player })
 					local i = session:laneIndex(tostring(p.UserId))
 					if i and p.Parent then
 						local was = sentOwn[p]
-						local own = Trip.riderLane(trip, i, scratchOwn)
+						local own = Trip.riderLane(trip, i, scratchOwn, trip.tick * trip.dt)
 						if not was or was.tgt ~= own.tgt or was.dest ~= own.dest or was.ack ~= own.ack or was.wait ~= own.wait
 							or was.waitAt ~= own.waitAt or was.tucking ~= own.tucking or was.inSide ~= own.inSide
 							or was.outSide ~= own.outSide then
 							sentOwn[p] = table.clone(own)
 							SteerLane:FireClient(p, own.tgt, own.dest, own.ack, own.wait, own.waitAt, own.tucking, own.inSide,
-								own.outSide, c.id)
+								own.outSide, own.t, c.id)
 						end
 					end
 				end

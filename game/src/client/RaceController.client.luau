@@ -662,7 +662,7 @@ steerPad.ZIndex = 8
 steerPad.Visible = false
 steerPad.Parent = steerGui
 local BUTTON_COLOUR, LOCKED_COLOUR = Color3.fromHex("F4EFE6"), Color3.fromRGB(170, 170, 170)
-local GREY_COLOUR = Color3.fromRGB(205, 200, 193) -- a boxed-in arrow (D-057 N4): soft, never red
+local GREY_COLOUR = Color3.fromRGB(SHUD.greyRgb[1], SHUD.greyRgb[2], SHUD.greyRgb[3]) -- a boxed-in arrow (D-057 N4): soft, never red
 -- Per button: the small horse icon (grey: a horse is there), the wait ring and its fill gradient,
 -- and what was last painted (repainted only on a change).
 local arrowUi: { [TextButton]: any } = {}
@@ -690,9 +690,9 @@ local function steerButton(text: string): TextButton
 	icon.BackgroundTransparency = 1
 	icon.Text = "🐎"
 	icon.TextScaled = true
-	icon.Size = UDim2.fromScale(0.32, 0.32)
-	icon.AnchorPoint = Vector2.new(1, 0)
-	icon.Position = UDim2.new(1, -4, 0, 4)
+	icon.Size = UDim2.fromScale(0.3, 0.3)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5) -- on the top edge, clear of the arrow and its text
+	icon.Position = UDim2.fromScale(0.5, 0)
 	icon.ZIndex = 9
 	icon.Visible = false
 	icon.Parent = b
@@ -1423,14 +1423,14 @@ end)
 -- Your own lane from the server (D-057 N4): only riders with the buttons hear it, so spectators
 -- and a rider's first races show none of this. A dropped wait wobbles its arrow; a wait that ends
 -- in the move says "Gap!".
-remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, courseId)
+remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack, wait, waitAt, tucking, inSide, outSide, stateT, courseId)
 	local s = steer
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or not s.shown or s.locked then return end
 	local lane = s.lane or {}
 	lane.tgt, lane.dest, lane.ack, lane.wait, lane.waitAt = tgt, dest, ack, wait or 0, waitAt or 0
-	lane.tucking, lane.inSide, lane.outSide = tucking == true, inSide or "free", outSide or "free"
+	lane.tucking, lane.inSide, lane.outSide, lane.t = tucking == true, inSide or "free", outSide or "free", stateT or 0
 	s.lane = lane
-	local wobble, gap = SteerHud.message(s.hud, lane, serverNow() - s.start, STEER, SHUD, s.pressDir, s.pressAt)
+	local wobble, gap = SteerHud.message(s.hud, lane, STEER, SHUD, s.pressDir, s.pressAt)
 	if wobble ~= 0 then wobbleArrow(wobble) end
 	if gap then
 		showChip("Gap!")
