@@ -644,7 +644,8 @@ def test_small_run_smart_kid_among_bots_matches_the_stored_report(report):
 
 def test_baseline_files_are_current():
     data = steering.load_baseline()
-    assert data["config"] == trip.config_record(trip.CONFIG),         "GameConfig.steering mirror changed: run python sims/steering.py --write"
+    assert data["config"] == trip.config_record(trip.CONFIG), (
+        "GameConfig.steering mirror changed: run python sims/steering.py --write")
     assert data["race"] == trip.RACE
     assert data["races"] >= 2000 and data["calibrationPasses"] == steering.CALIBRATION_PASSES
     for course in trip.COURSE_ORDER:
@@ -739,6 +740,22 @@ def test_d057_rules_are_all_off_by_default():
     assert trip.config_from_record(record) == CFG
 
 
+def test_records_survive_the_n3_flip(monkeypatch):
+    """D057_OFF is a literal of the D-054 values, not read from CONFIG. After N3 switches D-057 on
+    in CONFIG (simulated here), a D-057 config still records every D-057 key, and a record made
+    before D-057 (no D-057 keys) still reads back as D-054, never as "eased"."""
+    old_record = trip.config_record(CFG)
+    for key, value in trip.D057.items():
+        if key != "brush":  # N3 flips everything but the brushes (N5)
+            monkeypatch.setitem(trip.CONFIG, key, value)
+    assert trip.D057_OFF["glide"] == "linear" and trip.D057_OFF["blockedPress"] == "d054"
+    flipped = trip.config_record(trip.CONFIG)
+    assert all(k in flipped for k in trip.D057_KEYS) and flipped["glide"] == "eased"
+    back = trip.config_from_record(old_record)
+    assert all(back[k] == trip.D057_OFF[k] for k in trip.D057_KEYS) and back["glide"] == "linear"
+    assert trip.config_record(back) == old_record
+
+
 def test_d054_trip_fixture_runs_are_byte_identical_to_before_d057():
     """The D-054 parity runs (trip.json) regenerate byte for byte as they did before N1: the
     hash of eight runs' JSON and of the recorded config, taken from trip.json made at main
@@ -750,7 +767,8 @@ def test_d054_trip_fixture_runs_are_byte_identical_to_before_d057():
     for run in fx["runs"]:
         h.update(json.dumps(run).encode())
     assert h.hexdigest() == "00308033c56e108b42077696d30bbe17b182e0e7c94e81751658ddbc2519ee9f"
-    assert hashlib.sha256(json.dumps(fx["cfg"]).encode()).hexdigest() ==         "92644721342ce41db521740efcc806dcb20f1973aea3445a99ffbd01db8e40ed"
+    cfg_hash = hashlib.sha256(json.dumps(fx["cfg"]).encode()).hexdigest()
+    assert cfg_hash == "92644721342ce41db521740efcc806dcb20f1973aea3445a99ffbd01db8e40ed"
 
 
 def test_default_config_never_takes_a_d057_path():

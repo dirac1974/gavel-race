@@ -848,7 +848,7 @@ Template:
     - **Chaining:** a second press the same way continues the glide without stopping (from 0.3 lane before arrival). Two lanes take 1.6 s, three 2.3 s, four 3.0 s. One press can wait; an opposite press cancels a waiting one (as D-054).
     - **Commitment:** a glide always finishes.
     - **Reverse gap:** a change the other way starts at least 0.5 s after landing.
-    - **Weave gap:** a second reversal within 5 s of the last one waits 2.5 s after landing.
+    - **Weave gap:** a second reversal within 7 s of the last one waits 2.5 s after landing (5 s in debate 012; 7 s since the N1 review brought every masher cell under 8 reversals a minute).
     - **Bounce:** presses within 0.2 s count once.
     - **Glide reserve:** a horse gliding into a lane keeps 6 ft more room ahead and behind (clearance 14 ft ahead and 16 ft behind it).
     - **The make-room lanes after the lock** (`Trip.cosmetic`) glide on the same curve.
@@ -914,11 +914,40 @@ Template:
     - mashers: 80% / 64%, mean 0.0032;
     - rail riders and ditherers: 0.
   - Griefing (strangers who tapped exactly like the kid; the kid's own trip, final rules): shadow −0.0011, crew of 3 +0.0011, bumper −0.0007. The same strangers riding for the rail without targeting anyone: −0.0013 and −0.0020. Targeting gains nothing.
-- N1 (2026-10-06, model engineer): the Python model and sims, switched off. Details and numbers in docs/research/steering-calibration.md ("Natural steering (D-057), stage N1").
-  - **Built:** every rule in `src/trip.py` behind `trip.CONFIG` keys with the plan's `GameConfig.steering` names, all off, so the game, `TripBaseline.luau`, `trip_baseline.json`, `steering_report.json` and `trip.json` are byte for byte as before (`trip.config_record` leaves the D-057 keys out of recorded configs while they are off). `trip.d057_config()` turns D-057 on: the eased glide, chaining, reverse and weave gaps, press bounce, glide reserve, wait-for-room presses, `side_state`/`boxed_in`/`trapped` and the "tuck" flag for N4, brushes and the brush term in τ. `sims/steering.py --profile d057` adds the D-057 policies and measures; `tests/fixtures/trip_d057.json` (generated, 200 runs and 10 edge runs) is ready for the N2 port.
-  - **D-057 on, measured** (2,000 baseline races per cell and post, 600 report races per cell): every D-054 τ target passes in every course × distance (rail vs Smart Steer +0.017 to +0.026; never-steer −0.015 to −0.013; draft share 20–35%; post bias ≤ 0.0017 for a kid among bots and ≤ 0.0024 in all-Smart lobbies; Smart Steer kid mean −0.0009 to +0.0003). Reach per intent 72–98% per cell (per press 66–94%). Glides 1.0 / 1.6 / 2.3 / 3.0 s. Brushes charge casual riders in 0.6% of races; the other horse is never charged; griefing, targeted minus untargeted own trip, −0.0004 to +0.0029; 0 overlaps and fall-back ≤ 19.0 ft/s in 4,000 stress races.
-  - **Two notes on the new targets:** a masher reverses 7.6 times a minute pooled (target ≤ 8, as debate 012 measured it), but 8.35 in the dirt Mile and 8.34 in the dirt Marathon (always ≥ 3.5 s apart; the press bounce adds about 0.3 a minute). Sideways acceleration between 10 Hz ticks peaks at 30.4 ft/s² on a landing tick (Trip's own speed ≤ 27); the prototype measured the same 30.4 and quoted it as 30, so the check is to the whole ft/s². Left for N3's playtest; `weaveWindowSeconds` is the knob if every cell should be under 8.
-  - **Calls made where the plan was open:** the brush check sits in `accept_intent` after the bounce and steady checks (same order as the plan, so a finger bounce never brushes); a press queued behind a glide or a reverse gap starts the 2 s brush window when it is queued (the plan timed it from the last accepted press, which could be an older, opposite one; brushes in masher-heavy races rose 5% over the prototype, casual riders barely move); new key `boxedAheadFeet = 12` (reported only); the masher and griefing targets are checked pooled over the cells, each cell reported. With the prototype's window rule the model matches debate 012's prototype exactly (200 of 200 heavy-press races).
+- N1 (2026-10-06, model engineer, revised after the PR #48 review): the Python model and sims, switched off. Details and numbers are in docs/research/steering-calibration.md ("Natural steering (D-057), stage N1").
+  - **Built:**
+    - Every rule is in `src/trip.py` behind `trip.CONFIG` keys with the plan's `GameConfig.steering` names, all off. The game, `TripBaseline.luau`, `trip_baseline.json`, `steering_report.json` and `trip.json` stay byte for byte as before; a full `sims/steering.py --write` reproduces them.
+    - `trip.config_record` leaves the D-057 keys out of a recorded config while they hold the literal D-054 values in `trip.D057_OFF`, so records stay right after N3 flips `CONFIG`.
+    - `trip.d057_config()` turns D-057 on: the eased glide, chaining, reverse and weave gaps, the press bounce, the glide reserve and wait-for-room presses. It also brings `side_state` (with the "tuck" flag N4 needs), `boxed_in`, `no_tuck_inside` (D-057's "trapped", the grey ◀ In), `boxed_no_tuck`, brushes and the brush term in τ.
+    - `sims/steering.py --profile d057` adds the D-057 policies and measures and stores four exact probe races with its report.
+    - `make_fixtures.py --d057` writes `trip_d057.json`: 200 runs and 12 edge runs for the N2 port.
+  - **Tuning change (provisional, REVIEW_QUEUE): `weaveWindowSeconds` 7, not 5.**
+    - With 5, a masher reversed 8.35 times a minute in the dirt Mile and 8.34 in the dirt Marathon, against the ≤ 8 target in every course × distance. Pooled over the cells it was 7.6, the way debate 012 measured it.
+    - With 7, every cell is between 6.3 and 7.5. Casual reach per intent and brush charges don't move. Reversals stay at least 3.5 s apart.
+    - The reviewer's 6 s left the dirt Marathon at 8.11.
+  - **D-057 on, measured** (2,000 baseline races per cell and post, 600 report races per cell). Every D-054 τ target passes in every course × distance:
+    - rail vs Smart Steer +0.017 to +0.026;
+    - never-steer −0.015 to −0.013;
+    - draft share 20–35%;
+    - post bias ≤ 0.0017 for a kid among bots and ≤ 0.0024 in all-Smart lobbies;
+    - Smart Steer kid mean −0.0009 to +0.0003.
+  - **The new targets pass too:**
+    - reach per intent 72–98% per cell (per press 65–94%);
+    - glides of 1.0, 1.6, 2.3 and 3.0 s for one to four lanes;
+    - brushes charge casual riders in 0.6% of races, and the other horse is never charged;
+    - griefing (targeted minus untargeted own trip) −0.0004 to +0.0029;
+    - 0 overlaps and fall-back ≤ 19.0 ft/s in 4,000 stress races.
+    - Sideways acceleration between 10 Hz ticks peaks at 30.4 ft/s² on a landing tick (Trip's own speed ≤ 27). The prototype measured the same 30.4 and quoted it as 30, so the check allows the landing tick (≤ 30.5).
+  - **Call (provisional, REVIEW_QUEUE): the 2 s brush window starts when the waiting press was pressed, even if it queued** behind a glide or a reverse gap.
+    - The plan timed it from the last accepted press, which could be an older press the other way.
+    - Casual riders are charged in 0.60% of races against 0.48% with the plan's rule; mashers 66% against 62%.
+    - With the plan's rule the model matches debate 012's prototype exactly (200 of 200 heavy-press races).
+  - **Other calls where the plan was open:**
+    - The brush check sits in `accept_intent` after the bounce and steady checks, in the same order as the plan, so a finger bounce never brushes.
+    - New key `boxedAheadFeet = 12`, reported only.
+    - Griefing is checked pooled over the cells, and every cell passes as well.
+    - Smart Steer's wait clock only counts an unbroken wait.
+    - Reach per intent counts a first press answered cancelled, steady or brush as an intent; none of those can be a first press in practice.
 - Alternatives:
   - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.
   - **Body turn 1.5× the drift, capped at 12°** (Engagement, Competitive): a horse drawn turning more than it moves reads as skidding.
@@ -937,7 +966,7 @@ Template:
   - D-054: the promised "no room" shake (never built) becomes a soft 0.2 s wobble when an outward press drops.
 - Config (`GameConfig.steering` unless noted):
   - `glide = "eased"` ("linear" = D-054), `laneSpeedMax = 1.5`, `laneAccel = 4.5`, `chainWindow = 0.3`;
-  - `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 5`, `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`;
+  - `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 7` (5 in debate 012; 7 since the N1 review), `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`;
   - `blockedPress = "wait"` ("d054" = D-054), `gapWaitSeconds = 1.5` (outward), `gapWaitInSeconds = 0` (0 = an inward press waits until room, as D-054), `tuckAfterSeconds = 0`;
   - `brush = "repeat"` ("off" = none), `brushAlongFeet = 8`, `brushGraceSeconds = 0.3`, `brushRepeatSeconds = 2`, `brushPays = "mover"`, `brushCost = 0.002`, `brushFree = 1`, `brushMaxCharged = 3`, `brushCheckFeet = 4`, `brushRecoverPerSecond = 2`, `steadySeconds = 1`;
   - `GameConfig.steerView` (new): `yawGain = 1`, `yawMaxDeg = 10`, `yawSmoothSeconds = 0.15`, `leanDegPerFtps2 = 0.12`, `leanMaxDeg = 3`, `lookDeg = 3`, `lookRelaxSeconds = 0.3`, `brushLeanFeet = 1`, `brushLeanSeconds = 0.4`, `brushNodDeg = 2`, `brushVolume = 0.5`, `headTurnDeg = 0` (the art follow-up sets 12);

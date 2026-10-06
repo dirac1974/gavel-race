@@ -50,7 +50,7 @@
   "chainWindow": 0.3,
   "reverseGapSeconds": 0.5,
   "weaveGapSeconds": 2.5,
-  "weaveWindowSeconds": 5.0,
+  "weaveWindowSeconds": 7.0,
   "pressBounceSeconds": 0.2,
   "glideReserveFeet": 6.0,
   "blockedPress": "wait",

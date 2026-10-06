@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate Python reference fixtures for the Luau parity tests.
 
-Writes tests/fixtures/race_math.json, tests/fixtures/trip.json and tests/fixtures/trip_d057.json.
-Deterministic (fixed seeds). race_math.json is append-only: new sections draw from their own
+Writes tests/fixtures/race_math.json and tests/fixtures/trip.json; with --d057 also
+tests/fixtures/trip_d057.json (about 28 MB, for the N2 Luau port: N2 turns it on in CI and in
+tests/test_luau_parity.py). Deterministic (fixed seeds). race_math.json is append-only: new sections draw from their own
 generators, so the original sections stay byte-for-byte the same. trip.json is D-054 (it records
 the config without the D-057 keys, which are all off); trip_d057.json is D-057 switched on
 (stage N1, for the N2 Luau port).
@@ -125,7 +126,8 @@ def race_math_data() -> dict:
             "pace": pace_cases, "extraCases": extra_cases()}
 
 
-def main() -> None:
+def main(argv=None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
     data = race_math_data()
     out = ROOT / "tests" / "fixtures" / "race_math.json"
     out.write_text(json.dumps(data))
@@ -133,6 +135,8 @@ def main() -> None:
     trip_out = ROOT / "tests" / "fixtures" / "trip.json"
     trip_out.write_text(json.dumps(trip_fixture()))
     print(f"wrote {TRIP_RUNS} trip runs to {trip_out.relative_to(ROOT)}")
+    if "--d057" not in argv:
+        return
     d057 = trip_d057_fixture()
     d057_out = ROOT / "tests" / "fixtures" / "trip_d057.json"
     d057_out.write_text(json.dumps(d057))
@@ -297,15 +301,34 @@ def _d057_cfg(override=None):
 
 
 def _d057_snapshot(st_, tick):
-    """Everything the N2 port compares at a tick, plus the boxed-in view N4 reads. boxed and
-    trapped are trip.boxed_in and trip.trapped, worked out from the sides already found."""
-    sides = [[trip.side_state(st_, i, -1), trip.side_state(st_, i, 1)] for i in range(st_.n)]
+    """Everything the N2 port compares at a tick (the clocks included), plus the boxed-in view N4
+    reads. boxed, noTuckInside and boxedNoTuck are trip.boxed_in, trip.no_tuck_inside and
+    trip.boxed_no_tuck, worked out from the sides already found."""
+    n = st_.n
+    sides = [[trip.side_state(st_, i, -1), trip.side_state(st_, i, 1)] for i in range(n)]
     boxed = [sides[i][0] != "free" and sides[i][1] != "free" and trip.horse_ahead(st_, i, st_.cfg["boxedAheadFeet"])
-             for i in range(st_.n)]
+             for i in range(n)]
+    no_tuck = [st_.tgt[i] > 1 and sides[i][0] == "blocked" for i in range(n)]
     return {"tick": tick, "x": list(st_.x), "v": list(st_.v), "tgt": list(st_.tgt), "off": list(st_.off),
             "want": list(st_.want), "queued": list(st_.queued), "check": list(st_.check),
-            "charged": list(st_.charged), "tucking": list(st_.tucking), "sides": sides, "boxed": boxed,
-            "trapped": [boxed[i] and st_.tgt[i] > 1 and sides[i][0] == "blocked" for i in range(st_.n)]}
+            "charged": list(st_.charged), "tucking": list(st_.tucking),
+            "alongSince": [list(a) for a in st_.along_since], "steadyUntil": list(st_.steady_until),
+            "firstPressAt": list(st_.first_press_at), "lastRevAt": list(st_.last_rev_at),
+            "arrivedAt": list(st_.arrived_at), "manualAt": list(st_.manual_at),
+            "sides": sides, "boxed": boxed, "noTuckInside": no_tuck,
+            "boxedNoTuck": [boxed[i] and no_tuck[i] for i in range(n)]}
+
+
+def _exact(value):
+    """A config with every number as an exact decimal string (Lune's JSON reader can land a
+    number one ulp off; Luau's tonumber is exact). Strings and booleans stay as they are."""
+    if isinstance(value, (bool, str)):
+        return value
+    if isinstance(value, (int, float)):
+        return repr(value)
+    if isinstance(value, list):
+        return [_exact(v) for v in value]
+    return {k: _exact(v) for k, v in value.items()}
 
 
 def _d057_play(course, distance, posts, kinds, q, p1, uniforms, switch, ticks, cfg, presses, after_lock, baseline,
@@ -316,12 +339,15 @@ def _d057_play(course, distance, posts, kinds, q, p1, uniforms, switch, ticks, c
     geo = trip.phase_a(course, distance)
     st_ = trip.new_state(posts, q, uniforms, geo, cfg, kinds)
     dt = 1.0 / cfg["tickHz"]
-    intents, answers, snaps = [], [], []
+    intents, answers, snaps, events = [], [], [], []
     for tick in range(ticks):
         now = presses(st_, tick)
         for lane, d in now:
             intents.append([tick, lane + 1, d])
+        before = len(st_.events)
         answers.extend(trip.step(st_, q if tick < switch else p1, now, tick * dt, dt))
+        for e in st_.events[before:]:
+            events.append([tick, e[2] + 1, e[3] + 1, e[4]])
         if tick % snap_every == 0 or tick == ticks - 1:
             snaps.append(_d057_snapshot(st_, tick))
     lock_x = list(st_.x)
@@ -336,7 +362,7 @@ def _d057_play(course, distance, posts, kinds, q, p1, uniforms, switch, ticks, c
             "snapEvery": snap_every, "snapshots": snaps, "lockX": lock_x, "afterLock": after_lock,
             "afterLockAnswers": lock_answers, "ground": list(st_.ground), "draft": list(st_.draft), "trip": tr,
             "brushes": list(st_.brushes), "charged": list(st_.charged), "charges": charges,
-            "events": [[int(round(e[0] / dt)), e[2] + 1, e[3] + 1, e[4]] for e in st_.events],
+            "events": events,
             "tau": tau, "stars": [trip.trip_stars(v, cfg) for v in tau]}
 
 
@@ -399,6 +425,7 @@ def trip_d057_run(k, baseline, geometry):
     run["styles"] = [[i + 1, style] for i, style in zip(steerers, styles)]
     if override:
         run["cfg"] = cfg
+        run["cfgExact"] = _exact(cfg)
     return run
 
 
@@ -416,6 +443,7 @@ def _edge(name, posts, kinds, live, presses, ticks, after_lock, baseline, course
     run["name"] = name
     if cfg is not None:
         run["cfg"] = cfg
+        run["cfgExact"] = _exact(cfg)
     return run
 
 
@@ -462,16 +490,27 @@ def trip_d057_edges(baseline):
         # tucking never brushes.
         _edge("boxed-both-sides", [3, 3, 2, 4], ["manual"] * 4, [0.25 + 11 / 320, 0.25, 0.25, 0.25],
               _at({110: [(1, 1)], 130: [(1, -1)], 132: [(1, -1)]}), 200, [[2, -1], [3, 1]], baseline),
-        # Lane 3 (horse 2) boxed and trapped: a line of four in lane 2 (no tuck slot within
+        # Lane 3 (horse 2) boxed with no tuck slot inside: a line of four in lane 2 (no slot within
         # tuckBackMax), horse 1 ahead, horse 7 outside. Pairs of In presses: brushes 1 (free),
-        # 2, 3, 4 (charged up to the cap); a fifth pair just waits (the cap); a press 2.5 s
-        # after the first is a new try. Presses while steadying answer "steady". After the bell:
-        # nothing.
+        # 2, 3, 4 (charged up to the cap); a fifth pair just waits (the cap). Presses while
+        # steadying answer "steady". After the bell: nothing.
         _edge("trapped-brush-cap", [3, 3, 2, 2, 2, 2, 4], ["manual"] * 7, [1 / 7 + 11 / 320] + [1 / 7] * 6,
               _at({110: [(1, -1)], 115: [(1, -1)], 118: [(1, -1)], 130: [(1, -1)], 135: [(1, -1)], 150: [(1, -1)],
                    152: [(1, -1)], 170: [(1, -1)], 172: [(1, -1)], 190: [(1, -1)], 192: [(1, -1)], 194: [(1, 1)],
-                   196: [(1, 1)], 205: [(1, -1)], 230: [(1, -1)]}),
-              260, [[2, -1], [2, -1], [7, -1]], baseline),
+                   196: [(1, 1)]}),
+              220, [[2, -1], [2, -1], [7, -1]], baseline),
+        # The same box: a second In 2.1 s after the first is outside brushRepeatSeconds (it queues),
+        # two Outs cancel both, then a fresh pair 1.8 s apart brushes.
+        _edge("brush-window", [3, 3, 2, 2, 2, 2, 4], ["manual"] * 7, [1 / 7 + 11 / 320] + [1 / 7] * 6,
+              _at({110: [(1, -1)], 131: [(1, -1)], 133: [(1, 1)], 135: [(1, 1)], 140: [(1, -1)], 158: [(1, -1)]}),
+              180, [[2, -1]], baseline),
+        # The window starts when the waiting press was pressed, even if it queued: horse 1 glides
+        # In from lane 4 (10.0 s), presses Out mid-glide (10.5 s, queued for the reverse gap),
+        # finds horse 2 alongside in lane 4 when it may move (11.5 s) and presses Out again at
+        # 12.2 s: a brush, 1.7 s after the queued press (2.2 s after the accepted one).
+        _edge("brush-window-queued", [4, 4], ["manual", "manual"], [0.5, 0.5 - 28 / 320],
+              _at({100: [(0, -1)], 105: [(0, 1)], 122: [(0, 1)]}), 150, [[1, 1]], baseline,
+              live_after=[0.5, 0.5], switch=95),
         # Out into a horse closing from behind: no brush within brushGraceSeconds of it coming
         # alongside, a brush after.
         _edge("grace", [3, 4], ["manual", "manual"], [0.5, 0.5 - 40 / 320], _grace_script(), 160, [[1, 1]], baseline,
@@ -501,16 +540,19 @@ def trip_d057_fixture(only=None):
     D057_OVERRIDES), plus hand-built edge runs (`edges`, one per rule edge, snapshots every
     tick). Same conventions as trip.json: 1-based lanes in intents ([tick, lane, dir]), live =
     q before switchTick and p1 from it, exact decimal strings for the lanes' inputs, presses
-    after the bell all "locked". Snapshots add v, want, queued, check, charged, tucking, each
-    side's state ("free", "tuck", "blocked"), boxed and trapped. Results add brushes, charged,
-    charges (brush_charge), events ([tick, mover, other, dir], 1-based) and tau with the brush
-    term. cfg = the D-057 config; defaults = trip.CONFIG with every key (D-054 values), what
-    GameConfig.steering holds until N3; a run with other settings carries its whole cfg."""
+    after the bell all "locked". Snapshots add v, want, queued, check, charged, tucking, the
+    clocks (alongSince, steadyUntil, firstPressAt, lastRevAt, arrivedAt, manualAt), each side's
+    state ("free", "tuck", "blocked"), boxed, noTuckInside and boxedNoTuck. Results add brushes,
+    charged, charges (brush_charge), events ([tick, mover, other, dir], 1-based) and tau with the
+    brush term. cfg = the D-057 config; defaults = trip.CONFIG with every key (D-054 values),
+    what GameConfig.steering holds until N3; a run with other settings carries its whole cfg.
+    Each config also comes as exact decimal strings (cfgExact, defaultsExact)."""
     baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]
     geometry = {c: {d: trip.phase_a(c, d) for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
     runs = [trip_d057_run(k, baseline, geometry) for k in (only if only is not None else range(TRIP_D057_RUNS))]
-    return {"cfg": trip.d057_config(), "defaults": trip.CONFIG, "race": trip.RACE, "baseline": baseline,
-            "runs": runs, "edges": trip_d057_edges(baseline)}
+    return {"cfg": trip.d057_config(), "cfgExact": _exact(trip.d057_config()), "defaults": trip.CONFIG,
+            "defaultsExact": _exact(trip.CONFIG), "race": trip.RACE, "baseline": baseline, "runs": runs,
+            "edges": trip_d057_edges(baseline)}
 
 
 if __name__ == "__main__":

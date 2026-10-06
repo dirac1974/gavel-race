@@ -83,7 +83,7 @@ CONFIG: Dict = {
     "chainWindow": 0.0,           # D-057 0.3: a same-way change may start this close (lanes) to landing
     "reverseGapSeconds": 0.0,     # D-057 0.5: a change the other way starts this long after landing
     "weaveGapSeconds": 0.0,       # D-057 2.5: ...or this long, for a second reversal within the window
-    "weaveWindowSeconds": 5.0,
+    "weaveWindowSeconds": 7.0,    # N1 review: 7 (D-057 said 5); every masher cell under 8 reversals a minute
     "pressBounceSeconds": 0.0,    # D-057 0.2: a press the same way this soon after the last counts once
     "glideReserveFeet": 0.0,      # D-057 6: a horse gliding into a lane keeps this much more room
     "blockedPress": "d054",       # "wait" (D-057) or "d054": a press into a lane with no room
@@ -104,15 +104,18 @@ CONFIG: Dict = {
     "steadySeconds": 1.0,         # the mover can't steer for this long after a brush
 }
 
-# The D-057 keys, in CONFIG's order, and their D-054 (off) values.
-D057_KEYS: Tuple[str, ...] = (
-    "glide", "laneSpeedMax", "laneAccel", "chainWindow", "reverseGapSeconds", "weaveGapSeconds",
-    "weaveWindowSeconds", "pressBounceSeconds", "glideReserveFeet", "blockedPress", "gapWaitSeconds",
-    "gapWaitInSeconds", "tuckAfterSeconds", "boxedAheadFeet", "brush", "brushAlongFeet", "brushGraceSeconds",
-    "brushRepeatSeconds", "brushPays", "brushCost", "brushFree", "brushMaxCharged", "brushCheckFeet",
-    "brushRecoverPerSecond", "steadySeconds",
-)
-D057_OFF: Dict = {k: CONFIG[k] for k in D057_KEYS}
+# The D-057 keys with their D-054 (off) values, in CONFIG's order. A literal, never read from
+# CONFIG: once N3 switches D-057 on in CONFIG, files recorded before D-057 must still read as
+# D-054 (config_from_record) and a D-057 config must still record its keys (config_record).
+D057_OFF: Dict = {
+    "glide": "linear", "laneSpeedMax": 1.5, "laneAccel": 4.5, "chainWindow": 0.0, "reverseGapSeconds": 0.0,
+    "weaveGapSeconds": 0.0, "weaveWindowSeconds": 7.0, "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0,
+    "blockedPress": "d054", "gapWaitSeconds": 1.5, "gapWaitInSeconds": 0.0, "tuckAfterSeconds": 0.0,
+    "boxedAheadFeet": 12.0, "brush": "off", "brushAlongFeet": 8.0, "brushGraceSeconds": 0.3,
+    "brushRepeatSeconds": 2.0, "brushPays": "mover", "brushCost": 0.002, "brushFree": 1, "brushMaxCharged": 3,
+    "brushCheckFeet": 4.0, "brushRecoverPerSecond": 2.0, "steadySeconds": 1.0,
+}
+D057_KEYS: Tuple[str, ...] = tuple(D057_OFF)
 
 # D-057 on (debate 012): the switches N3 (motion and presses) and N5 (brushes) flip.
 D057: Dict = {
@@ -289,7 +292,7 @@ class TripState:
         self.check: List[float] = []      # feet below the skill target after a brush (steadying)
         self.steady_until: List[float] = []
         self.along_since: List[List[float]] = []  # [inside, outside]: since when a horse is alongside
-        self.smart_block_at: List[float] = []     # when Smart Steer's move last met a lane with no room
+        self.smart_block_at: List[float] = []     # since when Smart Steer's move has met no room, unbroken
         self.last_press_at: List[float] = []      # the last counted press (not a bounce)...
         self.last_press_dir: List[int] = []       # ...and its direction
         self.first_press_at: List[float] = []     # when the press now waiting was made
@@ -469,8 +472,9 @@ def lane_after(st: TripState, i: int) -> int:
 def side_state(st: TripState, i: int, d: int) -> str:
     """Room on side d (-1 in, +1 out) by Trip's clearance rule (the glide reserve included):
     "free" (a press moves now), "tuck" (no room, but an inward press can ease back to a slot
-    within tuckBackMax and slip in behind) or "blocked" (the rail or the outer edge, or no room
-    and no tuck slot). The N4 arrows: Out greys while not "free"; In greys only when "blocked"."""
+    within tuckBackMax and slip in behind: the "can tuck-back help" flag) or "blocked" (the rail
+    or the outer edge, or no room and no tuck slot). The N4 arrows: Out greys while not "free";
+    In greys only when "blocked" (no_tuck_inside, or on the rail)."""
     _check_lane(st, i)
     lane = st.tgt[i] + d
     if lane < 1 or lane > st.lanes:
@@ -503,10 +507,16 @@ def boxed_in(st: TripState, i: int) -> bool:
     return side_state(st, i, -1) != "free" and side_state(st, i, 1) != "free"
 
 
-def trapped(st: TripState, i: int) -> bool:
-    """Boxed in off the rail with no tuck slot inside within tuckBackMax (D-057: ~1% of a Smart
-    Steer kid's time)."""
-    return st.tgt[i] > 1 and boxed_in(st, i) and side_state(st, i, -1) == "blocked"
+def no_tuck_inside(st: TripState, i: int) -> bool:
+    """Off the rail, no room inside and no tuck slot within tuckBackMax: what D-057 calls
+    "trapped" for the grey In arrow (boxed or not). An inward press then waits for room."""
+    return st.tgt[i] > 1 and side_state(st, i, -1) == "blocked"
+
+
+def boxed_no_tuck(st: TripState, i: int) -> bool:
+    """Boxed in and no_tuck_inside: debate 012's "trapped" measure (about 1% of a Smart Steer
+    kid's pre-lock time)."""
+    return boxed_in(st, i) and no_tuck_inside(st, i)
 
 
 # ---------------------------------------------------------------- one tick
@@ -571,7 +581,8 @@ def _wait_for_room(st: TripState, i: int, d: int, t: float, slot: float, tucking
     """D-057 blockedPress = "wait": inward, the horse steadies back to the slot behind the horses
     alongside (tuck-back, after tuckAfterSeconds) when it is within tuckBackMax; otherwise the
     press waits for room (gapWaitInSeconds, 0 = until room). Outward, it waits gapWaitSeconds
-    (0 = until room), then drops quietly. Smart Steer never drops; smart_block_at is its clock."""
+    (0 = until room), then drops quietly. Smart Steer never drops; smart_block_at is its clock
+    (cleared on any tick it doesn't try and fail, so it only measures an unbroken wait)."""
     cfg = st.cfg
     if manual:
         since = st.want_at[i]
@@ -816,6 +827,8 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
     in_turn, to_turn = _turn_info(st.geo, s0)
     resume = cfg["smart"]["resumeSeconds"]
     chain = cfg["chainWindow"]
+    gaps_on = cfg["reverseGapSeconds"] > 0 or cfg["weaveGapSeconds"] > 0
+    smart_waiting = [False] * n
     for a in range(n):
         i = order[a]
         if tried[i]:
@@ -838,7 +851,7 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
             d = st.want[i]
             if moving and d != mdir:
                 continue
-            if _reverse_wait(st, i, d, t):
+            if gaps_on and _reverse_wait(st, i, d, t):
                 st.want_at[i] = t  # the wait for room starts once the horse may move
                 continue
             _try_move(st, i, d, t, tucking, True)
@@ -846,10 +859,19 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
             # Smart Steer: heads in before and through turns, never out, never for a draft.
             if moving and mdir != -1:
                 continue
-            if _reverse_wait(st, i, -1, t):
+            if not (in_turn or to_turn <= st.turn_lead[i] * st.speed + EPS):
                 continue
-            if in_turn or to_turn <= st.turn_lead[i] * st.speed + EPS:
-                _try_move(st, i, -1, t, tucking, False)
+            if gaps_on and _reverse_wait(st, i, -1, t):
+                continue
+            if not _try_move(st, i, -1, t, tucking, False):
+                smart_waiting[i] = True
+    # Smart Steer's wait clock (smart_block_at, set only by blockedPress "wait") measures one
+    # unbroken wait: a tick on which it didn't try and fail clears it, so a later block starts a
+    # fresh wait.
+    if cfg["blockedPress"] == "wait":
+        for i in range(n):
+            if not smart_waiting[i]:
+                st.smart_block_at[i] = LONG_AGO
     # 4. Lateral glide, then hold again so a horse arriving in a lane never overlaps.
     if cfg["glide"] == "eased":
         _glide_eased(st, t, dt)
@@ -860,10 +882,11 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
     for i in range(n):
         if not tucking[i] and st.tuck[i] > 0:
             st.tuck[i] = max(0.0, st.tuck[i] - release)
-    recover = cfg["brushRecoverPerSecond"] * dt
-    for i in range(n):
-        if st.check[i] > 0:
-            st.check[i] = max(0.0, st.check[i] - recover)
+    if cfg["brush"] != "off":
+        recover = cfg["brushRecoverPerSecond"] * dt
+        for i in range(n):
+            if st.check[i] > 0:
+                st.check[i] = max(0.0, st.check[i] - recover)
     st.tucking = tucking
     # 5. Ground on live turns (per 180 degrees) and the tucked-in draft, before the lock.
     s1 = st.speed * (t + dt)

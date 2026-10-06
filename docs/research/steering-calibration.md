@@ -247,11 +247,9 @@ Six runs use other configs: scale 0.5 and 0, steering off, no queue, Smart Steer
 
 # Natural steering (D-057), stage N1
 
-By the model engineer, 2026-10-06. N1 adds every D-057 rule to `src/trip.py` behind `trip.CONFIG` keys, **all switched off**: the game, `TripBaseline.luau` and every D-054 file are unchanged, and the report above still describes the game. `trip.d057_config()` switches D-057 on for the sims and the fixtures. Reproduce with `python sims/steering.py --profile d057 --write` (about 45 minutes on 12 cores). It writes `tests/fixtures/trip_baseline_d057.json` and `tests/fixtures/steering_report_d057.json`, which `tests/test_trip_d057.py` asserts; it never touches the game's baseline. N3 flips the config and regenerates the game's files from these.
+By the model engineer, 2026-10-06, revised after the PR #48 review. N1 adds every D-057 rule to `src/trip.py` behind `trip.CONFIG` keys, **all switched off**: the game, `TripBaseline.luau` and every D-054 file are unchanged (a full `python sims/steering.py --write` reproduces them byte for byte), and the report above still describes the game. `trip.d057_config()` switches D-057 on for the sims and the fixtures. Reproduce with `python sims/steering.py --profile d057 --write` (about 45 minutes on 12 cores). It writes `tests/fixtures/trip_baseline_d057.json` and `tests/fixtures/steering_report_d057.json`, which `tests/test_trip_d057.py` asserts (four stored probe races included, so the report can't go stale); it never touches the game's baseline. N3 flips the config and regenerates the game's files.
 
-**Short answer:** with D-057 on, every D-054 τ target still passes in every course × distance, against a baseline regenerated for D-057. Reach per intent (the new ≥ 70% target) passes in every cell, at 72–98%. The new targets pass too, with two notes:
-- **Masher zig-zag:** 7.6 reversals a minute pooled over the cells (target ≤ 8). Per cell, the dirt Mile (8.35) and the dirt Marathon (8.34) sit just above 8. The hard rule holds everywhere: reversals are always at least 3.5 s apart.
-- **Sideways acceleration:** 30.4 ft/s² at most, measured between 10 Hz ticks as D-057 measured it. Trip's own sideways speed never changes faster than 27 ft/s²; the extra 3.4 is the landing tick, where the horse snaps onto its lane. The prototype measured the same 30.4 and printed "30".
+**Short answer:** with D-057 on, every D-054 τ target still passes in every course × distance, against a baseline regenerated for D-057, and so does every new D-057 target. Reach per intent (the new ≥ 70% target) is 72% to 98% per cell. After the review, `weaveWindowSeconds` is 7 (debate 012: 5), which brings a masher under 8 reversals a minute in every cell (6.3–7.5; with 5 the dirt Mile and dirt Marathon sat at 8.35). One note: sideways acceleration between 10 Hz ticks peaks at 30.4 ft/s², because the landing tick snaps onto the lane; Trip's own sideways speed never changes faster than 27 ft/s². The prototype measured the same and quoted "30", and the check allows the landing tick (≤ 30.5).
 
 ## Config (mirror of `GameConfig.steering`; N2 adds the keys with these defaults)
 
@@ -263,7 +261,7 @@ laneAccel = 4.5,               -- eased: lanes/s^2 (27 ft/s^2)
 chainWindow = 0,               -- N3: 0.3
 reverseGapSeconds = 0,         -- N3: 0.5
 weaveGapSeconds = 0,           -- N3: 2.5
-weaveWindowSeconds = 5,
+weaveWindowSeconds = 7,        -- debate 012: 5; 7 since the N1 review (every masher cell under 8 a minute)
 pressBounceSeconds = 0,        -- N3: 0.2
 glideReserveFeet = 0,          -- N3: 6
 blockedPress = "d054",         -- N3: "wait"
@@ -281,11 +279,11 @@ Baseline: seed 20261005, 2,000 races per course × distance × post (144,000 rac
 
 | Course | Distance | Smart Steer kid among bots | Rail rider | Rail − Smart | Never steers | Wanderer | Casual | All-Smart field | Post bias: kid among bots | Post bias: all-Smart | Draft share | In within 3 s: per intent / per press |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| dirt | Sprint | +0.0002 | +0.0180 | +0.0179 | −0.0145 | −0.0035 | +0.0096 | +0.0000 | 0.0017 | 0.0016 | 34% | 98% / 94% |
+| dirt | Sprint | +0.0002 | +0.0180 | +0.0179 | −0.0145 | −0.0035 | +0.0097 | +0.0000 | 0.0017 | 0.0016 | 34% | 98% / 94% |
 | dirt | Mile | −0.0005 | +0.0161 | +0.0167 | −0.0147 | −0.0060 | +0.0065 | +0.0000 | 0.0014 | 0.0017 | 28% | 72% / 69% |
-| dirt | Classic | +0.0001 | +0.0192 | +0.0195 | −0.0142 | −0.0018 | +0.0135 | +0.0003 | 0.0016 | 0.0014 | 34% | 90% / 86% |
-| dirt | Marathon | −0.0009 | +0.0239 | +0.0250 | −0.0151 | −0.0051 | +0.0115 | −0.0000 | 0.0013 | 0.0016 | 20% | 72% / 66% |
-| turf | Sprint | +0.0003 | +0.0175 | +0.0169 | −0.0134 | −0.0030 | +0.0100 | +0.0000 | 0.0017 | 0.0024 | 33% | 97% / 93% |
+| dirt | Classic | +0.0001 | +0.0192 | +0.0195 | −0.0142 | −0.0017 | +0.0135 | +0.0003 | 0.0016 | 0.0014 | 34% | 90% / 85% |
+| dirt | Marathon | −0.0009 | +0.0239 | +0.0250 | −0.0151 | −0.0051 | +0.0115 | −0.0000 | 0.0013 | 0.0016 | 20% | 72% / 65% |
+| turf | Sprint | +0.0003 | +0.0175 | +0.0169 | −0.0134 | −0.0030 | +0.0101 | +0.0000 | 0.0017 | 0.0024 | 33% | 97% / 93% |
 | turf | Mile | −0.0002 | +0.0192 | +0.0195 | −0.0152 | −0.0050 | +0.0094 | +0.0001 | 0.0010 | 0.0014 | 32% | 83% / 77% |
 | turf | Classic | −0.0002 | +0.0194 | +0.0196 | −0.0148 | −0.0025 | +0.0125 | +0.0003 | 0.0013 | 0.0012 | 35% | 88% / 84% |
 | turf | Marathon | −0.0002 | +0.0264 | +0.0263 | −0.0151 | −0.0007 | +0.0178 | +0.0006 | 0.0014 | 0.0012 | 24% | 86% / 80% |
@@ -295,18 +293,18 @@ Baseline: seed 20261005, 2,000 races per course × distance × post (144,000 rac
 | Rail rider vs Smart Steer (every cell) | +0.01 to +0.03 | +0.017 to +0.026: pass | +0.016 to +0.026 |
 | Never-steer (every cell) | −0.02 to −0.01 | −0.015 to −0.013: pass | −0.015 to −0.013 |
 | Inward press reaching its lane within 3 s, **per intent** (every cell; replaces per press) | ≥ 70% | 72% to 98% (85.7% overall; rail rider 85.5%): pass | — |
-| …per press (information; was the D-054 target) | — | 66% to 94% (81.1%) | 81% to 98% (90.4%) |
+| …per press (information; was the D-054 target) | — | 65% to 94% (81.0%) | 81% to 98% (90.4%) |
 | Draft share of positive trip (every cell) | ≤ 40% | 20% to 35% (29.3%): pass | 20% to 35% |
 | Post bias, Smart Steer kid among bots (every cell and post) | < 0.005 | ≤ 0.0017 (absolute ≤ 0.0022): pass | ≤ 0.0017 |
 | Post bias, all-Smart lobbies (every cell and post) | < 0.005 | ≤ 0.0024: pass | ≤ 0.0020 |
 | Smart Steer kid among bots averages (every cell) | 0 ± 0.003 | −0.0009 to +0.0003: pass | −0.0009 to +0.0003 |
 | All-Smart field mean (every cell) | 0 ± 0.003 | −0.0000 to +0.0006: pass | −0.0000 to +0.0006 |
-| Masher reversals a minute (pooled) | ≤ 8 | 7.6: pass (per cell 7.1–8.35; dirt Mile 8.35, dirt Marathon 8.34) | 29 (prototype) |
+| Masher reversals a minute (every cell) | ≤ 8 | 6.3 to 7.5 (6.9 pooled): pass | 29 (prototype) |
 | Masher: none within 3 s of the previous (every cell) | ≥ 3 s | 3.5 s: pass | 0.6 s |
-| Sideways acceleration between ticks (every horse, whole ft/s²) | ≤ 30 ft/s² | 30.4 (Trip's speed ≤ 27): pass | 200 |
-| Casual riders charged for a brush (every cell) | ≤ 5% of races | 0–1.3% (0.6% overall): pass | — |
+| Sideways acceleration between ticks (every horse; + 0.5 for the landing tick) | ≤ 30 ft/s² | 30.4 (Trip's speed ≤ 27): pass | 200 |
+| Casual riders charged for a brush (every cell) | ≤ 5% of races | 0.0% to 1.3% (0.6% overall): pass | — |
 | Only the mover pays (every cell and policy) | 0 others charged | 0: pass | — |
-| Griefing: targeted minus untargeted own trip (each scenario and kid, pooled) | ≥ −0.001 | −0.0004 to +0.0029: pass (per cell ≥ −0.0008) | — |
+| Griefing: targeted minus untargeted own trip (each scenario and kid, pooled) | ≥ −0.001 | −0.0004 to +0.0029 (every cell ≥ −0.0008): pass | — |
 | A kid only pays for its own brushes; a Smart Steer kid never | 0 | 0: pass | — |
 | Stress, 4,000 races (masher + ditherer + casual among 5 bots) | 0 overlaps, fall-back ≤ 20 ft/s | 0 overlaps, 19.0 ft/s: pass | — |
 
@@ -323,7 +321,7 @@ Per-post residual with D-057 on, posts 1 to 8:
 | turf Classic | +.0012 −.0012 −.0013 +.0002 +.0005 −.0004 +.0004 +.0006 | −.0010 +.0008 +.0012 +.0009 +.0005 −.0011 −.0008 −.0007 |
 | turf Marathon | +.0011 −.0014 −.0008 −.0008 +.0000 −.0001 +.0006 +.0014 | −.0012 +.0007 +.0009 +.0008 +.0000 −.0005 −.0006 −.0003 |
 
-**The D-057 baseline** differs from D-054's at the outside posts only: the slower glide costs a wide horse more ground on its way in, so posts 6–8 sit up to 0.0033 lower in the Miles and the dirt Marathon (posts 1–4 within 0.0003). Lanes at the lock: Smart Steer 1.86–1.99, rail rider 1.00, never-steer 4.4–4.6. Never-steer sits on the floor in 57–75% of races; the rail rider hits the ceiling in 11% of dirt Marathons and 5% of turf Marathons, as with D-054.
+**The D-057 baseline** differs from D-054's at the outside posts: the slower glide costs a wide horse more ground on its way in, so posts 6–8 sit up to 0.0033 lower (posts 1–4 within 0.0003). Lanes at the lock: Smart Steer 1.86–1.99, rail rider 1.00, never-steer 4.4–4.6. Never-steer sits on the floor in 57% to 75% of races; the rail rider hits the ceiling in 11% of dirt Marathons at most, as with D-054.
 
 ### Motion and zig-zag
 
@@ -332,44 +330,44 @@ Per-post residual with D-057 on, posts 1 to 8:
 
   | Policy | Reversals a minute | Shortest gap | Median gap | Lane changes a minute |
   | --- | --- | --- | --- | --- |
-  | Masher | 7.6 | 3.5 s | 5.0 s | 22.9 |
+  | Masher | 6.9 | 3.5 s | 5.6 s | 21.3 |
   | Ditherer | 12.1 | 3.5 s | 3.7 s | 13.0 |
-  | Wanderer | 4.0 | 3.5 s | 5.2 s | 9.5 |
-  | Casual | 1.2 | 3.5 s | 5.3 s | 4.7 |
+  | Wanderer | 3.9 | 3.5 s | 5.6 s | 9.4 |
+  | Casual | 1.2 | 3.5 s | 5.4 s | 4.7 |
   | Rail rider, never-steer | 0 | | | 3.5, 0 |
 
-  Masher per cell: dirt 7.8, 8.35, 7.2, 8.34; turf 7.8, 7.5, 7.3, 7.1 (Sprint, Mile, Classic, Marathon). Without the press bounce (same races, 300 per cell) the pooled rate is 7.3 and the dirt Marathon 8.4: the bounce adds about 0.3 a minute (most likely because a masher's same-way presses within 0.2 s no longer queue a second lane in the same direction). The prototype's 7.1 was pooled over 80 races per cell and never reported per cell. If N3's playtest wants every cell under 8, `weaveWindowSeconds = 6` is the obvious knob (not tested here).
+  Masher per cell (Sprint, Mile, Classic, Marathon): dirt 7.3, 7.5, 6.5, 7.4; turf 7.3, 6.8, 6.6, 6.3. With debate 012's 5 s window: 7.6 pooled, dirt Mile 8.35, dirt Marathon 8.34 (the press bounce adds about 0.3 a minute; with it off the dirt Marathon was still 8.4).
 - **Sideways motion** (every horse while it moves, 10 Hz): top speed 9.0 ft/s (drift 9.1°), speed p50 9 ft/s; acceleration p50 10 ft/s², p95 30 ft/s², maximum 30.4 ft/s² (the landing tick, as above).
 - **Body yaw estimate** (N3's SteerPose from Trip's 10 Hz lanes: atan(sideways ÷ 56 ft/s), smoothed over 0.15 s, capped at 10°): at most 9.1°, p95 under 10°. Lean (0.12° per ft/s², capped at 3°): at most 2.9°.
 
 ### Boxed in
 
-Boxed = no room either side (`side_state` not "free") and a horse within 12 ft ahead in the lane; trapped = boxed off the rail with no tuck slot inside within `tuckBackMax`. Share of pre-lock time (Smart Steer: a kid at every post among bots; others: one rider at a random post):
+Boxed = no room either side (`side_state` not "free") and a horse within 12 ft ahead in the lane. "No tuck" = boxed and `no_tuck_inside` (off the rail, no tuck slot inside within `tuckBackMax`), debate 012's "trapped". Share of pre-lock time (Smart Steer: a kid at every post among bots; others: one rider at a random post):
 
-| Policy | Boxed | Trapped | Races with ≥ 1 s boxed | By post 1–8 |
+| Policy | Boxed | Boxed, no tuck slot | Races with ≥ 1 s boxed | By post 1–8 |
 | --- | --- | --- | --- | --- |
-| Smart Steer kid | 6.4% | 1.4% | 21% | 1, 2, 10, 10, 9, 7, 6, 5% |
-| Rail rider | 48% | 0% | 79% | 1, 53, 59, 58, 55, 53, 53, 52% |
+| Smart Steer kid | 6.4% | 1.38% | 21% | 1, 2, 10, 10, 9, 7, 6, 5% |
+| Rail rider | 48.2% | 0.00% | 79% | 1, 53, 59, 58, 55, 53, 53, 52% |
 | Never steers | 0.3% | 0.05% | 2% | 1, 1, 0, 0, 0, 0, 0, 0% |
-| Wanderer | 17% | 0.8% | 39% | 7, 28, 26, 24, 18, 13, 13, 10% |
-| Casual | 32% | 0.7% | 61% | 4, 41, 43, 44, 38, 30, 29, 24% |
-| Masher | 16% | 0.5% | 41% | 8, 22, 24, 24, 14, 13, 12, 9% |
-| Ditherer | 8% | 0.3% | 20% | 13, 40, 7, 1, 0, 0, 0, 0% |
+| Wanderer | 17.4% | 0.85% | 39% | 7, 27, 26, 24, 18, 13, 12, 10% |
+| Casual | 31.7% | 0.75% | 61% | 4, 41, 43, 44, 38, 30, 29, 24% |
+| Masher | 15.8% | 0.54% | 41% | 7, 21, 24, 24, 14, 14, 12, 10% |
+| Ditherer | 7.9% | 0.25% | 20% | 13, 40, 7, 1, 0, 0, 0, 0% |
 
-The rail rider's box is the classic one (on the rail behind a horse with one outside), where it wants to be. The prototype had a Smart Steer kid at 5.5% boxed, 21% of races ≥ 1 s and trapped about 1%. "No room yet" candidates (a casual press still waiting after 1 s with no glide and no tuck-back, before N4's 10 s limit): 0.45–2.9 a race by cell (1.6 overall), in line with the prototype's 0.4–2.7.
+The rail rider's box is the classic one (on the rail behind a horse with one outside), where it wants to be. The prototype had a Smart Steer kid at 5.5% boxed, 21% of races ≥ 1 s and trapped about 1%. "No room yet" candidates (a casual press still waiting after 1 s with no glide and no tuck-back, before N4's 10 s limit): 0.46–2.87 a race by cell (1.6 overall), in line with the prototype's 0.4–2.7.
 
 ### Brushes
 
-Focal rider among bots (a brush needs a second press within 2 s while the first waits and no tuck-back can help):
+Focal rider among bots (a brush needs a second press within 2 s of the waiting press, a horse alongside for 0.3 s and no tuck-back possible):
 
 | Policy | Races with a brush | Races charged | Brushes a race | Mean cost | Max cost |
 | --- | --- | --- | --- | --- | --- |
-| Casual | 2.0% | 0.6% | 0.03 | 0.0000 | 0.004 |
-| Wanderer | 36% | 13% | 0.55 | 0.0004 | 0.006 |
-| Masher | 80% | 65% | 2.41 | 0.0032 | 0.006 |
+| Casual | 2.1% | 0.6% | 0.03 | 0.0000 | 0.004 |
+| Wanderer | 36.4% | 13.0% | 0.55 | 0.0004 | 0.006 |
+| Masher | 81.9% | 65.7% | 2.45 | 0.0033 | 0.006 |
 | Rail rider, ditherer, never-steer | 0 | 0 | 0 | 0 | 0 |
 
-The prototype had casual 1.9% / 0.4%, wanderer 35% / 13.5%, masher 80% / 64%. A masher's presses bounce about 40 times a race and meet "steady" about 7 times. The other horse was charged 0 times in every run (mover pays).
+The prototype had casual 1.9% / 0.4%, wanderer 35% / 13.5%, masher 80% / 64%. N1's window rule (the window starts at the waiting press, even a queued one) charges casual riders in 0.60% of races against 0.48% with the plan's rule (same races). A masher's presses bounce about 40 times a race and meet "steady" about 7 times. The other horse was charged 0 times in every run (mover pays).
 
 ### Griefing
 
@@ -377,43 +375,114 @@ Strangers whose skill targets equal the kid's (they tapped exactly like it, the 
 
 | Kid | Strangers | Own trip vs the same strangers on Smart Steer (p5) | τ vs the same | Targeted − untargeted | Strangers charged a race |
 | --- | --- | --- | --- | --- | --- |
-| Smart Steer | Shadow (its inside) | −0.0011 (−0.016) | −0.0033 | +0.0003 (vs rail1) | 0.97 |
+| Smart Steer | Shadow (its inside) | −0.0011 (−0.016) | −0.0033 | +0.0003 (vs rail1) | 0.96 |
 | Smart Steer | Crew of 3 | +0.0009 (−0.015) | −0.0003 | +0.0029 (vs rail3) | 3.83 |
 | Smart Steer | Bumper | −0.0009 (−0.016) | −0.0027 | +0.0005 (vs rail1) | 1.48 |
 | Smart Steer | rail1 / rail3 (untargeted) | −0.0014 / −0.0020 | −0.0042 / −0.0094 | | 0 |
-| Rail rider | Shadow | +0.0001 (−0.0003) | −0.0023 | +0.0001 | 0.43 |
-| Rail rider | Crew of 3 | −0.0002 (−0.010) | −0.0049 | +0.0001 | 2.00 |
-| Rail rider | Bumper | −0.0003 (−0.008) | −0.0024 | −0.0004 | 0.66 |
+| Rail rider | Shadow (its inside) | +0.0001 (−0.000) | −0.0023 | +0.0001 (vs rail1) | 0.43 |
+| Rail rider | Crew of 3 | −0.0002 (−0.010) | −0.0049 | +0.0001 (vs rail3) | 2.00 |
+| Rail rider | Bumper | −0.0003 (−0.008) | −0.0024 | −0.0004 (vs rail1) | 0.66 |
 | Rail rider | rail1 / rail3 (untargeted) | +0.0000 / −0.0003 | −0.0026 / −0.0075 | | 0 |
 
 Targeting a kid does it no more harm than the same players simply riding well, and the kid is never charged (debate 012: shadow −0.0011, crew +0.0011, bumper −0.0007; untargeted −0.0013 and −0.0020). Per cell, every targeted − untargeted value is at least −0.0008.
 
 ### Overlaps
 
-Stress run: 4,000 races (500 per cell), a masher, a ditherer and a casual rider pressing at once among five bots: 0 frames with two horses within half a lane and 6 ft, the fastest fall-back 19.0 ft/s, 9,699 brushes. The closest same-lane pair at a tick's end is 5.0 ft in the report and 5.6 ft in the stress run (D-054: 7.0). That is a horse still gliding in within the 0.9-lane band, not an overlap; the slower glide spends longer in the band.
+Stress run: 4,000 races (500 per cell), a masher, a ditherer and a casual rider pressing at once among five bots: 0 frames with two horses within half a lane and 6 ft, the fastest fall-back 19.0 ft/s, 9,760 brushes. The closest same-lane pair at a tick's end is 5.0 ft in the report and 7.0 ft in the stress run (D-054: 7.0). That is a horse still gliding in within the 0.9-lane band, not an overlap; the slower glide spends longer in the band.
 
 ## Calls made in N1 (where the plan was open)
 
-1. **The rules sit behind `trip.CONFIG` keys, all off.** The names are the plan's `GameConfig.steering` names. Values that only matter once their switch is on (`laneSpeedMax` 1.5, `laneAccel` 4.5, `weaveWindowSeconds` 5, `gapWaitSeconds` 1.5, every `brush*` value, `steadySeconds` 1) already hold D-057's numbers, so N3 and N5 flip only the switches in `trip.D057`: `glide`, `chainWindow`, `reverseGapSeconds`, `weaveGapSeconds`, `pressBounceSeconds`, `glideReserveFeet`, `blockedPress` (N3) and `brush` (N5).
-2. **One key the plan doesn't name: `boxedAheadFeet = 12`** ("a horse within 12 ft ahead" in the boxed-in rule). It only feeds `trip.boxed_in`, which the sims and N4's chips read; it never changes a race.
-3. **Files made before D-057 stay byte for byte.** `trip.config_record(cfg)` leaves the D-057 keys out of a recorded config while every one holds its D-054 value, so `trip.json`, `trip_baseline.json` and `steering_report.json` (and the Luau check of `GameConfig.steering` against `trip.json`) are unchanged. Once any key is on, the whole config is recorded. The plan wanted `trip.json` to carry its config block; it already does (`cfg`, the D-054 view), and `trip_d057.json` carries the full config (`cfg`) and the full D-054 defaults (`defaults`) for N2's `GameConfig` check.
-4. **The brush check runs inside `accept_intent`**, after the bounce and steady checks and before the queue logic. The plan put it "in the intents loop, before `accept_intent`", and the prototype did that. The order of checks is the same, so the results are too (200/200 heavy-press races matched the prototype exactly with the rule below switched back). Keeping it inside means the bounce, which the plan puts in `acceptIntent`, also guards brushes: a finger bounce never brushes.
-5. **A queued first press is timed from when it was queued.** The plan sets `first_press_at` when a press is accepted. A press made during a glide or a reverse gap is queued, and its brush window was then timed from an older, possibly opposite press. N1 also sets `first_press_at` when a press is queued while nothing waits (`want == 0`), which matches the decision's "within 2 s of the first press". It changes heavy-press races only: against the prototype, 141 of 200 masher-and-double-press races stay identical and brushes rise from 859 to 899. Casual riders almost never queue.
-6. **The bounce** (`pressBounceSeconds`) counts from the last press that wasn't a bounce, the same way and only the same way (D-055's tap rule). An opposite press 0.1 s later is a new press (it cancels or queues as before).
-7. **The weave gap is judged when the change would start**, as in the prototype: a reversal waits 2.5 s after landing while it is still within 5 s of the last reversal, else 0.5 s. A masher's reversals are therefore at least 3.5 s apart (1.0 s glide + 2.5 s), a hard bound the tests check.
-8. **The sideways-acceleration target.** Trip's own sideways speed never changes faster than `laneAccel` (27 ft/s²). Measured as D-057 measured it (finite differences of the 10 Hz lanes), the landing tick reaches 30.4 ft/s²: the last step is a snap to the lane, shorter than the braking step. The prototype measured the same 30.4 and printed "30". The check reads "≤ 30 ft/s² to the whole ft/s²" and the report prints the exact value.
-9. **Griefing and the masher's reversal rate are checked pooled over the cells**, the way debate 012 measured them (griefing: 1,600 races per scenario and kid policy). The per-cell values are in the report: every griefing cell passes too, while two masher cells sit just above 8 (Motion and zig-zag).
-10. **Test sizes.** The plan's "0 overlaps in 400 random-press races" is the sim's 4,000-race stress run (stored, asserted); the tests replay 8 pressing races every tick (masher, ditherer, casual and double-presser together) to keep pytest within its budget.
-11. **`trip_d057.json`** is generated like `trip.json` (gitignored; `make_fixtures.py` writes it, and CI runs that before the Luau suite). It uses `trip_baseline.json`'s table for τ, so it doesn't depend on the D-057 baseline file.
+1. **The rules sit behind `trip.CONFIG` keys, all off.** The names are the plan's `GameConfig.steering` names. Values that only matter once their switch is on (`laneSpeedMax` 1.5, `laneAccel` 4.5, `weaveWindowSeconds` 7, `gapWaitSeconds` 1.5, every `brush*` value, `steadySeconds` 1) already hold D-057's numbers. N3 and N5 therefore flip only the switches in `trip.D057`: `glide`, `chainWindow`, `reverseGapSeconds`, `weaveGapSeconds`, `pressBounceSeconds`, `glideReserveFeet` and `blockedPress` (N3), and `brush` (N5).
+2. **`weaveWindowSeconds` 7, not 5** (N1 review, provisional, in REVIEW_QUEUE). With debate 012's 5 s, a masher reversed 8.35 times a minute in the dirt Mile and 8.34 in the dirt Marathon, above D-057's ≤ 8 in every cell (7.6 pooled, the way the debate measured it). A trial on the report's races:
+
+   | Window | Masher pooled | Worst cell | Casual reach per intent, worst cell | Casual charged |
+   | --- | --- | --- | --- | --- |
+   | 5 s | 7.62 | 8.35 | 71.9% | 0.58% |
+   | 6 s | 7.19 | 7.83 | 71.9% | 0.60% |
+   | 7 s | 6.86 | 7.47 | 71.8% | 0.60% |
+
+   The reviewer's own 6 s run left the dirt Marathon at 8.11, so 7 s, which clears every cell with a margin, is the value adopted. The masher target is now checked in every cell.
+3. **One key the plan doesn't name: `boxedAheadFeet = 12`** (the "horse within 12 ft ahead" in the boxed-in rule). It only feeds `trip.boxed_in`, which the sims and N4's chips read; it never changes a race.
+4. **Files made before D-057 stay byte for byte.**
+   - `trip.config_record(cfg)` leaves the D-057 keys out of a recorded config while every one holds its D-054 value. So `trip.json`, `trip_baseline.json` and `steering_report.json`, and the Luau check of `GameConfig.steering` against `trip.json`, are unchanged.
+   - The D-054 values are a literal, `trip.D057_OFF`, never read from `CONFIG`. After N3 switches D-057 on in `CONFIG`, a D-057 config still records every key, and an old record still reads back as D-054 (`test_records_survive_the_n3_flip`).
+   - The plan wanted `trip.json` to carry its config block; it already does (`cfg`, the D-054 view).
+5. **The brush check runs inside `accept_intent`**, after the bounce and steady checks and before the queue logic. The plan put it "in the intents loop, before `accept_intent`", and the prototype did that. The order of checks is the same. Keeping it inside means the bounce, which the plan puts in `acceptIntent`, also guards brushes: a finger bounce never brushes.
+6. **The 2 s brush window starts when the waiting press was pressed, even if it was queued** (provisional, in REVIEW_QUEUE).
+   - The plan sets `first_press_at` when a press is accepted. A press made during a glide or a reverse gap is queued, so its window was timed from an older press, possibly one the other way. N1 also sets `first_press_at` when a press is queued while nothing waits (`want == 0`), which matches the decision's "within 2 s of the first press".
+   - It changes some casual races too: on the report's races (600 per cell), casual riders are charged in 0.60% of races against 0.48% with the plan's rule, wanderers in 13.0% against 12.7% and mashers in 66% against 62%. Both rules are far under the 5% line. The reviewer measured 0.58% against 0.46% with the 5 s weave window.
+   - With the plan's rule, the model matches debate 012's prototype exactly (200 of 200 heavy-press races). The edge run `brush-window-queued` pins the new rule for the N2 port.
+7. **The bounce** (`pressBounceSeconds`) counts from the last press that wasn't a bounce, in the same direction only (D-055's tap rule). An opposite press 0.1 s later is a new press: it cancels or queues as before.
+8. **The weave gap is judged when the change would start**, as in the prototype: a reversal waits 2.5 s after landing while it is still within `weaveWindowSeconds` of the last reversal, and 0.5 s otherwise. Reversals are therefore at least 3.5 s apart (1.0 s glide plus 2.5 s), a hard bound the tests check.
+9. **The sideways-acceleration target.** Trip's own sideways speed never changes faster than `laneAccel` (27 ft/s²). Measured the way D-057 measured it (finite differences of the 10 Hz lanes), the landing tick reaches 30.4 ft/s², because the last step is a snap onto the lane, shorter than a braking step. The prototype measured the same 30.4 and printed "30". The check allows the landing tick explicitly (≤ 30.5), and the report prints the exact value.
+10. **Griefing is checked pooled over the cells**, the way debate 012 measured it (1,600 races per scenario and kid policy). Every cell is in the report, and every cell passes too.
+11. **Two meanings of "trapped", two names.**
+    - `trip.no_tuck_inside`: off the rail, no room inside and no tuck slot within `tuckBackMax`. This is D-057's "trapped", the grey ◀ In, boxed or not; `side_state(-1) == "blocked"` also covers the rail.
+    - `trip.boxed_no_tuck`: boxed in and `no_tuck_inside`. This is debate 012's "trapped" measure.
+    - The report and the fixture use these names (`no_tuck_share`, `noTuckInside`, `boxedNoTuck`).
+12. **Smart Steer's wait clock** (`smart_block_at`) measures one unbroken wait. It starts when Smart Steer's move first meets no room, and it clears on any tick where Smart Steer doesn't try and fail. It is only read with `tuckAfterSeconds` > 0 (0 in D-057).
+13. **Reach per intent** counts the first inward press after 3 s with no presses, unless it is refused (bounds, invalid, locked) or bounced. A first press answered cancelled, steady or brush counts, and fails unless the horse still gets there in 3 s. Steady, brush, bounce and rate need an earlier press within 3 s, so in practice a first press is accepted, queued, cancelled or bounds. The per-press figure keeps D-054's definition (accepted or queued).
+14. **Test sizes and runtime.**
+    - The plan's "0 overlaps in 400 random-press races" is covered by the sim's 4,000-race stress run (stored and asserted). The tests replay 8 pressing races every tick, with a masher, a ditherer, a casual rider and a double-presser together.
+    - Stale-report guard: four exact probe races (`steering.probe_races`: a masher, a casual rider, a bumper against a Smart Steer kid and a stress field) are stored in the D-057 report and replayed exactly by the tests. A change to the press, brush, bounce, weave or glide rules fails the tests until the report is regenerated.
+15. **`trip_d057.json` is written by `python tests/fixtures/make_fixtures.py --d057`.** It is gitignored and about 28 MB. The parity test and CI don't write it yet; N2 adds `--d057` there when `Trip.luau` reads it. Its configs also come as exact decimal strings (`cfgExact`, `defaultsExact`, and per-run `cfgExact`). It uses `trip_baseline.json`'s table for τ, so it doesn't depend on the D-057 baseline file.
 
 ## Mirror notes for N2 (`Trip.luau`)
 
-- **New state** (Python name, Luau camelCase): `v`, `last_dir`, `arrived_at`, `last_rev_at`, `brushes`, `charged`, `check`, `steady_until`, `along_since[i] = {inside, outside}` (`NOT_ALONG = 1e9`), `smart_block_at`, `last_press_at`, `last_press_dir`, `first_press_at`, `tucking`, `events` (`{t, "brush", mover, other, dir}`, lanes 1-based in Luau).
-- **`acceptIntent` order:** locked → invalid → bounce (same direction, `t − lastPressAt < pressBounceSeconds − EPS`; no `manualAt`) → record the press and `manualAt` → steady → brush (`brushTarget`) → cancel → bounds → reversing → idle (accepted, `firstPressAt = t`) → queued (`firstPressAt = t` only when `want == 0`) → rate.
-- **`step` order:** skill targets (now minus `check` too: `skill − tuck − check − off`) → hold → order → alongside tracking (only when `brush ~= "off"`) → intents → the lane-change loop (a gliding horse continues only within `chainWindow`, same direction; a queued or waiting press the other way waits for landing; the reverse gap restarts `wantAt`; Smart Steer honours the reverse gap and chains inward) → glide (`linear` or `eased`) → hold → tuck release → `check` recovery → `tucking` saved → ground and draft.
-- **Eased glide:** `adt = laneAccel·dt`; `vb = adt·(sqrt(0.25 + 2·dist/(adt·dt)) − 0.5)`; `v += clamp(sign·min(laneSpeedMax, vb) − v, ±adt)`; `x += v·dt`; snap (and `v = 0`, `arrivedAt = t + dt`) when `(nx − tgt)·sign ≥ −EPS` or `dist ≤ EPS`. `math.sqrt` is correctly rounded in both languages. The linear glide also sets `arrivedAt = t + dt` on landing.
-- **`slot`:** a horse with `tgt == lane` and `x ~= lane` blocks within `clearFeet + glideReserveFeet` ahead and `holdGap + glideReserveFeet` behind; the slot itself is still `holdGap` behind the rearmost blocker.
-- **`tryMove`:** a move that starts sets `lastRevAt` (when opposite to `lastDir`), `lastDir` and clears `smartBlockAt`. `blockedPress == "wait"` goes to `waitForRoom` (tuck when inward and the slot is within `tuckBackMax`, after `tuckAfterSeconds`; otherwise a rider's press drops after `gapWaitInSeconds` inward or `gapWaitSeconds` outward, 0 = never; Smart Steer never drops).
-- **`alongside`:** the next lane by `tgt + d`; a horse in it by `laneBand` or gliding into it; `|Δoff| < brushAlongFeet`; nearest, ties to the lower index. Rail and edge: none.
-- **`lock`** also sets every `steadyUntil` to −1e9. **`tau(trip, posts, baseline, cfg, brush)`** subtracts `scale·brush[i]` after the field mean, before the clamp; `brushCharge = brushCost · min(max(0, charged − brushFree), brushMaxCharged)`.
-- **Boxed-in helpers** (for N4, pure): `sideState(st, i, d)` → "free" / "tuck" / "blocked"; `boxedIn`; `trapped`. `trip_d057.json` snapshots carry them for every horse.
+- **New state** (Python name; Luau uses camelCase): `v`, `last_dir`, `arrived_at`, `last_rev_at`, `brushes`, `charged`, `check`, `steady_until`, `along_since[i] = {inside, outside}` (`NOT_ALONG = 1e9`), `smart_block_at`, `last_press_at`, `last_press_dir`, `first_press_at`, `tucking`, and `events` (`{t, "brush", mover, other, dir}`, with lanes 1-based in Luau). The fixture snapshots carry every clock: `alongSince`, `steadyUntil`, `firstPressAt`, `lastRevAt`, `arrivedAt`, `manualAt`. Events carry the tick they happened on.
+- **`acceptIntent` order:**
+  1. locked
+  2. invalid
+  3. bounce: same direction and `t − lastPressAt < pressBounceSeconds − EPS`; `manualAt` is not touched
+  4. record the press and `manualAt`
+  5. steady
+  6. brush (`brushTarget`)
+  7. cancel
+  8. bounds
+  9. reversing
+  10. idle: accepted, with `firstPressAt = t`
+  11. queued: `firstPressAt = t` only when `want == 0`
+  12. rate
+- **`step` order:**
+  1. Skill targets, now minus `check` as well: `skill − tuck − check − off`.
+  2. Hold.
+  3. Order.
+  4. Alongside tracking, only when `brush ~= "off"`.
+  5. This tick's intents.
+  6. The lane-change loop:
+     - a gliding horse continues only within `chainWindow`, in the same direction;
+     - a queued or waiting press the other way waits for landing;
+     - the reverse gap restarts `wantAt`;
+     - Smart Steer honours the reverse gap and chains inward;
+     - a tick on which Smart Steer doesn't try and fail clears `smartBlockAt`.
+  7. Glide, `linear` or `eased`.
+  8. Hold.
+  9. Tuck release.
+  10. `check` recovery.
+  11. Save `tucking`.
+  12. Ground and draft.
+- **Eased glide:**
+  - `adt = laneAccel·dt`
+  - `vb = adt·(sqrt(0.25 + 2·dist/(adt·dt)) − 0.5)`
+  - `v += clamp(sign·min(laneSpeedMax, vb) − v, ±adt)`, then `x += v·dt`
+  - Snap (with `v = 0` and `arrivedAt = t + dt`) when `(nx − tgt)·sign ≥ −EPS` or `dist ≤ EPS`.
+  - `math.sqrt` is correctly rounded in both languages.
+  - The linear glide also sets `arrivedAt = t + dt` on landing.
+- **`slot`:** a horse with `tgt == lane` and `x ~= lane` blocks within `clearFeet + glideReserveFeet` ahead and `holdGap + glideReserveFeet` behind. The slot itself is still `holdGap` behind the rearmost blocker.
+- **`tryMove`:**
+  - A move that starts sets `lastRevAt` (when it goes opposite to `lastDir`) and `lastDir`, and clears `smartBlockAt`.
+  - With `blockedPress == "wait"` it goes to `waitForRoom`:
+    - inward, it tucks back when the slot is within `tuckBackMax`, after `tuckAfterSeconds`;
+    - otherwise a rider's press drops after `gapWaitInSeconds` (inward) or `gapWaitSeconds` (outward), where 0 means never;
+    - Smart Steer never drops.
+- **`alongside`:**
+  - the next lane is `tgt + d`;
+  - a horse counts if it is in that lane by `laneBand` or gliding into it, and `|Δoff| < brushAlongFeet`;
+  - the nearest wins, ties go to the lower index;
+  - at the rail or the outer edge there is none.
+- **`lock`** also sets every `steadyUntil` to −1e9.
+- **`tau(trip, posts, baseline, cfg, brush)`** subtracts `scale·brush[i]` after the field mean and before the clamp. `brushCharge = brushCost · min(max(0, charged − brushFree), brushMaxCharged)`.
+- **Boxed-in helpers for N4** (pure):
+  - `sideState(st, i, d)` returns "free", "tuck" or "blocked";
+  - `boxedIn`, `noTuckInside` and `boxedNoTuck`.
+  - The `trip_d057.json` snapshots carry these for every horse.

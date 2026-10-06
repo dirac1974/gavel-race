@@ -255,7 +255,8 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
              match: Optional[Dict[int, float]] = None, focal: int = -1, measure: Sequence[str] = ()) -> Dict:
     """Phase A for one field. policies[i] per lane ("bot" or one of the policies above).
     match = {lane: feet}: that lane's skill target is the focal (kid) lane's plus feet.
-    measure (D-057 detail, slower): "boxed" (the focal horse's boxed-in and trapped time),
+    measure (D-057 detail, slower): "boxed" (the focal horse's boxed-in time, and boxed with no
+    tuck slot inside),
     "motion" (the focal horse's lane-change starts; every horse's sideways speed, acceleration
     and estimated body yaw and lean), "stress" (overlaps and the fastest fall-back)."""
     kinds = [KIND[p] for p in policies]
@@ -267,14 +268,20 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
     sw = switch_tick(geo, cfg)
     q, p1 = setup["q"], setup["p1"]
     reach_ticks = int(round(3.0 * cfg["tickHz"]))
-    pending: List[Tuple[int, int, int, bool]] = []  # (lane, goal, deadline tick, first press of an intent)
+    # (lane, goal, deadline tick, counts per press, first press of an intent). Per press (D-054):
+    # inward presses answered accepted or queued. Per intent (D-057): the first inward press after
+    # 3 s without presses, whatever it was answered except a refusal (bounds, invalid, locked) or
+    # a bounce; an answer of cancelled, steady or brush counts too (it fails unless the horse
+    # still gets there in 3 s). Steady, brush, bounce and rate need an earlier press within 3 s,
+    # so in practice a first press is accepted, queued, cancelled or bounds.
+    pending: List[Tuple[int, int, int, bool, bool]] = []
     reach_ok = reach_n = intent_ok = intent_n = 0
     last_press: Dict[int, int] = {}
     counts = {"accepted": 0, "queued": 0, "cancelled": 0, "bounds": 0, "rate": 0, "locked": 0, "invalid": 0}
     min_gap = math.inf
     boxed_on, motion_on, stress_on = "boxed" in measure, "motion" in measure, "stress" in measure
     lane_ft = trip.COURSES[geo["course"]]["laneWidth"]
-    boxed_s = trapped_s = 0.0
+    boxed_s = no_tuck_s = 0.0
     waits: List[Tuple[int, int, int]] = []  # the focal rider's presses: (tick, lane held then, dir)
     waits1s = 0
     starts: List[Tuple[float, int]] = []
@@ -312,24 +319,28 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
         answers = trip.step(st, live, intents, t, dt)
         for (i, d), goal, first, ans in zip(intents, goals, firsts, answers):
             counts[ans] = counts.get(ans, 0) + 1
-            if d < 0 and ans in ("accepted", "queued") and (tick + reach_ticks) * dt <= t_lock:
-                pending.append((i, goal, tick + reach_ticks, first))
+            per_press = ans in ("accepted", "queued")
+            per_intent = first and ans in ("accepted", "queued", "cancelled", "steady", "brush")
+            if d < 0 and (per_press or per_intent) and (tick + reach_ticks) * dt <= t_lock:
+                pending.append((i, goal, tick + reach_ticks, per_press, per_intent))
             if boxed_on and i == focal and ans in ("accepted", "queued") and (tick + 10) * dt <= t_lock:
                 waits.append((tick, st.tgt[i], d))
         still = []
-        for lane_i, goal, deadline, first in pending:
+        for lane_i, goal, deadline, per_press, first in pending:
             if st.x[lane_i] <= goal + trip.EPS:
-                reach_ok += 1
-                reach_n += 1
+                if per_press:
+                    reach_ok += 1
+                    reach_n += 1
                 if first:
                     intent_ok += 1
                     intent_n += 1
             elif tick >= deadline:
-                reach_n += 1
+                if per_press:
+                    reach_n += 1
                 if first:
                     intent_n += 1
             else:
-                still.append((lane_i, goal, deadline, first))
+                still.append((lane_i, goal, deadline, per_press, first))
         pending = still
         for i in range(LANES):
             for j in range(i + 1, LANES):
@@ -337,8 +348,8 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
                     min_gap = min(min_gap, abs(st.off[i] - st.off[j]))
         if boxed_on and trip.boxed_in(st, focal):
             boxed_s += dt
-            if st.tgt[focal] > 1 and trip.side_state(st, focal, -1) == "blocked":
-                trapped_s += dt
+            if trip.no_tuck_inside(st, focal):
+                no_tuck_s += dt
         if boxed_on and waits:
             # "No room yet" (N4): a press still waiting after 1 s with no glide and no tuck-back.
             keep = []
@@ -388,7 +399,7 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
            "intent": (intent_ok, intent_n), "brushes": list(st.brushes), "charged": list(st.charged),
            "brush_cost": trip.brush_charges(st), "events": len(st.events), "seconds": tick * dt}
     if boxed_on:
-        out["boxed"], out["trapped"], out["waits1s"] = boxed_s, trapped_s, waits1s
+        out["boxed"], out["boxed_no_tuck"], out["waits1s"] = boxed_s, no_tuck_s, waits1s
     if motion_on:
         out.update({"starts": starts, "vmax": vmax, "amax": amax, "yaw_max": yaw_max, "lean_max": lean_max,
                     "vhist": vhist, "ahist": ahist, "yhist": yhist})
@@ -475,7 +486,7 @@ def _report_chunk(args) -> List[Dict]:
             sweep_lane.append(res["lock_x"][p])
             rec["min_gap"] = min(rec["min_gap"], res["min_gap"])
             if d057:
-                sweep_boxed.append((res["boxed"], res["trapped"], res["seconds"]))
+                sweep_boxed.append((res["boxed"], res["boxed_no_tuck"], res["seconds"]))
         rec["sweep_tau"] = sweep_tau
         rec["smart"] = {"tau": sweep_tau[f], "lane": sweep_lane[f]}
         if d057:
@@ -490,7 +501,8 @@ def _report_chunk(args) -> List[Dict]:
                 rec[pol].update({
                     "intent": res["intent"], "brushes": res["brushes"][f], "charged": res["charged"][f],
                     "cost": res["brush_cost"][f], "others_charged": sum(res["charged"]) - res["charged"][f],
-                    "boxed": res["boxed"], "trapped": res["trapped"], "waits1s": res["waits1s"], "seconds": res["seconds"],
+                    "boxed": res["boxed"], "boxed_no_tuck": res["boxed_no_tuck"], "waits1s": res["waits1s"],
+                    "seconds": res["seconds"],
                     "starts": len(res["starts"]), "reversals": reversals(res["starts"]),
                     "vmax": res["vmax"], "amax": res["amax"], "yaw_max": res["yaw_max"], "lean_max": res["lean_max"],
                     "vhist": res["vhist"], "ahist": res["ahist"], "yhist": res["yhist"]})
@@ -558,6 +570,40 @@ def _stress_chunk(args) -> Dict:
         res["back_max"] = max(res["back_max"], r["back_max"])
         res["brushes"] += sum(r["brushes"])
     return res
+
+
+def probe_races(cfg: Dict) -> Dict:
+    """A few exact races stored with the D-057 report, which the tests rerun: a masher and a
+    casual rider (the report's dirt Mile race 3, where the masher brushes), a bumper against a
+    Smart Steer kid (griefing race 3, where it brushes) and a stress field (masher, ditherer and casual rider together). Any change
+    to the press, brush, bounce, weave or glide rules changes them, so a stale report can't stay
+    green."""
+    out: Dict = {}
+    cell = 1
+    course, distance = cells()[cell]
+    geo = trip.phase_a(course, distance)
+    setup = race_setup(race_seed(REPORT_SEED, cell, 3), distance)
+    f = setup["focal"]
+    for pol in ("masher", "scripted"):
+        pols = ["bot"] * LANES
+        pols[f] = pol
+        out[pol] = run_race(geo, setup, pols, cfg, focal=f, measure=("boxed", "motion"))
+    gs = race_setup(race_seed(GRIEF_SEED, cell, 3), distance)
+    kid = gs["focal"]
+    others = [i for i in range(LANES) if i != kid]
+    random.Random(gs["press_seed"] ^ 0x5EED).shuffle(others)
+    pols = ["bot"] * LANES
+    pols[kid] = "smart"
+    pols[others[0]] = "bumper"
+    out["bumper"] = run_race(geo, gs, pols, cfg, match={others[0]: 0.0}, focal=kid, measure=("boxed",))
+    ss = race_setup(race_seed(STRESS_SEED, cell, 0), distance)
+    order = list(range(LANES))
+    random.Random(ss["press_seed"]).shuffle(order)
+    pols = ["bot"] * LANES
+    for idx, pol in zip(order[:3], ("masher", "ditherer", "scripted")):
+        pols[idx] = pol
+    out["stress"] = run_race(geo, ss, pols, cfg, measure=("stress",))
+    return json.loads(json.dumps(out))
 
 
 def _chunks(total: int, size: int) -> List[Tuple[int, int]]:
@@ -871,7 +917,7 @@ def _summarize_d057_cell(r: Dict, recs: List[Dict]) -> None:
         r[pol + "_max_cost"] = max(v["cost"] for v in xs)
         r[pol + "_others_charged"] = sum(v["others_charged"] for v in xs)
         r[pol + "_boxed_share"] = sum(v["boxed"] for v in xs) / secs
-        r[pol + "_trapped_share"] = sum(v["trapped"] for v in xs) / secs
+        r[pol + "_no_tuck_share"] = sum(v["boxed_no_tuck"] for v in xs) / secs
         r[pol + "_reversals_per_min"] = 60.0 * revs / secs
         r[pol + "_min_reversal_gap"] = min(gaps) if gaps else None
         r[pol + "_changes_per_min"] = 60.0 * sum(v["starts"] for v in xs) / secs
@@ -880,7 +926,7 @@ def _summarize_d057_cell(r: Dict, recs: List[Dict]) -> None:
     r["smart_boxed_post"] = [sum(b[0] for b in boxed[p]) / sum(b[2] for b in boxed[p]) for p in range(LANES)]
     secs = sum(b[2] for p in range(LANES) for b in boxed[p])
     r["smart_boxed_share"] = sum(b[0] for p in range(LANES) for b in boxed[p]) / secs
-    r["smart_trapped_share"] = sum(b[1] for p in range(LANES) for b in boxed[p]) / secs
+    r["smart_no_tuck_share"] = sum(b[1] for p in range(LANES) for b in boxed[p]) / secs
     r["smart_boxed_1s_races"] = mean([1.0 if b[0] >= 1.0 - 1e-9 else 0.0 for p in range(LANES) for b in boxed[p]])
 
 
@@ -920,15 +966,15 @@ def _summarize_d057(summary: Dict, per_cell: Dict[int, List[Dict]]) -> None:
     for pol in ("smart",) + FOCAL_D057:
         by_post_b = [0.0] * LANES
         by_post_s = [0.0] * LANES
-        trapped = 0.0
+        no_tuck = 0.0
         long_races = races = 0
         if pol == "smart":
             for x in allrecs:
                 for p in range(LANES):
-                    b, tr, s = x["sweep_boxed"][p]
+                    b, nt, s = x["sweep_boxed"][p]
                     by_post_b[p] += b
                     by_post_s[p] += s
-                    trapped += tr
+                    no_tuck += nt
                     races += 1
                     long_races += 1 if b >= 1.0 - 1e-9 else 0
         else:
@@ -936,10 +982,10 @@ def _summarize_d057(summary: Dict, per_cell: Dict[int, List[Dict]]) -> None:
                 v, p = x[pol], x["focal"]
                 by_post_b[p] += v["boxed"]
                 by_post_s[p] += v["seconds"]
-                trapped += v["trapped"]
+                no_tuck += v["boxed_no_tuck"]
                 races += 1
                 long_races += 1 if v["boxed"] >= 1.0 - 1e-9 else 0
-        boxed[pol] = {"share": sum(by_post_b) / sum(by_post_s), "trapped_share": trapped / sum(by_post_s),
+        boxed[pol] = {"share": sum(by_post_b) / sum(by_post_s), "no_tuck_share": no_tuck / sum(by_post_s),
                       "races_boxed_1s": long_races / races,
                       "by_post": [by_post_b[p] / by_post_s[p] if by_post_s[p] else 0.0 for p in range(LANES)]}
     summary["boxed"] = boxed
@@ -1025,15 +1071,16 @@ def check_targets(s: Dict, profile: str = "d054") -> Dict[str, bool]:
     for key in ("draft_share", "post_bias_smart_among_bots", "post_bias_all_smart", "smart_among_bots_mean",
                 "all_smart_field_mean"):
         out[key] = checks[key]
-    # Pooled over the cells, as debate 012 measured it (7.1); the per-cell rates are in the report
-    # (two cells sit just above 8 with the D-057 values, see docs/research/steering-calibration.md).
-    out["masher_reversals"] = s["motion"]["masher"]["reversals_per_min"] <= t["masher_reversals_per_min"]
+    # Every cell (D-057's targets are per cell). With weaveWindowSeconds 5, as debate 012 had it,
+    # the dirt Mile and Marathon sat at 8.35; 7 (N1 review) brings every cell under 7.5.
+    out["masher_reversals"] = all(r["masher_reversals_per_min"] <= t["masher_reversals_per_min"] for r in rows)
     out["masher_reversal_gap"] = all(r["masher_min_reversal_gap"] is None or
                                      r["masher_min_reversal_gap"] >= t["masher_min_reversal_gap"] for r in rows)
-    # To the whole ft/s^2, as D-057 quotes it: Trip's own speed changes by at most laneAccel (27);
-    # the 10 Hz finite difference peaks at 30.4 on a landing tick (the snap), which the prototype
-    # also measured and printed as 30.
-    out["sideways_accel"] = round(s["motion"]["all_horses"]["amax_ftps2"]) <= t["accel_max_ftps2"]
+    # Trip's own sideways speed changes by at most laneAccel (27 ft/s^2). The 10 Hz finite
+    # difference peaks at 30.4 on a landing tick: the last step snaps onto the lane, shorter than a
+    # braking step. The prototype measured the same 30.4 and quoted it as "30", so the check allows
+    # the landing tick explicitly: 30.5.
+    out["sideways_accel"] = s["motion"]["all_horses"]["amax_ftps2"] <= t["accel_max_ftps2"] + 0.5
     out["casual_charged"] = all(r["scripted_charged_races"] <= t["casual_charged_share"] for r in rows)
     out["no_bystander_charged"] = all(r[pol + "_others_charged"] == 0 for r in rows for pol in FOCAL_D057)
     if "griefing" in s:
@@ -1057,9 +1104,9 @@ LABELS = {
     "post_bias_all_smart": "Post bias < 0.005, all-Smart fields (every cell, every post)",
     "smart_among_bots_mean": "Smart Steer kid among bots averages 0 +- 0.003 (every cell)",
     "all_smart_field_mean": "All-Smart field mean 0 +- 0.003 (every cell)",
-    "masher_reversals": "Masher reversals <= 8 a minute (pooled over the cells; per cell in the report)",
+    "masher_reversals": "Masher reversals <= 8 a minute (every cell)",
     "masher_reversal_gap": "No masher reversal within 3 s of the previous (every cell)",
-    "sideways_accel": "Sideways acceleration <= 30 ft/s^2 between ticks, to the whole ft/s^2 (every horse)",
+    "sideways_accel": "Sideways acceleration <= 30 ft/s^2 between ticks, + 0.5 for the landing tick (every horse)",
     "casual_charged": "Casual riders charged for a brush in <= 5% of races (every cell)",
     "no_bystander_charged": "Only the mover pays: no other horse is ever charged (every cell)",
     "griefing": "Griefing: targeted minus untargeted own trip >= -0.001 (each scenario and kid, pooled)",
@@ -1161,9 +1208,9 @@ def _format_d057(s: Dict) -> List[str]:
                f"max {a['amax_ftps2']:.1f} ft/s^2")
     out.append(f"Body estimate (SteerPose from 10 Hz lanes): yaw max {a['yaw_max_deg']:.1f} deg, p95 {a['yaw_p95_deg']:.0f} deg; "
                f"lean max {a['lean_max_deg']:.1f} deg")
-    out.append("Boxed in (share of pre-lock time; trapped; races with >= 1 s; by post 1-8):")
+    out.append("Boxed in (share of pre-lock time; boxed with no tuck slot inside; races with >= 1 s; by post 1-8):")
     for pol, b in s["boxed"].items():
-        out.append(f"  {pol:9s} {b['share']:.1%}  trapped {b['trapped_share']:.2%}  >=1 s {b['races_boxed_1s']:.0%}  "
+        out.append(f"  {pol:9s} {b['share']:.1%}  no tuck {b['no_tuck_share']:.2%}  >=1 s {b['races_boxed_1s']:.0%}  "
                    f"posts {_pcts(b['by_post'])}")
     out.append("Brushes (focal rider; races with a brush / charged; brushes a race; mean / max cost):")
     for pol, b in s["brushes"].items():
@@ -1241,7 +1288,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               "summary": summary}
     if args.profile == "d057":
         stored.update({"profile": "d057", "griefSeed": GRIEF_SEED, "griefRaces": args.grief_races,
-                       "stressSeed": STRESS_SEED, "stressRaces": args.stress_races})
+                       "stressSeed": STRESS_SEED, "stressRaces": args.stress_races, "probes": probe_races(cfg)})
     if args.write:
         report_path(args.profile).write_text(json.dumps(stored, indent=1) + "\n")
         print(f"wrote {report_path(args.profile).relative_to(ROOT)}")

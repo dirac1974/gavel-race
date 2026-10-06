@@ -54,9 +54,15 @@ def field(posts, live, kinds=None, cfg=None, course="dirt", distance="Classic"):
 
 
 @pytest.fixture(scope="module")
-def edges():
-    baseline = steering.load_baseline()["baseline"]
-    return {e["name"]: e for e in make_fixtures.trip_d057_edges(baseline)}
+def fx25():
+    """The generated D-057 parity fixture's runs 0, 3 and 8-24 (every override once) and its
+    edge runs, built once for the module."""
+    return make_fixtures.trip_d057_fixture(only=[0, 3] + list(range(8, 25)))
+
+
+@pytest.fixture(scope="module")
+def edges(fx25):
+    return {e["name"]: e for e in fx25["edges"]}
 
 
 def pressing_race(seed, cfg=CFG):
@@ -105,9 +111,9 @@ def races():
 def test_d057_config_turns_on_every_rule_and_records_it():
     assert CFG["glide"] == "eased" and CFG["blockedPress"] == "wait" and CFG["brush"] == "repeat"
     assert (CFG["laneSpeedMax"], CFG["laneAccel"], CFG["chainWindow"]) == (1.5, 4.5, 0.3)
-    assert (CFG["reverseGapSeconds"], CFG["weaveGapSeconds"], CFG["weaveWindowSeconds"]) == (0.5, 2.5, 5.0)
-    assert (CFG["pressBounceSeconds"], CFG["glideReserveFeet"], CFG["gapWaitSeconds"], CFG["gapWaitInSeconds"]) == \
-        (0.2, 6.0, 1.5, 0.0)
+    assert (CFG["reverseGapSeconds"], CFG["weaveGapSeconds"], CFG["weaveWindowSeconds"]) == (0.5, 2.5, 7.0)
+    assert (CFG["pressBounceSeconds"], CFG["glideReserveFeet"], CFG["gapWaitSeconds"],
+            CFG["gapWaitInSeconds"]) == (0.2, 6.0, 1.5, 0.0)
     assert (CFG["brushCost"], CFG["brushFree"], CFG["brushMaxCharged"], CFG["brushPays"]) == (0.002, 1, 3, "mover")
     assert (CFG["brushAlongFeet"], CFG["brushGraceSeconds"], CFG["brushRepeatSeconds"]) == (8.0, 0.3, 2.0)
     assert (CFG["brushCheckFeet"], CFG["brushRecoverPerSecond"], CFG["steadySeconds"]) == (4.0, 2.0, 1.0)
@@ -174,7 +180,7 @@ def test_glides_never_reverse_and_speed_changes_stay_under_the_cap(races):
 
 def test_reverse_and_weave_gaps(races):
     """No change opposite to the last one starts within 0.5 s of landing, or within 2.5 s when
-    it is a second reversal within 5 s; a masher's reversals are at least 3.5 s apart."""
+    it is a second reversal within weaveWindowSeconds (7 s); reversals are at least 3.5 s apart."""
     checked = 0
     for _st, frames, _k in races:
         for i in range(8):
@@ -184,7 +190,8 @@ def test_reverse_and_weave_gaps(races):
                 if tgt[i] != prev_tgt:
                     d = 1 if tgt[i] > prev_tgt else -1
                     if last_dir != 0 and d != last_dir:
-                        gap = 2.5 if (t * DT) - last_rev < 5.0 - 1e-9 else 0.5
+                        gap = CFG["weaveGapSeconds"] if (t * DT) - last_rev < CFG["weaveWindowSeconds"] - 1e-9 \
+                            else CFG["reverseGapSeconds"]
                         assert t * DT - arrived_before >= gap - 1e-9
                         last_rev = t * DT
                         reversals.append(t * DT)
@@ -198,7 +205,8 @@ def test_reverse_and_weave_gaps(races):
 
 def test_reverse_weave_timing(edges):
     """In at 10.0 s (lands 11.0), Out pressed mid-glide starts at 11.5; In, a second reversal
-    within 5 s, starts 2.5 s after landing (15.0); the next Out waits 2.5 s again (18.5)."""
+    within the weave window, starts 2.5 s after landing (15.0); the next Out waits 2.5 s again
+    (18.5)."""
     run = edges["reverse-weave"]
     starts = []
     prev = None
@@ -249,19 +257,22 @@ def test_boxed_in_both_sides(edges):
     run = edges["boxed-both-sides"]
     by_tick = {s["tick"]: s for s in run["snapshots"]}
     s = by_tick[110]
-    assert s["sides"][1] == ["tuck", "blocked"] and s["boxed"][1] and not s["trapped"][1]
+    assert s["sides"][1] == ["tuck", "blocked"] and s["boxed"][1] and not s["boxedNoTuck"][1]
+    assert not s["noTuckInside"][1]  # the In arrow stays lit: tuck-back can help
     assert by_tick[124]["want"][1] == 1 and by_tick[125]["want"][1] == 0  # dropped at 1.5 s
     assert by_tick[130]["tucking"][1] and run["answers"] == ["accepted", "accepted", "queued"]
     assert by_tick[145]["tgt"][1] <= 2 and run["events"] == [] and run["charged"] == [0, 0, 0, 0]
 
 
-def test_trapped_waits_for_room_and_drops_only_when_told(edges):
-    """An inward press with no tuck slot within tuckBackMax waits until room (gapWaitInSeconds
-    0, as D-054) and drops after gapWaitInSeconds otherwise; Smart Steer trapped never drops."""
+def test_no_tuck_inside_waits_for_room_and_drops_only_when_told(edges):
+    """An inward press with no tuck slot within tuckBackMax (no_tuck_inside: the grey In arrow,
+    D-057's "trapped") waits until room (gapWaitInSeconds 0, as D-054) and drops after
+    gapWaitInSeconds otherwise; Smart Steer in that spot never drops."""
     cap = edges["trapped-brush-cap"]
     s = {x["tick"]: x for x in cap["snapshots"]}[110]
-    assert s["sides"][1] == ["blocked", "blocked"] and s["boxed"][1] and s["trapped"][1]
-    assert {x["tick"]: x for x in cap["snapshots"]}[259]["want"][1] == -1  # the last press still waits
+    assert s["sides"][1] == ["blocked", "blocked"] and s["boxed"][1] and s["noTuckInside"][1] and s["boxedNoTuck"][1]
+    window = {x["tick"]: x for x in edges["brush-window"]["snapshots"]}
+    assert window[130]["want"][1] == -1  # pressed at 11.0 s, still waiting 2 s later (outward would drop at 1.5 s)
     drop = {x["tick"]: x for x in edges["trapped-drop"]["snapshots"]}
     assert drop[129]["want"][0] == -1 and drop[130]["want"][0] == 0
     smart = edges["smart-trapped"]
@@ -286,19 +297,19 @@ def test_side_state_matches_trips_clearance(races):
                 assert d < 0 and st.off[i] - slot <= CFG["tuckBackMax"] + trip.EPS
     st = field([1, 8], [0.5, 0.5])
     assert trip.side_state(st, 0, -1) == "blocked" and trip.side_state(st, 1, 1) == "blocked"
-    assert not trip.boxed_in(st, 0) and not trip.trapped(st, 0)
+    assert not trip.boxed_in(st, 0) and not trip.no_tuck_inside(st, 0) and not trip.boxed_no_tuck(st, 0)
 
 
 # ---------------------------------------------------------------- brushes
 
 def test_brush_cap_steady_and_mover_pays(edges):
-    """Trapped horse 2 presses In twice within 2 s: a brush (the first free), then 2, 3, 4
-    (charged, up to the cap: 0.006); a fifth second press just queues; presses while steadying
-    answer "steady"; a press 2.5 s after the first is a new try. Only the mover pays; the horse
-    it brushes (lane 2's leader) never does. After the bell: nothing."""
+    """Horse 2 (no tuck slot inside) presses In twice within 2 s: a brush (the first free), then
+    2, 3, 4 (charged, up to the cap: 0.006); a fifth second press just queues; presses while
+    steadying answer "steady". Only the mover pays; the horse it brushes (lane 2's leader) never
+    does. After the bell: nothing."""
     run = edges["trapped-brush-cap"]
     assert run["answers"] == ["accepted", "brush", "steady", "accepted", "brush", "accepted", "brush", "accepted",
-                              "brush", "accepted", "queued", "cancelled", "cancelled", "accepted", "queued"]
+                              "brush", "accepted", "queued", "cancelled", "cancelled"]
     assert run["events"] == [[115, 2, 3, -1], [135, 2, 3, -1], [152, 2, 3, -1], [172, 2, 3, -1]]
     assert run["brushes"] == [0, 4, 0, 0, 0, 0, 0] and run["charged"] == [0, 4, 0, 0, 0, 0, 0]
     assert run["charges"][1] == pytest.approx(0.006, abs=1e-15) and run["charges"].count(0.0) == 6
@@ -307,6 +318,39 @@ def test_brush_cap_steady_and_mover_pays(edges):
     assert by_tick[115]["check"][1] == pytest.approx(4.0 - 0.2)  # steadies back 4 ft, recovering 2 ft/s
     assert by_tick[115]["want"][1] == 0  # its waiting press cleared
     assert all(s["check"][2] == 0 for s in run["snapshots"])  # the other horse never steadies
+
+
+def test_brush_window_expires_after_two_seconds(edges):
+    """Before any cap: a second In 2.1 s after the first is a new try (it queues, no brush); a
+    fresh pair 1.8 s apart brushes."""
+    run = edges["brush-window"]
+    assert run["answers"] == ["accepted", "queued", "cancelled", "cancelled", "accepted", "brush"]
+    assert run["events"] == [[158, 2, 3, -1]] and run["brushes"][1] == 1
+
+
+def test_brush_window_starts_when_the_waiting_press_was_made(edges):
+    """The 2 s window runs from the press now waiting, even when it was queued behind a glide or
+    a reverse gap (N1's call; the plan timed it from the last accepted press). Horse 1's Out,
+    queued mid-glide at 10.5 s, waits for the reverse gap and a horse alongside; its second Out
+    at 12.2 s brushes: 1.7 s after the queued press, 2.2 s after the accepted In."""
+    run = edges["brush-window-queued"]
+    assert run["answers"] == ["accepted", "queued", "brush"]
+    accepted, queued, brushed = (i[0] for i in run["intents"])
+    assert brushed - queued <= 20 < brushed - accepted
+    snap = {s["tick"]: s for s in run["snapshots"]}[brushed - 1]
+    assert snap["firstPressAt"][0] == pytest.approx(queued * DT) and snap["want"][0] == 1
+    assert snap["alongSince"][0][1] <= (brushed - 3) * DT + 1e-9  # alongside for brushGraceSeconds
+    assert run["events"] == [[brushed, 1, 2, 1]]
+
+
+def test_smart_steer_wait_clock_only_counts_an_unbroken_wait(edges):
+    """smart_block_at starts when Smart Steer's move first meets no room and clears on any tick
+    it doesn't try and fail (here: a press pauses it), so a later block starts a fresh wait."""
+    st = field([3, 2, 2, 2, 2], [0.2] * 5, kinds=["smart"] + ["manual"] * 4)
+    play(st, 170, [0.2] * 5)  # Smart Steer heads in from 15.6 s and finds no room
+    assert st.smart_block_at[0] == pytest.approx(15.6, abs=0.15)
+    play(st, 1, [0.2] * 5, {170: [(0, 1)]}, start=170)  # a press pauses it: nothing tried
+    assert st.smart_block_at[0] == trip.LONG_AGO
 
 
 def test_brush_needs_the_grace_and_a_second_press(edges):
@@ -401,13 +445,13 @@ def test_no_overlaps_or_hops_in_pressing_races(races):
 
 # ---------------------------------------------------------------- parity fixture (N2)
 
-def test_d057_fixture_replays_exactly(edges):
-    """trip_d057.json (generated in CI like trip.json; tests/luau loads it in N2): a replay of
-    recorded presses reproduces answers, snapshots, events, charges and tau with the brush term."""
-    picks = [0, 3, 8, 9, 13, 21, 50, 199]
-    fx = make_fixtures.trip_d057_fixture(only=picks)
+def test_d057_fixture_replays_exactly(fx25):
+    """trip_d057.json (make_fixtures.py --d057; tests/luau loads it in N2): a replay of recorded
+    presses reproduces answers, snapshots, events, charges and tau with the brush term."""
+    fx = fx25
     assert fx["cfg"] == CFG and fx["defaults"] == trip.CONFIG
-    runs = fx["runs"] + list(edges.values())
+    assert fx["cfgExact"]["laneAccel"] == "4.5" and fx["defaultsExact"]["glide"] == "linear"
+    runs = [fx["runs"][k] for k in (0, 1, 2, 3, 7, 15)] + fx["edges"]  # runs 0, 3, 8, 9, 13, 21
     styles = set()
     for run in runs:
         cfg = run.get("cfg", fx["cfg"])
@@ -417,28 +461,29 @@ def test_d057_fixture_replays_exactly(edges):
             by_tick.setdefault(tick, []).append((lane - 1, d))
         st = trip.new_state(run["posts"], run["q"], run["uniforms"], trip.phase_a(run["course"], run["distance"]), cfg,
                             run["kinds"])
-        answers, snaps = [], []
+        answers, snaps, events = [], [], []
         for tick in range(run["ticks"]):
+            before = len(st.events)
             answers.extend(trip.step(st, run["q"] if tick < run["switchTick"] else run["p1"], by_tick.get(tick, []),
                                      tick * DT, DT))
+            events.extend([tick, e[2] + 1, e[3] + 1, e[4]] for e in st.events[before:])
             if tick % run["snapEvery"] == 0 or tick == run["ticks"] - 1:
                 snaps.append(make_fixtures._d057_snapshot(st, tick))
         assert answers == run["answers"] and snaps == run["snapshots"]
         trip.lock(st)
-        assert trip.step(st, run["p1"], [(lane - 1, d) for lane, d in run["afterLock"]], run["ticks"] * DT, DT) == \
-            ["locked"] * len(run["afterLock"])
+        late = trip.step(st, run["p1"], [(lane - 1, d) for lane, d in run["afterLock"]], run["ticks"] * DT, DT)
+        assert late == ["locked"] * len(run["afterLock"])
         charges = trip.brush_charges(st)
-        assert charges == run["charges"] and [[int(round(e[0] / DT)), e[2] + 1, e[3] + 1, e[4]] for e in st.events] == \
-            run["events"]
+        assert charges == run["charges"] and events == run["events"]
         row = trip.baseline_row(fx["baseline"], run["course"], run["distance"])
         assert trip.tau(trip.trip_values(st), run["posts"], row, cfg, charges) == run["tau"]
     assert {"masher", "ditherer", "double", "bounce"} <= styles
 
 
-def test_d057_fixture_covers_every_rule():
-    """The generated fixture's first 25 runs (every override once) and the edge runs exercise
-    every answer, the brush cap, every side state and both sides of each switch."""
-    fx = make_fixtures.trip_d057_fixture(only=range(25))
+def test_d057_fixture_covers_every_rule(fx25):
+    """The generated fixture's runs 0, 3 and 8-24 (every override once) and the edge runs
+    exercise every answer, the brush cap, every side state and both sides of each switch."""
+    fx = fx25
     answers = {a for r in fx["runs"] + fx["edges"] for a in r["answers"]}
     assert {"accepted", "queued", "cancelled", "bounds", "rate", "invalid", "bounce", "steady", "brush"} <= answers
     assert sum(len(r["events"]) for r in fx["runs"]) > 50
@@ -494,34 +539,33 @@ def test_stored_d057_report_meets_every_target(report57):
 
 
 def test_small_run_d057_meets_the_targets():
-    """A fresh small run with D-057 on (dirt and turf Sprint and Classic, 12 races each, the
-    same race replayed per policy, against the D-057 baseline): rail rider beats Smart Steer by
-    +0.01 to +0.03, never-steer sits between -0.02 and -0.01, and a casual rider's inward
-    presses reach their lane within 3 s per intent at least 70% of the time (pooled)."""
+    """A fresh small run with D-057 on (dirt Sprint and turf Classic, 10 races each, the same
+    race replayed per policy, against the D-057 baseline): rail rider beats Smart Steer by +0.01
+    to +0.03, never-steer sits between -0.02 and -0.01, and a casual rider's inward presses
+    reach their lane within 3 s per intent at least 70% of the time (pooled)."""
     table = steering.load_baseline("d057")["baseline"]
     ok = n = 0
-    for course in trip.COURSE_ORDER:
-        for distance in ("Sprint", "Classic"):
-            cell = steering.cells().index((course, distance))
-            geo = trip.phase_a(course, distance)
-            row = trip.baseline_row(table, course, distance)
-            diff, never = [], []
-            for k in range(12):
-                setup = steering.race_setup(steering.race_seed(5757, cell, k), distance)
-                f = setup["focal"]
-                taus = {}
-                for pol in ("smart", "rail", "never", "scripted"):
-                    pols = ["bot"] * 8
-                    pols[f] = pol
-                    res = steering.run_race(geo, setup, pols, CFG)
-                    taus[pol] = trip.tau(res["trip"], steering.posts(), row, CFG, res["brush_cost"])[f]
-                    if pol == "scripted":
-                        ok += res["intent"][0]
-                        n += res["intent"][1]
-                diff.append(taus["rail"] - taus["smart"])
-                never.append(taus["never"])
-            assert 0.01 <= sum(diff) / len(diff) <= 0.03, (course, distance, sum(diff) / len(diff))
-            assert -0.02 <= sum(never) / len(never) <= -0.01, (course, distance, sum(never) / len(never))
+    for course, distance in (("dirt", "Sprint"), ("turf", "Classic")):
+        cell = steering.cells().index((course, distance))
+        geo = trip.phase_a(course, distance)
+        row = trip.baseline_row(table, course, distance)
+        diff, never = [], []
+        for k in range(10):
+            setup = steering.race_setup(steering.race_seed(5757, cell, k), distance)
+            f = setup["focal"]
+            taus = {}
+            for pol in ("smart", "rail", "never", "scripted"):
+                pols = ["bot"] * 8
+                pols[f] = pol
+                res = steering.run_race(geo, setup, pols, CFG)
+                taus[pol] = trip.tau(res["trip"], steering.posts(), row, CFG, res["brush_cost"])[f]
+                if pol == "scripted":
+                    ok += res["intent"][0]
+                    n += res["intent"][1]
+            diff.append(taus["rail"] - taus["smart"])
+            never.append(taus["never"])
+        assert 0.01 <= sum(diff) / len(diff) <= 0.03, (course, distance, sum(diff) / len(diff))
+        assert -0.02 <= sum(never) / len(never) <= -0.01, (course, distance, sum(never) / len(never))
     assert ok / n >= 0.70, ok / n
 
 
@@ -530,10 +574,10 @@ def test_griefing_small_run():
     a bumper pressing into it) change its own trip (ground + draft) by no more than the same
     strangers riding for the rail without targeting anyone: targeted minus untargeted >= -0.001
     (pooled; the stored full run checks each scenario over 1,600 races). The kid never pays for
-    a brush."""
+    a brush. One cell; the stored run checks all eight."""
     cfg = CFG
     shadow, bumper = [], []
-    for cell in (1, 6):  # dirt Mile, turf Classic
+    for cell in (1,):  # dirt Mile
         course, distance = steering.cells()[cell]
         geo = trip.phase_a(course, distance)
         for k in range(10):
@@ -553,6 +597,15 @@ def test_griefing_small_run():
             bumper.append(own["bumper"] - own["rail1"])
     assert sum(shadow) / len(shadow) >= steering.TARGETS_D057["griefing"]
     assert sum(bumper) / len(bumper) >= steering.TARGETS_D057["griefing"]
+
+
+def test_stored_d057_report_probes_replay_exactly(report57):
+    """Exact races stored with the report (a masher, a casual rider, a bumper against a Smart
+    Steer kid, a stress field): any change to the press, brush, bounce, weave or glide rules
+    changes them, so the report can't go stale while the tests stay green. Rerun
+    python sims/steering.py --profile d057 --write after such a change."""
+    assert steering.probe_races(CFG) == report57["probes"]
+    assert sum(report57["probes"]["masher"]["brushes"]) > 0 and sum(report57["probes"]["bumper"]["brushes"]) > 0
 
 
 def test_grief_bound_holds_in_the_stored_report(report57):
