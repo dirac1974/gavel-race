@@ -836,3 +836,105 @@ Template:
   - game/src/shared/ModelSpecs.luau
   - game/src/client/WildHorses.client.luau
   - game/src/server/MarketService.server.luau
+
+## D-057 — Natural steering, boxed in and brushes
+
+- Date: 2026-10-05
+- Status: Accepted (provisional)
+- Decided by: team, debate 012. All four agreed after one rebuttal round on the motion rules, boxed in and the brush rule. The glide time split 2–2 (moderator chose 1.0 s), and so did the body-turn gain; the brush cap split 3–1. David asked for steering that "looks natural, sort of like a real horse moving", no zig-zag, horses that are "boxed in" when surrounded, and the team to consider bumping that slows the bumper "a little".
+- Decision:
+  - **Natural motion (the same for players, Smart Steer and bots; Trip runs it on the server):**
+    - **The glide is an S-curve.** Sideways speed builds up at 4.5 lanes/s² (27 ft/s²), caps at 1.5 lanes/s (9 ft/s, a 9° drift at 56 ft/s), and brakes at the same rate. One lane takes 1.0 s from press to arrival (about 2.3 strides). D-054's glide was linear: 0.6 s at 10 ft/s, starting, stopping and reversing instantly.
+    - **Chaining:** a second press the same way continues the glide without stopping (from 0.3 lane before arrival). Two lanes take 1.6 s, three 2.3 s, four 3.0 s. One press can wait; an opposite press cancels a waiting one (as D-054).
+    - **Commitment:** a glide always finishes.
+    - **Reverse gap:** a change the other way starts at least 0.5 s after landing.
+    - **Weave gap:** a second reversal within 5 s of the last one waits 2.5 s after landing.
+    - **Bounce:** presses within 0.2 s count once.
+    - **Glide reserve:** a horse gliding into a lane keeps 6 ft more room ahead and behind (clearance 14 ft ahead and 16 ft behind it).
+    - **The make-room lanes after the lock** (`Trip.cosmetic`) glide on the same curve.
+    - **The body:**
+      - It turns with its true drift (atan of sideways over forward speed: ≤ 9°, capped at 10°), smoothed over 0.15 s.
+      - It leans into the move by at most 3°.
+      - On your own press it "looks" first: a 3° turn toward the press at once, held until the slide starts, or relaxed over 0.3 s if the press waits. This stands in for a head turn; the split models have no separate head.
+      - Legs keep striding by distance moved (D-051).
+      - The chase camera follows the track, not the body turn.
+    - **Latency:** the slide starts with the server's lane. The S-curve covers 0.05 lane in its first 0.15 s, so a round trip hides inside the ease-in. SteerPredict no longer draws your sideways move ahead of the server, so a refused press never snaps back. The look cue is the instant answer.
+  - **Boxed in:**
+    - **No room on a side:** the rail or the outer edge, or a horse in that lane's clear zone (8 ft ahead to 10 ft behind, plus the reserve if it is gliding in). This is Trip's existing clearance rule.
+    - **Boxed in:** no room on either side and a horse within 12 ft ahead in your lane.
+    - **The arrows:**
+      - **Out ▶ greys** (with a small horse icon) while that side has no room.
+      - **◀ In greys only when trapped:** no room inside and no slot within the 3-length tuck reach (about 1% of race time). Most blocked inward presses are solved by tuck-back, and a grey button that works teaches kids not to press it.
+      - Grey arrows still take presses. No buzz, no red.
+    - **Presses:**
+      - Inward with room: it glides.
+      - Inward without room: the horse steadies back (tuck-back: automatic, at once, up to 3 lengths, visual only, as D-054) and slips in behind ("Tucked in!" as today).
+      - Inward and trapped: the press keeps waiting for a gap or a tuck slot (as D-054; a press Out cancels it). Dropping it after 3 s cut casual reach in the dirt Miles from 69% to 54%.
+      - Outward without room: it waits up to 1.5 s, then drops with a soft 0.2 s wobble of the arrow and no sound (D-054's promised shake; none under Reduced Motion).
+      - A waiting press shows a ring on its arrow: lit while an inward press waits, filling over 1.5 s for an outward one.
+    - **Chips** (riders with buttons only; at most one steering chip every 2 s):
+      - "No room yet" after a press has waited 1 s with no glide and no tuck-back; at most once per 10 s.
+      - "Gap!" (with `tap_good`) when a press that waited at least 0.5 s fires.
+    - **No boxed-in cost** (unchanged from D-054). Being boxed costs only its natural cost: you can't reach the rail until you steady back.
+  - **Brushes (rule-based contact in Trip; no collision bodies, no Roblox physics):**
+    - **When:** a second press toward a horse alongside (within 8 ft lengthwise in the next lane, alongside for at least 0.3 s), within 2 s of the first press, while the first press still waits and no tuck-back is possible. A first press never brushes, and a re-press many seconds later is a new try.
+    - **What happens:**
+      - The mover leans at most 1 ft toward the other horse over 0.4 s and nods.
+      - It steadies back 4 ft (in Trip's offsets, recovering at 2 ft/s) and can't steer for 1 s. Its waiting press clears.
+      - The other horse nods only: no slowdown, no chip, no name shown.
+      - Both keep striding: no stumble, pinned ears or squeal.
+      - Sound: `count_tick` at half volume.
+    - **The mover pays, only the mover:** 0.002 τ per brush after the first free one, at most 3 charged (0.006, 0.3 points of S), and at most 4 brushes a race (after that presses just wait).
+    - **Formula:** τ_i = clamp(scale × (trip_i − postBaseline − field mean − brushCost × charged_i), floor, ceiling). The brush term comes after the field mean (a brush never raises or lowers anyone else), sits inside the clamp, and is fixed at the lock. It never depends on luck.
+    - Smart Steer and bots never brush. Nobody brushes after the lock.
+  - **Server authority:** the server owns lanes, the no-room state, brushes and costs. The client's grey arrows and rings come from the 10 Hz lanes and the rider's own `SteerLane` state, as advice.
+  - **Targets** (sims, every course × distance): see Tuning.
+- Why:
+  - **Natural motion.** A real horse changes paths over strides, not frames, and racing rules punish crossing "when insufficiently clear" (ARCI-010-035, AR 131(a)). Sideways acceleration falls from 100–200 ft/s² at 10 Hz (instant starts and reversals) to at most 30. A masher reverses 7 times a minute with at least 3.5 s between reversals, instead of 29 a minute every 0.6 s. Casual riders are untouched (1.3 reversals a minute either way).
+  - **Boxed in.** David's "can't move left or right" is literal now: no sideways move into a horse, ever, and the arrow says so. The escape stays real: jockeys steady and slip in behind. Without tuck-back, steering stops working (rail riders reach the rail within 3 s 4% of the time instead of 93%), and strangers can hold a kid wide (own trip −0.015, p5 −0.06).
+  - **Brushes.** They answer David's "bump and slow down" the way racing does: the horse that moved pays (ARCI-010-035 E(4)). A second press within 2 s charges casual riders in 0.4% of races (mean under 0.0001), and a griefer who bumps a kid pays every time while the kid pays nothing.
+- Tuning (moderator's prototype, debate 012; all 8 course × distance cells):
+  - **Acceptance targets** (regenerated baselines, 1,000 races per cell and post, 300 report races per cell). Every D-054 target still passes in every course × distance:
+    - rail rider vs Smart Steer +0.017 to +0.026;
+    - never-steer −0.014 to −0.016;
+    - draft share 20–36%;
+    - post bias ≤ 0.0022 (kid among bots and all-Smart);
+    - Smart Steer kid mean −0.0009 to +0.0005.
+  - **Reach target replaced.** "Inward press reaching its lane within 3 s ≥ 70%" is now counted **per intent** (no press by that rider in the 3 s before): 74–100% per cell (150 races per cell on the report seeds, final rules). Per press it falls to 64–96% (dirt Mile 69%, dirt Marathon 64%), because the slower glide and reverse gaps stretch some moves past 3 s in jammed fields, and each re-press counts again. The per-press figure stays in the report.
+  - **New targets, all met:**
+    - masher reversals ≤ 8 a minute with none within 3 s of the previous (7.1, 3.5 s);
+    - sideways acceleration ≤ 30 ft/s² between ticks (30; D-054 200);
+    - casual riders charged for a brush in ≤ 5% of races (0.4%);
+    - griefing, targeted minus untargeted own trip ≥ −0.001 (−0.0005 to +0.0031);
+    - 0 overlaps and fall-back ≤ 20 ft/s in 4,000 stress races.
+  - Boxed (Smart Steer kid): 5.5% of pre-lock time; at least 1 s in 21% of races; trapped about 1%.
+  - Brushes (second press within 2 s):
+    - casual riders: 1.9% of races have one, 0.4% are charged;
+    - wanderers: 35% / 13.5%, mean 0.0004;
+    - mashers: 80% / 64%, mean 0.0032;
+    - rail riders and ditherers: 0.
+  - Griefing (strangers who tapped exactly like the kid; the kid's own trip, final rules): shadow −0.0011, crew of 3 +0.0011, bumper −0.0007. The same strangers riding for the rail without targeting anyone: −0.0013 and −0.0020. Targeting gains nothing.
+- Alternatives:
+  - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.
+  - **Body turn 1.5× the drift, capped at 12°** (Engagement, Competitive): a horse drawn turning more than it moves reads as skidding.
+  - **A reverse gap only**, without the weave gap: still sways every 1.5–1.9 s.
+  - **Refusing opposite presses:** a press that does nothing.
+  - **Wait for a gap without tuck-back:** steering stops working, and it is a griefing vector.
+  - **A boxed-in penalty:** it hits rail riders making the right play and unlucky posts, and it is a griefing tool.
+  - **A brush on any press at a horse alongside:** charges 51% of casual races.
+  - **The bumped horse paying, or both:** a kid's score would depend on a stranger's presses. With an any-press trigger the kid was charged 1.2 bumps a race.
+  - **Roblox physics collision bodies:** exploitable client-owned parts, lag on your own horse, no Python/Luau parity, and overlaps and jerks come back.
+  - **No bumping at all** (Young player's opening): doesn't answer David, and a refused press has no physical feel.
+  - **A brush cap of two charged** (Child safety).
+- Amends:
+  - D-054: the glide, presses into blocked lanes, the trip formula (brush term), Smart Steer and bots (same motion);
+  - D-054 S3: SteerPredict no longer draws your sideways move ahead of the server;
+  - D-054: the promised "no room" shake (never built) becomes a soft 0.2 s wobble when an outward press drops.
+- Config (`GameConfig.steering` unless noted):
+  - `glide = "eased"` ("linear" = D-054), `laneSpeedMax = 1.5`, `laneAccel = 4.5`, `chainWindow = 0.3`;
+  - `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `weaveWindowSeconds = 5`, `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`;
+  - `blockedPress = "wait"` ("d054" = D-054), `gapWaitSeconds = 1.5` (outward), `gapWaitInSeconds = 0` (0 = an inward press waits until room, as D-054), `tuckAfterSeconds = 0`;
+  - `brush = "repeat"` ("off" = none), `brushAlongFeet = 8`, `brushGraceSeconds = 0.3`, `brushRepeatSeconds = 2`, `brushPays = "mover"`, `brushCost = 0.002`, `brushFree = 1`, `brushMaxCharged = 3`, `brushCheckFeet = 4`, `brushRecoverPerSecond = 2`, `steadySeconds = 1`;
+  - `GameConfig.steerView` (new): `yawGain = 1`, `yawMaxDeg = 10`, `yawSmoothSeconds = 0.15`, `leanDegPerFtps2 = 0.12`, `leanMaxDeg = 3`, `lookDeg = 3`, `lookRelaxSeconds = 0.3`, `brushLeanFeet = 1`, `brushLeanSeconds = 0.4`, `brushNodDeg = 2`, `brushVolume = 0.5`, `headTurnDeg = 0` (the art follow-up sets 12);
+  - `GameConfig.steerHud`: `greyArrows = true`, `waitRing = true`, `noRoomChipAfter = 1`, `noRoomChipEvery = 10`, `gapChipAfterWait = 0.5`, `chipMinGap = 2`.
+- Links: debate 012 (`docs/debates/012-natural-steering.md`), src/trip.py, sims/steering.py, game/src/shared/Trip.luau, game/src/shared/SteerPredict.luau, game/src/client/RaceView.client.luau, game/src/client/RaceController.client.luau, game/src/server/RaceService.server.luau, game/src/client/Replay.client.luau

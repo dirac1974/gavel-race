@@ -21,16 +21,17 @@ Last updated: 2026-10-05
 2. **Sound effects**: generate and upload the 17 effects once the ElevenLabs key has Sound Effects access (docs/audio/AUDIO_PLAN.md); the code already plays them when their ids arrive. Then listen in Studio and tune `LEVEL` in `Sound.luau`.
 3. **Training rides** (D-053): ~~Training Ground and oval (T1)~~ done, ~~server-scored Sprint Lane + Mud Splash (T2)~~ done (PR, not yet run in Studio); ~~Gate Break + Hill Climb + Easy Rein (T3)~~ done (PR, not yet run in Studio); ~~ghosts / rosettes / Ride together / server Quick Train (T4)~~ done (PR, not yet run in Studio); ~~"This week's course" (T5)~~ done (PR, not yet run in Studio). All five stages built. Plan: docs/debates/009. David asked for this 2026-10-05 ("You should run around with the horse").
 4. **Race steering** (D-054): ~~Python trip model + calibration (S0)~~ done 2026-10-05 (`src/trip.py`, `sims/steering.py`, docs/research/steering-calibration.md); ~~rail coordinates + random posts (S1)~~ done 2026-10-05 (`TrackLayout.railPoint`/`phaseA`, posts drawn after the gate draws; not yet run in Studio); ~~Smart Steer on the server (S2)~~ done 2026-10-05 (`Trip.luau` at parity with `src/trip.py`, τ in the race from the lock; not yet run in Studio); ~~rider controls (S3)~~ done 2026-10-05 (◀ ▶ buttons from the 4th race, A/D and arrows, D-pad and stick flick, the lock bell and "Lanes locked!", chips, Smart Steer setting, steering counts at scale 1; not yet run in Studio); ~~replays and results (S4)~~ done 2026-10-05 ("Good trip" stars and trip gains on the results card, your line, wind lines and the lock marker in replays, the half-lane step at the finish; PR, not yet run in Studio). **The D-054 build is complete**; next is David's Studio playtest of the steering checklists in `game/PLAYTEST.md`. Plan: docs/debates/010. David asked for this 2026-10-05.
-5. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
-6. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
-7. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
-8. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
-9. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
-10. ~~Diamond store~~: built (D-050). David to create the three developer products and paste their ids into `DiamondProducts.luau`.
-11. **Cross-server Cup finals and Derby Day** (D-036 later).
-12. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
-13. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.
-14. **Performance pass**: StreamingEnabled check, model counts on phones (58 models in ReplicatedStorage), trees and fences.
+5. **Natural steering** (D-057): smooth S-curve lane changes, anti zig-zag, body turn and lean, boxed-in arrows and "No room yet", mover-pays brushes; stages N1–N6 in docs/plans/natural-steering.md. David asked for this 2026-10-05.
+6. **Economy sim v2** (`sims/economy.py`): Energy, training cap, Feed & Seed and market prices, stall costs, jobs ≤ 10% of race income, Cup purses; tune from playtest data.
+7. **Breeding** (D-047): foal Potential 0.7 × parents + 0.3 × breed ± 5, foals at 35% of Potential; run the bloodline sim first. Foal models exist (`foal_stand_*`).
+8. **Running styles** (debate 008 research): style-shaped skill offsets before the far turn; show the style before the gate.
+9. **Fan cosmetics**: Fan level badges, stand flags and titles for Fan XP (D-019); monthly stamp cosmetic for jobs (D-043).
+10. **Clubs and Friend Races** (D-006, D-042): party rule for cash races, Friend Races, Club visit setting.
+11. ~~Diamond store~~: built (D-050). David to create the three developer products and paste their ids into `DiamondProducts.luau`.
+12. **Cross-server Cup finals and Derby Day** (D-036 later).
+13. **"How races work"**: a 20 s animation for kids (the For grown-ups page has the text).
+14. **Anti-cheat tooling**: save Integrity trackers in the profile, review tool, "Ask for a check" button; turn off log-only after a month.
+15. **Performance pass**: StreamingEnabled check, model counts on phones (58 models in ReplicatedStorage), trees and fences.
 ## Done
 
 - 2026-10-05: race steering S3 and S4 (D-054): rider controls (◀ ▶, keys, D-pad, stick flick, Smart Steer setting, the lock bell, chips, your own glide predicted from the server's lane state) and replays and results ("Good trip" stars, trip gains, your line and the lock marker in replays, the half-lane step at the finish). The D-054 build is complete.
