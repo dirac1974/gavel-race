@@ -85,6 +85,35 @@ GameConfig.steering = {
 	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
 	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
 	requestsPerSecond = 8,         -- S3, game only: a rider's steering requests past this a second are dropped
+	-- D-057 natural steering (N2): every switch off, so races are D-054 exactly; N3 flips glide,
+	-- chainWindow, reverseGapSeconds, weaveGapSeconds, pressBounceSeconds, glideReserveFeet and
+	-- blockedPress, N5 brush (trip.D057 in src/trip.py). Values that only matter once their switch
+	-- is on already hold D-057's numbers.
+	glide = "linear",              -- "eased": S-curve lane changes (1.0 s a lane); "linear": D-054's 0.6 s
+	laneSpeedMax = 1.5,            -- eased: top sideways speed, lanes/s (9 ft/s)
+	laneAccel = 4.5,               -- eased: sideways acceleration and braking, lanes/s^2 (27 ft/s^2)
+	chainWindow = 0,               -- D-057 0.3: a same-way change may start this close (lanes) to landing
+	reverseGapSeconds = 0,         -- D-057 0.5: a change the other way starts this long after landing
+	weaveGapSeconds = 0,           -- D-057 2.5: ...or this long, for a second reversal within the window
+	weaveWindowSeconds = 7,        -- (debate 012: 5; 7 since the N1 review)
+	pressBounceSeconds = 0,        -- D-057 0.2: a press the same way this soon after the last counts once
+	glideReserveFeet = 0,          -- D-057 6: a horse gliding into a lane keeps this much more room
+	blockedPress = "d054",         -- "wait" (D-057) or "d054": a press into a lane with no room
+	gapWaitSeconds = 1.5,          -- wait: an outward press waits this long for room, then drops
+	gapWaitInSeconds = 0,          -- wait: an inward press that can't tuck back drops after this (0 = waits)
+	tuckAfterSeconds = 0,          -- wait: an inward press tucks back after this long without room
+	boxedAheadFeet = 12,           -- boxed in: no room either side and a horse this close ahead (reported)
+	brush = "off",                 -- "repeat" (D-057): a second press into a horse alongside brushes it
+	brushAlongFeet = 8,            -- alongside = within this many feet lengthwise in the next lane...
+	brushGraceSeconds = 0.3,       -- ...for at least this long
+	brushRepeatSeconds = 2,        -- the second press comes within this long of the waiting one (0 = any time)
+	brushPays = "mover",           -- "mover" (D-057); "bumped", "both", "none" for the sims
+	brushCost = 0.002,             -- tau per charged brush (own term, after the field mean)
+	brushFree = 1,                 -- the first brushes cost nothing
+	brushMaxCharged = 3,           -- at most this many charged; at most brushFree + this many a race
+	brushCheckFeet = 4,            -- the payer steadies this far back (Trip's offsets)...
+	brushRecoverPerSecond = 2,     -- ...and comes back at this rate
+	steadySeconds = 1,             -- the mover can't steer for this long after a brush
 }
 -- The steering controls on screen (D-054 S3; RaceController). Chips and tips only show to riders
 -- who have the buttons (from their introRaces + 1-th race).

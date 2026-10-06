@@ -6,6 +6,7 @@ __pycache__/
 tests/fixtures/race_math.json
 tests/fixtures/trip.json
 tests/fixtures/trip_d057.json
+tests/fixtures/.fixtures.sha256
 
 # Raw Meshy output (tools/meshy/meshy.py writes Models/generated/<slot>/). Never commit model binaries.
 Models/

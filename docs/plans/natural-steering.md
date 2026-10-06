@@ -192,6 +192,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
   - an injectable D-057 config block;
   - new counts: reversals per minute per rider, the shortest reversal gap, sideways acceleration of drawn lanes (ft/s²) before and after the lock, and brushes.
 - Gate: 960 races per row, with D-057 injected and with defaults: 0 overlaps, ≤ 20 ft/s fall-back, the order across the line right.
+- Added in the PR #49 review (eased glide only, after the lock): the make-room lanes plan ahead instead of dodging late, and keep the reverse and weave gaps. The d057 report also gates late full-lane moves (≤ 100 per 960 races in the last 2 s) and after-lock reversals (none within 3.5 s of the last). A `jitter=` option measures a jittery link; it is informational until N3.
 - No visible change in game.
 
 ### N3. Flip the server behaviour; motion visuals (roblox-engineer; model-engineer regenerates)
@@ -205,6 +206,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
   - Zero at rest. Sign convention tested for both directions and both courses' turns.
 - **`RaceView.client.luau`:**
   - Lanes interpolate the server's 10 Hz samples over one send interval (like offsets), replacing the constant-rate lerp. Your own horse does the same.
+  - **Interpolate by the server's timestamp, not by arrival.** Each sample carries the server's race time, and the screen draws one send interval behind the newest sample. Or keep a one-sample buffer, so there is always a next sample to move toward. With 0–30 ms of random delay, interpolating on arrival makes drawn lanes stall and then jump: 90 ft/s² against 30.6 on a steady link. Offsets drawn the same way show horses falling back at up to 22.2 ft/s in a quarter of the races (63% with D-054's drawing). `overlap_report d057 jitter=0.03` measures this (960 races: no overlaps, the order right). It is informational in N2, and N3 makes it pass and gates it, for offsets as well as lanes.
   - `place()` applies `CFrame.lookAt(pos, pos + tangent) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, 0, roll)` from SteerPose per horse.
   - The legs keep using the distance moved.
   - Race horses beyond 150 studs skip the pose, as legs do.
@@ -215,7 +217,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 - **`RaceController.client.luau`:** on a press, trigger the look cue in RaceView (`RaceState.lookSteer(dir)`). It relaxes after `lookRelaxSeconds` if no glide starts.
 - **Chase camera:** keep the Follow camera on the track heading. If Studio shows it swinging with the body turn, set the camera subject to a track-aligned attachment under the seat (Studio check, PLAYTEST.md).
 - **`Replay.client.luau`:** SteerPose from consecutive recorded frames (with `timeScale`), so replays turn and lean too. Recordings from before D-057 work unchanged.
-- **Tests:** SteerPose pure tests; the overlap report (N2 gate) on the live config; `steering_tests`/`steer_controls_tests` updated; the policy guard and syntax check.
+- **Tests:** SteerPose pure tests; the overlap report (N2 gate) on the live config, with the jitter row (`jitter=0.03`) now gated; `steering_tests`/`steer_controls_tests` updated; the policy guard and syntax check.
 - **Logs:** the `[Trip]` line adds reversals refused by the gaps and waits that dropped.
 
 ### N4. Boxed-in UI (roblox-engineer)
@@ -297,7 +299,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 
 ### Playtests (phones first, ages 8–11; then keyboard and gamepad)
 
-1. **Natural look:** chase view and a 3x replay of three races with mashing riders. **Pass:** no tester says "zig-zag", "wiggle", "slide" or "snap"; at least 2 of 3 say it looks "like real horses".
+1. **Natural look:** chase view and a 3x replay of three races with mashing riders. **Pass:** no tester says "zig-zag", "wiggle", "slide" or "snap"; at least 2 of 3 say it looks "like real horses". Watch the last 2 s too: **fail** if a tester points out a horse swerving a whole lane just before the line.
 2. **Blind 0.8 vs 1.0 s:** the same kid rides two races at each setting, in random order. **Pass for 1.0 s:** kids can't tell them apart better than chance, or don't prefer 0.8 s. Otherwise switch.
 3. **Boxed in:** after 3 races with buttons, ask "What does the grey arrow mean?" and "What happened when you were stuck?" **Pass:** ≥ 60% answer "can't go that way" or "waited or eased back for a gap"; nobody says they were "punished".
 4. **Brushes:** stage two kids side by side and have one press twice into the other. **Pass:** the bumper can say "I bumped, I slowed down"; the bumped kid isn't upset (see Risks).
@@ -308,6 +310,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 **Studio checklist additions** (`game/PLAYTEST.md`):
 - Lane changes ease in and out, the horse turns slightly into the move, and the rider's camera doesn't swing.
 - Mashing ◀ ▶ gives at most one quick change of mind, then the horse holds its line (the ring fills).
+- After "Lanes locked!", horses passing on screen move over early, in one smooth move, and never swerve a whole lane in the last 2 s; a horse that moved over doesn't swing back within 3.5 s.
 - Out ▶ greys beside a horse; ◀ In greys only when it can't tuck back; a press there waits, then drops quietly.
 - A second press into a horse alongside brushes it: lean, nod, a soft tick, the mover drops back a little; the other horse only nods.
 - Bots never brush; nothing brushes after "Lanes locked!".
