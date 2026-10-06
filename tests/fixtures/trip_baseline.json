@@ -58,7 +58,7 @@
   "gapWaitInSeconds": 0.0,
   "tuckAfterSeconds": 0.0,
   "boxedAheadFeet": 12.0,
-  "brush": "off",
+  "brush": "repeat",
   "brushAlongFeet": 8.0,
   "brushGraceSeconds": 0.3,
   "brushRepeatSeconds": 2.0,

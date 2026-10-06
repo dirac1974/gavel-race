@@ -14,6 +14,10 @@
 --   samples' corners, the lock, a landing and the finish never snap the body round. A replay starts
 --   each horse primed with the sideways speed its recording has there (SteerPose.prime), so one
 --   that starts mid-glide doesn't flick into a lean.
+-- * Brush (D-057 N5, SteerPose.brush): the horse that pressed into another leans toward it, at
+--   most brushLeanFeet, out and back over brushLeanSeconds, and nods (brushNodDeg); the other horse
+--   only nods. Both on a smooth sine, so nothing snaps; drawn only (never in the lanes that rank
+--   the race). No stumble, no flinch: a calm shoulder-to-shoulder brush.
 -- Angles are radians, positive toward higher lane numbers (outward), which is the horse's right
 -- on every course (TrackLayout.railPoint: x grows outward from the rail on its left).
 
@@ -86,6 +90,16 @@ function SteerPose.step(s: State, cfg: Config, x: number, dt: number, forward: n
 	return s.yaw, s.roll
 end
 
+-- A brush `age` seconds ago (D-057 N5): the drawn sideways lean in feet (toward dir for the mover,
+-- 0 for the other horse) and the nod in radians (positive = head down), both 0 outside the brush.
+function SteerPose.brush(age: number, cfg: any, mover: boolean, dir: number): (number, number)
+	local span = cfg.brushLeanSeconds
+	if age < 0 or age >= span or span <= 0 then return 0, 0 end
+	local shape = math.sin(math.pi * age / span) -- out and back, smooth at both ends
+	local lean = if mover then dir * cfg.brushLeanFeet * shape else 0
+	return lean, math.rad(cfg.brushNodDeg) * shape
+end
+
 -- The CFrame.Angles arguments for a pose, applied as
 -- CFrame.lookAt(pos, pos + tangent) * CFrame.Angles(0, ry, 0) * CFrame.Angles(0, 0, rz).
 -- Roblox rotations are right-handed: a positive turn about +Y swings the look vector (-Z) toward
@@ -93,6 +107,12 @@ end
 -- the left. Toward higher lanes is the horse's right, so both flip sign.
 function SteerPose.angles(yaw: number, roll: number): (number, number)
 	return -yaw, -roll
+end
+
+-- The nod's CFrame.Angles X argument: a positive turn about +X lifts the nose (-Z goes toward +Y),
+-- so a head-down nod flips sign.
+function SteerPose.nodAngle(nod: number): number
+	return -nod
 end
 
 return SteerPose

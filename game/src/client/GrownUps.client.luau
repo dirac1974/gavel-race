@@ -144,6 +144,7 @@ local function grownUpsTab()
 	para("🏁 How races work: each horse's chance comes from its care and training; riding well (tapping in time) moves it up; a little luck shows near the finish. There is no gambling of any kind: entry is free, prizes are fixed before the race, and nothing can be bought to win.", 16, 30)
 	para("🧭 Riders can steer a little: the best trip is worth about 2 points of a 100-point ride, and nothing buys it. Smart Steer is on unless turned off, and always on in a rider's first 3 races.", 16, 31)
 	para("🐎 Horses can get boxed in, like in real racing: they wait for a gap or ease back to find one. There's no penalty for being boxed in; a horse held wide just runs a little farther.", 16, 32)
+	para("🤝 A rider who keeps pressing into a horse alongside makes the two brush shoulders. A brush costs the horse that bumped a tiny bit (a third of a point at most), never the horse that was bumped. Bots and Smart Steer never bump.", 16, 33)
 	local shop = d and d.shop
 	para("💎 Diamonds cost real money through Robux, 1 Diamond = 1 Robux in every pack (no bigger-pack bonus). They buy looks only: saddle cloths and helmets for riding around, barn paint, name plates and yard decor.", 16, 40)
 	para("Never for sale: horses, coats, stats, speed, Green Cash, food, Energy, race entries, fan gear, trophies, rosettes or anything random.", 16, 41)

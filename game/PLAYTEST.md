@@ -342,6 +342,18 @@ From your 4th race on (the buttons are shown). Spectators and a rider's first 3 
 - [ ] **At "Lanes locked!"** the boxed-in look clears and the buttons go the usual locked grey.
 - [ ] **Grown-ups page:** "Horses can get boxed in, like in real racing: they wait for a gap or ease back to find one. There's no penalty for being boxed in; a horse held wide just runs a little farther." It sits right under the steering line, after "How races work" and before the Diamonds lines.
 
+## Brushes (D-057 N5)
+Stage two riders side by side (Studio Test with 2 players), both past their first 3 races.
+- [ ] **A brush:** with a horse right beside you, press toward it twice within 2 s (the first press waits). Your horse leans a little toward it (about a foot) and nods, eases back a few feet, and can't steer for a second; the other horse only nods and keeps its place. A soft tick plays at your horse (silent until `count_tick` is uploaded). Nothing stumbles, flinches or looks hurt; no flash, no text over the horses.
+- [ ] **One press never brushes**, and neither does pressing again many seconds later. Bots and Smart Steer never brush. Nothing brushes after "Lanes locked!".
+- [ ] **Your screen:** "No room yet" at most (never more than once in 10 s, and never right after another chip); no blame, no cost words. The other rider sees nothing about it.
+- [ ] **No wobble** on the arrow when a brush clears a press that was waiting.
+- [ ] **Smooth:** the horse that brushed eases back without a jerk (no snap backwards), and the horses never draw through each other.
+- [ ] **Results:** no brush line on the card; the "Good trip" stars may be a little lower after several brushes. The bumped rider's card is unchanged.
+- [ ] **Replays** show the lean and the nods, no text.
+- [ ] **Logs:** the `[Trip]` line lists brushes and the cost per rider.
+- [ ] **Grown-ups page:** "A brush costs the horse that bumped a tiny bit (a third of a point at most), never the horse that was bumped."
+
 ## Replays and results (steering S4, D-054)
 Plan section D, from your 4th race on (the buttons are shown):
 - [ ] **Results:** under "You rode ★★☆" comes "Good trip ★★☆" (one to three stars, never none). "Your trip gained you N places!" shows inside the card only when your trip gained places, with "Your riding gained you N places!" above it when riding did too. No line ever says you lost a place.

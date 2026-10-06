@@ -275,6 +275,11 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
   - the remote's argument order (course last);
   - a bot never in `events` as a mover;
   - nothing after the lock.
+- **As built (2026-10-06; DECISIONS D-057 N5 note, REVIEW_QUEUE "N5" rows):**
+  - `SteerBrush(mover, other, dir, serverTime, courseId)`: the brush's server time (the state after its tick, like the samples), so the screen draws it when the race on screen gets there (Playback's clock); fired before that tick's `SteerLane`.
+  - The pose is `SteerPose.brush` (a sine out and back over `brushLeanSeconds`: the mover's lean ≤ `brushLeanFeet`, both horses' nod ≤ `brushNodDeg`), drawn only. The replay records the brush when it was drawn.
+  - A brush clearing a waiting press never wobbles its arrow (`SteerHud.message`'s `brushAt`).
+  - The overlap report gates the brush rows: casual riders charged in ≤ 5% of races, no horse charged for a brush it didn't make.
 
 ### N6. Docs, playtest checklist, and the optional head split
 

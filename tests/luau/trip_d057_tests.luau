@@ -54,7 +54,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local defaults = fromExact(data.defaultsExact)
 
 	-- GameConfig.steering holds every key of trip.CONFIG (the game-only switches and the scale
-	-- aside), D-057's included: since N3, D-057's motion and press rules on, brushes off.
+	-- aside), D-057's included: since N5, D-057 in full.
 	local steering = table.clone(GameConfig.steering)
 	steering.drawPosts = nil
 	steering.requestsPerSecond = nil
@@ -62,12 +62,12 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local pyDefaults = table.clone(defaults)
 	pyDefaults.scale = nil
 	check(deepEqual(steering, pyDefaults, 0), "GameConfig.steering mirrors trip.CONFIG with every D-057 key")
-	local motionOn = true
+	local allOn = true
 	for key, value in Trip.D057 do
-		if key ~= "brush" and GameConfig.steering[key] ~= value then motionOn = false end
+		if GameConfig.steering[key] ~= value then allOn = false end
 	end
-	check(motionOn and GameConfig.steering.brush == "off",
-		"N3: D-057's motion and press switches are on in GameConfig.steering; brushes stay off until N5")
+	check(allOn and GameConfig.steering.brush == "repeat" and GameConfig.steering.brushPays == "mover",
+		"N3 and N5: every D-057 switch is on in GameConfig.steering, brushes included (the mover pays)")
 	local back = Trip.d054Config(GameConfig.steering)
 	local backOk = true
 	for key, value in Trip.D057_OFF do

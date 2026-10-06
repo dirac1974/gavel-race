@@ -249,7 +249,7 @@ def trip_run(k, baseline, geometry, base=None):
     lock_answers = trip.step(st_, p1, [(lane - 1, d) for lane, d in after_lock], ticks * dt, dt)
     tr = trip.trip_values(st_)
     row = trip.baseline_row(baseline, course, distance)
-    tau = trip.tau(tr, posts, row, cfg)
+    tau = trip.tau(tr, posts, row, cfg, trip.brush_charges(st_))  # with the brush term (all 0 with brushes off)
     # Lune's JSON reader can land a number one ulp off; Luau's tonumber is exact, so the inputs
     # that drive the lanes also go as exact decimal strings.
     exact = {"q": [repr(v) for v in q], "p1": [repr(v) for v in p1], "uniforms": [repr(v) for v in uniforms]}

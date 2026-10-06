@@ -16,7 +16,9 @@ By the model engineer, 2026-10-05; revised after the PR #37 review. Python refer
 
 **D-057 (natural steering), stage N1, 2026-10-06:** the rules are in `src/trip.py`, and the numbers with them on are in [Natural steering (D-057), stage N1](#natural-steering-d-057-stage-n1).
 
-**Stage N3, 2026-10-06: the game runs D-057's motion and press rules** (brushes stay off until N5). The game's numbers are in the last section, [The game's config (D-057 on, brushes off), stage N3](#the-games-config-d-057-on-brushes-off-stage-n3). Everything above is now the D-054 config, the switch-back (`trip.d054_config()`): its baseline and report moved to `tests/fixtures/trip_baseline_d054.json` and `steering_report_d054.json` (`python sims/steering.py --profile d054 --write`), and `tests/test_trip.py` still holds it to every D-054 target.
+**Stage N5, 2026-10-06: brushes are on too**, so the game runs D-057 in full. `python sims/steering.py --write` with brushes on reproduces the N3 baseline table and probes exactly (Smart Steer never brushes; only the recorded config changed). The report is the one in [Report with D-057 on](#report-with-d-057-on) (the N1 run with brushes, which is the game's config now): every target passes, casual riders are charged in 0.6% of races (cells 0–1.3%), and the griefing bound holds (−0.0004 to +0.0029).
+
+**Stage N3, 2026-10-06: the game runs D-057's motion and press rules** (brushes stayed off until N5). The game's numbers are in the last section, [The game's config (D-057 on, brushes off), stage N3](#the-games-config-d-057-on-brushes-off-stage-n3). Everything above is now the D-054 config, the switch-back (`trip.d054_config()`): its baseline and report moved to `tests/fixtures/trip_baseline_d054.json` and `steering_report_d054.json` (`python sims/steering.py --profile d054 --write`), and `tests/test_trip.py` still holds it to every D-054 target.
 
 ## Final values (mirror of `GameConfig.steering` for S2)
 

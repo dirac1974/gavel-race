@@ -58,6 +58,7 @@ local own = { races = 0, overlapsBefore = 0, overlapsAfter = 0, framesBefore = 0
 	timeouts = 0, longest = 0, presses = 0, predicted = 0, looks = 0, lookMax = 0, cueFlips = 0, cueSeconds = 0, cueExcess = 0 }
 local reversals: { [string]: { count: number, seconds: number, minGap: number } } = {}
 local accelBefore, accelAfter, brushes, brushRaces, boxedTicks, riderTicks = 0, 0, 0, 0, 0, 0
+local brushStyles: { [string]: any }, strangerCharged = {}, 0
 local after = { moves = 0, late = 0, lateRaces = 0, lateHalf = 0, reversals = 0, within = 0, minGap = math.huge }
 for _, course in { "dirt", "turf" } do
 	for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
@@ -93,6 +94,15 @@ for _, course in { "dirt", "turf" } do
 			accelAfter = math.max(accelAfter, s.accelAfter)
 			brushes += s.brushes
 			if s.brushes > 0 then brushRaces += 1 end
+			strangerCharged += s.strangerCharged
+			for styleName, b in s.brushStyles do
+				local a = brushStyles[styleName] or { riders = 0, brushRaces = 0, chargedRaces = 0, brushes = 0 }
+				a.riders += b.riders
+				a.brushRaces += b.brushRaces
+				a.chargedRaces += b.chargedRaces
+				a.brushes += b.brushes
+				brushStyles[styleName] = a
+			end
 			boxedTicks += s.boxedTicks
 			riderTicks += s.riderTicks
 			after.moves += s.afterMoves
@@ -167,6 +177,13 @@ if eased then
 	print(string.format("D-057 drawn sideways acceleration, fastest: before the lock %.1f ft/s^2, after it %.1f ft/s^2", accelBefore, accelAfter))
 	print(string.format("D-057 brushes: %d in %d/%d races (%.2f a race); riders boxed in %.1f%% of their pre-lock time",
 		brushes, brushRaces, totals.races, brushes / totals.races, 100 * boxedTicks / math.max(riderTicks, 1)))
+	local bparts = {}
+	for styleName, b in brushStyles do
+		table.insert(bparts, string.format("%s %.1f%% of races with a brush, %.1f%% charged, %.2f brushes a race", styleName,
+			100 * b.brushRaces / math.max(b.riders, 1), 100 * b.chargedRaces / math.max(b.riders, 1), b.brushes / math.max(b.riders, 1)))
+	end
+	table.sort(bparts)
+	if #bparts > 0 then print("D-057 brushes by rider: " .. table.concat(bparts, "; ") .. string.format("; horses charged for a brush they never made %d", strangerCharged)) end
 	print(string.format("D-057 after the lock: %d moves; in the last 2 s %d full-lane moves (%d races) and %d half-lane steps; %d reversals, %d within 3.5 s of the last, shortest gap %s",
 		after.moves, after.late, after.lateRaces, after.lateHalf, after.reversals, after.within,
 		if after.minGap < math.huge then string.format("%.1f s", after.minGap) else "-"))
@@ -187,6 +204,9 @@ if eased then
 	if after.minGap < 3.5 - 1e-6 then table.insert(problems, "a horse reverses after the lock within 3.5 s of its last reversal") end
 	if after.late > 100 / 960 * totals.races + 1e-9 then table.insert(problems, "more than 100 late full-lane moves per 960 races") end
 	if own.predicted > 0 then table.insert(problems, "rider 1's horse drawn ahead of the server") end
+	if strangerCharged > 0 then table.insert(problems, "a horse charged for a brush it never made (only the mover pays)") end
+	local casual = brushStyles.casual
+	if casual and casual.chargedRaces > 0.05 * casual.riders then table.insert(problems, "casual riders charged for a brush in more than 5% of races") end
 	if own.cueSeconds > 0 and own.cueFlips / own.cueSeconds >= 0.5 then table.insert(problems, "the look cue swings the body side to side 0.5 times a second or more") end
 	if own.cueExcess > math.rad(3) + 1e-9 then table.insert(problems, "the body turns more than 3 deg beyond its drift") end
 end

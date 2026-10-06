@@ -150,7 +150,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 				lockOk = false
 			end
 			local tr = Trip.tripValues(st)
-			local tau = Trip.tau(tr, run.posts, fx.baseline[run.course][run.distance], cfg)
+			local tau = Trip.tau(tr, run.posts, fx.baseline[run.course][run.distance], cfg, Trip.brushCharges(st))
 			for i = 1, st.n do
 				if not (close(tr[i], run.trip[i], 1e-9) and close(tau[i], run.tau[i], 1e-9)
 					and close(st.ground[i], run.ground[i], 1e-9) and close(st.draft[i], run.draft[i], 1e-9)

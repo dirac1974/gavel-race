@@ -12,8 +12,7 @@
 --   a gap or a tuck slot comes), filling over the outward wait for an outward one (then it drops).
 -- * Wobble: when a waiting press drops without moving (an outward press at the end of its wait), its
 --   arrow wobbles gently (RaceController: ±wobbleDeg over wobbleSeconds, none under Reduced Motion).
---   N5: a brush also clears a waiting press; that must not wobble (pass the brush in, or send the
---   steadying flag on SteerLane, when brushes go on).
+--   A brush also clears the mover's waiting press (D-057 N5); that never wobbles (brushAt).
 -- * "Gap!": when a press that waited at least gapChipAfterWait for room starts its move, unless the
 --   wait saw a tuck-back ("Tucked in!" says that one, and two chips would crowd).
 -- Every wait is timed by the server's clock (SteerLane's t and waitAt, race time), never by when a
@@ -70,8 +69,10 @@ end
 -- A new SteerLane message: returns the arrow to wobble (-1 In, 1 Out, 0 none) and whether to say
 -- "Gap!". Waits are measured on the server's clock (lane.t, the message's state time, against the
 -- wait's start). pressDir / pressAt = your last press (race time): a wait that ends because you
--- pressed the other way was cancelled by you, not dropped, and doesn't wobble.
-function SteerHud.message(h: Hud, lane: Lane, steer: any, hudCfg: any, pressDir: number?, pressAt: number?): (number, boolean)
+-- pressed the other way was cancelled by you, not dropped, and doesn't wobble. brushAt = your last
+-- brush (race time, SteerBrush): a wait it cleared doesn't wobble either.
+function SteerHud.message(h: Hud, lane: Lane, steer: any, hudCfg: any, pressDir: number?, pressAt: number?,
+	brushAt: number?): (number, boolean)
 	local wobble, gap = 0, false
 	if h.seen and h.wait ~= 0 and lane.wait == 0 then
 		local waited = lane.t - h.waitAt
@@ -79,7 +80,8 @@ function SteerHud.message(h: Hud, lane: Lane, steer: any, hudCfg: any, pressDir:
 			gap = waited >= hudCfg.gapChipAfterWait - 1e-9 and not h.sawTuck -- the wait ended in the move
 		else
 			local lim = SteerHud.waitLimit(steer, h.wait)
-			local cancelled = pressDir == -h.wait and (pressAt or -math.huge) >= h.waitAt
+			local cancelled = (pressDir == -h.wait and (pressAt or -math.huge) >= h.waitAt)
+				or (brushAt or -math.huge) >= h.waitAt - 1e-9 -- (or a brush cleared it)
 			if lim > 0 and waited >= lim - 1e-6 and not cancelled then wobble = h.wait end -- dropped by the server
 		end
 	end

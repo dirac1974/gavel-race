@@ -1280,7 +1280,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		steer = { race = cueRace, course = courseId or "dirt", start = start, geo = geo, shown = false, smart = true,
 			locked = false, seq = 0, lastPress = -math.huge, armed = true, turnAcc = acc, tipped = {}, tips = 0,
 			tuckedFor = 0, tuckedTotal = 0, tuckChips = 0, tuckChipAt = -math.huge, pressed = false,
-			hud = SteerHud.new(), chips = SteerChips.new(), lane = nil, pressDir = 0, pressAt = -math.huge }
+			hud = SteerHud.new(), chips = SteerChips.new(), lane = nil, pressDir = 0, pressAt = -math.huge, brushAt = -math.huge }
 	end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
 	status.Text = string.format("%s race: %s%s", league, conditions, if riding then "" else "  (watching)")
@@ -1430,12 +1430,21 @@ remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack,
 	lane.tgt, lane.dest, lane.ack, lane.wait, lane.waitAt = tgt, dest, ack, wait or 0, waitAt or 0
 	lane.tucking, lane.inSide, lane.outSide, lane.t = tucking == true, inSide or "free", outSide or "free", stateT or 0
 	s.lane = lane
-	local wobble, gap = SteerHud.message(s.hud, lane, STEER, SHUD, s.pressDir, s.pressAt)
+	local wobble, gap = SteerHud.message(s.hud, lane, STEER, SHUD, s.pressDir, s.pressAt, s.brushAt)
 	if wobble ~= 0 then wobbleArrow(wobble) end
 	if gap then
 		showChip("Gap!")
 		if Sound then Sound.play("tap_good") end
 	end
+end)
+-- A brush (D-057 N5): when you were the horse that pressed into another, "No room yet" (under the
+-- chips' limits; the other rider hears nothing), and the wait it cleared won't wobble. No cost or
+-- blame words anywhere; the results card shows nothing about it.
+remotes:WaitForChild("SteerBrush").OnClientEvent:Connect(function(mover, _other, _dir, at, courseId)
+	local s = steer
+	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
+	s.brushAt = (at or serverNow()) - s.start
+	if SteerChips.brushed(s.chips, s.brushAt, SHUD) then showChip("No room yet") end
 end)
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)
 	local s = steer

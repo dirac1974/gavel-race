@@ -85,10 +85,10 @@ GameConfig.steering = {
 	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
 	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
 	requestsPerSecond = 8,         -- S3, game only: a rider's steering requests past this a second are dropped
-	-- D-057 natural steering: N3 switched the motion and press rules on (src/trip.py's CONFIG is
-	-- the same). Back to D-054: glide = "linear", chainWindow = 0, reverseGapSeconds = 0,
-	-- weaveGapSeconds = 0, pressBounceSeconds = 0, glideReserveFeet = 0, blockedPress = "d054"
-	-- (Trip.d054Config; REVIEW_QUEUE has the whole switch-back). Brushes stay off until N5.
+	-- D-057 natural steering: N3 switched the motion and press rules on, N5 the brushes (src/trip.py's
+	-- CONFIG is the same). Back to D-054: glide = "linear", chainWindow = 0, reverseGapSeconds = 0,
+	-- weaveGapSeconds = 0, pressBounceSeconds = 0, glideReserveFeet = 0, blockedPress = "d054",
+	-- brush = "off" (Trip.d054Config; REVIEW_QUEUE has the whole switch-back).
 	glide = "eased",               -- "eased": S-curve lane changes (1.0 s a lane); "linear": D-054's 0.6 s
 	laneSpeedMax = 1.5,            -- eased: top sideways speed, lanes/s (9 ft/s)
 	laneAccel = 4.5,               -- eased: sideways acceleration and braking, lanes/s^2 (27 ft/s^2)
@@ -103,7 +103,7 @@ GameConfig.steering = {
 	gapWaitInSeconds = 0,          -- wait: an inward press that can't tuck back drops after this (0 = waits)
 	tuckAfterSeconds = 0,          -- wait: an inward press tucks back after this long without room
 	boxedAheadFeet = 12,           -- boxed in: no room either side and a horse this close ahead (reported)
-	brush = "off",                 -- "repeat" (D-057, N5): a second press into a horse alongside brushes it
+	brush = "repeat",              -- a second press into a horse alongside brushes it (N5; "off" = none)
 	brushAlongFeet = 8,            -- alongside = within this many feet lengthwise in the next lane...
 	brushGraceSeconds = 0.3,       -- ...for at least this long
 	brushRepeatSeconds = 2,        -- the second press comes within this long of the waiting one (0 = any time)
@@ -152,6 +152,11 @@ GameConfig.steerView = {
 	leanMaxDeg = 3,          -- ...at most this far
 	lookDeg = 3,             -- your own press: turn this far toward it at once...
 	lookRelaxSeconds = 0.3,  -- ...and relax over this long if the press waits
+	-- Brushes (D-057 N5): the mover leans toward the other horse and nods; the other only nods.
+	brushLeanFeet = 1,       -- the mover's lean, drawn only (never in the lanes that rank the race)...
+	brushLeanSeconds = 0.4,  -- ...out and back over this long (the nods too)
+	brushNodDeg = 2,         -- a small nod, both horses
+	brushVolume = 0.5,       -- count_tick at half volume, at the mover's horse (silent until uploaded)
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.

@@ -1078,6 +1078,66 @@ Template:
     - Out ▶: 11,699 presses tried, 4,905 grey; 0.23% disagree.
   - **Review probe** (48 races, 4 rider styles; 0.45 s one-way lag): "Gap!" per race went from 7.81 / 6.35 / 2.48 / 1.38 (masher / ditherer / casual / rail seeker) to 0.94 / 0 / 0.10 / 0; no "Gap!" after a tuck-back (was 381). SteerLane sends fell from 3.3 to 2.7 per rider-second (steady `waitAt`). Short Out ▶ grey blinks (under 0.3 s) went from 485 server flips (368 of one tick, about 2.5 per rider-race) to 91 on screen (0.47 per rider-race).
   - The overlap report is unchanged in every mode.
+- N5 (2026-10-06, model engineer and roblox engineer): brushes on.
+  - **Config:** `brush = "repeat"` in `trip.CONFIG` and `GameConfig.steering` (`brushPays = "mover"`). D-057 is now on in full, so `trip.d057_config()` is `trip.CONFIG`.
+  - **The rule** is N1's and is unchanged: a second press within 2 s toward a horse alongside, while the first waits and no tuck-back is possible. Only the mover pays: 0.002 τ per brush after the first free one, at most 0.006, fixed at the lock. Bots and Smart Steer never brush, nothing happens after the lock, and riders in their first 3 races have no buttons.
+  - **Calibration** (`python sims/steering.py --write`): The baseline is unchanged: Smart Steer never brushes, so the regenerated table and its probes are identical to N3's, and only the recorded config changed. Every D-054 τ target, every D-057 target and the griefing bound hold in every course × distance (table in docs/research/steering-calibration.md):
+    - D-054 targets:
+      - rail rider vs Smart Steer +0.017 to +0.026;
+      - never-steer −0.015 to −0.013;
+      - draft share 20–35%;
+      - post bias ≤ 0.0017 (kid among bots) and ≤ 0.0024 (all-Smart);
+      - Smart Steer kid −0.0009 to +0.0003.
+    - D-057 targets:
+      - reach per intent 72–98% (85.7% overall);
+      - masher 6.3–7.5 reversals a minute, none within 3.5 s;
+      - sideways acceleration 30.4 ft/s²;
+      - stress, 4,000 races: 0 overlaps, 19.0 ft/s (with 9,760 brushes).
+    - **Brushes by policy** (one rider among seven bots):
+      - casual: 2.1% of races with a brush, 0.6% charged (0–1.3% per cell; the target is ≤ 5%);
+      - wanderer: 36% / 13%, mean cost 0.0004;
+      - masher: 82% / 66%, mean cost 0.0033 (at most 0.006);
+      - rail riders, never-steer and ditherers: 0.
+      - No horse but the mover is ever charged.
+    - **Griefing** (targeted minus untargeted own trip; the bound is ≥ −0.001):
+      - Smart Steer kid: shadow +0.0003, crew +0.0029, bumper +0.0005;
+      - rail kid: +0.0001, +0.0001, −0.0004.
+      - The kid is never charged for a stranger's brush, and a Smart Steer kid is never charged at all.
+  - **What everyone sees** (`SteerBrush(mover, other, dir, serverTime, courseId)`, course id last, to every screen following the course, before that tick's `SteerLane`):
+    - The mover leans toward the other horse (at most 1 ft, drawn only, never in the lanes that rank the race) and nods (2°), then eases back 4 ft (Trip's steady, under the hold-pull cap, so it never jerks back).
+    - The other horse only nods. Both on a sine out and back over 0.4 s (`SteerPose.brush`).
+    - No stumble, no flash, no text over the horses.
+    - A soft `count_tick` at half volume, positional at the mover's horse. It stays silent until the effects are uploaded.
+    - The brush plays when the race on screen gets there (its server time against the playback clock), and the replay records it then.
+  - **The mover's rider** sees "No room yet" under the chips' limits; the other rider sees nothing. A wait the brush cleared never wobbles its arrow (the N4 carry-over).
+  - **Results:** no brush line; the trip stars already include the charge.
+  - **Log:** the `[Trip]` line lists each rider's brushes and brush cost.
+  - **Grown-ups page:** "A rider who keeps pressing into a horse alongside makes the two brush shoulders. A brush costs the horse that bumped a tiny bit (a third of a point at most), never the horse that was bumped. Bots and Smart Steer never bump."
+  - **Tests:**
+    - `steer_brush_tests.luau`:
+      - the pose (caps, smooth, the other horse only nods, the nod's sign);
+      - the cleared wait;
+      - the mover's chip limits;
+      - mashing races: only riders' presses brush, only movers pay, `Trip.raceTau` takes the charges and RaceSession uses them, nothing after the lock;
+      - the remote's shape;
+      - no stumble or hurt words.
+    - `trip.json` now carries τ with the brush term, at parity.
+    - `test_trip_d057.py`: the live report's brush and griefing checks.
+  - **On screen** (`overlap_report`, 960 races per row; brushes on in every D-057 row): on every row:
+    - 0 overlaps on any screen;
+    - no horse falling back faster than 20 ft/s (19.0–19.3, the 4 ft steady included);
+    - the finish order right at the last frame and at each horse's crossing;
+    - 0–2 full-lane moves in the last 2 s a row;
+    - no after-lock reversal within 3.5 s;
+    - drawn acceleration ≤ 30.6 ft/s².
+    - A second seed family (3,840 races) is clean too.
+    - The D-054 rows still print what main prints.
+  - **Brushes by rider style** (the overlap report's riders; the gate is casual riders charged in ≤ 5% of races):
+    - masher: 85–88% of races with a brush, 72–74% charged, about 2.7 a race;
+    - casual: 1.5–5.6% with a brush, 0.0–1.4% charged;
+    - ditherer: 0 (its presses alternate sides, so there's never a second press toward the same horse);
+    - rider 1 on its own screen: 62–65% / 40–41% with the press patterns, 84–87% / 67–72% mashing at 4 a second.
+    - No horse was ever charged for a brush it didn't make.
 - Alternatives:
   - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.
   - **Body turn 1.5× the drift, capped at 12°** (Engagement, Competitive): a horse drawn turning more than it moves reads as skidding.

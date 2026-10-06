@@ -6,6 +6,9 @@
 -- * Every other steering chip ("Saved ground!", "Tucked in!", "Gap!", the turn tip, "Lanes
 --   locked!") is good news or a one-off, so it always shows; SteerChips.shown records it, so a
 --   "No room yet" never crowds it.
+-- * After a brush (D-057 N5), the mover hears the same "No room yet", under the same limits (not
+--   within noRoomChipEvery of the last one, nor chipMinGap of another chip); the other horse's
+--   rider hears nothing.
 -- Times are race time (SteerLane's waitAt clock).
 
 export type Chips = { lastAt: number, noRoomAt: number, noRoomWait: number }
@@ -28,6 +31,13 @@ function SteerChips.noRoom(c: Chips, lane: any, now: number, hudCfg: any): boole
 	if c.noRoomWait == lane.waitAt then return false end -- once per wait
 	if now - c.noRoomAt < hudCfg.noRoomChipEvery or now - c.lastAt < hudCfg.chipMinGap then return false end
 	c.noRoomAt, c.noRoomWait, c.lastAt = now, lane.waitAt, now
+	return true
+end
+
+-- Whether the mover's "No room yet" after a brush should show now (and records it if so).
+function SteerChips.brushed(c: Chips, now: number, hudCfg: any): boolean
+	if now - c.noRoomAt < hudCfg.noRoomChipEvery or now - c.lastAt < hudCfg.chipMinGap then return false end
+	c.noRoomAt, c.lastAt = now, now
 	return true
 end
 

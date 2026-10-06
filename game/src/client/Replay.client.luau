@@ -363,7 +363,16 @@ local function placeAll(rec, t: number, speed: number?, raceDt: number)
 				(p - p0) * railLength / 0.05)
 		end
 		playing.lastProgress[i] = p
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i], yaw, roll)
+		-- A brush recorded live (D-057 N5): the same lean and nod, no text.
+		local leanFeet, nod = 0, 0
+		for _, e in rec.events or {} do
+			if e.kind == "brush" and (e.mover == i or e.other == i) and t >= e.t and t < e.t + GameConfig.steerView.brushLeanSeconds then
+				local l, n = SteerPose.brush(t - e.t, GameConfig.steerView, e.mover == i, e.dir)
+				leanFeet += l
+				nod = math.max(nod, n)
+			end
+		end
+		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i], yaw, roll, leanFeet, nod)
 	end
 	return progress, lanes
 end

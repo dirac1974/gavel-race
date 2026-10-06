@@ -24,9 +24,10 @@ gavel_race_v2).
 
 D-057 (natural steering, boxed in, brushes): N1 built every rule switched off; N3 switched the
 motion and press rules on in CONFIG (the eased glide, chaining, the reverse and weave gaps, the
-press bounce, the glide reserve and wait-for-room presses). Brushes stay off until N5. D057 holds
-every switch; d057_config() builds the full D-057 config (brushes on) and d054_config() the
-D-054 one (every D-057 switch off: the switch-back, and the config of files made before D-057).
+press bounce, the glide reserve and wait-for-room presses), and N5 the brushes (the mover pays).
+D057 holds every switch; d057_config() builds the full D-057 config (CONFIG itself since N5) and
+d054_config() the D-054 one (every D-057 switch off: the switch-back, and the config of files
+made before D-057).
 """
 
 from __future__ import annotations
@@ -76,8 +77,8 @@ CONFIG: Dict = {
     "stars": [0.015, -0.005],     # trip three-star and two-star thresholds
     "laneBand": 0.9,              # horses closer than this (in lanes) share a lane
     "tuckReleasePerSecond": 4.0,  # a tuck-back fades this fast once nothing is blocked
-    # ---- D-057: N3 switched the motion and press rules on (D-054 values in D057_OFF, the
-    # switch-back: d054_config()). Brushes stay off until N5. ----
+    # ---- D-057: N3 switched the motion and press rules on, N5 the brushes (D-054 values in
+    # D057_OFF, the switch-back: d054_config()). ----
     "glide": "eased",             # "eased": S-curve (D-057); "linear": one lane per laneSeconds (D-054)
     "laneSpeedMax": 1.5,          # eased: top sideways speed, lanes/s (9 ft/s)
     "laneAccel": 4.5,             # eased: sideways acceleration and braking, lanes/s^2 (27 ft/s^2)
@@ -92,7 +93,7 @@ CONFIG: Dict = {
     "gapWaitInSeconds": 0.0,      # wait: an inward press that can't tuck back drops after this (0 = waits)
     "tuckAfterSeconds": 0.0,      # wait: an inward press tucks back after this long without room
     "boxedAheadFeet": 12.0,       # boxed in: no room either side and a horse this close ahead (reported)
-    "brush": "off",               # "repeat" (D-057, N5): a second press into a horse alongside brushes it
+    "brush": "repeat",            # a second press into a horse alongside brushes it (N5; "off" = none)
     "brushAlongFeet": 8.0,        # alongside = within this many feet lengthwise in the next lane...
     "brushGraceSeconds": 0.3,     # ...for at least this long (the rider saw it, whatever the lag)
     "brushRepeatSeconds": 2.0,    # the second press comes within this long of the first (0 = any time)

@@ -1,7 +1,7 @@
 """Natural steering, boxed in and brushes (D-057): src/trip.py with D-057 on, the D-057 sims in
-sims/steering.py and the trip_d057.json parity runs for the Luau port. Since N3 the game runs
-D-057's motion and press rules with brushes off (trip.CONFIG, the "live" profile: its baseline
-is TripBaseline.luau's); trip.d057_config() adds the brushes (N5). Full-size runs live in
+sims/steering.py and the trip_d057.json parity runs for the Luau port. Since N5 the game runs
+D-057 in full, brushes included (trip.CONFIG, the "live" profile: its baseline is
+TripBaseline.luau's; trip.d057_config() is the same config). Full-size runs live in
 `python sims/steering.py --write` (tests/fixtures/trip_baseline.json, steering_report.json) and
 `--profile d057 --write` (trip_baseline_d057.json, steering_report_d057.json); these tests
 assert both and re-check the rules on small runs. The D-054 switch-back is test_trip.py's."""
@@ -504,15 +504,13 @@ def test_d057_fixture_covers_every_rule(fx25):
 LIVE = trip.CONFIG
 
 
-def test_game_config_runs_d057_motion_with_brushes_off():
-    """N3 switched D-057's motion and press rules on in CONFIG (GameConfig.steering mirrors it):
-    every switch in trip.D057 but the brushes (N5). The switch-back is trip.d054_config()."""
+def test_game_config_runs_d057_in_full():
+    """N3 switched D-057's motion and press rules on in CONFIG (GameConfig.steering mirrors it), and
+    N5 the brushes, with only the mover paying. The switch-back is trip.d054_config()."""
     for key, value in trip.D057.items():
-        if key == "brush":
-            assert LIVE[key] == "off"
-        else:
-            assert LIVE[key] == value, key
-    assert trip.d057_on(LIVE) and trip.d057_config() == trip.d057_config(trip.d054_config())
+        assert LIVE[key] == value, key
+    assert LIVE["brush"] == "repeat" and LIVE["brushPays"] == "mover"
+    assert trip.d057_on(LIVE) and trip.d057_config() == LIVE == trip.d057_config(trip.d054_config())
     back = trip.d054_config()
     assert all(back[k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
     assert (trip.D057_OFF["glide"], trip.D057_OFF["chainWindow"], trip.D057_OFF["reverseGapSeconds"],
@@ -540,7 +538,9 @@ def report_live():
 def test_stored_game_report_meets_every_target(report_live):
     """The full run on the game's config (2,000 baseline races per cell and post, 600 report
     races per cell, 200 griefing races per cell, 4,000 stress races): every D-054 tau target per
-    course x distance, reach per intent >= 70% per cell, and every D-057 target. No brushes."""
+    course x distance, reach per intent >= 70% per cell, and every D-057 target, brushes on (N5):
+    casual riders charged in <= 5% of races per cell, only the mover ever pays, and the griefing
+    bound holds."""
     data = steering.load_baseline("live")
     assert report_live["config"] == trip.config_record(LIVE) and report_live["profile"] == "live"
     assert report_live["baselineSeed"] == data["seed"] and report_live["baselineRaces"] == data["races"]
@@ -558,9 +558,10 @@ def test_stored_game_report_meets_every_target(report_live):
         assert abs(r["smart_among_bots"]) <= t["smart_mean"], cell
         assert abs(r["allsmart_mean"]) <= t["smart_mean"], cell
         assert r["masher_reversals_per_min"] <= t57["masher_reversals_per_min"], cell
-        assert r["scripted_charged_races"] == 0, cell  # brushes off
+        assert r["scripted_charged_races"] <= t57["casual_charged_share"], cell
+        assert all(r[pol + "_others_charged"] == 0 for pol in steering.FOCAL_D057), cell  # only the mover pays
     assert s["stress"]["overlap_frames"] == 0 and s["stress"]["back_max"] <= t57["stress_fallback_ftps"]
-    assert s["stress"]["brushes"] == 0
+    assert s["stress"]["brushes"] > 0
     assert s["glides"] == {"1": 1.0, "2": 1.6, "3": 2.3, "4": 3.0}
     assert all(s["checks"].values()), [k for k, v in s["checks"].items() if not v]
     assert s["checks"] == steering.check_targets(s)
@@ -569,14 +570,19 @@ def test_stored_game_report_meets_every_target(report_live):
 def test_stored_game_report_probes_replay_exactly(report_live):
     """The probe races stored with the game's report replay exactly (a stale report fails)."""
     assert steering.probe_races(LIVE) == report_live["probes"]
-    assert sum(report_live["probes"]["masher"]["brushes"]) == 0
+    assert sum(report_live["probes"]["masher"]["brushes"]) > 0 and sum(report_live["probes"]["bumper"]["brushes"]) > 0
 
 
 def test_grief_bound_holds_in_the_stored_game_report(report_live):
+    """With brushes on (N5): strangers who target a kid gain nothing over riding for the rail, and
+    the kid is only ever charged for its own brushes (a Smart Steer kid never)."""
     g = report_live["summary"]["griefing"]
     for kid in steering.GRIEF_KIDS:
         for target, control in steering.GRIEF_PAIRS:
             assert g[kid]["pooled"][target + "_minus_" + control] >= steering.TARGETS_D057["griefing"], (kid, target)
+        for name in steering.GRIEF:
+            assert g[kid]["pooled"][name]["kid_charged_not_own"] == 0
+    assert all(g["smart"]["pooled"][name]["kid_charged_per_race"] == 0 for name in steering.GRIEF)
 
 
 # ---------------------------------------------------------------- calibration with D-057 in full (brushes on)

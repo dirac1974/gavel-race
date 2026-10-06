@@ -72,6 +72,7 @@ local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on,
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
+local SteerBrush = makeRemote("SteerBrush")       -- server -> all: a brush (mover, other, dir, server time, course), D-057 N5
 local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, the state's race time, course (D-054 S3, D-057 N4)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
@@ -658,7 +659,8 @@ local function runRace(c, players: { Player })
 			local parts, answers = {}, {}
 			for i, lane in session.lanes do
 				if not lane.isBot then
-					table.insert(parts, string.format("post %d %s tau %.4f", i, trip.riderKind[i] or "smart", session.tau[i]))
+					table.insert(parts, string.format("post %d %s tau %.4f brushes %d cost %.3f", i, trip.riderKind[i] or "smart",
+						session.tau[i], trip.brushes[i], Trip.brushCharge(trip, i)))
 				end
 			end
 			for answer, count in trip.answers do table.insert(answers, answer .. " " .. count) end
@@ -695,8 +697,22 @@ local function runRace(c, players: { Player })
 		local lastStamp = tStart
 		local sentLanes, lanesAt, resend = nil, -math.huge, 0
 		local sentOwn: { [Player]: any } = {}
+		local sentBrushes = 0
+		-- Brushes (D-057 N5) go to every screen following the course, before that tick's SteerLane,
+		-- stamped with the server time they happened: the mover leans and nods, the other nods, a
+		-- soft tick at the mover's horse, and the mover's chip. Bots and Smart Steer never brush;
+		-- nothing happens after the lock (Trip).
+		local function sendBrushes()
+			while sentBrushes < #trip.events do
+				sentBrushes += 1
+				local e = trip.events[sentBrushes]
+				-- (stamped as the samples are: the state after its tick)
+				if e[2] == "brush" then SteerBrush:FireAllClients(e[3], e[4], e[5], tStart + e[1] + trip.dt, c.id) end
+			end
+		end
 		local scratchOwn = {}
 		local function send(stamp: number, frameDt: number)
+			sendBrushes()
 			local w = RaceShape.blendWeight(stamp, tFar, postEnd, GameConfig.raceShape.blendPower)
 			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, frameDt, stamp - tStart)
 			lastStamp = stamp
