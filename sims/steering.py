@@ -4,21 +4,24 @@
     python sims/steering.py                  # report, using the checked-in baseline
     python sims/steering.py --write          # regenerate the baseline files and the stored report
     python sims/steering.py --set groundPerLaneTurn=0.011 --races 500 --report-races 200   # try a change
-    python sims/steering.py --profile d057 --write   # D-057 on: its own baseline and report (no game files)
+    python sims/steering.py --profile d057 --write   # brushes on too: its own baseline and report
+    python sims/steering.py --profile d054 --write   # D-054 (the switch-back): its own baseline and report
 
---write regenerates tests/fixtures/trip_baseline.json and game/src/shared/TripBaseline.luau
-from a fixed seed, then runs the report and stores it in tests/fixtures/steering_report.json
-(tests/test_trip.py asserts its targets). Every race has its own seed, so --jobs never
-changes a number.
-
---profile d057 runs the same pipeline with D-057 switched on (trip.d057_config(): the eased
-glide, chaining, reverse and weave gaps, press bounce, glide reserve, wait-for-room presses and
-brushes). With --write it stores tests/fixtures/trip_baseline_d057.json and
-tests/fixtures/steering_report_d057.json (tests/test_trip_d057.py asserts them) and leaves
-TripBaseline.luau alone: the game keeps D-054 until stage N3 flips the config and regenerates.
-Its report adds the D-057 measures: zig-zag reversals, sideways speed and acceleration, a body
-yaw estimate, boxed-in time by post and policy, brushes by policy, reach per intent, the
-griefing test and an overlap stress run.
+Profiles:
+  live  trip.CONFIG, what the game runs (since N3: D-057's motion and press rules, brushes off).
+        --write regenerates tests/fixtures/trip_baseline.json and game/src/shared/TripBaseline.luau
+        from a fixed seed, then runs the report and stores it in tests/fixtures/steering_report.json
+        (tests/test_trip_d057.py asserts its targets).
+  d057  trip.d057_config(): D-057 in full, brushes on (N5). --write stores
+        tests/fixtures/trip_baseline_d057.json and steering_report_d057.json.
+  d054  trip.d054_config(): every D-057 switch off, the game before N3. --write stores
+        tests/fixtures/trip_baseline_d054.json and steering_report_d054.json (tests/test_trip.py).
+        Switching the game back to D-054 means the D-057 keys back in GameConfig.steering and
+        trip.CONFIG and a live --write, which then reproduces trip_baseline_d054.json's table.
+Only the live profile writes TripBaseline.luau. Every race has its own seed, so --jobs never
+changes a number. With any D-057 switch on (trip.d057_on), the report adds the D-057 measures:
+zig-zag reversals, sideways speed and acceleration, a body yaw estimate, boxed-in time by post
+and policy, brushes by policy, reach per intent, the griefing test and an overlap stress run.
 
 The baseline is fair for the riders who matter: a Smart Steer kid. For every course x
 distance it simulates BASELINE_RACES races with a Smart Steer rider at each post among seven
@@ -74,7 +77,9 @@ BASELINE_LUAU = ROOT / "game" / "src" / "shared" / "TripBaseline.luau"
 REPORT_JSON = ROOT / "tests" / "fixtures" / "steering_report.json"
 BASELINE_JSON_D057 = ROOT / "tests" / "fixtures" / "trip_baseline_d057.json"
 REPORT_JSON_D057 = ROOT / "tests" / "fixtures" / "steering_report_d057.json"
-PROFILES = ("d054", "d057")
+BASELINE_JSON_D054 = ROOT / "tests" / "fixtures" / "trip_baseline_d054.json"
+REPORT_JSON_D054 = ROOT / "tests" / "fixtures" / "steering_report_d054.json"
+PROFILES = ("live", "d057", "d054")
 
 # League temperatures that run each distance (GameConfig.leagues: Rookie runs Sprint and
 # Mile, Bronze adds the Classic, Silver and up run everything).
@@ -150,19 +155,21 @@ def posts() -> List[int]:
 
 
 def profile_config(profile: str) -> Dict:
-    if profile == "d054":
+    if profile == "live":
         return trip.CONFIG
     if profile == "d057":
         return trip.d057_config()
+    if profile == "d054":
+        return trip.d054_config()
     raise ValueError(f"unknown profile {profile!r}")
 
 
 def baseline_path(profile: str) -> Path:
-    return BASELINE_JSON if profile == "d054" else BASELINE_JSON_D057
+    return {"live": BASELINE_JSON, "d057": BASELINE_JSON_D057, "d054": BASELINE_JSON_D054}[profile]
 
 
 def report_path(profile: str) -> Path:
-    return REPORT_JSON if profile == "d054" else REPORT_JSON_D057
+    return {"live": REPORT_JSON, "d057": REPORT_JSON_D057, "d054": REPORT_JSON_D054}[profile]
 
 
 # ---------------------------------------------------------------- one race
@@ -457,15 +464,15 @@ def _baseline_chunk(args) -> List[Dict]:
     return out
 
 
-def _tau(res: Dict, row: Sequence[float], cfg: Dict, profile: str) -> List[float]:
-    if profile == "d054":
+def _tau(res: Dict, row: Sequence[float], cfg: Dict) -> List[float]:
+    if not trip.d057_on(cfg):
         return trip.tau(res["trip"], posts(), row, cfg)
     return trip.tau(res["trip"], posts(), row, cfg, res["brush_cost"])
 
 
 def _report_chunk(args) -> List[Dict]:
-    cell, k0, k1, cfg, table, profile = args
-    d057 = profile == "d057"
+    cell, k0, k1, cfg, table = args
+    d057 = trip.d057_on(cfg)
     course, distance = cells()[cell]
     geo = trip.phase_a(course, distance)
     row = trip.baseline_row(table, course, distance)
@@ -475,14 +482,14 @@ def _report_chunk(args) -> List[Dict]:
         f = setup["focal"]
         rec: Dict = {"focal": f, "p1": setup["p1"], "s1": setup["s1"]}
         bots = run_race(geo, setup, ["bot"] * LANES, cfg)
-        rec["bot_tau"] = _tau(bots, row, cfg, profile)
+        rec["bot_tau"] = _tau(bots, row, cfg)
         rec["bot_ground"] = bots["ground"]
         rec["bot_draft"] = bots["draft"]
         rec["min_gap"] = bots["min_gap"]
         sweep_tau, sweep_lane, sweep_boxed = [], [], []
         for p in range(LANES):
             res = run_race(geo, setup, smart_at(p), cfg, focal=p, measure=("boxed",) if d057 else ())
-            sweep_tau.append(_tau(res, row, cfg, profile)[p])
+            sweep_tau.append(_tau(res, row, cfg)[p])
             sweep_lane.append(res["lock_x"][p])
             rec["min_gap"] = min(rec["min_gap"], res["min_gap"])
             if d057:
@@ -495,7 +502,7 @@ def _report_chunk(args) -> List[Dict]:
             pols = ["bot"] * LANES
             pols[f] = pol
             res = run_race(geo, setup, pols, cfg, focal=f, measure=("boxed", "motion") if d057 else ())
-            rec[pol] = {"tau": _tau(res, row, cfg, profile)[f], "lane": res["lock_x"][f],
+            rec[pol] = {"tau": _tau(res, row, cfg)[f], "lane": res["lock_x"][f],
                         "reach": res["reach"], "counts": res["counts"]}
             if d057:
                 rec[pol].update({
@@ -508,7 +515,7 @@ def _report_chunk(args) -> List[Dict]:
                     "vhist": res["vhist"], "ahist": res["ahist"], "yhist": res["yhist"]})
             rec["min_gap"] = min(rec["min_gap"], res["min_gap"])
         allsmart = run_race(geo, setup, ["smart"] * LANES, cfg)
-        rec["allsmart_tau"] = _tau(allsmart, row, cfg, profile)
+        rec["allsmart_tau"] = _tau(allsmart, row, cfg)
         out.append(rec)
     return out
 
@@ -732,17 +739,17 @@ def _num(v: float) -> str:
     return "0" if s in ("0.000000", "-0.000000") else s
 
 
-def write_baseline(data: Dict, profile: str = "d054") -> None:
+def write_baseline(data: Dict, profile: str = "live") -> None:
     baseline_path(profile).write_text(json.dumps(data, indent=1) + "\n")
-    if profile == "d054":
+    if profile == "live":
         BASELINE_LUAU.write_text(render_luau(data))
 
 
-def load_baseline(profile: str = "d054") -> Dict:
+def load_baseline(profile: str = "live") -> Dict:
     return json.loads(baseline_path(profile).read_text())
 
 
-def load_report(profile: str = "d054") -> Dict:
+def load_report(profile: str = "live") -> Dict:
     return json.loads(report_path(profile).read_text())
 
 
@@ -752,18 +759,19 @@ def mean(v: Sequence[float]) -> float:
     return sum(v) / len(v) if v else float("nan")
 
 
-def run_report(races: int, jobs: Optional[int], data: Dict, cfg: Dict = trip.CONFIG, profile: str = "d054",
+def run_report(races: int, jobs: Optional[int], data: Dict, cfg: Dict = trip.CONFIG,
                grief_races: int = GRIEF_RACES, stress_races: int = STRESS_RACES) -> Dict:
     table = data["baseline"]
+    d057 = trip.d057_on(cfg)
     tasks = []
     for cell in range(len(cells())):
         for a, b in _chunks(races, 10):
-            tasks.append((cell, a, b, cfg, table, profile))
+            tasks.append((cell, a, b, cfg, table))
     with Pool(jobs) as pool:
         parts = pool.map(_report_chunk, tasks)
         grief_parts, stress_parts = [], []
         grief_tasks, stress_tasks = [], []
-        if profile == "d057":
+        if d057:
             grief_tasks = [(cell, a, b, cfg, table) for cell in range(len(cells())) for a, b in _chunks(grief_races, 10)]
             stress_tasks = [(cell, a, b, cfg) for cell in range(len(cells())) for a, b in _chunks(stress_races, 25)]
             grief_parts = pool.map(_grief_chunk, grief_tasks)
@@ -771,8 +779,8 @@ def run_report(races: int, jobs: Optional[int], data: Dict, cfg: Dict = trip.CON
     per_cell: Dict[int, List[Dict]] = {}
     for (cell, *_rest), part in zip(tasks, parts):
         per_cell.setdefault(cell, []).extend(part)
-    summary = summarize_report(per_cell, cfg, profile)
-    if profile == "d057":
+    summary = summarize_report(per_cell, cfg)
+    if d057:
         grief_cell: Dict[int, List[Dict]] = {}
         for (cell, *_rest), part in zip(grief_tasks, grief_parts):
             grief_cell.setdefault(cell, []).extend(part)
@@ -782,7 +790,7 @@ def run_report(races: int, jobs: Optional[int], data: Dict, cfg: Dict = trip.CON
         summary["griefing"] = summarize_griefing(grief_cell)
         summary["stress"] = summarize_stress(stress_cell)
         summary["glides"] = {str(n): glide_seconds(cfg, n) for n in (1, 2, 3, 4)}
-        summary["checks"] = check_targets(summary, "d057")
+        summary["checks"] = check_targets(summary)
     return summary
 
 
@@ -804,8 +812,8 @@ def _pct(hist: Sequence[int], p: float, width: float) -> float:
     return len(hist) * width
 
 
-def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict, profile: str = "d054") -> Dict:
-    d057 = profile == "d057"
+def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict) -> Dict:
+    d057 = trip.d057_on(cfg)
     pols_all = POLICIES_D057 if d057 else POLICIES
     rows = []
     for cell, (course, distance) in enumerate(cells()):
@@ -892,7 +900,7 @@ def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict, profile: str = 
     }
     if d057:
         _summarize_d057(summary, per_cell)
-    summary["checks"] = check_targets(summary, profile)
+    summary["checks"] = check_targets(summary)
     return summary
 
 
@@ -1047,7 +1055,8 @@ def summarize_stress(stress_cell: Dict[int, List[Dict]]) -> Dict:
             "back_max": max(p["back_max"] for p in parts), "brushes": sum(p["brushes"] for p in parts)}
 
 
-def check_targets(s: Dict, profile: str = "d054") -> Dict[str, bool]:
+def check_targets(s: Dict) -> Dict[str, bool]:
+    """D-054's targets; with D-057 on (the summary has its motion measures), D-057's set."""
     rows = s["rows"]
     lo, hi = TARGETS["rail_vs_smart"]
     nlo, nhi = TARGETS["never"]
@@ -1062,7 +1071,7 @@ def check_targets(s: Dict, profile: str = "d054") -> Dict[str, bool]:
         "smart_among_bots_mean": all(abs(r["smart_among_bots"]) <= sm for r in rows),
         "all_smart_field_mean": all(abs(r["allsmart_mean"]) <= sm for r in rows),
     }
-    if profile != "d057":
+    if "motion" not in s:
         return checks
     t = TARGETS_D057
     del checks["reach3s"]  # replaced by reach per intent (D-057); the per-press figure stays in the report
@@ -1123,11 +1132,12 @@ def _pcts(v: Sequence[float]) -> str:
     return " ".join(f"{x:.1%}" for x in v)
 
 
-def format_report(s: Dict, data: Dict, cfg: Dict, profile: str = "d054") -> str:
-    d057 = profile == "d057"
+def format_report(s: Dict, data: Dict, cfg: Dict) -> str:
+    d057 = trip.d057_on(cfg)
     out = []
     rows = s["rows"]
-    out.append(f"Steering calibration ({'D-057 on' if d057 else 'D-054'}): baseline seed {data['seed']}, "
+    label = "D-054" if not d057 else ("D-057 on" if cfg["brush"] != "off" else "D-057 on, brushes off")
+    out.append(f"Steering calibration ({label}): baseline seed {data['seed']}, "
                f"{data['races']:,} races per cell and post, "
                f"mix {data['mixWeight']}; report seed {REPORT_SEED}, {rows[0]['races']} races per cell")
     out.append(f"groundPerLaneTurn {cfg['groundPerLaneTurn']}, draftPerSecond {cfg['draftPerSecond']}, "
@@ -1243,7 +1253,8 @@ def _format_d057(s: Dict) -> List[str]:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Race steering calibration (D-054, D-057)")
     ap.add_argument("--write", action="store_true", help="regenerate the baseline files and the stored report")
-    ap.add_argument("--profile", choices=PROFILES, default="d054", help="d054 (the game today) or d057 (D-057 on)")
+    ap.add_argument("--profile", choices=PROFILES, default="live",
+                    help="live (trip.CONFIG, the game), d057 (brushes on too) or d054 (the switch-back)")
     ap.add_argument("--races", type=int, default=BASELINE_RACES, help="baseline races per cell (each post gets this many)")
     ap.add_argument("--report-races", type=int, default=REPORT_RACES, help="races per cell for the report")
     ap.add_argument("--grief-races", type=int, default=GRIEF_RACES, help="d057: griefing races per cell")
@@ -1273,21 +1284,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.write:
             write_baseline(data, args.profile)
             written = baseline_path(args.profile).relative_to(ROOT)
-            if args.profile == "d054":
+            if args.profile == "live":
                 written = f"{written} and {BASELINE_LUAU.relative_to(ROOT)}"
             print(f"wrote {written} ({args.races} races per cell and post, {time.time() - t0:.0f} s)")
     else:
         data = load_baseline(args.profile)
     if data["config"] != trip.config_record(cfg):
         print("warning: the checked-in baseline was made with a different config; run with --write")
-    summary = run_report(args.report_races, jobs, data, cfg, args.profile, args.grief_races, args.stress_races)
-    print(format_report(summary, data, cfg, args.profile))
+    summary = run_report(args.report_races, jobs, data, cfg, args.grief_races, args.stress_races)
+    print(format_report(summary, data, cfg))
     print(f"({time.time() - t0:.0f} s)")
     stored = {"seed": REPORT_SEED, "races": args.report_races, "baselineSeed": data["seed"],
               "baselineRaces": data["races"], "mixWeight": data["mixWeight"], "config": trip.config_record(cfg),
               "summary": summary}
-    if args.profile == "d057":
-        stored.update({"profile": "d057", "griefSeed": GRIEF_SEED, "griefRaces": args.grief_races,
+    if trip.d057_on(cfg):
+        stored.update({"profile": args.profile, "griefSeed": GRIEF_SEED, "griefRaces": args.grief_races,
                        "stressSeed": STRESS_SEED, "stressRaces": args.stress_races, "probes": probe_races(cfg)})
     if args.write:
         report_path(args.profile).write_text(json.dumps(stored, indent=1) + "\n")

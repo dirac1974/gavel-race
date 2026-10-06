@@ -1011,6 +1011,43 @@ Template:
 
     Reversals a minute: masher 7.1–7.7, ditherer 11.8–12.4, casual 1.8. Half-lane steps happen in 19–28 races per 960 (D-054: 11). A second seed family (3,840 more races across the four rows) also passed: no overlaps, jerks or wrong orders, 0–1 late moves a row, and no after-lock reversal within 3.5 s.
     - **A jittery link** (informational until N3; `jitter=0.03`, 0–30 ms on each message, 960 races, with and without rider 1 on its screen): no overlaps, the order right, the after-lock counts as above. Drawn lanes reach 90 ft/s², and offsets draw horses falling back at up to 22.2 ft/s in 242–263 races (D-054: 608). Both come from interpolating on arrival. N3's RaceView interpolates by the server's timestamp (or keeps a one-sample buffer) and makes this row pass.
+- N3 (2026-10-06, model engineer and roblox engineer): the server behaviour flipped on, and the motion visuals.
+  - **Config:** `trip.CONFIG` and `GameConfig.steering` switch D-057's motion and press rules on: `glide = "eased"`, `chainWindow = 0.3`, `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`, `blockedPress = "wait"`. Brushes stay `"off"` (N5); the boxed-in UI is N4. Bots, Smart Steer and riders all move by these rules on the server.
+  - **The switch-back** is `trip.d054_config()` / `Trip.d054Config`: those seven keys at their D-054 values (REVIEW_QUEUE has them). `tests/test_trip.py` now holds that config to every D-054 promise, against the D-054 baseline and report, kept as `trip_baseline_d054.json` and `steering_report_d054.json` (`sims/steering.py --profile d054`). The eight D-054 parity runs still hash byte for byte as at main 7abfa27. On screen, RaceView draws the linear glide exactly as D-054 did, and the four D-054 overlap reports (with the D-054 baseline) print exactly what main prints.
+  - **Calibration** (`python sims/steering.py --write`; the default profile is now the game's, `live`): every D-054 τ target and every D-057 target passes in every course × distance against the regenerated `TripBaseline.luau` (table in docs/research/steering-calibration.md). Rail rider vs Smart Steer +0.017 to +0.026; never-steer −0.015 to −0.013; reach per intent 73–98%; draft share 20–35%; post bias ≤ 0.0017 (kid among bots) and ≤ 0.0024 (all-Smart); Smart Steer kid −0.0009 to +0.0003; masher 6.3–7.4 reversals a minute, none within 3.5 s; sideways acceleration 30.4 ft/s²; griefing −0.0003 to +0.0030; stress 0 overlaps, 19.0 ft/s.
+  - **Fixtures:** `trip.json` is the game's config now (200 runs at parity), and `trip_d057.json` gains one run on the whole switch-back.
+  - **Screen playback** (`Playback.luau`, shared and pure):
+    - RaceService stamps every steering sample with the server time its state stands for: before the lock Trip's last fixed tick, after it the frame's time, with the make-room step taken from the last stamp. `RaceOffsets` is `(offsets, [lanes,] serverTime, courseId)`; the course id stays last.
+    - RaceView draws the race a delay behind the newest sample and interpolates offsets and lanes between samples by their stamps. The delay is the longest recent lag plus one send interval plus 0.05 s; the clock runs at most 4% fast or slow to change it, never jumps, and never draws backwards. A late sample holds the newest.
+    - The overlap report draws with the same module, and its jitter rows now pass and are gated.
+  - **The body** (`SteerPose.luau`, shared and pure; `GameConfig.steerView`): every horse in a steering race turns with its true drift, atan(sideways / forward speed), smoothed over 0.15 s and capped at 10°, and leans 0.12° per ft/s² of sideways acceleration, capped at 3°. `SteerPose.angles` turns the pose into `CFrame.Angles` (higher lanes are the horse's right on every course). The legs keep striding by distance, and the replay keeps its time scale and the rest hooks.
+  - **The look cue:** your press turns your horse 3° toward it at once (over about 0.05 s), on your screen only, when the lane it asks for has room by the lanes on your screen (`SteerPredict.look`). It holds until your horse starts over on your screen; it relaxes over 0.3 s when the server's answer shows the press waits, at the lock, or after 1.5 s. The sideways move waits for the server: nothing is drawn ahead of it.
+  - **Replays** draw the recorded lanes on a monotone cubic through the frames (`ReplayTrip.laneCurve`), and turn and lean the bodies from the replayed lanes and progress in race time. Old recordings stay on their posts.
+  - **Logs:** the `[Trip]` line ends with presses held by the reverse or weave gap and waits that dropped.
+  - **Calls made where the plan was open:**
+    - SteerPredict's D-054 prediction (AHEAD) stays, used only by the linear glide, so the switch-back is whole (the plan said it goes).
+    - No 150-stud pose cut-off (the plan said "as legs do", but the legs have none; the pose is one CFrame multiply).
+    - The chase camera stays Follow; whether it swings with the body turn is a PLAYTEST check, with the plan's fix (a track-aligned subject) if it does.
+  - **Measured on screen** (the game's config unless noted; 960 races per row; all pass):
+
+    | Row | Overlap frames (shared / own) | Fastest fall-back before / after the lock | Order wrong | Shortest rider reversal gap | Drawn accel before / after the lock | Full-lane moves in the last 2 s (races) | After-lock reversals within 3.5 s (shortest gap) |
+    | --- | --- | --- | --- | --- | --- | --- | --- |
+    | Masher + ditherer + casual, Smart Steer on | 0 / – | 19.0 / 19.0 ft/s | 0 | 3.5 s | 30.6 / 30.6 ft/s² | 2 (2) | 0 (3.5 s) |
+    | The same, Smart Steer off | 0 / – | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 2 (2) | 0 (3.5 s) |
+    | Rider 1 from its screen + the three, 0.1 s link | 0 / 0 | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 0 | 0 (3.5 s) |
+    | The same, 0.25 s link | 0 / 0 | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 0 | 0 (3.5 s) |
+    | Masher + ditherer + casual, 0–30 ms jitter | 0 / – | 19.3 / 19.2 | 0 | 3.5 s | 30.1 / 29.7 | 2 (2) | 0 (3.5 s) |
+    | Own screen 0.1 s + 0–30 ms jitter | 0 / 0 | 19.3 / 18.7 | 0 | 3.5 s | 30.1 / 29.2 | 0 | 0 (3.5 s) |
+    | Own screen 0.25 s + 0–30 ms jitter | 0 / 0 | 19.3 / 19.0 | 0 | 3.5 s | 30.2 / 29.0 | 0 | 0 (3.5 s) |
+    | Bots only | 0 / – | 19.0 / 19.0 | 0 | – | 30.6 / 30.6 | 0 | 0 (3.5 s) |
+    | Brushes on (N5 preview) | 0 / – | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 2 (2) | 0 (3.5 s) |
+    | Brushes on, own screen 0.1 s | 0 / 0 | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 0 | 0 (3.5 s) |
+
+    - The jitter rows before N3 (arrival-timed drawing): 90 ft/s² and horses falling back at 22.2 ft/s in 242–263 races per 960. Now within every gate.
+    - Reversals a minute (the game's config): masher 7.1–7.7, ditherer 11.7–12.4, casual 1.8–1.9, rider 1 on its own screen 6.3. Half-lane steps in the last 2 s: 27–37 a row. Riders boxed 13.5–15.6% of their pre-lock time; brushes 0 (on in the preview rows: 2.76 a race).
+    - The look cue (own screen): about 27,400 of 70,163 presses showed it (the rest asked for a lane with no room, or past the edge); it held at most 0.45 s on a 0.1 s link and 0.78–0.85 s on a 0.25 s link; nothing was drawn ahead of the server.
+    - The D-054 switch-back (`d054`, with the D-054 baseline): the four D-054 reports (bots; 2 riders predicting at 0.1 s and 0.25 s; 3 riders on manual) print exactly what main prints. Its jitter row still fails as D-054 always did (608 races falling back at 22.2 ft/s): the linear glide keeps D-054's arrival-timed drawing.
+    - A second seed family (3,840 races: the game's config, own screen at 0.1 s, jitter, own screen at 0.25 s with jitter) passes every gate too (0–1 late moves a row).
 - Alternatives:
   - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.
   - **Body turn 1.5× the drift, capped at 12°** (Engagement, Competitive): a horse drawn turning more than it moves reads as skidding.

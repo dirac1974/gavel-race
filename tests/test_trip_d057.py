@@ -1,9 +1,10 @@
-"""Natural steering, boxed in and brushes (D-057, stage N1): src/trip.py with D-057 switched on
-(trip.d057_config()), the D-057 sims in sims/steering.py and the trip_d057.json parity runs for
-the N2 Luau port. The game still runs D-054 (every D-057 switch is off in trip.CONFIG; see
-test_trip.py). Full-size runs live in `python sims/steering.py --profile d057 --write`, which
-stores tests/fixtures/steering_report_d057.json; these tests assert it and re-check the rules
-on small runs."""
+"""Natural steering, boxed in and brushes (D-057): src/trip.py with D-057 on, the D-057 sims in
+sims/steering.py and the trip_d057.json parity runs for the Luau port. Since N3 the game runs
+D-057's motion and press rules with brushes off (trip.CONFIG, the "live" profile: its baseline
+is TripBaseline.luau's); trip.d057_config() adds the brushes (N5). Full-size runs live in
+`python sims/steering.py --write` (tests/fixtures/trip_baseline.json, steering_report.json) and
+`--profile d057 --write` (trip_baseline_d057.json, steering_report_d057.json); these tests
+assert both and re-check the rules on small runs. The D-054 switch-back is test_trip.py's."""
 
 import copy
 import math
@@ -118,7 +119,7 @@ def test_d057_config_turns_on_every_rule_and_records_it():
     assert (CFG["brushAlongFeet"], CFG["brushGraceSeconds"], CFG["brushRepeatSeconds"]) == (8.0, 0.3, 2.0)
     assert (CFG["brushCheckFeet"], CFG["brushRecoverPerSecond"], CFG["steadySeconds"]) == (4.0, 2.0, 1.0)
     assert trip.config_record(CFG) == CFG  # anything switched on records the whole config
-    assert trip.CONFIG["glide"] == "linear"  # the game default is untouched
+    assert trip.d057_config(trip.d054_config()) == CFG  # brushes on top of any base
     with pytest.raises(ValueError):
         field([1], [1.0], cfg=cfg57(glide="curvy"))
     with pytest.raises(ValueError):
@@ -131,7 +132,7 @@ def test_free_glides_take_the_decision_times():
     """One lane 1.0 s from press to landing, then 1.6, 2.3 and 3.0 s for two to four chained
     lanes (the plan: one lane in <= 1.0 s, two in <= 1.7 s). D-054: 0.6 s a lane."""
     assert [steering.glide_seconds(CFG, n) for n in (1, 2, 3, 4)] == [1.0, 1.6, 2.3, 3.0]
-    assert steering.glide_seconds(trip.CONFIG, 1) == 0.6
+    assert steering.glide_seconds(trip.d054_config(), 1) == 0.6 and steering.glide_seconds(trip.CONFIG, 1) == 1.0
     alt = cfg57(laneSpeedMax=1.667, laneAccel=5.56)  # the 0.8 s playtest switch
     assert [steering.glide_seconds(alt, n) for n in (1, 2)] == [0.8, 1.4]
 
@@ -227,8 +228,8 @@ def test_press_bounce(edges):
     trip.step(st, [1.0], [(0, 1)], 1.0, DT)
     assert trip.step(st, [1.0], [(0, 1)], 1.1, DT) == ["bounce"] and st.manual_at[0] == 1.0
     assert trip.step(st, [1.0], [(0, -1)], 1.2, DT) == ["queued"] and st.manual_at[0] == pytest.approx(1.2)
-    # D-054: two presses on one tick are a press and a queued press
-    st = field([5], [1.0], cfg=trip.CONFIG)
+    # D-054 (the switch-back): two presses on one tick are a press and a queued press
+    st = field([5], [1.0], cfg=trip.d054_config())
     assert trip.step(st, [1.0], [(0, -1), (0, -1)], 0.0, DT) == ["accepted", "queued"]
 
 
@@ -450,7 +451,7 @@ def test_d057_fixture_replays_exactly(fx25):
     presses reproduces answers, snapshots, events, charges and tau with the brush term."""
     fx = fx25
     assert fx["cfg"] == CFG and fx["defaults"] == trip.CONFIG
-    assert fx["cfgExact"]["laneAccel"] == "4.5" and fx["defaultsExact"]["glide"] == "linear"
+    assert fx["cfgExact"]["laneAccel"] == "4.5" and fx["defaultsExact"]["glide"] == "eased"
     runs = [fx["runs"][k] for k in (0, 1, 2, 3, 7, 15)] + fx["edges"]  # runs 0, 3, 8, 9, 13, 21
     styles = set()
     for run in runs:
@@ -493,9 +494,92 @@ def test_d057_fixture_covers_every_rule(fx25):
     overridden = {k for r in fx["runs"] if "cfg" in r for k in r["cfg"] if r["cfg"][k] != fx["cfg"][k]}
     assert {"glide", "brush", "blockedPress", "brushPays", "chainWindow", "glideReserveFeet", "pressBounceSeconds",
             "weaveGapSeconds", "gapWaitInSeconds", "tuckAfterSeconds"} <= overridden
+    # The whole switch-back is one of the generated runs (the Luau port replays it too).
+    full = make_fixtures.trip_d057_fixture(only=[25])["runs"][0]
+    assert all(full["cfg"][k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
 
 
-# ---------------------------------------------------------------- calibration with D-057 on
+# ---------------------------------------------------------------- the game's config (N3)
+
+LIVE = trip.CONFIG
+
+
+def test_game_config_runs_d057_motion_with_brushes_off():
+    """N3 switched D-057's motion and press rules on in CONFIG (GameConfig.steering mirrors it):
+    every switch in trip.D057 but the brushes (N5). The switch-back is trip.d054_config()."""
+    for key, value in trip.D057.items():
+        if key == "brush":
+            assert LIVE[key] == "off"
+        else:
+            assert LIVE[key] == value, key
+    assert trip.d057_on(LIVE) and trip.d057_config() == trip.d057_config(trip.d054_config())
+    back = trip.d054_config()
+    assert all(back[k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
+    assert (trip.D057_OFF["glide"], trip.D057_OFF["chainWindow"], trip.D057_OFF["reverseGapSeconds"],
+            trip.D057_OFF["weaveGapSeconds"], trip.D057_OFF["pressBounceSeconds"], trip.D057_OFF["glideReserveFeet"],
+            trip.D057_OFF["blockedPress"]) == ("linear", 0.0, 0.0, 0.0, 0.0, 0.0, "d054")  # REVIEW_QUEUE's switch-back
+
+
+def test_game_baseline_files_are_current():
+    """TripBaseline.luau and trip_baseline.json come from the game's config (python
+    sims/steering.py --write); the stored probes reproduce exactly."""
+    data = steering.load_baseline("live")
+    assert data["config"] == trip.config_record(LIVE), "the config changed: run python sims/steering.py --write"
+    assert data["race"] == trip.RACE and data["races"] >= 2000
+    assert data["calibrationPasses"] == steering.CALIBRATION_PASSES
+    assert steering.BASELINE_LUAU.read_text() == steering.render_luau(data)
+    for course, distance in (("dirt", "Sprint"), ("turf", "Mile"), ("dirt", "Marathon")):
+        assert steering.probe_cell(course, distance, LIVE) == data["probe"]["baseline"][course][distance]
+
+
+@pytest.fixture(scope="module")
+def report_live():
+    return steering.load_report("live")
+
+
+def test_stored_game_report_meets_every_target(report_live):
+    """The full run on the game's config (2,000 baseline races per cell and post, 600 report
+    races per cell, 200 griefing races per cell, 4,000 stress races): every D-054 tau target per
+    course x distance, reach per intent >= 70% per cell, and every D-057 target. No brushes."""
+    data = steering.load_baseline("live")
+    assert report_live["config"] == trip.config_record(LIVE) and report_live["profile"] == "live"
+    assert report_live["baselineSeed"] == data["seed"] and report_live["baselineRaces"] == data["races"]
+    assert report_live["races"] >= 600 and report_live["griefRaces"] >= 200 and report_live["stressRaces"] * 8 >= 4000
+    s = report_live["summary"]
+    t, t57 = steering.TARGETS, steering.TARGETS_D057
+    for r in s["rows"]:
+        cell = (r["course"], r["distance"])
+        assert t["rail_vs_smart"][0] <= r["rail_vs_smart"] <= t["rail_vs_smart"][1], cell
+        assert t["never"][0] <= r["never"] <= t["never"][1], cell
+        assert r["intent3s"] >= t57["intent3s"], cell
+        assert r["draft_share"] <= t["draft_share"], cell
+        assert max(abs(v) for v in r["smart_post"]) < t["post_bias"], cell
+        assert max(abs(v) for v in r["allsmart_post"]) < t["post_bias"], cell
+        assert abs(r["smart_among_bots"]) <= t["smart_mean"], cell
+        assert abs(r["allsmart_mean"]) <= t["smart_mean"], cell
+        assert r["masher_reversals_per_min"] <= t57["masher_reversals_per_min"], cell
+        assert r["scripted_charged_races"] == 0, cell  # brushes off
+    assert s["stress"]["overlap_frames"] == 0 and s["stress"]["back_max"] <= t57["stress_fallback_ftps"]
+    assert s["stress"]["brushes"] == 0
+    assert s["glides"] == {"1": 1.0, "2": 1.6, "3": 2.3, "4": 3.0}
+    assert all(s["checks"].values()), [k for k, v in s["checks"].items() if not v]
+    assert s["checks"] == steering.check_targets(s)
+
+
+def test_stored_game_report_probes_replay_exactly(report_live):
+    """The probe races stored with the game's report replay exactly (a stale report fails)."""
+    assert steering.probe_races(LIVE) == report_live["probes"]
+    assert sum(report_live["probes"]["masher"]["brushes"]) == 0
+
+
+def test_grief_bound_holds_in_the_stored_game_report(report_live):
+    g = report_live["summary"]["griefing"]
+    for kid in steering.GRIEF_KIDS:
+        for target, control in steering.GRIEF_PAIRS:
+            assert g[kid]["pooled"][target + "_minus_" + control] >= steering.TARGETS_D057["griefing"], (kid, target)
+
+
+# ---------------------------------------------------------------- calibration with D-057 in full (brushes on)
 
 @pytest.fixture(scope="module")
 def report57():
@@ -535,7 +619,7 @@ def test_stored_d057_report_meets_every_target(report57):
     assert s["stress"]["overlap_frames"] == 0 and s["stress"]["back_max"] <= t57["stress_fallback_ftps"]
     assert s["glides"] == {"1": 1.0, "2": 1.6, "3": 2.3, "4": 3.0}
     assert all(s["checks"].values()), [k for k, v in s["checks"].items() if not v]
-    assert s["checks"] == steering.check_targets(s, "d057")
+    assert s["checks"] == steering.check_targets(s)
 
 
 def test_small_run_d057_meets_the_targets():

@@ -18,10 +18,14 @@
 -- * The prediction ends when the server has answered that press (ack), when the server's lane
 --   hasn't come any closer to it for SECONDS, or at the lock. Your horse then follows the server:
 --   its tgt before the lock, the lanes everyone sees after it.
--- * With the eased glide (D-057, cfg.glide = "eased") nothing is predicted: the slide starts with
---   the server's lane (the S-curve covers 0.05 lane in its first 0.15 s, so a round trip hides in
---   the ease-in) and your horse is drawn where everyone sees it, so a refused press never snaps
---   back. N3 adds the instant "look" cue. With D-054's linear glide nothing here changes.
+-- * With the eased glide (D-057, cfg.glide = "eased", the game since N3) nothing is predicted:
+--   the slide starts with the server's lane (the S-curve covers 0.05 lane in its first 0.15 s, so
+--   a round trip hides in the ease-in) and your horse is drawn where everyone sees it, so a
+--   refused press never snaps back. The instant answer is the look cue instead (look, lookDir):
+--   a press into a lane with room by the lanes on your screen turns your horse's body 3 degrees
+--   toward it at once (SteerPose); the cue holds until your horse starts over on your screen, and
+--   ends when the server's answer shows the press waits (no move toward it), at the lock, or after
+--   SECONDS. With D-054's linear glide (the switch-back) the prediction above runs as before.
 
 export type Server = { tgt: number, dest: number, ack: number }
 export type View = {
@@ -38,10 +42,13 @@ local SteerPredict = {}
 SteerPredict.SECONDS = 1.5 -- a prediction the server's lane hasn't moved toward for this long ends
 SteerPredict.AHEAD = 0.45  -- how far over (lanes) a prediction goes before the server answers
 
+SteerPredict.LOOK_STARTED = 0.05 -- (eased) your horse has started over once drawn this far (lanes) toward the press
+
 -- state.pred = { draw, from, seq, at, best, bestAt } while a press is drawn; timeouts = how many
--- ended by time; longest = the longest a prediction was drawn (s).
+-- ended by time; longest = the longest a prediction was drawn (s). (eased) state.look = { dir, seq,
+-- at, x0, from, moving } while the look cue holds; looks = how many presses showed it.
 function SteerPredict.new(): any
-	return { pred = nil, timeouts = 0, longest = 0 }
+	return { pred = nil, timeouts = 0, longest = 0, look = nil, looks = 0 }
 end
 
 -- `lane` has room for your horse by the server's lanes: nobody there within clearFeet ahead or
@@ -69,6 +76,43 @@ function SteerPredict.press(state: any, view: View, dir: number, seq: number, no
 	if lane < 1 or lane > view.lanes or not SteerPredict.room(view, lane) then return false end
 	state.pred = { draw = lane, from = srv.tgt, seq = seq, at = now, best = math.abs(x - lane), bestAt = now }
 	return true
+end
+
+-- (eased) A press: shows the look cue (returns true) when the lane it asks for is on the track and
+-- has room by the lanes on your screen. view.x = the lanes as drawn.
+function SteerPredict.look(state: any, view: View, dir: number, seq: number, now: number): boolean
+	local x = view.x[view.me]
+	local from = if view.srv ~= nil then (view.srv :: Server).tgt else math.floor(x + 0.5)
+	local lane = from + dir
+	if lane < 1 or lane > view.lanes or not SteerPredict.room(view, lane) then return false end
+	state.look = { dir = dir, seq = seq, at = now, x0 = x, from = from, moving = nil }
+	state.looks += 1
+	return true
+end
+
+-- (eased) The look cue's direction this frame (-1, 1), or 0 once it is over: the server answered
+-- the press without moving toward it (the press waits), or your horse has started over on your
+-- screen (the drift takes over), or the lock, or SECONDS without an answer.
+function SteerPredict.lookDir(state: any, view: View, now: number, locked: boolean): number
+	local look = state.look
+	if look == nil then return 0 end
+	if locked or now - look.at > SteerPredict.SECONDS then
+		state.look = nil
+		return 0
+	end
+	if (view.x[view.me] - look.x0) * look.dir >= SteerPredict.LOOK_STARTED then
+		state.look = nil -- started over on your screen
+		return 0
+	end
+	local srv = view.srv
+	if srv ~= nil and srv.ack >= look.seq then
+		if look.moving == nil then look.moving = (srv.tgt - look.from) * look.dir > 0 end
+		if not look.moving then
+			state.look = nil -- answered, and it waits: relax
+			return 0
+		end
+	end
+	return look.dir
 end
 
 -- The lane to glide your own horse toward this frame.

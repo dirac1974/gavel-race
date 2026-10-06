@@ -50,18 +50,14 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	-- GameConfig mirrors the Python CONFIG and RACE; TripBaseline is the generated table.
 	-- GameConfig.steering mirrors CONFIG, except two game-only switches (S1's post draw and S3's
 	-- spam limit on steering requests) and the scale, a documented switch (0 = cosmetic; S3 ships
-	-- the model's 1). Parity runs at the fixture's scale. trip.json records the config without the
-	-- D-057 keys while they are all off (trip.config_record); trip_d057_tests.luau checks those
-	-- against trip.CONFIG in full.
-	local D057_KEYS = { "glide", "laneSpeedMax", "laneAccel", "chainWindow", "reverseGapSeconds", "weaveGapSeconds",
-		"weaveWindowSeconds", "pressBounceSeconds", "glideReserveFeet", "blockedPress", "gapWaitSeconds", "gapWaitInSeconds",
-		"tuckAfterSeconds", "boxedAheadFeet", "brush", "brushAlongFeet", "brushGraceSeconds", "brushRepeatSeconds",
-		"brushPays", "brushCost", "brushFree", "brushMaxCharged", "brushCheckFeet", "brushRecoverPerSecond", "steadySeconds" }
+	-- the model's 1). Parity runs at the fixture's scale. Since N3 the config has D-057's motion
+	-- and press rules on, so trip.json records every key (trip.config_record).
+	local D057_KEYS = {}
+	for key in Trip.D057_OFF do table.insert(D057_KEYS, key) end
 	local steering = table.clone(GameConfig.steering)
 	steering.drawPosts = nil
 	steering.requestsPerSecond = nil
 	steering.scale = nil
-	for _, key in D057_KEYS do steering[key] = nil end
 	local pyCfg = table.clone(data.cfg)
 	pyCfg.scale = nil
 	check(deepEqual(steering, pyCfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py (the scale switch aside)")
@@ -96,7 +92,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		return cfg
 	end
 	local dt = 1 / GameConfig.steering.tickHz
-	local full = runConfig({}) -- GameConfig.steering at the fixture's scale, every key (D-057 off)
+	local full = runConfig({}) -- GameConfig.steering at the fixture's scale, every key
 	local runsOk, answersOk, snapsOk, lockOk, tripOk = 0, true, true, true, true
 	for r, run in data.runs do
 		local cfg = runConfig(run)
@@ -177,7 +173,9 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		check(not pcall(Trip.step, st, { 0.5, 0.5 }, { { 2.5, -1 } }, 0, dt), "a fractional lane index is refused")
 		check(not pcall(Trip.new, { 0, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, full, nil, data.race), "post 0 is refused")
 		check(not pcall(Trip.tau, { 0, 0 }, { 1, 9 }, table.create(8, 0), full), "post 9 is refused by tau")
-		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, data.cfg, nil, data.race),
+		local old = table.clone(full)
+		for _, key in D057_KEYS do old[key] = nil end
+		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, old, nil, data.race),
 			"a config without the D-057 keys is refused (Python raises too)")
 		local bad = table.clone(full)
 		bad.glide = "curvy"

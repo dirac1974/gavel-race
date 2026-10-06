@@ -26,6 +26,7 @@ local simulateRace = require("./race_overlap")
 
 local EPS = 1e-9
 local STEER = GameConfig.steering
+local STEER54 = Trip.d054Config(GameConfig.steering) -- the switch-back (D-057 N3)
 local SHUD = GameConfig.steerHud
 local COURSES = { "dirt", "turf" }
 local DISTANCES = { "Sprint", "Mile", "Classic", "Marathon" }
@@ -85,10 +86,16 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	local plan = TrackLayout.plan(track, TrackLayout.distances.Mile)
 	local geo = TrackLayout.phaseA(track, plan)
 	local race = Trip.raceParams(GameConfig)
-	local function fresh(posts: { number }): any
+	-- D-054's answers (the switch-back config); D-057's own rules are checked against the Python
+	-- model in trip_d057_tests.luau.
+	local function fresh(posts: { number }, cfg: any?): any
 		local u = table.create(2 * #posts, 0.5)
-		return Trip.new(posts, table.create(#posts, 1 / #posts), u, geo, STEER, table.create(#posts, "manual"), race)
+		return Trip.new(posts, table.create(#posts, 1 / #posts), u, geo, cfg or STEER54, table.create(#posts, "manual"), race)
 	end
+	local eased = fresh({ 4, 7 }, STEER)
+	check(Trip.acceptIntent(eased, 1, -1, 1) == "accepted" and Trip.acceptIntent(eased, 1, -1, 1.1) == "bounce"
+		and Trip.acceptIntent(eased, 1, -1, 1.3) == "queued",
+		"the game's config (D-057): a press the same way within 0.2 s counts once; a later one waits")
 	local st = fresh({ 4, 7 })
 	check(Trip.acceptIntent(st, 1, -1, 1) == "accepted", "an idle rider's press is accepted")
 	check(Trip.acceptIntent(st, 1, -1, 1.1) == "queued", "a press during a lane change waits (one queued)")
@@ -148,8 +155,8 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	for _, count in trip.answers do answered += count end
 	check(answered == 0 and #trip.pending == sent, "nothing applies before the next tick")
 	Trip.advance(trip, s.live, 0.6)
-	check((trip.answers.accepted or 0) == 1 and (trip.answers.queued or 0) == 1 and (trip.answers.rate or 0) == sent - 2
-		and #trip.pending == 0, "the next tick applies them in arrival order: one accepted, one queued, the rest refused")
+	check((trip.answers.accepted or 0) == 1 and (trip.answers.bounce or 0) == sent - 1 and #trip.pending == 0,
+		"the next tick applies them in arrival order: one accepted, the rest within 0.2 s count once (D-057's bounce)")
 	check(trip.ack[i1] == 12, "the rider's screen hears that every press was answered (ack), spam included")
 	check(Trip.submit(trip, s, "1", d, 30, 1.6) == "sent", "a second later the rider may press again")
 	Trip.submit(trip, s, "2", -1, 1, trip.lockT - 0.05)
@@ -266,9 +273,9 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(ta.smart[ia] and tauA[ia] == 0 and tauB[ia] ~= 0 and othersKept,
 		"a rider without buttons rides Smart Steer with tau 0; everyone else (bots too) keeps theirs")
 
-	-- Your own glide (SteerPredict) -------------------------------------------------------------
+	-- Your own glide (SteerPredict; D-054's linear glide, the switch-back) ----------------------
 	local function pview(srv: any, x: { number }, off: { number }): any
-		return { me = 1, lanes = 8, x = x, off = off, srv = srv, cfg = STEER }
+		return { me = 1, lanes = 8, x = x, off = off, srv = srv, cfg = STEER54 }
 	end
 	check(not SteerPredict.press(SteerPredict.new(), pview(nil, { 3, 6 }, { 0, 0 }), -1, 1, 0),
 		"nothing is drawn before the server has said where your lane is")
@@ -311,7 +318,39 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	SteerPredict.press(stG, vG, -1, 1, 0)
 	check(SteerPredict.laneTo(stG, vG, 0.1, true) == 3, "at the lock your horse follows the lanes everyone sees")
 
-	-- Whole races with riders pressing at random: nobody overlaps on screen --------------------
+	-- Your press with the eased glide (D-057, the game's config): the look cue ------------------
+	local function eview(srv: any, x: { number }, off: { number }): any
+		return { me = 1, lanes = 8, x = x, off = off, srv = srv, cfg = STEER }
+	end
+	local stL = SteerPredict.new()
+	local vL = eview({ tgt = 3, dest = 3, ack = 0 }, { 3, 6 }, { 0, 0 })
+	check(not SteerPredict.press(stL, vL, -1, 1, 0) and SteerPredict.laneTo(stL, vL, 0.05, false) == 3,
+		"eased: a press draws no sideways move ahead of the server (your horse is drawn where everyone sees it)")
+	check(SteerPredict.look(stL, vL, -1, 1, 0) and SteerPredict.lookDir(stL, vL, 0.05, false) == -1 and stL.looks == 1,
+		"eased: a press into a lane with room shows the look cue toward it at once")
+	vL.srv = { tgt = 2, dest = 2, ack = 1 } -- the server took the lane: the cue holds until the horse starts over on screen
+	check(SteerPredict.lookDir(stL, vL, 0.3, false) == -1, "...it holds while the server's answer plays out")
+	vL.x[1] = 2.9 -- drawn over by more than LOOK_STARTED
+	check(SteerPredict.lookDir(stL, vL, 0.4, false) == 0 and stL.look == nil, "...and hands over as your horse starts over")
+	local stW = SteerPredict.new()
+	local vW = eview({ tgt = 3, dest = 3, ack = 0 }, { 3, 6 }, { 0, 0 })
+	SteerPredict.look(stW, vW, -1, 1, 0)
+	vW.srv = { tgt = 3, dest = 3, ack = 1 } -- answered without a move: the press waits (or was refused)
+	check(SteerPredict.lookDir(stW, vW, 0.25, false) == 0, "eased: a press that waits relaxes the cue (SteerPose eases it back)")
+	check(not SteerPredict.look(SteerPredict.new(), eview({ tgt = 3, dest = 3, ack = 0 }, { 3, 2 }, { 0, 3 }), -1, 1, 0)
+		and not SteerPredict.look(SteerPredict.new(), eview({ tgt = 1, dest = 1, ack = 0 }, { 1, 6 }, { 0, 0 }), -1, 1, 0),
+		"eased: no look into a lane with a horse alongside, or past the rail")
+	local stT = SteerPredict.new()
+	local vT = eview(nil, { 3, 6 }, { 0, 0 })
+	check(SteerPredict.look(stT, vT, 1, 1, 0) and SteerPredict.lookDir(stT, vT, SteerPredict.SECONDS - 0.01, false) == 1
+		and SteerPredict.lookDir(stT, vT, SteerPredict.SECONDS + 0.01, false) == 0,
+		"eased: no answer: the cue relaxes after SteerPredict.SECONDS")
+	local stK = SteerPredict.new()
+	SteerPredict.look(stK, vT, 1, 2, 0)
+	check(SteerPredict.lookDir(stK, vT, 0.1, true) == 0, "eased: the lock ends the cue")
+
+	-- Whole races with riders pressing (the game's config: a masher and a ditherer; Smart Steer on
+	-- and off): nobody overlaps on screen -----------------------------------------------------
 	local races, overlaps, wrongOrder, jerkFrames = 0, 0, 0, 0
 	for ci, course in COURSES do
 		for di, distance in DISTANCES do
@@ -324,15 +363,17 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 			end
 		end
 	end
-	check(overlaps == 0, `riders pressing ◀ ▶ at random: no overlapping horses in {races} races ({overlaps} frames)`)
+	check(overlaps == 0, `riders pressing ◀ ▶: no overlapping horses in {races} races ({overlaps} frames)`)
 	check(wrongOrder == 0, "...and the order across the line is still the result")
 	check(jerkFrames == 0, `...and nobody is drawn hopping back (over 20 ft/s) before or after the lock ({jerkFrames} frames)`)
 	-- Rider 1 pressing from its own screen (0.1 s each way): singles, doubles, mashes, In-then-Out.
+	-- D-054 (the switch-back): its glide is predicted.
 	local ownRaces, ownOverlaps, sharedOverlaps, timeouts, predicted, longest, apartAtLock = 0, 0, 0, 0, 0, 0, 0
 	for ci, course in COURSES do
 		for di, distance in DISTANCES do
 			for k = 1, 2 do
-				local res = simulateRace(course, distance, 9000 + 100 * ci + 10 * di + k, nil, { riders = 2, manual = k == 2, predict = true })
+				local res = simulateRace(course, distance, 9000 + 100 * ci + 10 * di + k, nil,
+					{ riders = 2, manual = k == 2, predict = true, d054 = true })
 				local o = res.own :: any
 				ownRaces += 1
 				ownOverlaps += o.overlapsBefore + o.overlapsAfter
@@ -347,8 +388,25 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(ownOverlaps == 0 and sharedOverlaps == 0,
 		`a rider pressing from their own screen: no overlaps there or on anyone's in {ownRaces} races ({ownOverlaps} / {sharedOverlaps} frames)`)
 	check(predicted > 0 and timeouts == 0 and longest < 0.5 and apartAtLock < 0.05,
-		string.format("no stuck predictions: %d glides started at once, none timed out (%d), each answered within %.2f s, together after the lock",
+		string.format("D-054: no stuck predictions: %d glides started at once, none timed out (%d), each answered within %.2f s, together after the lock",
 			predicted, timeouts, longest))
+	-- The game's config (D-057): the look cue at once, the move with the server's lane.
+	local eRaces, eOwn, eShared, looks, ePredicted, lookMax = 0, 0, 0, 0, 0, 0
+	for ci, course in COURSES do
+		for di, distance in DISTANCES do
+			local res = simulateRace(course, distance, 9500 + 100 * ci + 10 * di, nil, { predict = true })
+			local o = res.own :: any
+			eRaces += 1
+			eOwn += o.overlapsBefore + o.overlapsAfter
+			eShared += res.before + res.after
+			looks += o.looks
+			ePredicted += o.predicted
+			lookMax = math.max(lookMax, o.lookMax)
+		end
+	end
+	check(eOwn == 0 and eShared == 0 and looks > 0 and ePredicted == 0 and lookMax <= SteerPredict.SECONDS + 0.05,
+		string.format("eased, from your own screen: no overlaps in %d races, %d presses looked at once, none drawn ahead of the server, the longest look %.2f s",
+			eRaces, looks, lookMax))
 
 	-- Settings and copy -------------------------------------------------------------------------
 	local now = 20000 * 86400

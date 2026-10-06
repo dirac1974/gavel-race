@@ -1,10 +1,16 @@
 --!strict
 -- Runs one race the way RaceService runs it (10 Hz server: checkpoints, the trip to the far-turn
 -- lock, tau, the race shape's offsets and make-room lanes after it, the send rates) and draws it
--- the way RaceView does with steering on (60 fps: the sent offsets interpolated, lanes gliding
--- linearly at most frame/laneSeconds), and counts horses overlapping on screen: closer than half
--- a lane sideways and 6 ft lengthwise (a horse is 8 ft long). Used by trip_tests.luau,
--- steer_controls_tests.luau and tests/luau/overlap_report.luau (D-054 S2, S3).
+-- the way RaceView does with steering on (60 fps; with the eased glide the timestamped samples'
+-- offsets and lanes played back by their server times, Playback, D-057 N3; with D-054's linear
+-- glide, the switch-back, as D-054 drew them: offsets interpolated from each sample's arrival over
+-- one send interval, lanes gliding at most frame/laneSeconds), and counts horses overlapping on screen:
+-- closer than half a lane sideways and 6 ft lengthwise (a horse is 8 ft long). Used by
+-- trip_tests.luau, trip_d057_tests.luau, steer_controls_tests.luau and
+-- tests/luau/overlap_report.luau (D-054 S2, S3; D-057 N2, N3).
+-- The config is GameConfig's (since N3: D-057's motion and press rules, brushes off) unless
+-- `config` is given, or opts.d057 (D-057 in full, brushes on: Trip.d057Config) or opts.d054 (the
+-- switch-back: Trip.d054Config).
 -- opts (all optional):
 --   riders = how many lanes are riders pressing ◀ ▶ at random (S3; the presses go through
 --     Trip.submit like RaceService's SteerRequest); manual = those riders have Smart Steer off.
@@ -13,18 +19,18 @@
 --     horse drawn by SteerPredict as RaceView draws it, from SteerLane messages (tgt, destination,
 --     last press answered, sent on change as RaceService does). Counts overlaps on that screen and
 --     how long its own horse is drawn somewhere else than everyone else sees it.
---   d057 = natural steering on (D-057, N2: Trip.d057Config of GameConfig.steering, brushes included),
---     with riders in `styles` (default masher, ditherer, casual: 4 presses a second on a random side;
---     In, Out, In, Out every 0.2 s; In about every 5 s and Out about every 20 s), and lanes drawn as
---     N3's RaceView will draw them: the 10 Hz samples interpolated like the offsets (the S-curve is
---     in the samples). Also counts each rider's reversals and the shortest gap between them, the
---     drawn sideways acceleration (every horse, before and after the lock), brushes, and how long
---     riders are boxed in. With predict, rider 1 ("own") presses from its screen and three styled
---     riders follow. Also counts the moves after the lock (every horse): late full-lane moves (in
---     the last 2 s), late half-lane steps, and reversals after the lock with the gap to the one
---     before. Without d057, everything is as before (D-054).
+--   With the eased glide (D-057; the game's config since N3), riders ride in `styles` (default
+--     masher, ditherer, casual: 4 presses a second on a random side; In, Out, In, Out every 0.2 s;
+--     In about every 5 s and Out about every 20 s). With predict, rider 1 ("own") presses from its
+--     screen, where a press shows the look cue (SteerPredict.look) and its horse is drawn where
+--     everyone sees it, and three styled riders follow. With D-054's linear glide, riders press at
+--     random and rider 1's own glide is predicted as before.
+--   Counts (any config): each rider's reversals and the shortest gap between them, the drawn
+--     sideways acceleration (every horse, before and after the lock), brushes, how long riders are
+--     boxed in, and the moves after the lock (every horse): late full-lane moves (in the last 2 s),
+--     late half-lane steps, and reversals after the lock with the gap to the one before.
 --   jitter = extra random delay on each message to the client, 0..jitter s (in order, as
---     RemoteEvents arrive), from its own generator; informational until N3's RaceView buffers.
+--     RemoteEvents arrive), from its own generator. The playback absorbs it.
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -35,7 +41,11 @@ local RaceSession = require("../../game/src/shared/RaceSession")
 local TrackLayout = require("../../game/src/shared/TrackLayout")
 local Trip = require("../../game/src/shared/Trip")
 local TripBaseline = require("../../game/src/shared/TripBaseline")
+local fs = require("@lune/fs")
+local serde = require("@lune/serde")
+local baselineD054: any = nil -- the D-054 table (the switch-back regenerates TripBaseline to it), loaded once
 local SteerPredict = require("../../game/src/shared/SteerPredict")
+local Playback = require("../../game/src/shared/Playback")
 
 local SIDE, LENGTH = 0.5, 6 -- overlap: closer than this sideways (lanes) and lengthwise (feet)
 local FRAME = 1 / 60
@@ -60,7 +70,7 @@ end
 -- the longest a single prediction was drawn (s), presses / predicted = presses sent / presses that
 -- started a glide at once.
 export type Own = { overlapsBefore: number, overlapsAfter: number, apartMax: number, apartAtLock: number,
-	timeouts: number, longestPrediction: number, presses: number, predicted: number }
+	timeouts: number, longestPrediction: number, presses: number, predicted: number, looks: number, lookMax: number }
 export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean,
 	lineOrder: { number }, result: { number }, answers: { [string]: number }, halfSteps: number,
 	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own?,
@@ -70,12 +80,14 @@ export type Stats = { before: number, first5: number, after: number, lastTwo: nu
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local d057 = opts ~= nil and opts.d057 == true
+	local d054 = opts ~= nil and opts.d054 == true
 	local cfgGame = config or GameConfig
-	if d057 and config == nil then
+	if config == nil and (d057 or d054) then
 		cfgGame = table.clone(GameConfig)
-		cfgGame.steering = Trip.d057Config(GameConfig.steering)
+		cfgGame.steering = if d057 then Trip.d057Config(GameConfig.steering) else Trip.d054Config(GameConfig.steering)
 	end
 	local steer = cfgGame.steering
+	local eased = steer.glide == "eased"
 	local track = TrackLayout.courses[courseId]
 	local plan = TrackLayout.plan(track, TrackLayout.distances[distanceName])
 	local rng = makeRng(seed)
@@ -90,11 +102,11 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	local humans, riders = {}, {}
 	local styles = (opts and opts.styles)
-		or (if d057 and predict then { "own", "masher", "ditherer", "casual" } elseif d057 then { "masher", "ditherer", "casual" } else {})
+		or (if eased and predict then { "own", "masher", "ditherer", "casual" } elseif eased then { "masher", "ditherer", "casual" } else {})
 	local style = {}
 	for r = 1, (opts and opts.riders) or #styles do
 		table.insert(humans, { id = "rider" .. r, name = "Rider " .. r, rating = 50, isBot = false })
-		riders["rider" .. r] = if opts.manual then "manual" else "smart"
+		riders["rider" .. r] = if opts and opts.manual then "manual" else "smart"
 		style["rider" .. r] = styles[r] or "random"
 	end
 	local lanes = RaceSession.fillWithBots(humans, cfgGame.lanes, cfgGame, ThemePack, rng)
@@ -112,7 +124,12 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local tFar = tFinish - (track.finishFromTop + math.pi * TrackLayout.laneRadius(track, 1)) / speed
 	local closes = { mid + 0.35, preEnd + 0.35, burstClose + 0.35, postEnd + 0.35 }
 	session:assignPosts(RaceSession.postOrder(cfgGame, #session.lanes, rng))
-	local trip = Trip.start(cfgGame, session, track, plan, TripBaseline[courseId][distanceName], rng, TrackLayout, riders)
+	local baseline = TripBaseline
+	if d054 then -- the switch-back's own baseline (tests/fixtures/trip_baseline_d054.json)
+		baselineD054 = baselineD054 or serde.decode("json", fs.readFile("tests/fixtures/trip_baseline_d054.json")).baseline
+		baseline = baselineD054
+	end
+	local trip = Trip.start(cfgGame, session, track, plan, baseline[courseId][distanceName], rng, TrackLayout, riders)
 	assert(trip, "steering is on")
 	-- Riders press at random, 0.4 to 2 s apart, more often in than out (their own generator, so the
 	-- race's draws are unchanged). With predict, rider 1 presses from its screen instead.
@@ -125,12 +142,15 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local n = #session.lanes
 	local shownLive = table.clone(session.live)
 	-- Client state (what every screen shows).
-	local offset, from, to = table.create(n, 0), table.create(n, 0), table.create(n, 0)
-	local lane, laneTarget = table.create(n, 0), table.create(n, 0)
-	for i = 1, n do
-		lane[i], laneTarget[i] = i, i
-	end
-	local sampleAt, sampleT = 0, 0 -- when the shown sample arrived, and the server tick that made it
+	local offset = table.create(n, 0)
+	local lane, laneTarget = table.create(n, 0), table.create(n, 0) -- as drawn; the newest sample's
+	for i = 1, n do lane[i], laneTarget[i] = i, i end
+	local pb = Playback.new(Playback.config(cfgGame)) -- (eased) RaceView's playback of the timestamped samples
+	local play: number? = nil
+	-- (linear, D-054) the offsets glide from where they are to the newest sample, timed from its
+	-- arrival; sampleT = the server tick that made it.
+	local from, to = table.create(n, 0), table.create(n, 0)
+	local sampleAt, sampleT = 0, 0
 	local stats: Stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {},
 		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil,
 		reversals = {}, accelBefore = 0, accelAfter = 0, brushes = 0, boxedTicks = 0, riderTicks = 0,
@@ -149,9 +169,8 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		stats.reversals[style[h.id]] = stats.reversals[style[h.id]] or { count = 0, seconds = 0, minGap = math.huge }
 	end
 	local laneWidth = track.laneWidth
-	local laneFrom = table.create(n, 0)
 	local lastLane, lastVel = table.create(n, 0), table.create(n, 0)
-	for i = 1, n do laneFrom[i], lastLane[i] = i, i end
+	for i = 1, n do lastLane[i] = i end
 	-- backBefore / backAfter = the fastest any horse is drawn falling back against the pace (ft/s),
 	-- from 1 s after the gate to the lock and from the lock on (by the server tick that made the
 	-- sample being drawn); jerks / jerksBefore = frames after / before the lock where one falls back
@@ -163,21 +182,24 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	-- Rider 1's own screen (predict).
 	local me = if predict then session:laneIndex("rider1") :: number else 0
 	local ownLane, clientLocked = if predict then lane[me] else 0, false
-	local ownFrom = ownLane
 	local state = SteerPredict.new()
-	local view = { me = me, lanes = cfgGame.lanes, x = laneTarget, off = offset, srv = nil, cfg = steer }
+	-- (as RaceView: with the eased glide SteerPredict sees the lanes as played back, with D-054's
+	-- linear glide the newest sample's)
+	local view = { me = me, lanes = cfgGame.lanes, x = if eased then lane else laneTarget, off = offset, srv = nil, cfg = steer }
 	local own: Own = { overlapsBefore = 0, overlapsAfter = 0, apartMax = 0, apartAtLock = 0, timeouts = 0, longestPrediction = 0,
-		presses = 0, predicted = 0 }
+		presses = 0, predicted = 0, looks = 0, lookMax = 0 }
+	local lookSince: number? = nil
 	local apartFor, sentOwn = 0, nil
 	local presses, nextPattern, mySeq = {}, if predict then 1 + 2 * pressRng:NextNumber() else math.huge, 0 -- presses = { { at, dir } } still to make
 	local seg = 1
 	local lastFrame = 0
 	local serverDt = 1 / steer.sendHz
 	local k = 0
-	-- d057: with a link delay the client keeps drawing until the last samples have arrived (the
-	-- server stops at the line; its last messages land `latency` later), so the order across the
-	-- line is judged on what the screen finally shows. D-054 runs stop at the line as before.
-	local drain = if d057 then latency + serverDt else 0
+	-- (eased) The client keeps drawing until it has played the last samples (the server stops at the
+	-- line; its last messages land `latency` (and jitter) later and play back a delay behind), so the
+	-- order across the line is judged on what the screen finally shows. D-054 runs stop at the line
+	-- as D-054's did.
+	local drain = if eased then latency + jitter + 2 * serverDt + pb.cfg.margin else 0
 	while k * serverDt < tFinish + drain do
 		local T = k * serverDt
 		if T < tFinish then
@@ -292,26 +314,39 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 			while #inbox > 0 and inbox[1].at <= tc + 1e-9 do
 				local m = table.remove(inbox, 1)
 				if m.kind == "offsets" then
-					for i = 1, n do
-						from[i], to[i] = offset[i], m.offsets[i]
-						laneFrom[i] = lane[i]
-						laneTarget[i] = (m.lanes :: { number })[i]
+					for i = 1, n do laneTarget[i] = (m.lanes :: { number })[i] end
+					if eased then -- as RaceView: pushed with its stamp, played back by it (never by arrival)
+						Playback.push(pb, m.T, tc, { off = table.clone(m.offsets), lanes = table.clone(m.lanes :: { number }) })
+					else -- D-054: the glide to the new sample is timed from its arrival (just after the last frame)
+						for i = 1, n do from[i], to[i] = offset[i], m.offsets[i] end
+						sampleAt, sampleT = tc - FRAME, m.T
 					end
-					ownFrom = ownLane
-					-- As RaceView: the glide to the new sample is timed from its arrival (here, just
-					-- after the last frame), so a message a frame late never squeezes a glide.
-					sampleAt, sampleT = tc - FRAME, m.T
 				elseif m.kind == "own" then
 					view.srv = { tgt = m.own[1], dest = m.own[2], ack = m.own[3] }
 				else
 					clientLocked = true
 				end
 			end
-			local f = math.clamp((tc - sampleAt) / serverDt, 0, 1)
-			for i = 1, n do offset[i] = from[i] + (to[i] - from[i]) * f end
+			local glide = FRAME / steer.laneSeconds
+			local afterLock -- drawn from a sample made after the lock
+			if eased then
+				play = Playback.advance(pb, tc, FRAME)
+				if play then
+					local a, b, f = Playback.around(pb, play :: number)
+					Playback.lerp(offset, a.data.off, b.data.off, f)
+					Playback.lerp(lane, a.data.lanes, b.data.lanes, f)
+				end
+				afterLock = play ~= nil and (play :: number) >= trip.lockT - 1e-9
+			else
+				local f = math.clamp((tc - sampleAt) / serverDt, 0, 1)
+				for i = 1, n do
+					offset[i] = from[i] + (to[i] - from[i]) * f
+					lane[i] += math.clamp(laneTarget[i] - lane[i], -glide, glide)
+				end
+				afterLock = sampleT >= trip.lockT - 1e-9
+			end
 			if tc > 1 then
 				local jerked = false
-				local afterLock = sampleT >= trip.lockT - 1e-9 -- drawn from a sample made after the lock
 				for i = 1, n do
 					local back = (lastOffset[i] - offset[i]) / FRAME
 					if afterLock then
@@ -328,22 +363,12 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 				end
 			end
 			for i = 1, n do lastOffset[i] = offset[i] end
-			local glide = FRAME / steer.laneSeconds
-			if d057 then -- N3's RaceView: the samples interpolated like the offsets
-				for i = 1, n do -- (at f = 1 exactly the sample, not a rounding short of it)
-					lane[i] = if f >= 1 - 1e-9 then laneTarget[i] else laneFrom[i] + (laneTarget[i] - laneFrom[i]) * f
-				end
-			else
-				for i = 1, n do
-					local d = laneTarget[i] - lane[i]
-					lane[i] += math.clamp(d, -glide, glide)
-				end
-			end
-			local afterLock = sampleT >= trip.lockT - 1e-9
+			-- (not once the stream has ended: after the last sample the drawn lanes just stop; with the
+			-- eased glide a late sample mid-race holds them too, and that counts)
+			local streaming = if eased then play ~= nil and (not pb.held or tc < tFinish) else tc - sampleAt <= serverDt + 1e-9
 			for i = 1, n do
 				local vel = (lane[i] - lastLane[i]) * laneWidth / FRAME
-				-- (not once the stream has ended: after the last sample the drawn lanes just stop)
-				if tc > 1 and tc - sampleAt <= serverDt + 1e-9 then
+				if tc > 1 and streaming then
 					local acc = math.abs(vel - lastVel[i]) / serverDt
 					if afterLock then
 						stats.accelAfter = math.max(stats.accelAfter, acc)
@@ -394,14 +419,25 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					if tc < trip.lockT and not clientLocked then
 						mySeq += 1
 						own.presses += 1
-						if SteerPredict.press(state, view, p.dir, mySeq, tc) then own.predicted += 1 end
+						if eased then
+							if SteerPredict.look(state, view, p.dir, mySeq, tc) then
+								own.looks += 1
+								lookSince = tc
+							end
+						elseif SteerPredict.press(state, view, p.dir, mySeq, tc) then
+							own.predicted += 1
+						end
 						table.insert(outbox, { at = tc + latency, dir = p.dir, seq = mySeq })
 					end
 				end
-				local laneTo = SteerPredict.laneTo(state, view, tc, clientLocked)
-				if d057 then -- interpolated toward SteerPredict's answer, as the shared lanes (eased: the server's lane)
-					ownLane = if f >= 1 - 1e-9 then laneTo else ownFrom + (laneTo - ownFrom) * f
+				if eased then -- drawn where everyone sees it; the look cue holds until it starts over
+					ownLane = lane[me]
+					if SteerPredict.lookDir(state, view, tc, clientLocked) == 0 then
+						if lookSince then own.lookMax = math.max(own.lookMax, tc - (lookSince :: number)) end
+						lookSince = nil
+					end
 				else
+					local laneTo = SteerPredict.laneTo(state, view, tc, clientLocked)
 					ownLane += math.clamp(laneTo - ownLane, -glide, glide)
 				end
 				local mine = false

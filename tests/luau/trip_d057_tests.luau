@@ -53,19 +53,28 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local base = fromExact(data.cfgExact)
 	local defaults = fromExact(data.defaultsExact)
 
-	-- GameConfig.steering holds every key of trip.CONFIG at its D-054 value (the game-only switches
-	-- and the scale aside), D-057's included: the game runs D-054 until N3 flips them.
+	-- GameConfig.steering holds every key of trip.CONFIG (the game-only switches and the scale
+	-- aside), D-057's included: since N3, D-057's motion and press rules on, brushes off.
 	local steering = table.clone(GameConfig.steering)
 	steering.drawPosts = nil
 	steering.requestsPerSecond = nil
 	steering.scale = nil
 	local pyDefaults = table.clone(defaults)
 	pyDefaults.scale = nil
-	check(deepEqual(steering, pyDefaults, 0), "GameConfig.steering mirrors trip.CONFIG with every D-057 key (all off)")
-	check(GameConfig.steering.glide == "linear" and GameConfig.steering.blockedPress == "d054" and GameConfig.steering.brush == "off"
-		and GameConfig.steering.chainWindow == 0 and GameConfig.steering.reverseGapSeconds == 0
-		and GameConfig.steering.weaveGapSeconds == 0 and GameConfig.steering.pressBounceSeconds == 0
-		and GameConfig.steering.glideReserveFeet == 0, "every D-057 switch is off in GameConfig.steering")
+	check(deepEqual(steering, pyDefaults, 0), "GameConfig.steering mirrors trip.CONFIG with every D-057 key")
+	local motionOn = true
+	for key, value in Trip.D057 do
+		if key ~= "brush" and GameConfig.steering[key] ~= value then motionOn = false end
+	end
+	check(motionOn and GameConfig.steering.brush == "off",
+		"N3: D-057's motion and press switches are on in GameConfig.steering; brushes stay off until N5")
+	local back = Trip.d054Config(GameConfig.steering)
+	local backOk = true
+	for key, value in Trip.D057_OFF do
+		if back[key] ~= value then backOk = false end
+	end
+	check(backOk and back.smart ~= GameConfig.steering.smart and GameConfig.steering.glide == "eased",
+		"Trip.d054Config switches every D-057 key back to D-054, on a copy")
 	check(base.glide == "eased" and base.brush == "repeat" and base.weaveWindowSeconds == 7, "the fixture runs D-057 on")
 
 	local race = Trip.raceParams(GameConfig)

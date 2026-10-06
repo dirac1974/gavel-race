@@ -1,4 +1,4 @@
-# Race steering calibration (D-054, stage S0; D-057, stage N1)
+# Race steering calibration (D-054, stage S0; D-057, stages N1 and N3)
 
 By the model engineer, 2026-10-05; revised after the PR #37 review. Python reference `src/trip.py`, calibration `sims/steering.py`, tests `tests/test_trip.py`. Reproduce with `python sims/steering.py --write`, which takes about 20 minutes on 12 cores. It rewrites `tests/fixtures/trip_baseline.json`, `game/src/shared/TripBaseline.luau` and the stored report `tests/fixtures/steering_report.json`, which the tests assert. `python sims/steering.py` reruns the report against the checked-in baseline.
 
@@ -14,7 +14,9 @@ By the model engineer, 2026-10-05; revised after the PR #37 review. Python refer
 
 `smart.homeLane` (2) and every other plan value are unchanged.
 
-**D-057 (natural steering), stage N1, 2026-10-06:** the rules are in `src/trip.py`, switched off, and the numbers with them on are in the last section, [Natural steering (D-057), stage N1](#natural-steering-d-057-stage-n1). Everything above still describes the game.
+**D-057 (natural steering), stage N1, 2026-10-06:** the rules are in `src/trip.py`, and the numbers with them on are in [Natural steering (D-057), stage N1](#natural-steering-d-057-stage-n1).
+
+**Stage N3, 2026-10-06: the game runs D-057's motion and press rules** (brushes stay off until N5). The game's numbers are in the last section, [The game's config (D-057 on, brushes off), stage N3](#the-games-config-d-057-on-brushes-off-stage-n3). Everything above is now the D-054 config, the switch-back (`trip.d054_config()`): its baseline and report moved to `tests/fixtures/trip_baseline_d054.json` and `steering_report_d054.json` (`python sims/steering.py --profile d054 --write`), and `tests/test_trip.py` still holds it to every D-054 target.
 
 ## Final values (mirror of `GameConfig.steering` for S2)
 
@@ -486,3 +488,51 @@ Stress run: 4,000 races (500 per cell), a masher, a ditherer and a casual rider 
   - `sideState(st, i, d)` returns "free", "tuck" or "blocked";
   - `boxedIn`, `noTuckInside` and `boxedNoTuck`.
   - The `trip_d057.json` snapshots carry these for every horse.
+
+# The game's config (D-057 on, brushes off), stage N3
+
+By the model engineer, 2026-10-06. N3 switched D-057's motion and press rules on in `trip.CONFIG` and `GameConfig.steering`: `glide = "eased"`, `chainWindow = 0.3`, `reverseGapSeconds = 0.5`, `weaveGapSeconds = 2.5`, `pressBounceSeconds = 0.2`, `glideReserveFeet = 6`, `blockedPress = "wait"`. Brushes stay `"off"` (N5). Reproduce with `python sims/steering.py --write` (about 30 minutes on 12 cores; the default profile is now `live`, `trip.CONFIG`). It rewrites `tests/fixtures/trip_baseline.json`, `game/src/shared/TripBaseline.luau` and `tests/fixtures/steering_report.json` (with four probe races), which `tests/test_trip_d057.py` asserts. Profiles: `live` (the game), `d057` (brushes on too, N5's preview; its files are unchanged by the flip, since `d057_config()` gives the same config from either base) and `d054` (the switch-back).
+
+**Short answer:** every D-054 τ target and every D-057 target passes in every course × distance, against the regenerated baseline. The numbers match the N1 run with brushes on, except where brushes moved them: the wanderer and casual columns move by up to 0.0008, and nobody is ever charged.
+
+Baseline: seed 20261005, 2,000 races per course × distance × post. Report: seed 20261006, 600 races per cell; griefing 200 races per cell, scenario and kid policy; stress 4,000 races.
+
+| Course | Distance | Smart Steer kid among bots | Rail rider | Rail − Smart | Never steers | Wanderer | Casual | All-Smart field | Post bias: kid among bots | Post bias: all-Smart | Draft share | In within 3 s: per intent / per press |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dirt | Sprint | +0.0002 | +0.0180 | +0.0179 | −0.0145 | −0.0037 | +0.0097 | +0.0000 | 0.0017 | 0.0016 | 34% | 98% / 93% |
+| dirt | Mile | −0.0005 | +0.0161 | +0.0167 | −0.0147 | −0.0058 | +0.0065 | +0.0000 | 0.0014 | 0.0017 | 28% | 73% / 69% |
+| dirt | Classic | +0.0001 | +0.0192 | +0.0195 | −0.0142 | −0.0015 | +0.0135 | +0.0003 | 0.0016 | 0.0014 | 34% | 91% / 86% |
+| dirt | Marathon | −0.0009 | +0.0239 | +0.0250 | −0.0151 | −0.0046 | +0.0115 | −0.0000 | 0.0013 | 0.0016 | 20% | 74% / 66% |
+| turf | Sprint | +0.0003 | +0.0175 | +0.0169 | −0.0134 | −0.0030 | +0.0101 | +0.0000 | 0.0017 | 0.0024 | 33% | 97% / 93% |
+| turf | Mile | −0.0002 | +0.0192 | +0.0195 | −0.0152 | −0.0049 | +0.0094 | +0.0001 | 0.0010 | 0.0014 | 32% | 84% / 77% |
+| turf | Classic | −0.0002 | +0.0194 | +0.0196 | −0.0148 | −0.0023 | +0.0125 | +0.0003 | 0.0013 | 0.0012 | 35% | 90% / 84% |
+| turf | Marathon | −0.0002 | +0.0264 | +0.0263 | −0.0151 | +0.0001 | +0.0178 | +0.0006 | 0.0014 | 0.0012 | 24% | 87% / 81% |
+
+| Target | Value | The game (N3) | D-054 (the switch-back) |
+| --- | --- | --- | --- |
+| Rail rider vs Smart Steer (every cell) | +0.01 to +0.03 | +0.017 to +0.026: pass | +0.016 to +0.026 |
+| Never-steer (every cell) | −0.02 to −0.01 | −0.015 to −0.013: pass | −0.015 to −0.013 |
+| Inward press reaching its lane within 3 s, per intent (every cell) | ≥ 70% | 73% to 98% (86.9% overall; rail rider 85.5%): pass | — |
+| …per press (information; the D-054 target) | — | 66% to 93% (81.5%) | 81% to 98% (90.4%) |
+| Draft share of positive trip (every cell) | ≤ 40% | 20% to 35% (29.3%): pass | 20% to 35% |
+| Post bias, Smart Steer kid among bots (every cell and post) | < 0.005 | ≤ 0.0017: pass | ≤ 0.0017 |
+| Post bias, all-Smart lobbies (every cell and post) | < 0.005 | ≤ 0.0024: pass | ≤ 0.0020 |
+| Smart Steer kid among bots averages (every cell) | 0 ± 0.003 | −0.0009 to +0.0003: pass | −0.0009 to +0.0003 |
+| All-Smart field mean (every cell) | 0 ± 0.003 | −0.0000 to +0.0006: pass | −0.0000 to +0.0006 |
+| Masher reversals a minute (every cell) | ≤ 8 | 6.3 to 7.4 (6.8 pooled): pass | 29 (prototype) |
+| Masher: none within 3 s of the previous (every cell) | ≥ 3 s | 3.5 s: pass | 0.6 s |
+| Sideways acceleration between ticks (every horse; + 0.5 for the landing tick) | ≤ 30 ft/s² | 30.4: pass | 200 |
+| Brushes | off | 0 brushes, nobody charged | — |
+| Griefing: targeted minus untargeted own trip (each scenario and kid, pooled) | ≥ −0.001 | −0.0003 to +0.0030: pass | — |
+| Stress, 4,000 races (masher + ditherer + casual among 5 bots) | 0 overlaps, fall-back ≤ 20 ft/s | 0 overlaps, 19.0 ft/s: pass | — |
+
+Other numbers:
+- **Glides:** one lane 1.0 s, two 1.6 s, three 2.3 s, four 3.0 s. Top sideways speed 9.0 ft/s (a 9.1° drift); sideways acceleration p50 10 and p95 30 ft/s², max 30.4.
+- **Body estimate** (SteerPose's rule on the 10 Hz lanes): yaw up to 9.1° (p95 10°), lean up to 2.9°.
+- **Zig-zag:** masher 6.8 reversals a minute (per cell 6.3–7.4), ditherer 12.1, wanderer 3.9, casual 1.2, all at least 3.5 s apart.
+- **Boxed in** (Smart Steer kid): 6.4% of pre-lock time, at least 1 s in 21% of races; boxed with no tuck slot inside 1.4%.
+- **Lanes at the lock:** Smart Steer 1.86–1.99, rail rider 1.00, never-steer 4.4–4.6.
+- **Waits:** a masher's presses bounce 40 times a race and wait over 1 s 30 times; a casual rider waits over 1 s 1.6 times a race.
+- **Griefing** (own trip, targeted minus untargeted): Smart Steer kid shadow +0.0003, crew +0.0030, bumper +0.0005; rail kid +0.0001, +0.0001, −0.0003.
+
+**On screen** (`tests/luau/overlap_report`, the game's config, 960 races per row; numbers in DECISIONS D-057 N3): no overlaps on any screen, no horse falling back faster than 20 ft/s, the order across the line right, 0–2 full-lane moves in the last 2 s per 960 races (the gate allows 100), no after-lock reversal within 3.5 s, and the drawn sideways acceleration within 31.7 ft/s², also with 0–30 ms of jitter on the link (the screen plays the samples back by their server timestamps, `Playback`).
