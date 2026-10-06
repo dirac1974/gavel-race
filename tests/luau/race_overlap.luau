@@ -20,7 +20,11 @@
 --     in the samples). Also counts each rider's reversals and the shortest gap between them, the
 --     drawn sideways acceleration (every horse, before and after the lock), brushes, and how long
 --     riders are boxed in. With predict, rider 1 ("own") presses from its screen and three styled
---     riders follow. Without d057, everything is as before (D-054).
+--     riders follow. Also counts the moves after the lock (every horse): late full-lane moves (in
+--     the last 2 s), late half-lane steps, and reversals after the lock with the gap to the one
+--     before. Without d057, everything is as before (D-054).
+--   jitter = extra random delay on each message to the client, 0..jitter s (in order, as
+--     RemoteEvents arrive), from its own generator; informational until N3's RaceView buffers.
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -61,7 +65,8 @@ export type Stats = { before: number, first5: number, after: number, lastTwo: nu
 	lineOrder: { number }, result: { number }, answers: { [string]: number }, halfSteps: number,
 	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own?,
 	reversals: { [string]: { count: number, seconds: number, minGap: number } }, accelBefore: number, accelAfter: number,
-	brushes: number, boxedTicks: number, riderTicks: number }
+	brushes: number, boxedTicks: number, riderTicks: number, afterMoves: number, lateMoves: number, lateHalfSteps: number,
+	afterReversals: number, afterReversalsWithin: number, afterMinGap: number }
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local d057 = opts ~= nil and opts.d057 == true
@@ -77,6 +82,12 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape }
 	local predict = opts ~= nil and opts.predict == true
 	local latency = if opts and opts.latency then opts.latency elseif predict then 0.1 else 0
+	local jitter = (opts and opts.jitter) or 0
+	local jitterRng = makeRng(seed * 17 + 5)
+	local function arrival(T: number): number -- when a message sent at T reaches the client
+		if jitter > 0 then return T + latency + jitter * jitterRng:NextNumber() end
+		return T + latency
+	end
 	local humans, riders = {}, {}
 	local styles = (opts and opts.styles)
 		or (if d057 and predict then { "own", "masher", "ditherer", "casual" } elseif d057 then { "masher", "ditherer", "casual" } else {})
@@ -122,7 +133,11 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local sampleAt, sampleT = 0, 0 -- when the shown sample arrived, and the server tick that made it
 	local stats: Stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {},
 		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil,
-		reversals = {}, accelBefore = 0, accelAfter = 0, brushes = 0, boxedTicks = 0, riderTicks = 0 }
+		reversals = {}, accelBefore = 0, accelAfter = 0, brushes = 0, boxedTicks = 0, riderTicks = 0,
+		afterMoves = 0, lateMoves = 0, lateHalfSteps = 0, afterReversals = 0, afterReversalsWithin = 0, afterMinGap = math.huge }
+	-- Every horse's lane moves (the trip's before the lock, the shown lanes' after it): direction,
+	-- lane, and when it last turned, for the after-lock counts.
+	local moveTgt, moveDir, moveRev = table.clone(trip.tgt), table.create(n, 0), table.create(n, -math.huge)
 	-- D-057 counts: each rider's lane-change starts (from the server's tgt), boxed-in ticks, and the
 	-- drawn sideways speed per frame (for the acceleration: lanes interpolate the 10 Hz samples, so
 	-- the drawn speed changes once a sample interval and the change over that interval is the
@@ -148,6 +163,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	-- Rider 1's own screen (predict).
 	local me = if predict then session:laneIndex("rider1") :: number else 0
 	local ownLane, clientLocked = if predict then lane[me] else 0, false
+	local ownFrom = ownLane
 	local state = SteerPredict.new()
 	local view = { me = me, lanes = cfgGame.lanes, x = laneTarget, off = offset, srv = nil, cfg = steer }
 	local own: Own = { overlapsBefore = 0, overlapsAfter = 0, apartMax = 0, apartAtLock = 0, timeouts = 0, longestPrediction = 0,
@@ -237,15 +253,37 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 			lastFrame = T
 			-- RaceService skips unchanged lanes, which leaves the client's lane targets as they are, so
 			-- sending them every tick is the same.
-			table.insert(inbox, { at = T + latency, kind = "offsets", offsets = offsets, lanes = sentLanes, T = T })
+			table.insert(inbox, { at = arrival(T), kind = "offsets", offsets = offsets, lanes = sentLanes, T = T })
+			local laneNow = if trip.locked then trip.shownTgt else trip.tgt
+			for i = 1, n do
+				if laneNow[i] ~= moveTgt[i] then
+					local dir = if laneNow[i] > moveTgt[i] then 1 else -1
+					if trip.locked then
+						stats.afterMoves += 1
+						if tFinish - T <= 2 + 1e-9 then
+							if math.abs(laneNow[i] - moveTgt[i]) >= 1 - 1e-9 then stats.lateMoves += 1 else stats.lateHalfSteps += 1 end
+						end
+					end
+					if moveDir[i] ~= 0 and dir ~= moveDir[i] then
+						if trip.locked then
+							local gap = T - moveRev[i]
+							stats.afterReversals += 1
+							stats.afterMinGap = math.min(stats.afterMinGap, gap)
+							if gap < 3.5 - 1e-6 then stats.afterReversalsWithin += 1 end
+						end
+						moveRev[i] = T
+					end
+					moveDir[i], moveTgt[i] = dir, laneNow[i]
+				end
+			end
 			if predict and not trip.locked then
 				local ownNow = { trip.tgt[me], Trip.laneAfter(trip, me), trip.ack[me] }
 				if not sentOwn or sentOwn[1] ~= ownNow[1] or sentOwn[2] ~= ownNow[2] or sentOwn[3] ~= ownNow[3] then
 					sentOwn = ownNow
-					table.insert(inbox, { at = T + latency, kind = "own", own = ownNow })
+					table.insert(inbox, { at = arrival(T), kind = "own", own = ownNow })
 				end
 			end
-			if trip.locked and not wasLocked then table.insert(inbox, { at = T + latency, kind = "locked" }) end
+			if trip.locked and not wasLocked then table.insert(inbox, { at = arrival(T), kind = "locked" }) end
 		end
 		-- Client frames until the next server tick.
 		local tc = T
@@ -259,6 +297,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 						laneFrom[i] = lane[i]
 						laneTarget[i] = (m.lanes :: { number })[i]
 					end
+					ownFrom = ownLane
 					-- As RaceView: the glide to the new sample is timed from its arrival (here, just
 					-- after the last frame), so a message a frame late never squeezes a glide.
 					sampleAt, sampleT = tc - FRAME, m.T
@@ -360,8 +399,8 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					end
 				end
 				local laneTo = SteerPredict.laneTo(state, view, tc, clientLocked)
-				if d057 then
-					ownLane = lane[me] -- SteerPredict draws nothing with the eased glide (laneTo is the server's lane)
+				if d057 then -- interpolated toward SteerPredict's answer, as the shared lanes (eased: the server's lane)
+					ownLane = if f >= 1 - 1e-9 then laneTo else ownFrom + (laneTo - ownFrom) * f
 				else
 					ownLane += math.clamp(laneTo - ownLane, -glide, glide)
 				end
@@ -402,6 +441,6 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	stats.lineOrder, stats.result = line, result
 	stats.halfSteps = trip.halfSteps or 0
 	stats.brushes = #trip.events
-	for _, r in stats.reversals do r.seconds += trip.lockT end
+	for _, h in humans do stats.reversals[style[h.id]].seconds += trip.lockT end -- per rider
 	return stats
 end

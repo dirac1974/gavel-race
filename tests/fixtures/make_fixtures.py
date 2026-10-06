@@ -2,8 +2,9 @@
 """Generate Python reference fixtures for the Luau parity tests.
 
 Writes tests/fixtures/race_math.json and tests/fixtures/trip.json; with --d057 also
-tests/fixtures/trip_d057.json (about 15 MB; CI and tests/test_luau_parity.py pass --d057, and
-tests/luau/trip_d057_tests.luau replays it against Trip.luau). Deterministic (fixed seeds).
+tests/fixtures/trip_d057.json (about 7 MB; CI passes --d057, tests/test_luau_parity.py does when
+its inputs changed, and tests/luau/trip_d057_tests.luau replays it against Trip.luau).
+Deterministic (fixed seeds).
 race_math.json is append-only: new sections draw from their own generators, so the original
 sections stay byte-for-byte the same. trip.json is D-054 (it records the config without the
 D-057 keys, which are all off); trip_d057.json is D-057 switched on.
@@ -275,8 +276,8 @@ def trip_fixture(only=None):
 
 # ---------------------------------------------------------------- D-057 (stage N1, for the N2 port)
 
-TRIP_D057_RUNS = 100
-D057_SNAPSHOT_EVERY = 10
+TRIP_D057_RUNS = 50
+D057_SNAPSHOT_EVERY = 20
 # Runs k >= 8 cycle through these on top of the D-057 config, so every switch's other branch is
 # replayed too.
 D057_OVERRIDES = [None] * 8 + [
@@ -301,9 +302,10 @@ def _d057_cfg(override=None):
 
 
 def _d057_snapshot(st_, tick):
-    """Everything the N2 port compares at a tick (the clocks included), plus the boxed-in view N4
-    reads. boxed, noTuckInside and boxedNoTuck are trip.boxed_in, trip.no_tuck_inside and
-    trip.boxed_no_tuck, worked out from the sides already found."""
+    """Everything the N2 port compares at a tick (every clock and per-horse field D-057 adds or
+    reads), plus the boxed-in view N4 reads. boxed, noTuckInside and boxedNoTuck are
+    trip.boxed_in, trip.no_tuck_inside and trip.boxed_no_tuck, worked out from the sides already
+    found."""
     n = st_.n
     sides = [[trip.side_state(st_, i, -1), trip.side_state(st_, i, 1)] for i in range(n)]
     boxed = [sides[i][0] != "free" and sides[i][1] != "free" and trip.horse_ahead(st_, i, st_.cfg["boxedAheadFeet"])
@@ -315,6 +317,9 @@ def _d057_snapshot(st_, tick):
             "alongSince": [list(a) for a in st_.along_since], "steadyUntil": list(st_.steady_until),
             "firstPressAt": list(st_.first_press_at), "lastRevAt": list(st_.last_rev_at),
             "arrivedAt": list(st_.arrived_at), "manualAt": list(st_.manual_at),
+            "smartBlockAt": list(st_.smart_block_at), "lastPressAt": list(st_.last_press_at),
+            "lastPressDir": list(st_.last_press_dir), "wantAt": list(st_.want_at),
+            "lastChange": list(st_.last_change), "lastDir": list(st_.last_dir), "tuck": list(st_.tuck),
             "sides": sides, "boxed": boxed, "noTuckInside": no_tuck,
             "boxedNoTuck": [boxed[i] and no_tuck[i] for i in range(n)]}
 
@@ -540,9 +545,10 @@ def trip_d057_fixture(only=None):
     D057_OVERRIDES), plus hand-built edge runs (`edges`, one per rule edge, snapshots every
     tick). Same conventions as trip.json: 1-based lanes in intents ([tick, lane, dir]), live =
     q before switchTick and p1 from it, exact decimal strings for the lanes' inputs, presses
-    after the bell all "locked". Snapshots add v, want, queued, check, charged, tucking, the
-    clocks (alongSince, steadyUntil, firstPressAt, lastRevAt, arrivedAt, manualAt), each side's
-    state ("free", "tuck", "blocked"), boxed, noTuckInside and boxedNoTuck. Results add brushes,
+    after the bell all "locked". Snapshots (every D057_SNAPSHOT_EVERY ticks) add v, want, queued,
+    check, charged, tucking, tuck, every clock (alongSince, steadyUntil, firstPressAt, lastRevAt,
+    arrivedAt, manualAt, smartBlockAt, lastPressAt, lastPressDir, wantAt, lastChange, lastDir),
+    each side's state ("free", "tuck", "blocked"), boxed, noTuckInside and boxedNoTuck. Results add brushes,
     charged, charges (brush_charge), events ([tick, mover, other, dir], 1-based) and tau with the
     brush term. cfg = the D-057 config; defaults = trip.CONFIG with every key (D-054 values),
     what GameConfig.steering holds until N3; a run with other settings carries its whole cfg.

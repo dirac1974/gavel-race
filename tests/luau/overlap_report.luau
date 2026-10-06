@@ -1,18 +1,25 @@
 --!strict
 -- Overlap report (D-054 S2, S3; D-057 N2): how often horses overlap on screen, before the far-turn
 -- lock, in the first 5 s after it, and from the lock to the line.
--- Run: lune run tests/luau/overlap_report [races] [riders=N] [manual] [predict] [latency=S] [d057]
+-- Run: lune run tests/luau/overlap_report [races] [riders=N] [manual] [predict] [latency=S] [jitter=S] [d057]
 --   riders = lanes pressing ◀ ▶ at random (S3); manual = with Smart Steer off; predict = rider 1
 --   presses from its own screen (singles, doubles, mashes, In-then-Out) with `latency` each way
 --   (0.1 s by default), its horse drawn by SteerPredict; the report then adds that screen's numbers.
 --   d057 = natural steering on (D-057, brushes included) with a masher, a ditherer and a casual
 --   rider (riders=N takes the first N of those; with predict, rider 1 presses from its screen and
 --   the three follow), lanes drawn from the interpolated 10 Hz samples as N3's RaceView will draw
---   them; the report adds reversals, the drawn sideways acceleration, brushes and boxed-in time.
+--   them; the report adds reversals, the drawn sideways acceleration, brushes, boxed-in time, the
+--   moves after the lock (late full-lane moves in the last 2 s, late half-lane steps) and the
+--   reversals after the lock.
+--   jitter = up to S s of extra random delay on each message (in order): informational until N3,
+--   whose RaceView must interpolate lanes by server time (or keep a one-sample buffer).
 -- Exits 1 if any race overlaps on any screen, draws a horse falling back faster than 20 ft/s,
 -- or crosses the line out of order; with d057 also if a rider reverses within 3 s of its last
--- reversal or the drawn sideways acceleration passes 31.7 ft/s^2 (D-057's 30, plus 0.5 for the
--- landing tick and 1.2 for the 0.001-lane rounding of the sent lanes).
+-- reversal, any horse reverses after the lock within 3.5 s of its last reversal, late full-lane
+-- moves pass 100 per 960 races (D-054 makes 59-99), or the drawn sideways acceleration passes
+-- 31.7 ft/s^2. (Trip's landing tick reaches 30.4 ft/s^2, against D-057's 30; the sent lanes'
+-- 0.001-lane rounding adds up to 1.2 more, 0.002 lane over a second difference: 31.6.) A jitter
+-- run reports and never fails.
 local process = require("@lune/process")
 local simulate = require("./race_overlap")
 
@@ -37,6 +44,7 @@ local own = { races = 0, overlapsBefore = 0, overlapsAfter = 0, framesBefore = 0
 	timeouts = 0, longest = 0, presses = 0, predicted = 0 }
 local reversals: { [string]: { count: number, seconds: number, minGap: number } } = {}
 local accelBefore, accelAfter, brushes, brushRaces, boxedTicks, riderTicks = 0, 0, 0, 0, 0, 0
+local after = { moves = 0, late = 0, lateRaces = 0, lateHalf = 0, reversals = 0, within = 0, minGap = math.huge }
 for _, course in { "dirt", "turf" } do
 	for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
 		local cell = { before = 0, first5 = 0, after = 0 }
@@ -72,6 +80,13 @@ for _, course in { "dirt", "turf" } do
 			if s.brushes > 0 then brushRaces += 1 end
 			boxedTicks += s.boxedTicks
 			riderTicks += s.riderTicks
+			after.moves += s.afterMoves
+			after.late += s.lateMoves
+			if s.lateMoves > 0 then after.lateRaces += 1 end
+			after.lateHalf += s.lateHalfSteps
+			after.reversals += s.afterReversals
+			after.within += s.afterReversalsWithin
+			after.minGap = math.min(after.minGap, s.afterMinGap)
 			local o = s.own
 			if o then
 				own.races += 1
@@ -124,6 +139,9 @@ if opts.d057 then
 	print(string.format("D-057 drawn sideways acceleration, fastest: before the lock %.1f ft/s^2, after it %.1f ft/s^2", accelBefore, accelAfter))
 	print(string.format("D-057 brushes: %d in %d/%d races (%.2f a race); riders boxed in %.1f%% of their pre-lock time",
 		brushes, brushRaces, totals.races, brushes / totals.races, 100 * boxedTicks / math.max(riderTicks, 1)))
+	print(string.format("D-057 after the lock: %d moves; in the last 2 s %d full-lane moves (%d races) and %d half-lane steps; %d reversals, %d within 3.5 s of the last, shortest gap %s",
+		after.moves, after.late, after.lateRaces, after.lateHalf, after.reversals, after.within,
+		if after.minGap < math.huge then string.format("%.1f s", after.minGap) else "-"))
 end
 local problems = {}
 if totals.beforeFrames + totals.afterFrames > 0 then table.insert(problems, "overlapping horses on the shared screen") end
@@ -134,9 +152,15 @@ if opts.d057 then
 	for styleName, r in reversals do
 		if r.minGap < 3 - 1e-9 then table.insert(problems, styleName .. " reverses within 3 s") end
 	end
-	-- D-057's 30 ft/s^2, + 0.5 for the landing tick (Trip's own sideways speed changes at most 27),
-	-- + 1.2 for the sent lanes' 0.001-lane rounding (0.002 lane over a second difference).
+	-- Trip's landing tick reaches 30.4 ft/s^2 (its own sideways speed changes at most 27); the sent
+	-- lanes' 0.001-lane rounding adds up to 1.2 (0.002 lane over a second difference): 31.6.
 	if math.max(accelBefore, accelAfter) > 31.7 then table.insert(problems, "drawn sideways acceleration over 31.7 ft/s^2") end
+	if after.minGap < 3.5 - 1e-6 then table.insert(problems, "a horse reverses after the lock within 3.5 s of its last reversal") end
+	if after.late > 100 / 960 * totals.races + 1e-9 then table.insert(problems, "more than 100 late full-lane moves per 960 races") end
+end
+if (opts.jitter or 0) > 0 then
+	print(if #problems > 0 then "INFO (jitter, informational until N3): " .. table.concat(problems, "; ") else "INFO (jitter): no problems")
+	process.exit(0)
 end
 if #problems > 0 then
 	print("FAIL: " .. table.concat(problems, "; "))

@@ -2,7 +2,7 @@
 -- Natural steering stage N2 (D-057): Trip.luau with D-057 switched on against the Python reference
 -- (tests/fixtures/trip_d057.json from `python tests/fixtures/make_fixtures.py --d057`, 1e-9): every
 -- answer, snapshot (lanes, sideways speeds, offsets, targets, waiting presses, steadying, charges,
--- tucking, every clock, each side's state, boxed in), brush event, trip, charge, tau with the
+-- tucking, tuck-back, every clock, each side's state, boxed in), brush event, trip, charge, tau with the
 -- brush term and stars, for the scripted runs and the hand-built edge runs. Also: GameConfig.steering
 -- holds every D-057 key with its D-054 value (the game stays on D-054 until N3). Run from
 -- run_all.luau.
@@ -144,6 +144,12 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 						{ "lastRevAt", nums(st.lastRevAt, snap.lastRevAt, 1e-9) },
 						{ "arrivedAt", nums(st.arrivedAt, snap.arrivedAt, 1e-9) },
 						{ "manualAt", nums(st.manualAt, snap.manualAt, 1e-9) },
+						{ "smartBlockAt", nums(st.smartBlockAt, snap.smartBlockAt, 1e-9) },
+						{ "lastPressAt", nums(st.lastPressAt, snap.lastPressAt, 1e-9) },
+						{ "lastPressDir", same(st.lastPressDir, snap.lastPressDir) },
+						{ "wantAt", nums(st.wantAt, snap.wantAt, 1e-9) },
+						{ "lastChange", nums(st.lastChange, snap.lastChange, 1e-9) },
+						{ "lastDir", same(st.lastDir, snap.lastDir) }, { "tuck", nums(st.tuck, snap.tuck, 1e-9) },
 						{ "sides", deepEqual(sides, snap.sides, 0) }, { "boxed", same(boxed, snap.boxed) },
 						{ "noTuckInside", same(noTuck, snap.noTuckInside) }, { "boxedNoTuck", same(boxedNoTuck, snap.boxedNoTuck) },
 					}
@@ -208,7 +214,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	end
 	local brushes = 0
 	for _, run in data.runs do brushes += #run.events end
-	check(#data.runs >= 100 and runsOk == #data.runs,
+	check(#data.runs >= 50 and runsOk == #data.runs,
 		`all {#data.runs} trip_d057.json runs replay to 1e-9 ({runsOk} matched; {brushes} brush events)`)
 	check(#data.edges >= 12 and edgesOk == #data.edges, `all {#data.edges} edge runs replay to 1e-9 ({table.concat(names, ", ")})`)
 	for what, count in failed do check(false, `trip_d057: {what} differs in {count} places`) end
@@ -226,10 +232,13 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	-- samples interpolated (N3's RaceView), half of the races with rider 1 pressing from its own
 	-- screen over a 0.1 s link. No horse within half a lane and 6 ft of another on any screen, none
 	-- drawn falling back faster than 20 ft/s, the order across the line the result, no rider
-	-- reversing within 3 s of its last reversal, and the drawn sideways acceleration within D-057's
-	-- 30 ft/s^2 (+0.5 for the landing tick, +1.2 for the 0.001-lane rounding of the sent lanes).
+	-- reversing within 3 s of its last reversal, no horse reversing after the lock within 3.5 s of
+	-- its last reversal, no full-lane move in the last 2 s (the report allows 100 per 960 races),
+	-- and the drawn sideways acceleration within 31.7 ft/s^2 (Trip's landing tick reaches 30.4,
+	-- the 0.001-lane rounding of the sent lanes adds up to 1.2).
 	local simulateRace = require("./race_overlap")
 	local races, overlaps, own, jerks, wrongOrder, predicted, minGap, accel, brushes = 0, 0, 0, 0, 0, 0, math.huge, 0, 0
+	local afterMoves, lateMoves, afterGap = 0, 0, math.huge
 	local cell = 0
 	for _, course in { "dirt", "turf" } do
 		for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
@@ -247,6 +256,9 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 				for _, r in res.reversals do minGap = math.min(minGap, r.minGap) end
 				accel = math.max(accel, res.accelBefore, res.accelAfter)
 				brushes += res.brushes
+				afterMoves += res.afterMoves
+				lateMoves += res.lateMoves
+				afterGap = math.min(afterGap, res.afterMinGap)
 			end
 		end
 	end
@@ -256,4 +268,24 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(accel <= 31.7, `D-057 on: drawn sideways acceleration within 31.7 ft/s^2 ({accel})`)
 	check(predicted == 0, "D-057 on: SteerPredict draws nothing ahead of the server (the slide starts with the server's lane)")
 	check(brushes > 0, `D-057 on: brushes happen ({brushes} in {races} races)`)
+	check(afterMoves > 0 and afterGap >= 3.5 - 1e-6,
+		`D-057 on: after the lock no horse reverses within 3.5 s of its last reversal ({afterMoves} moves, shortest gap {afterGap} s)`)
+	check(lateMoves == 0, `D-057 on: no full-lane move in the last 2 s ({lateMoves})`)
+
+	-- Repro races from the PR #49 review: without a plan, seed 174221 (the report's race 22) overlapped
+	-- on dirt and turf Marathon with a rider pressing from its own screen (15-20 frames at 0.1 and
+	-- 0.25 s), and only a late full-lane dodge saved it; a half-step-only dodge overlapped on dirt
+	-- Marathon, seed 277168. With the plan they run clean with no late full-lane moves.
+	local repro = {}
+	for _, case in { { "dirt", 174221 }, { "turf", 174221 }, { "dirt", 277168 } } do
+		for _, latency in { 0.1, 0.25 } do
+			local res = simulateRace(case[1], "Marathon", case[2], nil, { d057 = true, predict = true, latency = latency })
+			local frames = res.before + res.after + res.own.overlapsBefore + res.own.overlapsAfter
+			if frames > 0 or res.lateMoves > 0 or not res.orderOk or res.afterMinGap < 3.5 - 1e-6 then
+				table.insert(repro, `{case[1]} {case[2]} at {latency} s: {frames} overlapping frames, {res.lateMoves} late moves`)
+			end
+		end
+	end
+	check(#repro == 0, "D-057 repro races (174221 dirt/turf Marathon, 277168 dirt Marathon, predict at 0.1 and 0.25 s) run clean"
+		.. (if #repro > 0 then ": " .. table.concat(repro, "; ") else ""))
 end

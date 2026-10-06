@@ -4,7 +4,8 @@
 -- runs under Lune.
 --
 -- Mirrors src/trip.py line by line; tests/luau/trip_tests.luau replays tests/fixtures/trip.json
--- (D-054) and tests/fixtures/trip_d057.json (D-057 on) and must agree to 1e-9 (D-012). Mirror
+-- (D-054) and tests/luau/trip_d057_tests.luau replays tests/fixtures/trip_d057.json (D-057 on);
+-- both must agree to 1e-9 (D-012). Mirror
 -- rules: lanes visited in index order; every sort uses a total key (offset, then lane position,
 -- then index); step, lock and tau use only + - * /, comparisons, min, max, abs and sqrt (sqrt is
 -- correctly rounded in Luau and CPython alike; only the D-057 eased glide uses it); "never" times
@@ -42,6 +43,7 @@ Trip.D057 = {
 
 function Trip.d057Config(steering: any): any
 	local cfg = table.clone(steering)
+	cfg.smart, cfg.bots, cfg.stars = table.clone(steering.smart), table.clone(steering.bots), table.clone(steering.stars)
 	for key, value in Trip.D057 do cfg[key] = value end
 	return cfg
 end
@@ -150,6 +152,9 @@ function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: a
 	-- little must finish before two horses meet).
 	st.view = table.clone(st.off)
 	st.shown, st.shownTgt, st.shownV = table.clone(st.x), table.clone(st.tgt), table.create(n, 0)
+	-- (eased) the after-lock lanes' own reverse and weave gaps (Trip.cosmetic), carried on from
+	-- the trip at the bell: the last move's direction, when it last turned, when it landed.
+	st.shownDir, st.shownRevAt, st.shownArrived = table.create(n, 0), table.create(n, LONG_AGO), table.create(n, LONG_AGO)
 	st.lookahead = cfg.holdGap + 2 * race.maxGapFeetPerSecond * (Trip.glideSeconds(cfg, 1) + 0.2)
 	local smart, bots = cfg.smart, cfg.bots
 	for i = 1, n do
@@ -946,6 +951,9 @@ function Trip.advance(st: any, live: { number }, t: number): boolean
 		st.shownTgt = table.clone(st.tgt) -- a glide under way at the bell finishes on screen...
 		st.shownV = table.clone(st.v)     -- ...at its speed (the eased glide carries on, D-057)
 		st.shownLanded = {}               -- a horse that landed on the last tick rests a tick (Trip.cosmetic)
+		st.shownDir = table.clone(st.lastDir)        -- and the reverse and weave gaps carry on
+		st.shownRevAt = table.clone(st.lastRevAt)
+		st.shownArrived = table.clone(st.arrivedAt)
 		for i = 1, st.n do
 			if st.arrivedAt[i] >= st.tick * st.dt - 1e-6 then st.shownLanded[i] = true end
 		end
@@ -995,13 +1003,19 @@ local function holdView(st: any, before: { number }, h: number)
 		if x[a] ~= x[b] then return x[a] < x[b] end
 		return a < b
 	end)
+	local eased = st.cfg.glide == "eased"
 	for a = 1, st.n do
 		local i = ord[a]
 		for b = 1, a - 1 do
 			local j = ord[b]
 			local apart = math.abs(x[i] - x[j])
-			local halfway = (tgt[i] % 1 ~= 0 or tgt[j] % 1 ~= 0) and apart > 0.45
-			if apart < band and not halfway and view[j] - view[i] < gap then
+			-- (eased: only once the step is done; the S-curve takes its last 0.05 lane slowly, and a
+			-- horse closing in meanwhile would still be within half a lane)
+			local halfway = (tgt[i] % 1 ~= 0 or tgt[j] % 1 ~= 0) and (if eased then apart >= 0.5 - 1e-9 else apart > 0.45)
+			-- (eased) two horses gliding into the same lane share it already: a 1.0 s glide from
+			-- either side would otherwise meet before the hold sees them in one lane.
+			local shared = apart < band or (eased and tgt[i] == tgt[j] and x[i] ~= x[j])
+			if shared and not halfway and view[j] - view[i] < gap then
 				view[i] = math.max(view[j] - gap, math.min(view[i], before[i] - pull))
 			end
 		end
@@ -1028,13 +1042,6 @@ function Trip.viewStep(st: any, targets: { number }, dt: number, toLine: number)
 	end
 end
 
--- j, ahead of i on screen in i's lane, is in i's way: i is held behind it (closer than holdGap)
--- or closing on it (i's place is not holdGap behind j's) from less than the look-ahead apart.
-local function inWay(st: any, i: number, j: number, targets: { number }): boolean
-	local d = st.view[j] - st.view[i]
-	return d < st.cfg.holdGap or (targets[i] > targets[j] - st.cfg.holdGap and d < st.lookahead)
-end
-
 -- After the lock, lanes are cosmetic: they make room so horses passing on screen (the race
 -- shape's luck blend) never run through each other. Working on the shown offsets (st.view, held
 -- by viewStep), the horse behind on screen in a meeting glides to the nearest free lane it can
@@ -1044,21 +1051,54 @@ end
 -- nobody is there (S4): it may finish less than a length behind the horse ahead in its lane, and
 -- then the two finish staggered instead of through each other. Decided again each tick. Never
 -- touches the trip or tau. t = race time (seconds since the gate). Returns the lanes to show.
--- With the eased glide (D-057) the shown lanes glide on the same S-curve as the trip (Trip's
--- easeStep on st.shownV), so nothing slides at once after the lock either. A horse starts a new
--- move only from rest, so no glide ever turns back, and not on the tick it lands (it rests a tick
--- first): landing and setting straight off the other way would add up to 47 ft/s^2.
-function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { number }
+--
+-- With the eased glide (D-057) the after-lock lanes move like the trip's:
+-- * the same S-curve (Trip's easeStep on st.shownV), so nothing slides at once;
+-- * a horse starts a new move only from rest, never on the tick it lands (it rests a tick:
+--   landing and setting straight off the other way drew 47 ft/s^2), and a move the other way
+--   waits the trip's reverse gap after landing, or its weave gap for a second reversal within
+--   weaveWindowSeconds (st.shownDir / shownRevAt / shownArrived, carried on from the trip at the
+--   bell), so no horse zig-zags after the lock either;
+-- * planned, not dodged: plan = where each horse is heading by the last tap (the race shape at
+--   full luck weight, Trip.frame passes it; re-planned every tick as the live chances move). A
+--   horse whose planned place is within holdGap behind, or ahead of, a horse ahead in its lane,
+--   within PLAN_SECONDS of closing, moves over now, with one S-curve move, outward first;
+-- * in the last moments (the half-lane-step window) a horse still boxed in edges half a lane
+--   over before it tries a full lane change, so late conflicts end in a small step, not a swerve;
+-- * a horse moving in front of another keeps the glide reserve from it (targets drift while a
+--   1.0 s glide is under way).
+-- plan is optional (tests may call without it): the current targets then stand in.
+local PLAN_SECONDS = 3 -- (eased) look this far ahead for meetings: two horses close at up to 2 * maxGapFeetPerSecond
+
+function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number, plan: { number }?): { number }
 	local cfg, n = st.cfg, st.n
 	local band = cfg.laneBand
 	Trip.viewStep(st, targets, dt, st.geo.length / st.speed - t)
 	local view, x, tgt = st.view, st.shown, st.shownTgt
 	local eased = cfg.glide == "eased"
+	local aim = if eased and plan ~= nil then plan else targets
 	local landed = st.shownLanded or {} -- (eased) horses that landed on the last tick rest this one
 	st.shownLanded = {}
 	-- j may start a move: at rest (and, eased, not just landed).
 	local function atRest(j: number): boolean
 		return x[j] == tgt[j] and not (eased and landed[j])
+	end
+	-- (eased) j may start a move in direction dir: the same way as its last move, or the other way
+	-- once the reverse gap (or the weave gap, for a second reversal within the window) has passed
+	-- since it landed.
+	local function mayTurn(j: number, dir: number): boolean
+		if not eased or st.shownDir[j] == 0 or dir == st.shownDir[j] then return true end
+		local g = cfg.reverseGapSeconds
+		if cfg.weaveGapSeconds > g and t - st.shownRevAt[j] < cfg.weaveWindowSeconds - EPS then g = cfg.weaveGapSeconds end
+		return t - st.shownArrived[j] >= g - EPS
+	end
+	local function startMove(j: number, to: number)
+		if eased then
+			local dir = if to > tgt[j] then 1 else -1
+			if st.shownDir[j] ~= 0 and dir ~= st.shownDir[j] then st.shownRevAt[j] = t end
+			st.shownDir[j] = dir
+		end
+		tgt[j] = to
 	end
 	local ord = table.create(n)
 	for i = 1, n do ord[i] = i end
@@ -1072,10 +1112,17 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 	local cross = 2 * st.race.maxGapFeetPerSecond * laneTime -- closing while crossing a lane
 	-- Half-lane steps start this long before the holds let go, so the step is done by then.
 	local stepping = Trip.halfSteps and st.geo.length / st.speed - t <= HOLD_RELEASE_SECONDS + laneTime
-	-- Eased (D-057): a half-lane step takes about 0.7 s, not 0.3, and targets can drift meanwhile, so
-	-- in those last moments a horse within holdGap + glideReserveFeet behind another in its lane
-	-- starts looking for a way out (a lane, a horse to make way, or the half-lane step) already.
-	local early = eased and stepping
+	-- How far ahead (feet) a meeting counts: the make-room look-ahead, or (eased) PLAN_SECONDS of
+	-- closing, whichever is longer.
+	local ahead = if eased then math.max(st.lookahead, cfg.holdGap + 2 * st.race.maxGapFeetPerSecond * PLAN_SECONDS) else st.lookahead
+	-- j, ahead of i on screen in i's lane, is in i's way: i is held behind it (closer than holdGap)
+	-- or will close on it (i's place, or with the eased glide its planned place, is not holdGap
+	-- behind j's) from less than the look-ahead apart.
+	local margin = if eased then cfg.holdGap + cfg.glideReserveFeet else cfg.holdGap
+	local function inWay(i: number, j: number): boolean
+		local d = view[j] - view[i]
+		return d < cfg.holdGap or (aim[i] > aim[j] - margin and d < ahead)
+	end
 	-- j is in `lane`: there, heading there, or gliding across it on the way (S4 review: a horse that
 	-- moved onto another's path got held back as the other crossed, a jerk on screen).
 	local function inLane(j: number, lane: number): boolean
@@ -1084,9 +1131,9 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 	end
 	-- j stands in i's way in `lane`: within holdGap ahead or behind, ahead and being closed on by i,
 	-- or behind and closing on i (S4 review: closer than holdGap, or with one catching the other,
-	-- the hold would pull one of them back when they meet, a jerk on screen).
-	-- With the eased glide a move takes longer (1.0 s a lane) and targets can drift meanwhile, so a
-	-- horse moving in front of another keeps the trip's glide reserve from it (glideReserveFeet).
+	-- the hold would pull one of them back when they meet, a jerk on screen). With the eased glide
+	-- a horse moving in front of another keeps the glide reserve from it. (Closing is judged on the
+	-- targets now, not the plan: a horse that will pass half the field would find no lane free.)
 	local reserve = if eased then cfg.glideReserveFeet else 0
 	local function blocks(i: number, j: number, lane: number): boolean
 		if j == i or not inLane(j, lane) then return false end
@@ -1109,12 +1156,13 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 		end
 		return true
 	end
-	-- The nearest free lane i can reach across passable lanes, outward first at equal distance.
+	-- The nearest free lane i can reach across passable lanes, outward first at equal distance
+	-- (and, eased, only a way it may turn).
 	local function findLane(i: number): number?
 		for dist = 1, st.lanes - 1 do
 			for _, dir in { 1, -1 } do
 				local lane = tgt[i] + dir * dist
-				if lane >= 1 and lane <= st.lanes and free(i, lane) then
+				if lane >= 1 and lane <= st.lanes and mayTurn(i, dir) and free(i, lane) then
 					local ok = true
 					for m = 1, dist - 1 do
 						if not passable(i, tgt[i] + dir * m) then ok = false end
@@ -1132,7 +1180,7 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 		if catching and atRest(catching) then
 			local other = findLane(catching)
 			if other then
-				tgt[catching] = other
+				startMove(catching, other)
 				return true
 			end
 		end
@@ -1143,7 +1191,7 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 					if atRest(j) and blocks(i, j, side) then
 						local other = findLane(j)
 						if other and (other - side) * dir > 0 then
-							tgt[j] = other
+							startMove(j, other)
 							return true
 						end
 						if depth > 1 and clearLane(j, nil, depth - 1) then return true end
@@ -1158,7 +1206,7 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 	local function halfStep(i: number): boolean
 		for _, dir in { 1, -1 } do
 			local spot = tgt[i] + 0.5 * dir
-			if spot >= 1 and spot <= st.lanes then
+			if spot >= 1 and spot <= st.lanes and mayTurn(i, dir) then
 				local ok = true
 				for j = 1, n do
 					if j ~= i and math.abs(view[j] - view[i]) < clear + cross
@@ -1167,7 +1215,7 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 					end
 				end
 				if ok then
-					tgt[i] = spot
+					startMove(i, spot)
 					st.halfSteps = (st.halfSteps or 0) + 1 -- counted for the overlap report
 					return true
 				end
@@ -1181,16 +1229,18 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 			local blocker = nil
 			for b = 1, a - 1 do -- horses ahead on screen (or level and earlier): i gives way
 				local j = ord[b]
-				if inLane(j, x[i]) and (inWay(st, i, j, targets) or (early and view[j] - view[i] < cfg.holdGap + reserve)) then
-					blocker = j
-				end
+				if inLane(j, x[i]) and inWay(i, j) then blocker = j end
 			end
 			if blocker then
-				local lane = findLane(i)
-				if lane then
-					tgt[i] = lane
-				elseif not clearLane(i, blocker, MAKE_WAY_DEPTH) and stepping then
-					halfStep(i) -- if nothing can move, it is held until a lane opens (or the holds let go)
+				if eased and stepping and halfStep(i) then
+					-- late: a half-lane step first, not a full lane change
+				else
+					local lane = findLane(i)
+					if lane then
+						startMove(i, lane)
+					elseif not clearLane(i, blocker, MAKE_WAY_DEPTH) and stepping and not eased then
+						halfStep(i) -- if nothing can move, it is held until a lane opens (or the holds let go)
+					end
 				end
 			end
 		end
@@ -1198,7 +1248,10 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number): { n
 	if eased then
 		local adt, vmax, v = cfg.laneAccel * dt, cfg.laneSpeedMax, st.shownV
 		for i = 1, n do
-			if not (x[i] == tgt[i] and v[i] == 0) and easeStep(x, tgt, v, i, dt, adt, vmax) then st.shownLanded[i] = true end
+			if not (x[i] == tgt[i] and v[i] == 0) and easeStep(x, tgt, v, i, dt, adt, vmax) then
+				st.shownLanded[i] = true
+				st.shownArrived[i] = t + dt
+			end
 		end
 	else
 		local glide = dt / cfg.laneSeconds
@@ -1231,9 +1284,12 @@ end
 -- trip (steering off) the race shape's offsets alone, exactly as before steering (lanes = nil).
 function Trip.frame(st: any, session: any, shownLive: { number }, w: number, shapeCfg: any, dt: number, t: number): ({ number }, { number }?)
 	if st == nil then return session:displayOffsets(shownLive, w, shapeCfg), nil end
-	local per = if st.cfg.glide == "eased" then 1000 else 100
+	local eased = st.cfg.glide == "eased"
+	local per = if eased then 1000 else 100
 	if not st.locked then return table.clone(st.off), sendLanes(st.x, per) end
-	local lanes = Trip.cosmetic(st, session:displayOffsets(shownLive, w, shapeCfg), dt, t)
+	-- (eased) the plan: where each horse is heading by the last tap (full luck weight)
+	local plan = if eased then session:displayOffsets(shownLive, 1, shapeCfg) else nil
+	local lanes = Trip.cosmetic(st, session:displayOffsets(shownLive, w, shapeCfg), dt, t, plan)
 	return table.clone(st.view), sendLanes(lanes, per)
 end
 
