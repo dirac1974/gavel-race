@@ -120,7 +120,7 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?,
 	local cf = CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
 	if (yaw and yaw ~= 0) or (roll and roll ~= 0) then
 		local ry, rz = SteerPose.angles(yaw or 0, roll or 0)
-		cf = cf * CFrame.Angles(0, ry, 0) * CFrame.Angles(0, 0, rz)
+		cf = cf * CFrame.Angles(0, ry, rz) -- (Angles applies Z, then Y: the turn, then the lean in it)
 	end
 	horse:PivotTo(cf)
 	-- Running legs (D-051): stride with the ground actually covered since the last frame (the
@@ -234,7 +234,6 @@ function RaceState.predictSteer(dir: number, seq: number): boolean
 	if EASED then return SteerPredict.look(race.predict, race.own, dir, seq, os.clock()) end
 	return SteerPredict.press(race.predict, race.own, dir, seq, os.clock())
 end
-RaceState.lookSteer = RaceState.predictSteer
 
 -- Your own lane from the server (riders with the buttons, on change, up to the lock).
 remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack, courseId)
@@ -252,14 +251,16 @@ remotes.RaceOffsets.OnClientEvent:Connect(function(offsets, a, b, c)
 	if typeof(a) == "number" then stamp, courseId = a, b else courseId = a end
 	local race = races[courseId or "dirt"]
 	if not race then return end
+	if race.steering and EASED then
+		-- What to show at that server time (no second easing, so held gaps stay as the server holds
+		-- them): the screen plays the samples back by their stamps (Playback). A packet overtaken by
+		-- a later one is dropped whole, its lanes too.
+		if not Playback.pushOffsets(race.pb, stamp or serverNow(), serverNow(), offsets, lanes, race.laneTarget) then return end
+	end
 	if lanes then
 		for i, x in lanes do race.laneTarget[i] = x end
 	end
-	if race.steering and EASED then
-		-- What to show at that server time (no second easing, so held gaps stay as the server holds
-		-- them): the screen plays the samples back by their stamps (Playback).
-		Playback.push(race.pb, stamp or serverNow(), serverNow(), { off = table.clone(offsets), lanes = table.clone(race.laneTarget) })
-	elseif race.steering then
+	if race.steering and not EASED then
 		-- (D-054) glide from where the horse is to the new sample over one send interval
 		for i, feet in offsets do
 			race.from[i], race.to[i] = race.offset[i], feet

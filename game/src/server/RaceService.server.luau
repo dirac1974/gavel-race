@@ -690,12 +690,13 @@ local function runRace(c, players: { Player })
 		-- tStart + tick * dt, however late this loop woke); after it, now, with the make-room step
 		-- taken from the last sample's time, so the samples' spacing is exactly how far they moved.
 		local lastStamp = tStart
-		local sentLanes, lanesAt = nil, -math.huge
+		local sentLanes, lanesAt, resend = nil, -math.huge, 0
 		local sentOwn: { [Player]: { number } } = {}
 		while alive() do
 			local t = now()
 			advanceTrip(t)
-			-- (before the gate nothing moves: now, so a sample is never stamped in the future)
+			-- (before the gate nothing moves: stamped now, not with the gate time seconds ahead. After it a
+			-- sample can stand for a tick up to 0.1 s ahead of now; the screen's lag estimate absorbs that.)
 			local stamp, frameDt = if t < tStart then t else tStart + trip.tick * trip.dt, 0
 			if trip.locked then
 				local base = math.max(lastStamp, stamp) -- (stamp is the lock's tick here)
@@ -727,7 +728,9 @@ local function runRace(c, players: { Player })
 					if x ~= sentLanes[i] then changed = true end
 				end
 			end
-			if changed and lanes then
+			if changed then resend = 2 end -- (and on the next two samples: a dropped packet can't strand a lane)
+			if (changed or resend > 0) and lanes then
+				if not changed then resend -= 1 end
 				sentLanes, lanesAt = lanes, t
 				RaceOffsets:FireAllClients(offsets, lanes, stamp, c.id)
 			else

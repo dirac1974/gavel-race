@@ -234,7 +234,7 @@ local function frameAt(rec, t: number)
 			return a, b, (t - a.t) / math.max(1e-6, b.t - a.t), k
 		end
 	end
-	return frames[#frames], frames[#frames], 0, #frames
+	return frames[#frames], frames[#frames], 1, #frames -- (past the last frame: on it, f = 1)
 end
 
 local function stop()
@@ -353,8 +353,12 @@ local function placeAll(rec, t: number, speed: number?, raceDt: number)
 		if last and raceDt > 0 then
 			local forward = (p - last) * railLength / raceDt
 			yaw, roll = SteerPose.step(playing.pose[i], GameConfig.steerView, lanes[i], raceDt, forward, cfg.laneWidth, 0)
-		else
-			playing.pose[i].x = lanes[i] -- the first frame: nothing to turn from yet
+		else -- the first frame: start at the sideways speed the recording has here (no flick mid-glide)
+			local a0, b0, f0, k0 = frameAt(rec, t - 0.05)
+			local before = ReplayTrip.laneCurve(rec, k0, f0, i)
+			local p0 = (a0[i] or 0) + ((b0[i] or 0) - (a0[i] or 0)) * f0
+			yaw, roll = SteerPose.prime(playing.pose[i], GameConfig.steerView, lanes[i], (lanes[i] - before) * cfg.laneWidth / 0.05,
+				(p - p0) * railLength / 0.05)
 		end
 		playing.lastProgress[i] = p
 		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i], yaw, roll)
@@ -402,11 +406,15 @@ RunService.RenderStepped:Connect(function(dt)
 		local pivot = horse:GetPivot()
 		local target = pivot.Position + Vector3.new(0, 4, 0)
 		-- Side view from just outside the outer rail (broadcast angle), so no horse runs through it.
+		-- The camera follows the track's heading at the horse, never its body turn or lean (D-057).
 		local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
 		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, lanes[subject] or subject) + 12 -- its lane now
+		local _, _, dx, dz = TrackLayout.railPoint(cfg, rec.plan, (progress[subject] or 0) * TrackLayout.railLength(cfg, rec.plan),
+			lanes[subject] or subject)
+		local look, right = Vector3.new(dx, 0, dz), Vector3.new(-dz, 0, dx)
 		local eye = if playing.view == "side"
-			then target + pivot.RightVector * outside + Vector3.new(0, 6, 0)
-			else target - pivot.LookVector * 18 + Vector3.new(0, 7, 0)
+			then target + right * outside + Vector3.new(0, 6, 0)
+			else target - look * 18 + Vector3.new(0, 7, 0)
 		camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(eye, target), math.min(1, dt * 4))
 	end
 

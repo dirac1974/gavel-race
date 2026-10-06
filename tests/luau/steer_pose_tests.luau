@@ -92,6 +92,11 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local yawStop = 0
 	for k = 1, 60 do yawStop = SteerPose.step(stop, POSE, 3 + k * 0.001, FRAME, 0, W, 0) end
 	check(yawStop > 0 and yawStop <= math.rad(10), "a horse pulling up past the line never turns past the cap")
+	local primed = SteerPose.new()
+	local yP, rP = SteerPose.prime(primed, POSE, 3.4, 9, FWD)
+	local yP2, rP2 = SteerPose.step(primed, POSE, 3.4 + 9 / W * FRAME, FRAME, FWD, W, 0)
+	check(close(yP, math.atan(9 / FWD), 1e-12) and rP == 0 and close(yP2, yP, 1e-9) and math.abs(rP2) < 1e-9,
+		"SteerPose.prime: a replay starting mid-glide turns at once with the glide, and doesn't flick into a lean")
 	SteerPose.reset(stop)
 	check(stop.x == nil and stop.yaw == 0 and select(1, SteerPose.step(stop, POSE, 7, FRAME, FWD, W, 0)) == 0,
 		"after a reset (a replay starting) the first frame turns nothing")
@@ -165,6 +170,39 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		"a sample older than the newest (or a repeat) is dropped")
 	local empty = Playback.new(cfg)
 	check(Playback.advance(empty, 5, FRAME) == nil, "before the first sample there is nothing to draw")
+	-- Lanes ride only on the samples where they changed: the others carry the newest sample's on, and a
+	-- packet overtaken by a later one (unreliable remotes) is dropped whole, so its lanes never come back.
+	local lb = Playback.new(cfg)
+	local posts = { 1, 2 }
+	check(Playback.pushOffsets(lb, 1.0, 1.1, { 0, 0 }, nil, posts) and lb.samples[1].data.lanes[2] == 2,
+		"pushOffsets: before any lanes, the posts")
+	Playback.pushOffsets(lb, 1.2, 1.3, { 0, 0 }, { 1, 2.5 }, posts)
+	check(not Playback.pushOffsets(lb, 1.1, 1.35, { 0, 0 }, { 1, 2.2 }, posts), "...an overtaken packet is dropped, lanes and all")
+	Playback.pushOffsets(lb, 1.3, 1.4, { 0, 0 }, nil, posts)
+	check(lb.samples[#lb.samples].data.lanes[2] == 2.5, "...and a sample without lanes carries the newest sample's on")
+	-- A client freeze: every packet queued during it arrives at once. Only the newest says how late
+	-- the link is, so the delay is back to normal within a few seconds, not half a race.
+	local fz = Playback.new(cfg)
+	local queued, tcF, delayAfter = {}, 0, 0
+	for kk = 0, 400 do table.insert(queued, { T = kk * 0.1, at = kk * 0.1 + 0.1 }) end
+	local normal = 0
+	while tcF < 20 do
+		local frozen = tcF >= 3 and tcF < 3.8
+		if not frozen then
+			tcF += FRAME
+			while #queued > 0 and queued[1].at <= tcF do
+				local m = table.remove(queued, 1)
+				Playback.push(fz, m.T, tcF, { x = { 0 } })
+			end
+			Playback.advance(fz, tcF, FRAME)
+			if tcF > 2.5 and tcF < 2.6 then normal = fz.delay :: number end
+			if tcF > 7 and delayAfter == 0 then delayAfter = fz.delay :: number end
+		else
+			tcF = 3.8 -- (nothing runs while frozen)
+		end
+	end
+	check(normal > 0 and delayAfter < normal + 0.1,
+		string.format("a 0.8 s client freeze: the delay is back near normal 3 s later (%.2f s, normal %.2f s)", delayAfter, normal))
 	local out = Playback.lerp({}, { 1, 2 }, { 3, 6 }, 1)
 	check(out[1] == 3 and out[2] == 6 and Playback.lerp({}, { 1 }, { 3 }, 0.5)[1] == 2, "lerp: exactly the later sample at f = 1")
 

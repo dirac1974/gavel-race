@@ -17,7 +17,10 @@
 -- guessing ahead, so nothing is ever drawn going back.
 --
 -- Times are in any one clock (RaceView: workspace:GetServerTimeNow(); the overlap report: race
--- time). Samples must be pushed in arrival order; one older than the newest is dropped.
+-- time). Samples are pushed in arrival order; one older than the newest (an unreliable packet
+-- overtaken by a later one) is dropped whole, its lanes too. The lag is measured once a frame, from
+-- the newest sample that arrived since the last frame: after a client freeze every queued packet
+-- arrives at once, and only the newest of them says how late the link really is.
 
 export type Config = {
 	interval: number,          -- the server's send interval (1 / steering.sendHz)
@@ -34,6 +37,7 @@ export type Buffer = {
 	delay: number?,  -- now - play
 	lag: number?,    -- the lag estimate (fast up, slow down)
 	lastLag: number, -- the newest sample's own lag
+	fresh: number?,  -- arrival time of the newest sample, until the next advance measures its lag
 	rate: number,    -- the playback clock's rate (1 = real time)
 	play: number?,   -- the last playback time returned by advance
 	held: boolean,   -- the last advance had no sample after the playback time (holding the newest)
@@ -51,7 +55,7 @@ function Playback.config(gameConfig: any): Config
 end
 
 function Playback.new(cfg: Config): Buffer
-	return { cfg = cfg, samples = {}, delay = nil, lag = nil, lastLag = 0, rate = 1, play = nil, held = false }
+	return { cfg = cfg, samples = {}, delay = nil, lag = nil, lastLag = 0, fresh = nil, rate = 1, play = nil, held = false }
 end
 
 local function target(b: Buffer): number
@@ -64,10 +68,11 @@ function Playback.push(b: Buffer, T: number, now: number, data: any): boolean
 	local n = #b.samples
 	if n > 0 and T <= b.samples[n].T then return false end
 	table.insert(b.samples, { T = T, data = data })
-	local lag = now - T
-	b.lastLag = lag
-	if b.lag == nil or lag > (b.lag :: number) then b.lag = lag end
-	if b.delay == nil then b.delay = target(b) end
+	b.fresh = now
+	if b.lag == nil then -- the first sample sets the delay to start from
+		b.lag, b.lastLag = now - T, now - T
+		b.delay = target(b)
+	end
 	-- Keep what the playback time can still reach (and a little behind it).
 	local keepFrom = now - (b.delay :: number) - 1
 	while #b.samples > 2 and b.samples[2].T < keepFrom do table.remove(b.samples, 1) end
@@ -81,6 +86,12 @@ function Playback.advance(b: Buffer, now: number, dt: number): number?
 	if n == 0 or b.delay == nil then return nil end
 	local cfg = b.cfg
 	local delay = b.delay :: number
+	if b.fresh ~= nil then -- the newest arrival since the last frame: its lag (fast up)
+		local lag = (b.fresh :: number) - b.samples[n].T
+		b.fresh = nil
+		b.lastLag = lag
+		if lag > (b.lag :: number) then b.lag = lag end
+	end
 	if dt > 0 then
 		b.lag = math.max((b.lag :: number) - cfg.lagReleasePerSecond * dt, math.min(b.lastLag, b.lag :: number))
 		local want = 1 + math.clamp((delay - target(b)) * cfg.gain, -cfg.slew, cfg.slew)
@@ -101,6 +112,15 @@ function Playback.advance(b: Buffer, now: number, dt: number): number?
 	end
 	b.delay, b.play = delay, play
 	return play
+end
+
+-- A steering sample (RaceOffsets): offsets, and lanes when they changed; without lanes the newest
+-- sample's carry on (or `posts` before any). Returns false if it is stale (dropped whole).
+function Playback.pushOffsets(b: Buffer, T: number, now: number, offsets: { number }, lanes: { number }?, posts: { number }): boolean
+	local n = #b.samples
+	if n > 0 and T <= b.samples[n].T then return false end
+	local carried = if lanes then lanes elseif n > 0 then b.samples[n].data.lanes else table.clone(posts)
+	return Playback.push(b, T, now, { off = offsets, lanes = carried })
 end
 
 -- The two samples around playback time `play` and the fraction between them (a == b at either end).

@@ -316,7 +316,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 				if m.kind == "offsets" then
 					for i = 1, n do laneTarget[i] = (m.lanes :: { number })[i] end
 					if eased then -- as RaceView: pushed with its stamp, played back by it (never by arrival)
-						Playback.push(pb, m.T, tc, { off = table.clone(m.offsets), lanes = table.clone(m.lanes :: { number }) })
+						Playback.pushOffsets(pb, m.T, tc, m.offsets, m.lanes, laneTarget)
 					else -- D-054: the glide to the new sample is timed from its arrival (just after the last frame)
 						for i = 1, n do from[i], to[i] = offset[i], m.offsets[i] end
 						sampleAt, sampleT = tc - FRAME, m.T

@@ -11,8 +11,9 @@
 --   the press is on its way (SteerPredict.lookDir); it hands over to the drift as the slide starts
 --   (the larger of the two counts) and relaxes over lookRelaxSeconds if the press waits.
 -- * Smooth: sideways speed and acceleration are smoothed over yawSmoothSeconds, so the 10 Hz
---   samples' corners, the lock, a landing, the finish and a replay's first frame never snap the
---   body round. A placement that jumps (a replay starting or seeking) resets the state.
+--   samples' corners, the lock, a landing and the finish never snap the body round. A replay starts
+--   each horse primed with the sideways speed its recording has there (SteerPose.prime), so one
+--   that starts mid-glide doesn't flick into a lean.
 -- Angles are radians, positive toward higher lane numbers (outward), which is the horse's right
 -- on every course (TrackLayout.railPoint: x grows outward from the rail on its left).
 
@@ -32,6 +33,16 @@ end
 -- Forget the last lane (the next step only records it): after a jump, or with no steering.
 function SteerPose.reset(s: State)
 	s.x, s.v, s.a, s.look, s.yaw, s.roll = nil, 0, 0, 0, 0, 0
+end
+
+-- Start a horse at lane x moving sideways at v ft/s (a replay's first frame): its turn is the
+-- drift's at once, with no lean. Returns yaw, roll.
+function SteerPose.prime(s: State, cfg: Config, x: number, v: number, forward: number): (number, number)
+	s.x, s.v, s.a, s.look = x, v, 0, 0
+	local maxYaw = math.rad(cfg.yawMaxDeg)
+	s.yaw = math.clamp(math.atan2(v, math.max(forward, SteerPose.MIN_FORWARD)) * cfg.yawGain, -maxYaw, maxYaw)
+	s.roll = 0
+	return s.yaw, s.roll
 end
 
 -- One frame: x = lane position now, dt = race seconds since the last frame, forward = forward
