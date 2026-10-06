@@ -8,7 +8,7 @@
     python sims/steering.py --profile d054 --write   # D-054 (the switch-back): its own baseline and report
 
 Profiles:
-  live  trip.CONFIG, what the game runs (since N3: D-057's motion and press rules, brushes off).
+  live  trip.CONFIG, what the game runs (since N3: D-057's motion and press rules; N5: brushes).
         --write regenerates tests/fixtures/trip_baseline.json and game/src/shared/TripBaseline.luau
         from a fixed seed, then runs the report and stores it in tests/fixtures/steering_report.json
         (tests/test_trip_d057.py asserts its targets).
@@ -37,6 +37,7 @@ Policies (one focal rider among seven bots, the same race replayed for each poli
   scripted  a casual human: In about every 5 s, Out about every 20 s (Smart Steer on)
   masher    (D-057) 4 presses a second on a random side
   ditherer  (D-057) In, Out, In, Out ... every 0.2 s
+  doubletap (N5 review, griefing kid) a press every 2-6 s, pressed again 0.3-0.8 s later
 Griefers (D-057 griefing test; strangers who tapped exactly like the kid, see GRIEF):
   shadow / crew_in   sit on the kid's inside      crew_out  sit on its outside
   crew_ahead         sit in its lane              bumper    get beside it, then keep pressing into it
@@ -98,9 +99,9 @@ FOCAL_D057 = FOCAL + ("masher", "ditherer")
 POLICIES = ("smart",) + FOCAL
 POLICIES_D057 = ("smart",) + FOCAL_D057
 GRIEFERS = ("shadow", "crew_in", "crew_out", "crew_ahead", "bumper")
-PRESSERS = ("rail", "wanderer", "scripted", "masher", "ditherer") + GRIEFERS
+PRESSERS = ("rail", "wanderer", "scripted", "masher", "ditherer", "doubletap") + GRIEFERS
 KIND = {"bot": "bot", "smart": "smart", "rail": "smart", "never": "manual", "wanderer": "smart", "scripted": "smart",
-        "masher": "smart", "ditherer": "smart", "shadow": "smart", "crew_in": "smart", "crew_out": "smart",
+        "masher": "smart", "ditherer": "smart", "doubletap": "smart", "shadow": "smart", "crew_in": "smart", "crew_out": "smart",
         "crew_ahead": "smart", "bumper": "smart"}
 
 TARGETS = {
@@ -139,7 +140,18 @@ GRIEF: Dict[str, Tuple[Tuple[str, ...], Tuple[float, ...]]] = {
     "rail3": (("rail", "rail", "rail"), (0.0, 0.0, 12.0)),
 }
 GRIEF_PAIRS = (("shadow", "rail1"), ("crew", "rail3"), ("bumper", "rail1"))  # targeted, its untargeted control
-GRIEF_KIDS = ("smart", "rail")
+# N5 review: the kids who press the most (wanderer, masher) and the one who presses again when
+# nothing seems to happen (doubletap) too. Every kid is measured and reported; the targets:
+# - own trip, targeted minus untargeted >= -0.001 (the D-057 bound), for the kids who steer with
+#   a purpose (GRIEF_TARGET_KIDS). A stranger matched to a kid who presses at random and sitting
+#   just inside it pushes it wide whatever the brush rule (brushes off too): the N5 review's
+#   shadow finding, reported and queued for David (REVIEW_QUEUE), not a brush effect;
+# - the brush charges strangers add (targeted minus untargeted) >= -0.001 for every kid but the
+#   masher (GRIEF_BRUSH_KIDS): a natural press pattern never pays for being boxed in. A masher
+#   who keeps pressing into a box pays: that is what a brush teaches.
+GRIEF_KIDS = ("smart", "rail", "wanderer", "masher", "doubletap")
+GRIEF_TARGET_KIDS = ("smart", "rail")
+GRIEF_BRUSH_KIDS = ("smart", "rail", "wanderer", "doubletap")
 
 
 def cells() -> List[Tuple[str, str]]:
@@ -206,6 +218,7 @@ class Rider:
         self.rng = rng
         self.kid = kid
         self.flip = 1
+        self.next_at, self.again_at, self.again_dir = -1, -1, 0  # doubletap
 
     def _toward(self, st: trip.TripState, i: int, goal: int, tick: int) -> int:
         if tick % 3 != 0:
@@ -235,6 +248,23 @@ class Rider:
         elif p == "masher":
             if self.rng.random() < 0.4:
                 return -1 if self.rng.random() < 0.5 else 1
+        elif p == "doubletap":
+            # N5 review: an intent every 2-6 s, one press, and the same press again 0.3-0.8 s
+            # later (nothing seemed to happen)
+            if self.next_at < 0:
+                self.next_at = tick + int(self.rng.uniform(10, 50))
+            if tick == self.again_at:
+                self.again_at = -1
+                return self.again_dir
+            if tick >= self.next_at:
+                self.next_at = tick + int(self.rng.uniform(20, 60))
+                d = -1 if self.rng.random() < 0.5 else 1
+                after = trip.lane_after(st, i)
+                if after + d < 1 or after + d > st.lanes:
+                    d = -d
+                self.again_dir = d
+                self.again_at = tick + int(self.rng.uniform(3, 9))
+                return d
         elif p == "ditherer":
             if tick % 2 == 0:
                 self.flip = -self.flip
@@ -545,7 +575,8 @@ def _grief_chunk(args) -> List[Dict]:
                 res = run_race(geo, setup, pols, cfg, match=match, focal=kid, measure=("boxed",))
                 strangers = [others[g] for g in range(len(gpols))]
                 per[name] = {"tau": trip.tau(res["trip"], posts(), row, cfg, res["brush_cost"])[kid],
-                             "own": res["trip"][kid] - res["brush_cost"][kid], "lane": res["lock_x"][kid],
+                             "own": res["trip"][kid] - res["brush_cost"][kid], "cost": res["brush_cost"][kid],
+                             "lane": res["lock_x"][kid],
                              "kid_charged": res["charged"][kid], "kid_brushes": res["brushes"][kid],
                              "stranger_brushes": sum(res["brushes"][s] for s in strangers),
                              "stranger_charged": sum(res["charged"][s] for s in strangers),
@@ -1015,7 +1046,8 @@ def _summarize_d057(summary: Dict, per_cell: Dict[int, List[Dict]]) -> None:
 
 def summarize_griefing(grief_cell: Dict[int, List[Dict]]) -> Dict:
     """Per kid policy: each scenario's kid own trip, tau, lane and charges against "matched", and
-    targeted minus untargeted own trip (GRIEF_PAIRS), per cell and pooled."""
+    targeted minus untargeted own trip (GRIEF_PAIRS), per cell and pooled, with its brush-charge
+    part ("_charges": minus the extra charges, so it adds into the own-trip figure)."""
     out: Dict = {}
     for kid_pol in GRIEF_KIDS:
         res: Dict = {"cells": [], "pooled": {}}
@@ -1027,6 +1059,9 @@ def summarize_griefing(grief_cell: Dict[int, List[Dict]]) -> Dict:
                 d = [x[target]["own"] - x[control]["own"] for x in recs]
                 row[target + "_minus_" + control] = mean(d)
                 pooled.setdefault(target + "_minus_" + control, []).extend(d)
+                c = [x[control]["cost"] - x[target]["cost"] for x in recs]
+                row[target + "_minus_" + control + "_charges"] = mean(c)
+                pooled.setdefault(target + "_minus_" + control + "_charges", []).extend(c)
             res["cells"].append(row)
         for name in GRIEF:
             recs = [x[kid_pol] for cell in range(len(cells())) for x in grief_cell[cell]]
@@ -1094,7 +1129,9 @@ def check_targets(s: Dict) -> Dict[str, bool]:
     out["no_bystander_charged"] = all(r[pol + "_others_charged"] == 0 for r in rows for pol in FOCAL_D057)
     if "griefing" in s:
         out["griefing"] = all(s["griefing"][k]["pooled"][a + "_minus_" + b] >= t["griefing"]
-                              for k in GRIEF_KIDS for a, b in GRIEF_PAIRS)
+                              for k in GRIEF_TARGET_KIDS for a, b in GRIEF_PAIRS)
+        out["griefing_brushes"] = all(s["griefing"][k]["pooled"][a + "_minus_" + b + "_charges"] >= t["griefing"]
+                                      for k in GRIEF_BRUSH_KIDS for a, b in GRIEF_PAIRS)
         out["griefing_mover_pays"] = all(
             s["griefing"][k]["pooled"][name]["kid_charged_not_own"] == 0 for k in GRIEF_KIDS for name in GRIEF) and all(
             s["griefing"]["smart"]["pooled"][name]["kid_charged_per_race"] == 0 for name in GRIEF)
@@ -1118,7 +1155,8 @@ LABELS = {
     "sideways_accel": "Sideways acceleration <= 30 ft/s^2 between ticks, + 0.5 for the landing tick (every horse)",
     "casual_charged": "Casual riders charged for a brush in <= 5% of races (every cell)",
     "no_bystander_charged": "Only the mover pays: no other horse is ever charged (every cell)",
-    "griefing": "Griefing: targeted minus untargeted own trip >= -0.001 (each scenario and kid, pooled)",
+    "griefing": "Griefing: targeted minus untargeted own trip >= -0.001 (each scenario, Smart Steer and rail kids, pooled)",
+    "griefing_brushes": "Griefing: brush charges strangers add >= -0.001 (each scenario, every kid but the masher, pooled)",
     "griefing_mover_pays": "Griefing: a kid is only ever charged for its own brushes (a Smart Steer kid never)",
     "stress": "Stress: 0 overlaps and fall-back <= 20 ft/s",
 }
@@ -1233,7 +1271,10 @@ def _format_d057(s: Dict) -> List[str]:
         out.append("Griefing (kid's own trip = ground + draft - own brush charge; strangers tapped exactly like the kid):")
         for kid, res in s["griefing"].items():
             p = res["pooled"]
-            out.append(f"  {kid} kid: " + "; ".join(f"{a} - {b} {p[a + '_minus_' + b]:+.4f}" for a, b in GRIEF_PAIRS))
+            note = "" if kid in GRIEF_TARGET_KIDS else " (reported; the gate is the charges part)"
+            out.append(f"  {kid} kid: " + "; ".join(
+                f"{a} - {b} {p[a + '_minus_' + b]:+.4f} (charges {p.get(a + '_minus_' + b + '_charges', 0.0):+.4f})"
+                for a, b in GRIEF_PAIRS) + note)
             for name in GRIEF:
                 v = p[name]
                 out.append(f"    {name:8s} own vs matched {v['own_vs_matched']:+.4f} (p5 {v['own_vs_matched_p5']:+.4f}), "

@@ -28,7 +28,8 @@
 --   SECONDS. A press the server will ignore or hold shows no cue, so mashing stays calm: the same
 --   way within pressBounceSeconds of the last cue, against a glide under way, the other way within
 --   reverseGapSeconds of landing or (a second reversal within weaveWindowSeconds) weaveGapSeconds,
---   and the other way while a cue is held (the cue never swings from side to side). Landings and
+--   the other way while a cue is held (the cue never swings from side to side), and any press while
+--   your horse steadies after a brush (D-057 N5: steadyUntil, the server answers "steady"). Landings and
 --   reversals are read off your horse as drawn (lookDir watches it every frame), so the client's
 --   gaps end a little after the server's, never before. With D-054's linear glide (the switch-back)
 --   the prediction above runs as before.
@@ -41,6 +42,7 @@ export type View = {
 	off: { number },     -- offsets as drawn (feet ahead of the pace), every horse
 	srv: Server?,        -- your own lane from the server (SteerLane), once one has arrived
 	cfg: any,            -- GameConfig.steering
+	steadyUntil: number?, -- (D-057 N5) your horse steadies after your brush until this (the same clock as `now`)
 }
 
 local SteerPredict = {}
@@ -118,6 +120,7 @@ function SteerPredict.look(state: any, view: View, dir: number, seq: number, now
 	local from = if srv ~= nil then (srv :: Server).tgt else math.floor(x + 0.5)
 	local lane = from + dir
 	if lane < 1 or lane > view.lanes or not SteerPredict.room(view, lane) then return false end
+	if view.steadyUntil ~= nil and now < view.steadyUntil then return false end -- steadying after a brush
 	if state.look ~= nil and state.look.dir ~= dir then return false end -- never swing a held cue round
 	local last = state.lastLook
 	if last ~= nil and last.dir == dir and now - last.at < cfg.pressBounceSeconds then return false end -- a bounce

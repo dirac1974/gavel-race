@@ -342,6 +342,21 @@ From your 4th race on (the buttons are shown). Spectators and a rider's first 3 
 - [ ] **At "Lanes locked!"** the boxed-in look clears and the buttons go the usual locked grey.
 - [ ] **Grown-ups page:** "Horses can get boxed in, like in real racing: they wait for a gap or ease back to find one. There's no penalty for being boxed in; a horse held wide just runs a little farther." It sits right under the steering line, after "How races work" and before the Diamonds lines.
 
+## Brushes (D-057 N5)
+Stage two riders side by side (Studio Test with 2 players), both past their first 3 races.
+- [ ] **A brush:** with a horse right beside you and no gap to slip into behind it, press toward it three times within 2 s (the first press waits, the second is the same try). Your horse leans a little toward it (about a foot) and nods, eases back a few feet, and can't steer for a second; the other horse only nods and keeps its place. The lean starts and ends softly (no jump on the first frame). A soft tick plays at your horse (silent until `count_tick` is uploaded). Nothing stumbles, flinches or looks hurt; no flash, no text over the horses.
+- [ ] **Pressing again never brushes** (N5 review): press toward the horse, then once more half a second or a second later, as a kid does when nothing seems to happen. The press just waits; no lean, no tick. One press never brushes either, nor does pressing again many seconds later. Bots and Smart Steer never brush.
+- [ ] **The lock:** no brush starts after the lock. A brush from the last moment before it can still be drawn just after "Lanes locked!" shows (your screen runs a moment behind the server), never later than that.
+- [ ] **Your screen:** the first brush you ever have shows the tip "Bump! Press once, then wait for a gap" (once per player, never again, even in a new session). After that, "No room yet" at most (never more than once in 10 s, and never right after another chip). Either one shows as your horse leans, not before. No blame, no cost words. The other rider sees nothing about it.
+- [ ] **No look cue while steadying:** right after your brush, pressing again doesn't turn your horse's head toward the press for a second.
+- [ ] **No wobble** on the arrow when a brush clears a press that was waiting.
+- [ ] **Smooth:** the horse that brushed eases back without a jerk (no snap backwards), and the horses never draw through each other.
+- [ ] **Results:** no brush line on the card; the "Good trip" stars may be a little lower after several brushes. The bumped rider's card is unchanged.
+- [ ] **Replays** show the lean and the nods, no text.
+- [ ] **Logs:** the `[Trip]` line lists brushes and the cost per rider, with how many went into each other horse (`brushes 3 (into post 4 x2, post 6 x1)`). The plan's griefing fail line counts one rider brushing the same horse 3+ times.
+- [ ] **A late brush** (network simulator at 300 ms, with packet jitter): a brush that reaches your screen late still starts from the beginning (no horse snapping a foot sideways); one that arrives after its moment has passed isn't drawn at all.
+- [ ] **Grown-ups page:** "A brush costs the horse that bumped a tiny bit (a third of a point at most), never the horse that was bumped."
+
 ## Replays and results (steering S4, D-054)
 Plan section D, from your 4th race on (the buttons are shown):
 - [ ] **Results:** under "You rode ★★☆" comes "Good trip ★★☆" (one to three stars, never none). "Your trip gained you N places!" shows inside the card only when your trip gained places, with "Your riding gained you N places!" above it when riding did too. No line ever says you lost a place.

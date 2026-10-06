@@ -721,7 +721,7 @@ def test_trip_fixture_replays_exactly():
         assert late == run["afterLockAnswers"] == ["locked"] * len(run["afterLock"])
         tr = trip.trip_values(st)
         assert tr == run["trip"]
-        assert trip.tau(tr, run["posts"], fx["baseline"][run["course"]][run["distance"]], cfg) == run["tau"]
+        assert trip.tau(tr, run["posts"], fx["baseline"][run["course"]][run["distance"]], cfg, trip.brush_charges(st)) == run["tau"]
     assert {r["course"] for r in fx["runs"]} == {"dirt", "turf"}
     assert fx["geometry"]["dirt"]["Mile"]["gate"] == {"straight": "home", "offset": pytest.approx(1258.5707, abs=1e-3),
                                                       "laps": 0}
@@ -734,7 +734,8 @@ def test_d054_config_switches_every_d057_rule_off():
     switch-back. Files made with it record the config without the D-057 keys
     (trip.config_record), as every file made before D-057 did."""
     off = {"glide": "linear", "chainWindow": 0.0, "reverseGapSeconds": 0.0, "weaveGapSeconds": 0.0,
-           "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0, "blockedPress": "d054", "brush": "off"}
+           "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0, "blockedPress": "d054", "brush": "off",
+           "brushPresses": 2}  # (N5 review: D-057 ships 3; N1's rule, 2, sits in D057_OFF)
     for key, value in off.items():
         assert CFG[key] == value, key
     assert set(trip.D057) == set(off)
@@ -749,12 +750,12 @@ def test_d054_config_switches_every_d057_rule_off():
 
 def test_records_survive_the_n3_flip():
     """D057_OFF is a literal of the D-054 values, not read from CONFIG. With D-057 on in CONFIG
-    (N3, brushes still off), a D-057 config records every D-057 key, and a record made before
+    (N3, and the brushes since N5), a D-057 config records every D-057 key, and a record made before
     D-057 (no D-057 keys) still reads back as D-054, never as "eased"."""
     old_record = trip.config_record(CFG)
     assert trip.D057_OFF["glide"] == "linear" and trip.D057_OFF["blockedPress"] == "d054"
     flipped = trip.config_record(trip.CONFIG)
-    assert all(k in flipped for k in trip.D057_KEYS) and flipped["glide"] == "eased" and flipped["brush"] == "off"
+    assert all(k in flipped for k in trip.D057_KEYS) and flipped["glide"] == "eased" and flipped["brush"] == "repeat"
     back = trip.config_from_record(old_record)
     assert all(back[k] == trip.D057_OFF[k] for k in trip.D057_KEYS) and back["glide"] == "linear"
     assert trip.config_record(back) == old_record

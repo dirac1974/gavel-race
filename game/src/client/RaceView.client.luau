@@ -52,6 +52,8 @@ local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 local SteerPredict = require(Shared:WaitForChild("SteerPredict"))
 local SteerPose = require(Shared:WaitForChild("SteerPose"))
+local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
+if not okSound then Sound = nil end
 local Playback = require(Shared:WaitForChild("Playback"))
 
 local myId = tostring(Players.LocalPlayer.UserId)
@@ -110,20 +112,24 @@ local JUMP_STUDS = 60
 -- Lane i at progress p (lane-1 feet over railLength) and lane position `x` (default: its post,
 -- which is its lane number). `timeScale`: how fast the race clock runs (replays in slow motion),
 -- so the legs pick the gait for the race's real speed. yaw and roll (radians, toward higher lanes;
--- SteerPose) turn and lean the body through a lane change.
+-- SteerPose) turn and lean the body through a lane change; leanFeet and nod are a brush's (D-057
+-- N5: drawn only, never in the lanes that rank the race).
 local function place(i: number, p: number, bob: number, plan, courseId: string?, timeScale: number?, x: number?,
-	yaw: number?, roll: number?)
+	yaw: number?, roll: number?, leanFeet: number?, nod: number?)
 	local horse = horseModel(courseId, i)
 	if not horse then return end
 	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
 	local railLength = TrackLayout.railLength(cfg, plan)
-	local px, pz, dx, dz = TrackLayout.railPoint(cfg, plan, p * railLength, x or i)
+	local px, pz, dx, dz = TrackLayout.railPoint(cfg, plan, p * railLength, (x or i) + (leanFeet or 0) / cfg.laneWidth)
 	local pos = Vector3.new(px, bob, pz)
 	local cf = CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
 	lastBase[horse] = cf
-	if (yaw and yaw ~= 0) or (roll and roll ~= 0) then
+	if (yaw and yaw ~= 0) or (roll and roll ~= 0) or (nod and nod ~= 0) then
 		local ry, rz = SteerPose.angles(yaw or 0, roll or 0)
-		cf = cf * CFrame.Angles(0, ry, rz) -- (Angles applies Z, then Y: the turn, then the lean in it)
+		-- (CFrame.Angles(x, y, z) is Rx * Ry * Rz: the nod turns about the track's sideways axis, the
+		-- unturned body's X, then the turn about the nodded up axis, then the lean about the body's length.
+		-- The turn is a few degrees at most, so the nod is all but about the turned body.)
+		cf = cf * CFrame.Angles(SteerPose.nodAngle(nod or 0), ry, rz)
 	end
 	horse:PivotTo(cf)
 	-- Running legs (D-051): stride with the ground actually covered since the last frame (the
@@ -189,6 +195,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 	local race = {
 		course = courseId, cfg = cfg, start = start, plan = plan, lanes = #laneList, offset = {}, target = {},
 		lane = {}, laneTarget = {}, drawn = {}, pose = {}, steering = false, locked = false, pb = Playback.new(PLAYBACK),
+		brushes = {}, -- (D-057 N5) { at (server time), mover, other, dir, started } still to draw or drawing
 		from = {}, to = {}, sampleAt = 0, -- (D-054's linear glide) the offsets' glide to the newest sample
 		done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond, predict = SteerPredict.new(),
 	}
@@ -278,6 +285,19 @@ remotes.RaceOffsets.OnClientEvent:Connect(function(offsets, a, b, c)
 	end
 end)
 
+-- A brush (D-057 N5), stamped with the server time it happened: drawn when the race on screen
+-- gets there (the playback time), a soft tick at the mover's horse as it starts. Your own brush
+-- also steadies your horse (steadySeconds): no look cue for presses the server answers "steady".
+remotes:WaitForChild("SteerBrush").OnClientEvent:Connect(function(mover, other, dir, at, courseId)
+	local race = races[courseId or "dirt"]
+	if not race or not race.steering then return end
+	local stamp = at or serverNow()
+	table.insert(race.brushes, { at = stamp, mover = mover, other = other, dir = dir, started = false })
+	if mover == race.myLane and race.own then
+		race.own.steadyUntil = os.clock() + math.max(0, stamp + STEER.steadySeconds - serverNow())
+	end
+end)
+
 -- Steering (D-054): this race's lanes move, and lock at the far turn (server time lockAt).
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)
 	local race = races[courseId or "dirt"]
@@ -351,6 +371,34 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			end
 		end
 		local laneWidth = race.cfg.laneWidth
+		-- Brushes (D-057 N5): each starts when the race on screen reaches it; the mover's horse ticks
+		-- softly, the mover's chip shows (RaceState.BrushDrawn), and the replay records it then (what
+		-- this screen showed). One that arrives late starts from the beginning now (its clock restarts
+		-- at the drawn time, so the horse never snaps into the middle of a lean); one the screen is
+		-- already past (brushLeanSeconds) isn't drawn, ticked or recorded at all.
+		local drawnAt = if race.steering and EASED and race.pb.play then race.pb.play else t
+		for k = #race.brushes, 1, -1 do
+			local b = race.brushes[k]
+			local age = drawnAt - b.at
+			if not b.started and age >= 0 then
+				local how = SteerPose.brushStart(age, POSE)
+				if how == "skip" then
+					table.remove(race.brushes, k)
+					continue
+				end
+				if how == "restart" then b.at, age = drawnAt, 0 end
+				b.started = true
+				local horse = horseModel(courseId, b.mover)
+				local part = horse and (horse.PrimaryPart or horse:FindFirstChildWhichIsA("BasePart", true))
+				if Sound and part then Sound.play("count_tick", POSE.brushVolume, part) end
+				local rec = RaceState.recording
+				if isFocus and rec and rec.course == courseId then
+					table.insert(rec.events, { t = t, kind = "brush", mover = b.mover, other = b.other, dir = b.dir })
+				end
+				RaceState.BrushDrawn:Fire(courseId, b.mover, b.at)
+			end
+			if age > POSE.brushLeanSeconds + 0.1 then table.remove(race.brushes, k) end
+		end
 		for i = 1, race.lanes do
 			if race.steering and not EASED then
 				local f = math.clamp((clock - race.sampleAt) / SAMPLE_SECONDS, 0, 1)
@@ -385,13 +433,20 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			if i == race.myLane and nudge > 0 then shown = p + nudge / race.len1 end
 			-- The body through lane changes (SteerPose): every horse in a steering race; your own
 			-- press's look cue on your horse (eased glide).
-			local yaw, roll = 0, 0
+			local yaw, roll, leanFeet, nod = 0, 0, 0, 0
 			if race.steering and EASED then
 				local look = if i == race.myLane then SteerPredict.lookDir(race.predict, race.own, clock, race.locked) else 0
 				yaw, roll = SteerPose.step(race.pose[i], POSE, race.lane[i], dt, GameConfig.raceSpeedStudsPerSecond * speed,
 					laneWidth, look)
 			end
-			place(i, shown, bob, race.plan, courseId, nil, race.lane[i], yaw, roll)
+			for _, b in race.brushes do
+				if b.mover == i or b.other == i then
+					local l, n = SteerPose.brush(drawnAt - b.at, POSE, b.mover == i, b.dir)
+					leanFeet += l
+					nod = math.max(nod, n)
+				end
+			end
+			place(i, shown, bob, race.plan, courseId, nil, race.lane[i], yaw, roll, leanFeet, nod)
 			if isFocus then
 				RaceState.progress[i] = p
 				if i == race.myLane and raw >= 1 + 2 * PAST_LINE then RaceState.myHome = true end

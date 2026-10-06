@@ -35,6 +35,9 @@ RaceState.cheerOpen = false     -- watching: the cheer strip is still open (FanC
 -- Steering (D-054 S3): RaceView sets this; RaceController calls it on each press (dir, seq), so
 -- your own glide starts on your screen at once. Returns true if your horse started over.
 RaceState.predictSteer = function(_dir: number, _seq: number): boolean return false end
+-- A brush (D-057 N5) as RaceView starts drawing it: (courseId, mover lane, server time drawn).
+-- RaceController shows the mover's chip then, so the chip and the lean come together.
+RaceState.BrushDrawn = Instance.new("BindableEvent")
 
 -- Race HUD size on small screens (D-055): the board, place badge, results card and race map
 -- shrink with the screen height. The race map's top and unscaled height place the badge under it.

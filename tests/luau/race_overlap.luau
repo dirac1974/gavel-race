@@ -86,7 +86,8 @@ export type Stats = { before: number, first5: number, after: number, lastTwo: nu
 	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own?,
 	reversals: { [string]: { count: number, seconds: number, minGap: number } }, accelBefore: number, accelAfter: number,
 	brushes: number, boxedTicks: number, riderTicks: number, afterMoves: number, lateMoves: number, lateHalfSteps: number,
-	afterReversals: number, afterReversalsWithin: number, afterMinGap: number, crossOrderOk: boolean, crossOrder: { number } }
+	afterReversals: number, afterReversalsWithin: number, afterMinGap: number, crossOrderOk: boolean, crossOrder: { number },
+	brushStyles: { [string]: { riders: number, brushRaces: number, chargedRaces: number, brushes: number } }, strangerCharged: number }
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local d057 = opts ~= nil and opts.d057 == true
@@ -165,7 +166,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil,
 		reversals = {}, accelBefore = 0, accelAfter = 0, brushes = 0, boxedTicks = 0, riderTicks = 0,
 		afterMoves = 0, lateMoves = 0, lateHalfSteps = 0, afterReversals = 0, afterReversalsWithin = 0, afterMinGap = math.huge,
-		crossOrderOk = true, crossOrder = {} }
+		crossOrderOk = true, crossOrder = {}, brushStyles = {}, strangerCharged = 0 }
 	-- Each horse's crossing on the drawn screen: RaceView's pace (a quick ease out of the gate, then a
 	-- steady gallop reaching the race length at tFinish) plus its drawn offset.
 	local len1 = plan.lengths[1]
@@ -226,7 +227,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	-- turned beyond its drift (radians).
 	local ownPose, cueSide = SteerPose.new(), 0
 	local masher = opts ~= nil and opts.ownStyle == "masher"
-	local apartFor, sentOwn = 0, nil
+	local apartFor, sentOwn, sentEvents = 0, nil, 0
 	local presses, nextPattern, mySeq = {}, if predict then 1 + 2 * pressRng:NextNumber() else math.huge, 0 -- presses = { { at, dir } } still to make
 	local seg = 1
 	local lastFrame = 0
@@ -335,6 +336,15 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					moveDir[i], moveTgt[i] = dir, laneNow[i]
 				end
 			end
+			if predict then -- (N5 review) your own brushes, before that tick's lane: RaceView steadies the look cue
+				while sentEvents < #trip.events do
+					sentEvents += 1
+					local e = trip.events[sentEvents]
+					if e[2] == "brush" and e[3] == me then
+						table.insert(inbox, { at = arrival(T), kind = "brush", T = e[1] + trip.dt })
+					end
+				end
+			end
 			if predict and not trip.locked then
 				local ownNow = { trip.tgt[me], Trip.laneAfter(trip, me), trip.ack[me] }
 				if not sentOwn or sentOwn[1] ~= ownNow[1] or sentOwn[2] ~= ownNow[2] or sentOwn[3] ~= ownNow[3] then
@@ -360,6 +370,8 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					end
 				elseif m.kind == "own" then
 					view.srv = { tgt = m.own[1], dest = m.own[2], ack = m.own[3] }
+				elseif m.kind == "brush" then -- as RaceView: no look cue while your horse steadies
+					view.steadyUntil = math.max(tc, m.T + steer.steadySeconds)
 				else
 					clientLocked = true
 				end
@@ -574,6 +586,22 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	stats.lineOrder, stats.result = line, result
 	stats.halfSteps = trip.halfSteps or 0
 	stats.brushes = #trip.events
+	-- Brushes by rider style (D-057 N5), and the mover-pays check: a horse charged for a brush it
+	-- never made (it was only ever the one bumped) would count in strangerCharged.
+	local moved = {}
+	for _, e in trip.events do moved[e[3]] = true end
+	for i = 1, n do
+		if Trip.brushCharge(trip, i) > 0 and not moved[i] then stats.strangerCharged += 1 end
+	end
+	for _, h in humans do
+		local i = riderLane[h.id]
+		local b = stats.brushStyles[style[h.id]] or { riders = 0, brushRaces = 0, chargedRaces = 0, brushes = 0 }
+		b.riders += 1
+		b.brushes += trip.brushes[i]
+		if trip.brushes[i] > 0 then b.brushRaces += 1 end
+		if Trip.brushCharge(trip, i) > 0 then b.chargedRaces += 1 end
+		stats.brushStyles[style[h.id]] = b
+	end
 	for _, h in humans do stats.reversals[style[h.id]].seconds += trip.lockT end -- per rider
 	return stats
 end

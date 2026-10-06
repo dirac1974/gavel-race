@@ -6,6 +6,11 @@
 -- * Every other steering chip ("Saved ground!", "Tucked in!", "Gap!", the turn tip, "Lanes
 --   locked!") is good news or a one-off, so it always shows; SteerChips.shown records it, so a
 --   "No room yet" never crowds it.
+-- * After a brush (D-057 N5), the mover hears the same "No room yet", under the same limits (not
+--   within noRoomChipEvery of the last one, nor chipMinGap of another chip); the other horse's
+--   rider hears nothing. The first brush a rider ever has (it is free) brings the one-time tip
+--   instead, "Bump! Press once, then wait for a gap" (data.flags.bumpTip once it has come; like
+--   the turn tip, a one-off, so it always shows). As the mover's screen draws the brush.
 -- Times are race time (SteerLane's waitAt clock).
 
 export type Chips = { lastAt: number, noRoomAt: number, noRoomWait: number }
@@ -29,6 +34,23 @@ function SteerChips.noRoom(c: Chips, lane: any, now: number, hudCfg: any): boole
 	if now - c.noRoomAt < hudCfg.noRoomChipEvery or now - c.lastAt < hudCfg.chipMinGap then return false end
 	c.noRoomAt, c.noRoomWait, c.lastAt = now, lane.waitAt, now
 	return true
+end
+
+-- Whether the mover's "No room yet" after a brush should show now (and records it if so).
+function SteerChips.brushed(c: Chips, now: number, hudCfg: any): boolean
+	if now - c.noRoomAt < hudCfg.noRoomChipEvery or now - c.lastAt < hudCfg.chipMinGap then return false end
+	c.noRoomAt, c.lastAt = now, now
+	return true
+end
+
+-- The mover's chip as a brush is drawn: "tip" (the one-time tip, when tipDue), "noRoom" or nil.
+-- Either one counts as the brush's "No room yet" for the limits.
+function SteerChips.bumped(c: Chips, now: number, hudCfg: any, tipDue: boolean): string?
+	if tipDue then
+		c.noRoomAt, c.lastAt = now, now
+		return "tip"
+	end
+	return if SteerChips.brushed(c, now, hudCfg) then "noRoom" else nil
 end
 
 return SteerChips

@@ -1280,7 +1280,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		steer = { race = cueRace, course = courseId or "dirt", start = start, geo = geo, shown = false, smart = true,
 			locked = false, seq = 0, lastPress = -math.huge, armed = true, turnAcc = acc, tipped = {}, tips = 0,
 			tuckedFor = 0, tuckedTotal = 0, tuckChips = 0, tuckChipAt = -math.huge, pressed = false,
-			hud = SteerHud.new(), chips = SteerChips.new(), lane = nil, pressDir = 0, pressAt = -math.huge }
+			hud = SteerHud.new(), chips = SteerChips.new(), lane = nil, pressDir = 0, pressAt = -math.huge, brushAt = -math.huge }
 	end
 	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
 	status.Text = string.format("%s race: %s%s", league, conditions, if riding then "" else "  (watching)")
@@ -1411,10 +1411,11 @@ end)
 
 -- Steering (D-054 S3): your buttons and Smart Steer for this race (sent to you only), the lock
 -- time, and the lock itself.
-remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smart, tip, courseId)
+remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smart, tip, bumpTip, courseId)
 	local s = steer
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace then return end
 	s.shown, s.smart = shown == true, smart ~= false
+	s.bumpTip = s.shown and bumpTip == true -- (D-057 N5) the one-time tip on your first brush
 	if s.shown and tip then s.tipAt = s.start + 1.5 end
 	if s.shown and RaceState.recording then RaceState.recording.steer = true end -- the replay draws your line
 	bindSteer(s.shown)
@@ -1430,11 +1431,33 @@ remotes:WaitForChild("SteerLane").OnClientEvent:Connect(function(tgt, dest, ack,
 	lane.tgt, lane.dest, lane.ack, lane.wait, lane.waitAt = tgt, dest, ack, wait or 0, waitAt or 0
 	lane.tucking, lane.inSide, lane.outSide, lane.t = tucking == true, inSide or "free", outSide or "free", stateT or 0
 	s.lane = lane
-	local wobble, gap = SteerHud.message(s.hud, lane, STEER, SHUD, s.pressDir, s.pressAt)
+	local wobble, gap = SteerHud.message(s.hud, lane, STEER, SHUD, s.pressDir, s.pressAt, s.brushAt)
 	if wobble ~= 0 then wobbleArrow(wobble) end
 	if gap then
 		showChip("Gap!")
 		if Sound then Sound.play("tap_good") end
+	end
+end)
+-- A brush (D-057 N5): when you were the horse that pressed into another, the wait it cleared won't
+-- wobble (from its arrival: the SteerLane that clears the wait comes right after it), and as your
+-- screen draws it (RaceState.BrushDrawn, with the lean) a chip: the first brush you ever have (it
+-- is free) the one-time tip, "Bump! Press once, then wait for a gap"; after that "No room yet"
+-- under the chips' limits. The other rider hears nothing. No cost or blame words anywhere; the
+-- results card shows nothing about it.
+remotes:WaitForChild("SteerBrush").OnClientEvent:Connect(function(mover, _other, _dir, at, courseId)
+	local s = steer
+	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
+	s.brushAt = (at or serverNow()) - s.start
+end)
+RaceState.BrushDrawn.Event:Connect(function(courseId, mover, _at)
+	local s = steer
+	if not s or s.course ~= courseId or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
+	local chip = SteerChips.bumped(s.chips, serverNow() - s.start, SHUD, s.bumpTip == true)
+	if chip == "tip" then
+		s.bumpTip = false
+		showChip("Bump! Press once, then wait for a gap", SHUD.tipSeconds)
+	elseif chip == "noRoom" then
+		showChip("No room yet")
 	end
 end)
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)
