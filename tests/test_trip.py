@@ -5,6 +5,7 @@ tests/fixtures/steering_report.json); the tests here assert that report and re-c
 small runs."""
 
 import copy
+import hashlib
 import inspect
 import json
 import math
@@ -551,7 +552,7 @@ def test_stored_report_is_current_and_meets_every_target(report):
     """sims/steering.py --write stores the full run (600 races per course x distance). It must
     be made with today's config and baseline and pass every acceptance target in every cell."""
     data = steering.load_baseline()
-    assert report["config"] == trip.CONFIG
+    assert report["config"] == trip.config_record(trip.CONFIG)
     assert report["baselineSeed"] == data["seed"] and report["baselineRaces"] == data["races"]
     assert report["mixWeight"] == data["mixWeight"] == steering.MIX_WEIGHT
     assert report["races"] >= 600
@@ -643,7 +644,7 @@ def test_small_run_smart_kid_among_bots_matches_the_stored_report(report):
 
 def test_baseline_files_are_current():
     data = steering.load_baseline()
-    assert data["config"] == trip.CONFIG, "GameConfig.steering mirror changed: run python sims/steering.py --write"
+    assert data["config"] == trip.config_record(trip.CONFIG),         "GameConfig.steering mirror changed: run python sims/steering.py --write"
     assert data["race"] == trip.RACE
     assert data["races"] >= 2000 and data["calibrationPasses"] == steering.CALIBRATION_PASSES
     for course in trip.COURSE_ORDER:
@@ -694,10 +695,10 @@ def test_extra_cases_fixture(race_math):
 def test_trip_fixture_replays_exactly():
     picks = [0, 9, 25, 50, 75, 100, 151, 199]  # 9: steering off (k >= 8 cycles the overrides)
     fx = make_fixtures.trip_fixture(only=picks)
-    assert fx["cfg"] == trip.CONFIG and len(fx["runs"]) == len(picks)
+    assert fx["cfg"] == trip.config_record(trip.CONFIG) and len(fx["runs"]) == len(picks)
     assert fx["runs"][1]["cfg"]["enabled"] is False
     for run in fx["runs"]:
-        cfg = run.get("cfg", fx["cfg"])
+        cfg = trip.config_from_record(run.get("cfg", fx["cfg"]))
         geo = trip.phase_a(run["course"], run["distance"])
         by_tick = {}
         for tick, lane, d in run["intents"]:
@@ -719,3 +720,53 @@ def test_trip_fixture_replays_exactly():
     assert {r["course"] for r in fx["runs"]} == {"dirt", "turf"}
     assert fx["geometry"]["dirt"]["Mile"]["gate"] == {"straight": "home", "offset": pytest.approx(1258.5707, abs=1e-3),
                                                       "laps": 0}
+
+
+# ---------------------------------------------------------------- D-057 off: D-054 bit for bit
+
+def test_d057_rules_are_all_off_by_default():
+    """N1 adds every D-057 rule switched off: CONFIG holds D-054's behaviour, and the files made
+    before D-057 record the config without the new keys (trip.config_record)."""
+    off = {"glide": "linear", "chainWindow": 0.0, "reverseGapSeconds": 0.0, "weaveGapSeconds": 0.0,
+           "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0, "blockedPress": "d054", "brush": "off"}
+    for key, value in off.items():
+        assert CFG[key] == value, key
+    assert set(trip.D057) == set(off)
+    assert all(CFG[k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
+    record = trip.config_record(CFG)
+    assert list(record) == [k for k in CFG if k not in trip.D057_KEYS]
+    assert record == steering.load_baseline()["config"] == steering.load_report()["config"]
+    assert trip.config_from_record(record) == CFG
+
+
+def test_d054_trip_fixture_runs_are_byte_identical_to_before_d057():
+    """The D-054 parity runs (trip.json) regenerate byte for byte as they did before N1: the
+    hash of eight runs' JSON and of the recorded config, taken from trip.json made at main
+    7abfa27. The Luau parity test replays the whole regenerated file against Trip.luau, which
+    has no D-057 code yet."""
+    picks = [0, 9, 25, 50, 75, 100, 151, 199]
+    fx = make_fixtures.trip_fixture(only=picks)
+    h = hashlib.sha256()
+    for run in fx["runs"]:
+        h.update(json.dumps(run).encode())
+    assert h.hexdigest() == "00308033c56e108b42077696d30bbe17b182e0e7c94e81751658ddbc2519ee9f"
+    assert hashlib.sha256(json.dumps(fx["cfg"]).encode()).hexdigest() ==         "92644721342ce41db521740efcc806dcb20f1973aea3445a99ffbd01db8e40ed"
+
+
+def test_default_config_never_takes_a_d057_path():
+    """With the D-054 config a race never bounces, steadies, brushes or reverses late, and the
+    D-057 state stays at rest: no sideways speed, no brushes, no steadying back."""
+    for seed in range(4):
+        rng = random.Random(seed)
+        course, distance = steering.cells()[seed * 2]
+        geo = trip.phase_a(course, distance)
+        setup = steering.race_setup(steering.race_seed(9, seed, 0), distance)
+        st = trip.new_state(list(range(1, 9)), setup["q"], setup["uniforms"], geo, CFG,
+                            ["manual", "smart", "bot", "manual", "smart", "bot", "manual", "bot"])
+        answers = set()
+        for tick in range(phase_a_ticks(geo)):
+            intents = [(i, rng.choice((-1, 1))) for i in (0, 1, 3, 4, 6) if rng.random() < 0.3]
+            answers.update(trip.step(st, setup["q"] if tick < 150 else setup["p1"], intents, tick * DT, DT))
+            assert st.v == [0.0] * 8 and st.check == [0.0] * 8
+        assert not answers & {"bounce", "steady", "brush"}
+        assert st.events == [] and st.brushes == [0] * 8 and trip.brush_charges(st) == [0.0] * 8
