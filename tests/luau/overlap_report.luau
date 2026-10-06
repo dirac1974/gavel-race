@@ -1,10 +1,18 @@
 --!strict
--- Overlap report (D-054 S2, S3): how often horses overlap on screen, before the far-turn lock, in the
--- first 5 s after it, and from the lock to the line.
--- Run: lune run tests/luau/overlap_report [races] [riders=N] [manual] [predict] [latency=S]
+-- Overlap report (D-054 S2, S3; D-057 N2): how often horses overlap on screen, before the far-turn
+-- lock, in the first 5 s after it, and from the lock to the line.
+-- Run: lune run tests/luau/overlap_report [races] [riders=N] [manual] [predict] [latency=S] [d057]
 --   riders = lanes pressing ◀ ▶ at random (S3); manual = with Smart Steer off; predict = rider 1
 --   presses from its own screen (singles, doubles, mashes, In-then-Out) with `latency` each way
 --   (0.1 s by default), its horse drawn by SteerPredict; the report then adds that screen's numbers.
+--   d057 = natural steering on (D-057, brushes included) with a masher, a ditherer and a casual
+--   rider (riders=N takes the first N of those; with predict, rider 1 presses from its screen and
+--   the three follow), lanes drawn from the interpolated 10 Hz samples as N3's RaceView will draw
+--   them; the report adds reversals, the drawn sideways acceleration, brushes and boxed-in time.
+-- Exits 1 if any race overlaps on any screen, draws a horse falling back faster than 20 ft/s,
+-- or crosses the line out of order; with d057 also if a rider reverses within 3 s of its last
+-- reversal or the drawn sideways acceleration passes 31.7 ft/s^2 (D-057's 30, plus 0.5 for the
+-- landing tick and 1.2 for the 0.001-lane rounding of the sent lanes).
 local process = require("@lune/process")
 local simulate = require("./race_overlap")
 
@@ -14,18 +22,21 @@ for _, arg in process.args do
 	local key, value = string.match(arg, "^(%w+)=(.+)$")
 	if key then
 		opts[key] = tonumber(value)
-	elseif arg == "manual" or arg == "predict" then
+	elseif arg == "manual" or arg == "predict" or arg == "d057" then
 		opts[arg] = true
 	elseif tonumber(arg) then
 		races = tonumber(arg) :: number
 	end
 end
-if opts.predict and opts.riders < 1 then opts.riders = 1 end
+if opts.d057 and opts.riders == 0 then opts.riders = nil end -- d057: the styled riders (with predict, rider 1 + three)
+if opts.predict and opts.riders ~= nil and opts.riders < 1 then opts.riders = 1 end
 
 local answers, halfStepRaces, jerkRaces, jerkRacesBefore, backBefore, backAfter = {}, 0, 0, 0, 0, 0
 local totals = { races = 0, before = 0, first5 = 0, after = 0, frames = 0, beforeFrames = 0, first5Frames = 0, afterFrames = 0, lastTwo = 0, lastTwoFrames = 0, orderBad = 0 }
 local own = { races = 0, overlapsBefore = 0, overlapsAfter = 0, framesBefore = 0, framesAfter = 0, apartMax = 0, apartAtLock = 0,
 	timeouts = 0, longest = 0, presses = 0, predicted = 0 }
+local reversals: { [string]: { count: number, seconds: number, minGap: number } } = {}
+local accelBefore, accelAfter, brushes, brushRaces, boxedTicks, riderTicks = 0, 0, 0, 0, 0, 0
 for _, course in { "dirt", "turf" } do
 	for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
 		local cell = { before = 0, first5 = 0, after = 0 }
@@ -48,6 +59,19 @@ for _, course in { "dirt", "turf" } do
 			backBefore = math.max(backBefore, s.backBefore)
 			backAfter = math.max(backAfter, s.backAfter)
 			for answer, count in s.answers do answers[answer] = (answers[answer] or 0) + count end
+			for styleName, r in s.reversals do
+				local a = reversals[styleName] or { count = 0, seconds = 0, minGap = math.huge }
+				a.count += r.count
+				a.seconds += r.seconds
+				a.minGap = math.min(a.minGap, r.minGap)
+				reversals[styleName] = a
+			end
+			accelBefore = math.max(accelBefore, s.accelBefore)
+			accelAfter = math.max(accelAfter, s.accelAfter)
+			brushes += s.brushes
+			if s.brushes > 0 then brushRaces += 1 end
+			boxedTicks += s.boxedTicks
+			riderTicks += s.riderTicks
 			local o = s.own
 			if o then
 				own.races += 1
@@ -77,7 +101,7 @@ print(string.format("in the last 2 s (holds let go): %d races, %d frames; order 
 	totals.lastTwo, totals.lastTwoFrames, totals.orderBad, totals.races, halfStepRaces))
 print(string.format("races where a horse is drawn jerking back (faster than 20 ft/s against the pace): before the lock %d/%d, after it %d/%d; fastest fall back before the lock %.1f ft/s, after it %.1f ft/s",
 	jerkRacesBefore, totals.races, jerkRaces, totals.races, backBefore, backAfter))
-if opts.riders > 0 then
+if (opts.riders or 0) > 0 or opts.d057 then
 	local parts = {}
 	for answer, count in answers do table.insert(parts, answer .. " " .. count) end
 	table.sort(parts)
@@ -89,3 +113,33 @@ if own.races > 0 then
 	print(string.format("  presses %d, %d started a glide at once; longest prediction %.2f s, timed out %d; longest drawn apart from the shared view %.2f s; apart 1 s after the lock %.3f lanes",
 		own.presses, own.predicted, own.longest, own.timeouts, own.apartMax, own.apartAtLock))
 end
+if opts.d057 then
+	local parts = {}
+	for styleName, r in reversals do
+		table.insert(parts, string.format("%s %.2f a minute (shortest gap %s)", styleName, 60 * r.count / math.max(r.seconds, 1e-9),
+			if r.minGap < math.huge then string.format("%.1f s", r.minGap) else "-"))
+	end
+	table.sort(parts)
+	print("D-057 reversals: " .. table.concat(parts, "; "))
+	print(string.format("D-057 drawn sideways acceleration, fastest: before the lock %.1f ft/s^2, after it %.1f ft/s^2", accelBefore, accelAfter))
+	print(string.format("D-057 brushes: %d in %d/%d races (%.2f a race); riders boxed in %.1f%% of their pre-lock time",
+		brushes, brushRaces, totals.races, brushes / totals.races, 100 * boxedTicks / math.max(riderTicks, 1)))
+end
+local problems = {}
+if totals.beforeFrames + totals.afterFrames > 0 then table.insert(problems, "overlapping horses on the shared screen") end
+if own.framesBefore + own.framesAfter > 0 then table.insert(problems, "overlapping horses on rider 1's own screen") end
+if jerkRaces + jerkRacesBefore > 0 then table.insert(problems, "a horse drawn falling back faster than 20 ft/s") end
+if totals.orderBad > 0 then table.insert(problems, "the order across the line differs from the result") end
+if opts.d057 then
+	for styleName, r in reversals do
+		if r.minGap < 3 - 1e-9 then table.insert(problems, styleName .. " reverses within 3 s") end
+	end
+	-- D-057's 30 ft/s^2, + 0.5 for the landing tick (Trip's own sideways speed changes at most 27),
+	-- + 1.2 for the sent lanes' 0.001-lane rounding (0.002 lane over a second difference).
+	if math.max(accelBefore, accelAfter) > 31.7 then table.insert(problems, "drawn sideways acceleration over 31.7 ft/s^2") end
+end
+if #problems > 0 then
+	print("FAIL: " .. table.concat(problems, "; "))
+	process.exit(1)
+end
+print("PASS")

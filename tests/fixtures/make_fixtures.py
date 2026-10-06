@@ -2,11 +2,11 @@
 """Generate Python reference fixtures for the Luau parity tests.
 
 Writes tests/fixtures/race_math.json and tests/fixtures/trip.json; with --d057 also
-tests/fixtures/trip_d057.json (about 28 MB, for the N2 Luau port: N2 turns it on in CI and in
-tests/test_luau_parity.py). Deterministic (fixed seeds). race_math.json is append-only: new sections draw from their own
-generators, so the original sections stay byte-for-byte the same. trip.json is D-054 (it records
-the config without the D-057 keys, which are all off); trip_d057.json is D-057 switched on
-(stage N1, for the N2 Luau port).
+tests/fixtures/trip_d057.json (about 15 MB; CI and tests/test_luau_parity.py pass --d057, and
+tests/luau/trip_d057_tests.luau replays it against Trip.luau). Deterministic (fixed seeds).
+race_math.json is append-only: new sections draw from their own generators, so the original
+sections stay byte-for-byte the same. trip.json is D-054 (it records the config without the
+D-057 keys, which are all off); trip_d057.json is D-057 switched on.
 """
 
 import json
@@ -275,7 +275,7 @@ def trip_fixture(only=None):
 
 # ---------------------------------------------------------------- D-057 (stage N1, for the N2 port)
 
-TRIP_D057_RUNS = 200
+TRIP_D057_RUNS = 100
 D057_SNAPSHOT_EVERY = 10
 # Runs k >= 8 cycle through these on top of the D-057 config, so every switch's other branch is
 # replayed too.

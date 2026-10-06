@@ -50,11 +50,18 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	-- GameConfig mirrors the Python CONFIG and RACE; TripBaseline is the generated table.
 	-- GameConfig.steering mirrors CONFIG, except two game-only switches (S1's post draw and S3's
 	-- spam limit on steering requests) and the scale, a documented switch (0 = cosmetic; S3 ships
-	-- the model's 1). Parity runs at the fixture's scale.
+	-- the model's 1). Parity runs at the fixture's scale. trip.json records the config without the
+	-- D-057 keys while they are all off (trip.config_record); trip_d057_tests.luau checks those
+	-- against trip.CONFIG in full.
+	local D057_KEYS = { "glide", "laneSpeedMax", "laneAccel", "chainWindow", "reverseGapSeconds", "weaveGapSeconds",
+		"weaveWindowSeconds", "pressBounceSeconds", "glideReserveFeet", "blockedPress", "gapWaitSeconds", "gapWaitInSeconds",
+		"tuckAfterSeconds", "boxedAheadFeet", "brush", "brushAlongFeet", "brushGraceSeconds", "brushRepeatSeconds",
+		"brushPays", "brushCost", "brushFree", "brushMaxCharged", "brushCheckFeet", "brushRecoverPerSecond", "steadySeconds" }
 	local steering = table.clone(GameConfig.steering)
 	steering.drawPosts = nil
 	steering.requestsPerSecond = nil
 	steering.scale = nil
+	for _, key in D057_KEYS do steering[key] = nil end
 	local pyCfg = table.clone(data.cfg)
 	pyCfg.scale = nil
 	check(deepEqual(steering, pyCfg, 0), "GameConfig.steering mirrors CONFIG in src/trip.py (the scale switch aside)")
@@ -89,6 +96,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		return cfg
 	end
 	local dt = 1 / GameConfig.steering.tickHz
+	local full = runConfig({}) -- GameConfig.steering at the fixture's scale, every key (D-057 off)
 	local runsOk, answersOk, snapsOk, lockOk, tripOk = 0, true, true, true, true
 	for r, run in data.runs do
 		local cfg = runConfig(run)
@@ -163,12 +171,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	do
 		local track = TrackLayout.courses.dirt
 		local plan = TrackLayout.plan(track, TrackLayout.distances.Classic)
-		local st = Trip.new({ 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), data.cfg, { "manual", "manual" }, data.race)
+		local st = Trip.new({ 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, data.race)
 		check(not pcall(Trip.acceptIntent, st, 0, -1, 0), "lane 0 is refused")
 		check(not pcall(Trip.acceptIntent, st, 3, -1, 0), "a lane past the field is refused")
 		check(not pcall(Trip.step, st, { 0.5, 0.5 }, { { 2.5, -1 } }, 0, dt), "a fractional lane index is refused")
-		check(not pcall(Trip.new, { 0, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, data.cfg, nil, data.race), "post 0 is refused")
-		check(not pcall(Trip.tau, { 0, 0 }, { 1, 9 }, table.create(8, 0), data.cfg), "post 9 is refused by tau")
+		check(not pcall(Trip.new, { 0, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, full, nil, data.race), "post 0 is refused")
+		check(not pcall(Trip.tau, { 0, 0 }, { 1, 9 }, table.create(8, 0), full), "post 9 is refused by tau")
+		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, data.cfg, nil, data.race),
+			"a config without the D-057 keys is refused (Python raises too)")
+		local bad = table.clone(full)
+		bad.glide = "curvy"
+		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, bad, nil, data.race), "an unknown glide is refused")
 	end
 
 	-- RaceMath.liveChances with an extra exponent (crowd boost + trip).
@@ -385,7 +398,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	do -- make room: a horse closing on another in its lane moves out
 		local track = TrackLayout.courses.dirt
 		local plan = TrackLayout.plan(track, TrackLayout.distances.Sprint)
-		local st = Trip.new({ 2, 2 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), data.cfg, { "manual", "manual" }, race)
+		local st = Trip.new({ 2, 2 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, race)
 		Trip.lock(st)
 		st.view = { 10, -10 } -- the second horse 20 ft behind the first in lane 2, but its place is ahead
 		local lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 10)
@@ -394,7 +407,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		check(st.view[2] > 0, "...and goes on toward its place")
 		lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 11)
 		check(lanes[2] == 3, "make-room lanes don't jump back")
-		local held = Trip.new({ 1, 1 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), data.cfg, { "manual", "manual" }, race)
+		local held = Trip.new({ 1, 1 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, race)
 		Trip.lock(held)
 		held.view = { 0, -10 }
 		held.shown, held.shownTgt = { 1, 1 }, { 1, 1 }

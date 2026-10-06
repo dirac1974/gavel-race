@@ -13,6 +13,14 @@
 --     horse drawn by SteerPredict as RaceView draws it, from SteerLane messages (tgt, destination,
 --     last press answered, sent on change as RaceService does). Counts overlaps on that screen and
 --     how long its own horse is drawn somewhere else than everyone else sees it.
+--   d057 = natural steering on (D-057, N2: Trip.d057Config of GameConfig.steering, brushes included),
+--     with riders in `styles` (default masher, ditherer, casual: 4 presses a second on a random side;
+--     In, Out, In, Out every 0.2 s; In about every 5 s and Out about every 20 s), and lanes drawn as
+--     N3's RaceView will draw them: the 10 Hz samples interpolated like the offsets (the S-curve is
+--     in the samples). Also counts each rider's reversals and the shortest gap between them, the
+--     drawn sideways acceleration (every horse, before and after the lock), brushes, and how long
+--     riders are boxed in. With predict, rider 1 ("own") presses from its screen and three styled
+--     riders follow. Without d057, everything is as before (D-054).
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -51,10 +59,17 @@ export type Own = { overlapsBefore: number, overlapsAfter: number, apartMax: num
 	timeouts: number, longestPrediction: number, presses: number, predicted: number }
 export type Stats = { before: number, first5: number, after: number, lastTwo: number, frames: number, orderOk: boolean,
 	lineOrder: { number }, result: { number }, answers: { [string]: number }, halfSteps: number,
-	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own? }
+	backBefore: number, backAfter: number, jerks: number, jerksBefore: number, own: Own?,
+	reversals: { [string]: { count: number, seconds: number, minGap: number } }, accelBefore: number, accelAfter: number,
+	brushes: number, boxedTicks: number, riderTicks: number }
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
+	local d057 = opts ~= nil and opts.d057 == true
 	local cfgGame = config or GameConfig
+	if d057 and config == nil then
+		cfgGame = table.clone(GameConfig)
+		cfgGame.steering = Trip.d057Config(GameConfig.steering)
+	end
 	local steer = cfgGame.steering
 	local track = TrackLayout.courses[courseId]
 	local plan = TrackLayout.plan(track, TrackLayout.distances[distanceName])
@@ -63,9 +78,13 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local predict = opts ~= nil and opts.predict == true
 	local latency = if opts and opts.latency then opts.latency elseif predict then 0.1 else 0
 	local humans, riders = {}, {}
-	for r = 1, (opts and opts.riders) or 0 do
+	local styles = (opts and opts.styles)
+		or (if d057 and predict then { "own", "masher", "ditherer", "casual" } elseif d057 then { "masher", "ditherer", "casual" } else {})
+	local style = {}
+	for r = 1, (opts and opts.riders) or #styles do
 		table.insert(humans, { id = "rider" .. r, name = "Rider " .. r, rating = 50, isBot = false })
 		riders["rider" .. r] = if opts.manual then "manual" else "smart"
+		style["rider" .. r] = styles[r] or "random"
 	end
 	local lanes = RaceSession.fillWithBots(humans, cfgGame.lanes, cfgGame, ThemePack, rng)
 	local session = RaceSession.new({ deps = deps, config = cfgGame, leagueName = "Silver", lanes = lanes, rng = rng })
@@ -102,7 +121,22 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	local sampleAt, sampleT = 0, 0 -- when the shown sample arrived, and the server tick that made it
 	local stats: Stats = { before = 0, first5 = 0, after = 0, lastTwo = 0, frames = 0, orderOk = true, lineOrder = {}, result = {},
-		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil }
+		answers = trip.answers, halfSteps = 0, backBefore = 0, backAfter = 0, jerks = 0, jerksBefore = 0, own = nil,
+		reversals = {}, accelBefore = 0, accelAfter = 0, brushes = 0, boxedTicks = 0, riderTicks = 0 }
+	-- D-057 counts: each rider's lane-change starts (from the server's tgt), boxed-in ticks, and the
+	-- drawn sideways speed per frame (for the acceleration: lanes interpolate the 10 Hz samples, so
+	-- the drawn speed changes once a sample interval and the change over that interval is the
+	-- acceleration).
+	local riderLane, lastTgt, lastDir, lastRev, flips = {}, {}, {}, {}, {}
+	for _, h in humans do
+		local i = session:laneIndex(h.id) :: number
+		riderLane[h.id], lastTgt[h.id], lastDir[h.id], lastRev[h.id], flips[h.id] = i, trip.tgt[i], 0, -math.huge, 1
+		stats.reversals[style[h.id]] = stats.reversals[style[h.id]] or { count = 0, seconds = 0, minGap = math.huge }
+	end
+	local laneWidth = track.laneWidth
+	local laneFrom = table.create(n, 0)
+	local lastLane, lastVel = table.create(n, 0), table.create(n, 0)
+	for i = 1, n do laneFrom[i], lastLane[i] = i, i end
 	-- backBefore / backAfter = the fastest any horse is drawn falling back against the pace (ft/s),
 	-- from 1 s after the gate to the lock and from the lock on (by the server tick that made the
 	-- sample being drawn); jerks / jerksBefore = frames after / before the lock where one falls back
@@ -124,43 +158,95 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local lastFrame = 0
 	local serverDt = 1 / steer.sendHz
 	local k = 0
-	while k * serverDt < tFinish do
+	-- d057: with a link delay the client keeps drawing until the last samples have arrived (the
+	-- server stops at the line; its last messages land `latency` later), so the order across the
+	-- line is judged on what the screen finally shows. D-054 runs stop at the line as before.
+	local drain = if d057 then latency + serverDt else 0
+	while k * serverDt < tFinish + drain do
 		local T = k * serverDt
-		-- Server tick.
-		while seg <= #closes and closes[seg] <= T do
-			shownLive = session:closeSegment(seg)
-			seg += 1
-		end
-		while #outbox > 0 and outbox[1].at <= T + 1e-9 do -- rider 1's presses that have arrived
-			local p = table.remove(outbox, 1)
-			Trip.submit(trip, session, "rider1", p.dir, p.seq, p.at)
-		end
-		for _, h in humans do
-			if not (predict and h.id == "rider1") and T >= nextPress[h.id] and T < trip.lockT then
-				seqs[h.id] += 1
-				Trip.submit(trip, session, h.id, if pressRng:NextNumber() < 0.6 then -1 else 1, seqs[h.id], T)
-				nextPress[h.id] = T + 0.4 + 1.6 * pressRng:NextNumber()
+		if T < tFinish then
+			-- Server tick.
+			while seg <= #closes and closes[seg] <= T do
+				shownLive = session:closeSegment(seg)
+				seg += 1
 			end
-		end
-		local wasLocked = trip.locked
-		if not trip.locked and Trip.advance(trip, session.live, T) then
-			session:setTrip(Trip.raceTau(trip))
-			shownLive = table.clone(session.live)
-		end
-		local w = RaceShape.blendWeight(T, tFar, postEnd, cfgGame.raceShape.blendPower)
-		local offsets, sentLanes = Trip.frame(trip, session, shownLive, w, cfgGame.raceShape, T - lastFrame, T)
-		lastFrame = T
-		-- RaceService skips unchanged lanes, which leaves the client's lane targets as they are, so
-		-- sending them every tick is the same.
-		table.insert(inbox, { at = T + latency, kind = "offsets", offsets = offsets, lanes = sentLanes, T = T })
-		if predict and not trip.locked then
-			local ownNow = { trip.tgt[me], Trip.laneAfter(trip, me), trip.ack[me] }
-			if not sentOwn or sentOwn[1] ~= ownNow[1] or sentOwn[2] ~= ownNow[2] or sentOwn[3] ~= ownNow[3] then
-				sentOwn = ownNow
-				table.insert(inbox, { at = T + latency, kind = "own", own = ownNow })
+			while #outbox > 0 and outbox[1].at <= T + 1e-9 do -- rider 1's presses that have arrived
+				local p = table.remove(outbox, 1)
+				Trip.submit(trip, session, "rider1", p.dir, p.seq, p.at)
 			end
+			for _, h in humans do
+				if predict and h.id == "rider1" then continue end
+				if style[h.id] == "random" then
+					if T >= nextPress[h.id] and T < trip.lockT then
+						seqs[h.id] += 1
+						Trip.submit(trip, session, h.id, if pressRng:NextNumber() < 0.6 then -1 else 1, seqs[h.id], T)
+						nextPress[h.id] = T + 0.4 + 1.6 * pressRng:NextNumber()
+					end
+				elseif T < trip.lockT then
+					local i = riderLane[h.id]
+					local d = 0
+					if style[h.id] == "masher" then
+						if pressRng:NextNumber() < 0.4 then d = if pressRng:NextNumber() < 0.5 then -1 else 1 end
+					elseif style[h.id] == "ditherer" then
+						if k % 2 == 0 then
+							flips[h.id] = -flips[h.id]
+							d = flips[h.id]
+						end
+					else -- casual
+						local u = pressRng:NextNumber()
+						local after = Trip.laneAfter(trip, i)
+						local idle = trip.want[i] == 0 and trip.queued[i] == 0 and trip.x[i] == trip.tgt[i]
+						if u < 0.02 and after > 1 then
+							d = -1
+						elseif u >= 0.02 and u < 0.025 and idle and after < cfgGame.lanes then
+							d = 1
+						end
+					end
+					if d ~= 0 then
+						seqs[h.id] += 1
+						Trip.submit(trip, session, h.id, d, seqs[h.id], T)
+					end
+				end
+			end
+			local wasLocked = trip.locked
+			if not trip.locked and Trip.advance(trip, session.live, T) then
+				session:setTrip(Trip.raceTau(trip))
+				shownLive = table.clone(session.live)
+			end
+			if not wasLocked then -- each rider's lane-change starts and boxed-in time, up to the lock
+				for _, h in humans do
+					local i = riderLane[h.id]
+					if trip.tgt[i] ~= lastTgt[h.id] then
+						local dir = if trip.tgt[i] > lastTgt[h.id] then 1 else -1
+						if lastDir[h.id] ~= 0 and dir ~= lastDir[h.id] then
+							local r = stats.reversals[style[h.id]]
+							r.count += 1
+							r.minGap = math.min(r.minGap, T - lastRev[h.id])
+							lastRev[h.id] = T
+						end
+						lastDir[h.id], lastTgt[h.id] = dir, trip.tgt[i]
+					end
+					if not trip.locked then
+						stats.riderTicks += 1
+						if Trip.boxedIn(trip, i) then stats.boxedTicks += 1 end
+					end
+				end
+			end
+			local w = RaceShape.blendWeight(T, tFar, postEnd, cfgGame.raceShape.blendPower)
+			local offsets, sentLanes = Trip.frame(trip, session, shownLive, w, cfgGame.raceShape, T - lastFrame, T)
+			lastFrame = T
+			-- RaceService skips unchanged lanes, which leaves the client's lane targets as they are, so
+			-- sending them every tick is the same.
+			table.insert(inbox, { at = T + latency, kind = "offsets", offsets = offsets, lanes = sentLanes, T = T })
+			if predict and not trip.locked then
+				local ownNow = { trip.tgt[me], Trip.laneAfter(trip, me), trip.ack[me] }
+				if not sentOwn or sentOwn[1] ~= ownNow[1] or sentOwn[2] ~= ownNow[2] or sentOwn[3] ~= ownNow[3] then
+					sentOwn = ownNow
+					table.insert(inbox, { at = T + latency, kind = "own", own = ownNow })
+				end
+			end
+			if trip.locked and not wasLocked then table.insert(inbox, { at = T + latency, kind = "locked" }) end
 		end
-		if trip.locked and not wasLocked then table.insert(inbox, { at = T + latency, kind = "locked" }) end
 		-- Client frames until the next server tick.
 		local tc = T
 		while tc < T + serverDt - 1e-9 do
@@ -170,6 +256,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 				if m.kind == "offsets" then
 					for i = 1, n do
 						from[i], to[i] = offset[i], m.offsets[i]
+						laneFrom[i] = lane[i]
 						laneTarget[i] = (m.lanes :: { number })[i]
 					end
 					-- As RaceView: the glide to the new sample is timed from its arrival (here, just
@@ -203,15 +290,37 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 			end
 			for i = 1, n do lastOffset[i] = offset[i] end
 			local glide = FRAME / steer.laneSeconds
+			if d057 then -- N3's RaceView: the samples interpolated like the offsets
+				for i = 1, n do -- (at f = 1 exactly the sample, not a rounding short of it)
+					lane[i] = if f >= 1 - 1e-9 then laneTarget[i] else laneFrom[i] + (laneTarget[i] - laneFrom[i]) * f
+				end
+			else
+				for i = 1, n do
+					local d = laneTarget[i] - lane[i]
+					lane[i] += math.clamp(d, -glide, glide)
+				end
+			end
+			local afterLock = sampleT >= trip.lockT - 1e-9
 			for i = 1, n do
-				local d = laneTarget[i] - lane[i]
-				lane[i] += math.clamp(d, -glide, glide)
+				local vel = (lane[i] - lastLane[i]) * laneWidth / FRAME
+				-- (not once the stream has ended: after the last sample the drawn lanes just stop)
+				if tc > 1 and tc - sampleAt <= serverDt + 1e-9 then
+					local acc = math.abs(vel - lastVel[i]) / serverDt
+					if afterLock then
+						stats.accelAfter = math.max(stats.accelAfter, acc)
+					else
+						stats.accelBefore = math.max(stats.accelBefore, acc)
+					end
+				end
+				lastVel[i], lastLane[i] = vel, lane[i]
 			end
 			stats.frames += 1
 			local hits = 0
 			for i = 1, n do
 				for j = i + 1, n do
-					if math.abs(lane[i] - lane[j]) < SIDE and math.abs(offset[i] - offset[j]) < LENGTH then hits += 1 end
+					if math.abs(lane[i] - lane[j]) < SIDE and math.abs(offset[i] - offset[j]) < LENGTH then
+						hits += 1
+					end
 				end
 			end
 			if hits > 0 then
@@ -251,7 +360,11 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 					end
 				end
 				local laneTo = SteerPredict.laneTo(state, view, tc, clientLocked)
-				ownLane += math.clamp(laneTo - ownLane, -glide, glide)
+				if d057 then
+					ownLane = lane[me] -- SteerPredict draws nothing with the eased glide (laneTo is the server's lane)
+				else
+					ownLane += math.clamp(laneTo - ownLane, -glide, glide)
+				end
 				local mine = false
 				for j = 1, n do
 					if j ~= me and math.abs(ownLane - lane[j]) < SIDE and math.abs(offset[me] - offset[j]) < LENGTH then mine = true end
@@ -288,5 +401,7 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	stats.lineOrder, stats.result = line, result
 	stats.halfSteps = trip.halfSteps or 0
+	stats.brushes = #trip.events
+	for _, r in stats.reversals do r.seconds += trip.lockT end
 	return stats
 end

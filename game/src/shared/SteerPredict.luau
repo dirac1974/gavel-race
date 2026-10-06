@@ -18,6 +18,10 @@
 -- * The prediction ends when the server has answered that press (ack), when the server's lane
 --   hasn't come any closer to it for SECONDS, or at the lock. Your horse then follows the server:
 --   its tgt before the lock, the lanes everyone sees after it.
+-- * With the eased glide (D-057, cfg.glide = "eased") nothing is predicted: the slide starts with
+--   the server's lane (the S-curve covers 0.05 lane in its first 0.15 s, so a round trip hides in
+--   the ease-in) and your horse is drawn where everyone sees it, so a refused press never snaps
+--   back. N3 adds the instant "look" cue. With D-054's linear glide nothing here changes.
 
 export type Server = { tgt: number, dest: number, ack: number }
 export type View = {
@@ -56,6 +60,7 @@ end
 -- A press (dir -1 in, 1 out; seq as sent). Returns true if your horse starts over now.
 function SteerPredict.press(state: any, view: View, dir: number, seq: number, now: number): boolean
 	local srv = view.srv
+	if view.cfg.glide == "eased" then return false end -- D-057: the server's lane only
 	if state.pred ~= nil or srv == nil then return false end
 	local x = view.x[view.me]
 	if srv.ack < seq - 1 then return false end -- an earlier press is still on its way: srv is stale
@@ -69,6 +74,7 @@ end
 -- The lane to glide your own horse toward this frame.
 function SteerPredict.laneTo(state: any, view: View, now: number, locked: boolean): number
 	local srv, x = view.srv, view.x[view.me]
+	if view.cfg.glide == "eased" then return x end -- D-057: drawn where everyone sees it
 	local pred = state.pred
 	if pred then
 		local gap = math.abs(x - pred.draw)

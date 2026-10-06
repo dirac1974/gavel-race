@@ -948,6 +948,46 @@ Template:
     - Griefing is checked pooled over the cells, and every cell passes as well.
     - Smart Steer's wait clock only counts an unbroken wait.
     - Reach per intent counts a first press answered cancelled, steady or brush as an intent; none of those can be a first press in practice.
+- N2 (2026-10-06, roblox engineer): Luau parity and overlap tooling, still D-054 in the game.
+  - **`Trip.luau`** mirrors every N1 rule line by line, behind the same keys:
+    - the S-curve glide (`easeStep`, `math.sqrt`), chaining, no reversal mid-glide, the reverse and weave gaps, and the bounce;
+    - the glide reserve, wait-for-room presses, and `sideState`, `boxedIn`, `noTuckInside` and `boxedNoTuck`;
+    - brushes, every new clock, and `tau(..., brushCharges)`.
+  - **`GameConfig.steering`** gains the 25 D-057 keys at their D-054 values, checked equal to `trip.CONFIG` in full. `Trip.d057Config` builds the D-057-on config and is checked equal to `trip.d057_config()`.
+  - **`Trip.raceTau`** now passes each mover's brush charges. They are all zero while brushes are off, which changes nothing.
+  - **Parity:**
+    - `tests/luau/trip_d057_tests.luau` replays `trip_d057.json` at 1e-9: 100 scripted runs and 12 edge runs.
+    - It checks every answer and every snapshot field: lanes, sideways speeds, offsets, targets, waiting presses, steadying, charges, tucking, the six clocks, side states, boxed and no-tuck.
+    - It also checks every brush event with its tick, the trip, charges, τ with the brush term, and stars.
+    - Configs come from the exact-decimal strings.
+    - A mutation check (widening the brush window by 0.15 s) fails it in 7 different fields.
+    - `trip.json` parity is unchanged.
+    - `make_fixtures.py --d057` now runs in CI and in `tests/test_luau_parity.py`. The fixture is cut to 100 runs: 14.7 MB, written in about 4 s.
+  - **After the lock (Luau only), all switched on by `glide = "eased"`:**
+    - The make-room lanes glide on the same S-curve (`st.shownV`, carried on from Trip's sideways speeds at the bell), so nothing slides at once.
+    - A horse rests a tick after landing before it sets off again, including on the bell's tick. Landing and setting straight off the other way drew 44–47 ft/s².
+    - The look-ahead, crossing time and half-lane-step lead come from the eased glide time (`Trip.glideSeconds`).
+    - A horse moving in front of another keeps the glide reserve (6 ft) from it. Without this, one race in 960 had a cut-in that ended in a finish-line overlap.
+    - In the last moments (the half-step window), a horse within holdGap + glideReserveFeet behind another in its lane starts looking for a way out at once. An eased half-lane step takes about 0.7 s instead of 0.3.
+    - With D-057 off nothing changes: the D-054 overlap reports (960 races each: bots; two riders predicting at 0.1 s and 0.25 s; three riders on manual) print exactly what main prints.
+  - **Lanes on the wire** are rounded to 0.001 lane with the eased glide, instead of 0.01. N3's screen draws the S-curve from these samples, and 0.01 lane of rounding adds up to 12 ft/s² of sideways jitter.
+  - **`SteerPredict`** predicts nothing with the eased glide: the slide starts with the server's lane, as D-057 decides. N3 adds the look cue. Its D-054 behaviour is unchanged.
+  - **Overlap tooling:** `race_overlap.luau` and `overlap_report.luau` gain a `d057` mode.
+    - Riders: a masher, a ditherer and a casual rider pressing through `Trip.submit`. With `predict`, rider 1 presses from its own screen and the three follow.
+    - Drawing: lanes are drawn as N3's RaceView will draw them, with the 10 Hz samples interpolated.
+    - Delayed messages: the client keeps drawing until the last delayed samples land. Before, a 0.25 s link judged the finish order on a stale frame.
+    - New counts: reversals per rider, the shortest gap between them, the drawn sideways acceleration (excluding frames after the stream ends), brushes, and boxed-in time.
+    - The report exits 1 on any overlap on either screen, any jerk over 20 ft/s, a wrong finish order, a reversal within 3 s, or drawn acceleration over 31.7 ft/s². That bound is D-057's 30, plus 0.5 for the landing tick and 1.2 for the 0.001-lane rounding.
+  - **Measured with D-057 on** (960 races per row; all pass):
+
+    | Row | Overlaps (shared / own) | Fastest fall-back before / after the lock | Order wrong | Shortest reversal gap | Drawn accel before / after the lock | Brushes a race | Riders boxed |
+    | --- | --- | --- | --- | --- | --- | --- | --- |
+    | Masher + ditherer + casual, Smart Steer | 0 / – | 19.0 / 19.0 ft/s | 0 | 3.5 s | 30.6 / 30.6 ft/s² | 2.76 | 15.5% |
+    | The same, Smart Steer off | 0 / – | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 2.88 | 14.2% |
+    | Rider 1 from its screen + the three, 0.1 s link | 0 / 0 | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 4.07 | 13.7% |
+    | The same, 0.25 s link | 0 / 0 | 19.0 / 19.0 | 0 | 3.5 s | 30.6 / 30.6 | 4.10 | 13.6% |
+
+    Reversals a minute: masher 7.1–7.7, ditherer 11.8–12.4, casual 1.8. Half-lane steps happen in 54–67 races per 960 (D-054: 11). A second seed family (6,400 more races across the four rows) also passed.
 - Alternatives:
   - **A 0.8 s glide** (Engagement, Young player; peak 10 ft/s, 37 ft/s²). It also passes every target (per-intent reach 76–100%) and is the playtest switch.
   - **Body turn 1.5× the drift, capped at 12°** (Engagement, Competitive): a horse drawn turning more than it moves reads as skidding.

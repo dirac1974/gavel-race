@@ -1,6 +1,6 @@
 --!strict
 -- Luau parity and property tests for src/RaceMath.luau. Run with:
---   python tests/fixtures/make_fixtures.py && lune run tests/luau/run_all
+--   python tests/fixtures/make_fixtures.py --d057 && lune run tests/luau/run_all
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 local process = require("@lune/process")
@@ -188,6 +188,7 @@ require("./game_tests")(check, close)
 require("./world_tests")(check, close)
 require("./steering_tests")(check, close)
 require("./trip_tests")(check, close)
+require("./trip_d057_tests")(check, close)
 require("./steer_controls_tests")(check, close)
 require("./steer_results_tests")(check, close)
 
