@@ -325,7 +325,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local grownUps = fs.readFile("game/src/client/GrownUps.client.luau")
 	check(string.find(grownUps, "There's no penalty for being boxed in; a horse held wide just runs a little farther.", 1, true) ~= nil
 		and string.find(grownUps, "never costs points", 1, true) == nil,
-		"the grown-ups page: no penalty for being boxed in (and no promise about points: brushes cost the mover in N5)")
+		"the grown-ups page: no penalty for being boxed in (and no promise about points: brushes cost the mover)")
 	local order = {}
 	local tab = string.match(grownUps, "local function grownUpsTab%(%)(.-)\nend") :: string
 	for n in string.gmatch(tab, ", (%d+)%)\r?\n") do table.insert(order, tonumber(n) :: number) end

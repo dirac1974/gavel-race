@@ -21,15 +21,6 @@ function ReplayTrip.tuck(t0: number, t1: number): any
 	return { t = t1, kind = "tuck", t0 = t0, t1 = t1 }
 end
 
--- Horse i's lane position between frames a and b (fraction f): the recorded lanes, else its post
--- (the recording's lane list), else its lane number.
-function ReplayTrip.laneAt(rec: any, a: any, b: any, f: number, i: number): number
-	local post = (rec.lane and rec.lane[i]) or i
-	local xa = (a.x and a.x[i]) or post
-	local xb = (b.x and b.x[i]) or xa
-	return xa + (xb - xa) * f
-end
-
 -- Horse i's lane position between frames k - 1 and k (fraction f) on a smooth curve through the
 -- recorded lanes (D-057 N3): a monotone cubic using the frames either side (k - 2 and k + 1), so a
 -- replayed lane change keeps the S-curve it had live (no corner at each 10 Hz frame, even in slow

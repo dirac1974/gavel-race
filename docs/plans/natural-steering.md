@@ -295,6 +295,12 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
   - Re-upload `horse_anim_<coat>` (LlamaWorks; standing OK for Roblox asset uploads).
   - `HorseLegs` poses the head about the neck joint: SteerPose's look and yaw lead by up to `headTurnDeg` (12) and the nod moves the head.
   - The body look cue falls to 0.
+- **As built (2026-10-06; DECISIONS D-057 "Built"):**
+  - `docs/GAME_DESIGN.md` describes natural steering, boxed in and brushes for kids and grown-ups.
+  - `docs/V2_PROPOSAL.md` step 5 has the brush term.
+  - `game/PLAYTEST.md` has one checklist, "Natural steering (D-057)": the playtests and risk lines above, kids on phones first, then keyboard and gamepad, Studio checks with the chase-camera yaw, a week of logs, and the switch-back recipe.
+  - The grown-ups copy was checked: accurate, and kept as it is.
+  - The head split is not built. It waits for David's Studio look (REVIEW_QUEUE "N6: head split later").
 
 ---
 
@@ -310,7 +316,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 | Grey arrows confuse | ◀ In greys only when trapped; a horse icon, no words | **Pass** if ≥ 60% of 8–10-year-olds asked after 3 races what a grey arrow means say "can't go that way" or "a horse is there" |
 | Chip spam | "No room yet" only after 1 s of nothing, ≤ once per 10 s; one chip per 2 s | **Fail** if logs show more than 2 "No room yet" per race on average for riders with buttons (prototype casual rider: 0.4–2.7 one-second waits a race before the 10 s limit) |
 | Brushes upset the bumped kid | Mover only pays; the other horse only nods; no name, no chip | **Fail** if more than 1 in 10 bumped kids get upset (observed or asked), even at zero cost. Then `brushCost = 0`, and `brush = "off"` if it persists (Child safety) |
-| Brush cost feels unfair to the mover | First brush free; trigger needs a second press within 2 s; cap 0.006 | **Fail** if logs show riders with buttons charged in more than 5% of races (prototype: 0.4% casual, 64% for mashers), or kids call it unfair |
+| Brush cost feels unfair to the mover | First brush free; trigger needs a third press within 2 s (N5 review; the plan had a second); cap 0.006 | **Fail** if logs show riders with buttons charged in more than 5% of races (prototype: 0.4% casual, 64% for mashers), or kids call it unfair |
 | Griefing (strangers trapping or bumping a kid) | Tuck-back kept; mover pays; positions come from taps, not steering | **Fail** if the sims' targeted-minus-untargeted own trip is below −0.001, or logs show one rider brushing the same opponent 3+ times in more than 1% of races |
 | Overlaps or backward jerks return | Glide reserve; holds settle ≤ 19 ft/s; the N2 overlap gate in CI | **Fail** on any overlap or a fall-back faster than 20 ft/s in `overlap_report` (all rows, 960 races) |
 | Python/Luau drift (sqrt, new ties) | Exact-decimal fixtures; fixed order; the sqrt-free fallback | **Fail** on any `trip_d057.json` mismatch beyond 1e-9 |
@@ -323,7 +329,7 @@ Every stage is one PR. Every value lives in `GameConfig.steering`, `GameConfig.s
 1. **Natural look:** chase view and a 3x replay of three races with mashing riders. **Pass:** no tester says "zig-zag", "wiggle", "slide" or "snap"; at least 2 of 3 say it looks "like real horses". Watch the last 2 s too: **fail** if a tester points out a horse swerving a whole lane just before the line.
 2. **Blind 0.8 vs 1.0 s:** the same kid rides two races at each setting, in random order. **Pass for 1.0 s:** kids can't tell them apart better than chance, or don't prefer 0.8 s. Otherwise switch.
 3. **Boxed in:** after 3 races with buttons, ask "What does the grey arrow mean?" and "What happened when you were stuck?" **Pass:** ≥ 60% answer "can't go that way" or "waited or eased back for a gap"; nobody says they were "punished".
-4. **Brushes:** stage two kids side by side and have one press twice into the other. **Pass:** the bumper can say "I bumped, I slowed down"; the bumped kid isn't upset (see Risks).
+4. **Brushes:** stage two kids side by side and have one keep pressing into the other (three presses since the N5 review). **Pass:** the bumper can say "I bumped, I slowed down"; the bumped kid isn't upset (see Risks).
 5. **Load:** slider scores in races with D-057 against D-054 (config A/B, same kids). **Fail** if the slider S drops more than 2 points on average.
 6. **Latency:** a phone on a throttled link (0.25 s each way). **Pass:** the look cue shows on the press frame, and there is no sideways snap-back in 50 presses.
 7. **Logs** (one week): reversals refused by the gaps per race, waits dropped, "No room yet" per race, brushes and charges per race by policy, τ by post, Smart Steer kid mean, and how often τ binds the clamp.

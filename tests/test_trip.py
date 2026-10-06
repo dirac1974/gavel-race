@@ -734,8 +734,7 @@ def test_d054_config_switches_every_d057_rule_off():
     switch-back. Files made with it record the config without the D-057 keys
     (trip.config_record), as every file made before D-057 did."""
     off = {"glide": "linear", "chainWindow": 0.0, "reverseGapSeconds": 0.0, "weaveGapSeconds": 0.0,
-           "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0, "blockedPress": "d054", "brush": "off",
-           "brushPresses": 2}  # (N5 review: D-057 ships 3; N1's rule, 2, sits in D057_OFF)
+           "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0, "blockedPress": "d054", "brush": "off"}
     for key, value in off.items():
         assert CFG[key] == value, key
     assert set(trip.D057) == set(off)

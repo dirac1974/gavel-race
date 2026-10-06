@@ -8,9 +8,9 @@ tests/fixtures/trip_d057.json (about 7 MB; CI passes --d057, tests/test_luau_par
 its inputs changed, and tests/luau/trip_d057_tests.luau replays it against Trip.luau).
 Deterministic (fixed seeds).
 race_math.json is append-only: new sections draw from their own generators, so the original
-sections stay byte-for-byte the same. trip.json is the game's config (trip.CONFIG; since N3
-D-057's motion and press rules, brushes off); trip_d057.json is D-057 in full (brushes on), with
-runs on other settings, the D-054 switch-back among them.
+sections stay byte-for-byte the same. trip.json is the game's config (trip.CONFIG, D-057 in full
+since N5); trip_d057.json is D-057 in full too, with runs on other settings, the D-054 switch-back
+among them.
 """
 
 import json
@@ -586,12 +586,12 @@ def trip_d057_fixture(only=None):
     tick). Same conventions as trip.json: 1-based lanes in intents ([tick, lane, dir]), live =
     q before switchTick and p1 from it, exact decimal strings for the lanes' inputs, presses
     after the bell all "locked". Snapshots (every D057_SNAPSHOT_EVERY ticks) add v, want, queued,
-    check, charged, tucking, tuck, every clock (alongSince, steadyUntil, firstPressAt, lastRevAt,
-    arrivedAt, manualAt, smartBlockAt, lastPressAt, lastPressDir, wantAt, lastChange, lastDir),
-    each side's state ("free", "tuck", "blocked"), boxed, noTuckInside and boxedNoTuck. Results add brushes,
-    charged, charges (brush_charge), events ([tick, mover, other, dir], 1-based) and tau with the
-    brush term. cfg = the D-057 config; defaults = trip.CONFIG with every key, what
-    GameConfig.steering holds (since N3 D-057's motion and press rules, brushes off); a run with
+    check, charged, tucking, tuck, every clock (alongSince, steadyUntil, firstPressAt with its
+    samePresses count, lastRevAt, arrivedAt, manualAt, smartBlockAt, lastPressAt, lastPressDir,
+    wantAt, lastChange, lastDir), each side's state ("free", "tuck", "blocked"), boxed, noTuckInside
+    and boxedNoTuck. Results add brushes, charged, charges (brush_charge), events ([tick, mover,
+    other, dir], 1-based) and tau with the brush term. cfg = the D-057 config; defaults =
+    trip.CONFIG with every key, what GameConfig.steering holds (D-057 in full since N5); a run with
     other settings carries its whole cfg.
     Each config also comes as exact decimal strings (cfgExact, defaultsExact)."""
     baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]

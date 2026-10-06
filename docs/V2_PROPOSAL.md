@@ -27,7 +27,7 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 4. **Skill vs. this race:** `R_i = clamp((S_i − mean S) / 50, −0.5, 1)`, mean over all lanes in the race. During the race, use only the windows played so far.
 5. **Live win chance (exponential tilt):** `p'_i = q_i · e^{κ R_i} / Σ_j q_j · e^{κ R_j}`, `κ = 1.0`. With the crowd boost (D-020) and race steering (D-054) the exponent becomes `κ R_i + c_i + τ_i`:
    - `c_i ∈ [0, 0.03]` comes from the lane's three best Clap Along fans.
-   - `τ_i ∈ [−0.02, +0.04]` is the lane's steering trip: ground saved on turns plus tucked-in draft, minus its post's baseline and the field mean (`src/trip.py`). It is fixed at the far-turn lock and used from then on; before the lock `τ = 0`, so the trip never depends on luck, and `q` and the locked purses are unchanged.
+   - `τ_i ∈ [−0.02, +0.04]` is the lane's steering trip: ground saved on turns plus tucked-in draft, minus its post's baseline and the field mean, then minus the lane's own brush charge (D-057: 0.002 per brush it made after the first, at most 0.006; the bumped horse never pays), inside the clamp (`src/trip.py`). It is fixed at the far-turn lock and used from then on; before the lock `τ = 0`, so the trip never depends on luck, and `q` and the locked purses are unchanged.
    - `c_i = τ_i = 0` for every lane gives the formula above (`live_chances(q, R, cfg, extra)` with `extra = c + τ`; `extra=None` is bit-identical to the plain formula).
 6. **Finish order:** draw the winner from `p'`, then 2nd from the remaining horses renormalized, and so on (Harville).
 
