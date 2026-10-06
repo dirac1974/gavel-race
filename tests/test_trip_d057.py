@@ -118,7 +118,7 @@ def test_d057_config_turns_on_every_rule_and_records_it():
             CFG["gapWaitInSeconds"]) == (0.2, 6.0, 1.5, 0.0)
     assert (CFG["brushCost"], CFG["brushFree"], CFG["brushMaxCharged"], CFG["brushPays"]) == (0.002, 1, 3, "mover")
     assert (CFG["brushAlongFeet"], CFG["brushGraceSeconds"], CFG["brushRepeatSeconds"]) == (8.0, 0.3, 2.0)
-    assert CFG["brushPresses"] == 3 and trip.D057_OFF["brushPresses"] == 2  # N5 review: a press again never brushes
+    assert CFG["brushPresses"] == 3  # N5 review: a press again never brushes (N1's rule, 2, is a fixture override)
     assert (CFG["brushCheckFeet"], CFG["brushRecoverPerSecond"], CFG["steadySeconds"]) == (4.0, 2.0, 1.0)
     assert trip.config_record(CFG) == CFG  # anything switched on records the whole config
     assert trip.d057_config(trip.d054_config()) == CFG  # brushes on top of any base

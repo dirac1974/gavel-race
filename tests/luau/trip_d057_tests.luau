@@ -4,8 +4,8 @@
 -- answer, snapshot (lanes, sideways speeds, offsets, targets, waiting presses, steadying, charges,
 -- tucking, tuck-back, every clock, each side's state, boxed in), brush event, trip, charge, tau with the
 -- brush term and stars, for the scripted runs and the hand-built edge runs. Also: GameConfig.steering
--- holds every D-057 key with its D-054 value (the game stays on D-054 until N3). Run from
--- run_all.luau.
+-- mirrors trip.CONFIG with every D-057 switch on (N3, N5), and Trip.d054Config is the switch-back.
+-- Run from run_all.luau.
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 

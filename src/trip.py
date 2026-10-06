@@ -98,7 +98,7 @@ CONFIG: Dict = {
     "brushGraceSeconds": 0.3,     # ...for at least this long (the rider saw it, whatever the lag)
     "brushRepeatSeconds": 2.0,    # the second press comes within this long of the first (0 = any time)
     "brushPresses": 3,            # N5 review: the press that brushes is at least the third that way since
-                                  # the first (a press again is the same try; N1: 2)
+                                  # the first (a press again is the same try; N1's rule: 2)
     "brushPays": "mover",         # "mover" (D-057); "bumped", "both", "none" for the sims
     "brushCost": 0.002,           # tau per charged brush (own term, after the field mean)
     "brushFree": 1,               # the first brushes cost nothing
@@ -116,17 +116,17 @@ D057_OFF: Dict = {
     "weaveGapSeconds": 0.0, "weaveWindowSeconds": 7.0, "pressBounceSeconds": 0.0, "glideReserveFeet": 0.0,
     "blockedPress": "d054", "gapWaitSeconds": 1.5, "gapWaitInSeconds": 0.0, "tuckAfterSeconds": 0.0,
     "boxedAheadFeet": 12.0, "brush": "off", "brushAlongFeet": 8.0, "brushGraceSeconds": 0.3,
-    "brushRepeatSeconds": 2.0, "brushPresses": 2, "brushPays": "mover", "brushCost": 0.002, "brushFree": 1,
+    "brushRepeatSeconds": 2.0, "brushPresses": 3, "brushPays": "mover", "brushCost": 0.002, "brushFree": 1,
     "brushMaxCharged": 3, "brushCheckFeet": 4.0, "brushRecoverPerSecond": 2.0, "steadySeconds": 1.0,
 }
 D057_KEYS: Tuple[str, ...] = tuple(D057_OFF)
 
-# D-057 on (debate 012): the switches N3 (motion and presses) and N5 (brushes) flip, and the N5
-# review's brushPresses (3; D057_OFF keeps N1's 2).
+# D-057 on (debate 012): the switches N3 (motion and presses) and N5 (brushes) flip. (Every other
+# D-057 key already holds D-057's value in D057_OFF, where nothing reads it with the switches off:
+# brushPresses 3 included, so the switch-back is these eight keys.)
 D057: Dict = {
     "glide": "eased", "chainWindow": 0.3, "reverseGapSeconds": 0.5, "weaveGapSeconds": 2.5,
     "pressBounceSeconds": 0.2, "glideReserveFeet": 6.0, "blockedPress": "wait", "brush": "repeat",
-    "brushPresses": 3,
 }
 
 

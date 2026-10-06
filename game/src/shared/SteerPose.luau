@@ -34,11 +34,6 @@ function SteerPose.new(): State
 	return { x = nil, v = 0, a = 0, look = 0, yaw = 0, roll = 0 }
 end
 
--- Forget the last lane (the next step only records it): after a jump, or with no steering.
-function SteerPose.reset(s: State)
-	s.x, s.v, s.a, s.look, s.yaw, s.roll = nil, 0, 0, 0, 0, 0
-end
-
 -- Start a horse at lane x moving sideways at v ft/s (a replay's first frame): its turn is the
 -- drift's at once, with no lean. Returns yaw, roll.
 function SteerPose.prime(s: State, cfg: Config, x: number, v: number, forward: number): (number, number)

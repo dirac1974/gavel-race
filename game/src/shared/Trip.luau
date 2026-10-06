@@ -12,7 +12,7 @@
 -- are -1e9 (and 1e9 for "no horse alongside"); fixed ticks t = k * dt.
 --
 -- D-057 (natural steering, boxed in, brushes) sits behind GameConfig.steering keys: N2 ported the
--- rules switched off, N3 switched the motion and press rules on (brushes stay off until N5).
+-- rules switched off, N3 switched the motion and press rules on, N5 the brushes.
 -- Trip.d054Config is the switch-back.
 --
 -- Coordinates (rail coordinates, D-054 S1): s = feet along the lane-1 path from the gate (the
@@ -35,20 +35,19 @@ Trip.LONG_AGO = LONG_AGO
 Trip.NOT_ALONG = NOT_ALONG
 
 -- D-057 on (debate 012; src/trip.py's D057): the switches N3 (motion and presses) flipped in
--- GameConfig.steering, N5's brushes and the N5 review's brushPresses (3; D057_OFF keeps N1's 2).
+-- GameConfig.steering, and N5's brushes (every other D-057 key holds D-057's value in D057_OFF too).
 -- Trip.d057Config builds the full D-057 config (brushes on) for the tests and the overlap report;
 -- Trip.d054Config the switch-back, every D-057 key at its D-054 value (src/trip.py's D057_OFF).
 Trip.D057 = {
 	glide = "eased", chainWindow = 0.3, reverseGapSeconds = 0.5, weaveGapSeconds = 2.5,
 	pressBounceSeconds = 0.2, glideReserveFeet = 6, blockedPress = "wait", brush = "repeat",
-	brushPresses = 3,
 }
 Trip.D057_OFF = {
 	glide = "linear", laneSpeedMax = 1.5, laneAccel = 4.5, chainWindow = 0, reverseGapSeconds = 0,
 	weaveGapSeconds = 0, weaveWindowSeconds = 7, pressBounceSeconds = 0, glideReserveFeet = 0,
 	blockedPress = "d054", gapWaitSeconds = 1.5, gapWaitInSeconds = 0, tuckAfterSeconds = 0,
 	boxedAheadFeet = 12, brush = "off", brushAlongFeet = 8, brushGraceSeconds = 0.3,
-	brushRepeatSeconds = 2, brushPresses = 2, brushPays = "mover", brushCost = 0.002, brushFree = 1,
+	brushRepeatSeconds = 2, brushPresses = 3, brushPays = "mover", brushCost = 0.002, brushFree = 1,
 	brushMaxCharged = 3, brushCheckFeet = 4, brushRecoverPerSecond = 2, steadySeconds = 1,
 }
 

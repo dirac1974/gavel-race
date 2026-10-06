@@ -71,11 +71,9 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	local frame1 = { t = 10, [1] = 0.10, [2] = 0.11, x = { 2, 4 } }
 	local frame2 = { t = 10.1, [1] = 0.11, [2] = 0.12, x = { 1.5, 4 } }
 	local rec = { frames = { frame1, frame2 }, lane = { 2, 4 }, events = {}, myLane = 1, steer = true }
-	check(math.abs(ReplayTrip.laneAt(rec, frame1, frame2, 0.5, 1) - 1.75) < 1e-12, "replay lanes come from the recorded lanes, interpolated")
+	check(math.abs(ReplayTrip.laneCurve(rec, 2, 0.5, 1) - 1.75) < 1e-12, "replay lanes come from the recorded lanes, interpolated")
 	local old = { frames = { { t = 1, [1] = 0.1 }, { t = 1.1, [1] = 0.2 } }, lane = { 6 } }
 	local older = { frames = { { t = 1, [1] = 0.1 }, { t = 1.1, [1] = 0.2 } } }
-	check(ReplayTrip.laneAt(old, old.frames[1], old.frames[2], 0.5, 1) == 6 and ReplayTrip.laneAt(older, older.frames[1], older.frames[2], 0.5, 1) == 1,
-		"recordings without lanes: the post, else the lane number")
 	-- The replay's smooth curve through the recorded lanes (D-057 N3): through every frame, never past
 	-- a lane, smooth (no corner at a frame), and older recordings on their posts.
 	local glideFrames = {}

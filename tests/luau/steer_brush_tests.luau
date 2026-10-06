@@ -33,7 +33,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(STEER.brush == "repeat" and STEER.brushPays == "mover" and STEER.brushCost == 0.002 and STEER.brushFree == 1
 		and STEER.brushMaxCharged == 3 and POSE.brushLeanFeet == 1 and POSE.brushLeanSeconds == 0.4 and POSE.brushNodDeg == 2
 		and POSE.brushVolume == 0.5, "brushes are on with D-057's values: the mover pays 0.002 after one free, at most 0.006")
-	check(STEER.brushPresses == 3 and Trip.D057.brushPresses == 3 and Trip.D057_OFF.brushPresses == 2,
+	check(STEER.brushPresses == 3 and Trip.D057.brushPresses == nil and Trip.D057_OFF.brushPresses == 3,
 		"N5 review: a brush needs a third press that way (a press again is the same try)")
 
 	-- The pose ---------------------------------------------------------------------------------

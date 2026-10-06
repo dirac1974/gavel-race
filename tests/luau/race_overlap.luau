@@ -8,9 +8,9 @@
 -- closer than half a lane sideways and 6 ft lengthwise (a horse is 8 ft long). Used by
 -- trip_tests.luau, trip_d057_tests.luau, steer_controls_tests.luau and
 -- tests/luau/overlap_report.luau (D-054 S2, S3; D-057 N2, N3).
--- The config is GameConfig's (since N3: D-057's motion and press rules, brushes off) unless
--- `config` is given, or opts.d057 (D-057 in full, brushes on: Trip.d057Config) or opts.d054 (the
--- switch-back: Trip.d054Config).
+-- The config is GameConfig's (D-057 in full since N5) unless `config` is given, or opts.d057
+-- (D-057 in full from Trip.d057Config, the same since N5) or opts.d054 (the switch-back:
+-- Trip.d054Config).
 -- opts (all optional):
 --   riders = how many lanes are riders pressing ◀ ▶ at random (S3; the presses go through
 --     Trip.submit like RaceService's SteerRequest); manual = those riders have Smart Steer off.

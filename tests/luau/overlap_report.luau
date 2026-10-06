@@ -3,8 +3,8 @@
 -- far-turn lock, in the first 5 s after it, and from the lock to the line.
 -- Run: lune run tests/luau/overlap_report [races] [riders=N] [manual] [predict] [latency=S] [jitter=S]
 --   [ownStyle=masher] [d057 | d054]
---   The config is GameConfig's (since N3: D-057's motion and press rules, brushes off); d057 turns
---   the brushes on too (Trip.d057Config, N5's preview); d054 is the switch-back (Trip.d054Config).
+--   The config is GameConfig's (D-057 in full since N5); d057 builds the same from Trip.d057Config;
+--   d054 is the switch-back (Trip.d054Config).
 --   With the eased glide (the game's, and d057) the riders are a masher, a ditherer and a casual
 --   rider (riders=N takes the first N; with predict, rider 1 presses from its screen and the three
 --   follow); with d054 riders=N lanes press at random (none by default).

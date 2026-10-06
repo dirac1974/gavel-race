@@ -97,9 +97,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local yP2, rP2 = SteerPose.step(primed, POSE, 3.4 + 9 / W * FRAME, FRAME, FWD, W, 0)
 	check(close(yP, math.atan(9 / FWD), 1e-12) and rP == 0 and close(yP2, yP, 1e-9) and math.abs(rP2) < 1e-9,
 		"SteerPose.prime: a replay starting mid-glide turns at once with the glide, and doesn't flick into a lean")
-	SteerPose.reset(stop)
-	check(stop.x == nil and stop.yaw == 0 and select(1, SteerPose.step(stop, POSE, 7, FRAME, FWD, W, 0)) == 0,
-		"after a reset (a replay starting) the first frame turns nothing")
+	local fresh = SteerPose.new()
+	check(select(1, SteerPose.step(fresh, POSE, 7, FRAME, FWD, W, 0)) == 0, "a new pose's first frame turns nothing (it only records the lane)")
 	-- The sign convention: toward higher lanes is the horse's right.
 	local ry, rz = SteerPose.angles(math.rad(5), math.rad(2))
 	local lookV = aboutY({ 0, 0, -1 }, ry)
