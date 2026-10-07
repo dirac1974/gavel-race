@@ -162,10 +162,14 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 
 	-- One results row -----------------------------------------------------------------------------------
 	local rc = code(fs.readFile("game/src/client/RaceController.client.luau"))
-	check(string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale)", 1, true) ~= nil
+	check(string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)", 1, true) ~= nil
 		and string.find(rc, "ResultsText.gainedLine(horse, rideReport.gain, rideReport.tripGain, STEER.scale)", 1, true) ~= nil
-		and string.find(rc, "tripLine", 1, true) == nil and string.find(rc, "Good trip", 1, true) == nil,
-		"the results card has one star row and the taps line")
+		and string.find(rc, "Good trip", 1, true) == nil and string.find(rc, "if TRIP_ROW then ResultsText.tripLine(", 1, true) ~= nil,
+		"the results card has one star row and the taps line (the trip row only with the switch-back)")
+	check(GameConfig.results ~= nil and GameConfig.results.tripRow == false, "results.tripRow is off: one row")
+	local ResultsText = require("../../game/src/shared/ResultsText")
+	check(ResultsText.oneRow(1, 3, 1, true) == "You rode ★☆☆" and ResultsText.tripLine(3, 1) == "Good trip ★★★"
+		and ResultsText.tripLine(3, 0) == nil and ResultsText.tripLine(nil, 1) == nil, "the switch-back: the ride row alone plus Good trip")
 
 	-- Stable Board: jobs inline, the pill ---------------------------------------------------------------
 	local sb = code(fs.readFile("game/src/client/StableBoard.client.luau"))
@@ -189,6 +193,8 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 				`{p[1]} at {view[1]}x{view[2]}: scale {f.scale} keeps 14 px text and 56 px buttons`)
 			check(f.scroll == (f.height * f.scale > view[2] - PanelFit.MARGIN) and f.canvas >= f.height * f.scale,
 				`{p[1]} at {view[1]}x{view[2]}: what doesn't fit scrolls`)
+			check(f.scrollX == (p[2] * f.scale > view[1] - PanelFit.MARGIN) and f.canvasX >= p[2] * f.scale + PanelFit.MARGIN - 1e-9,
+				`{p[1]} at {view[1]}x{view[2]}: too wide scrolls sideways, never cut off`)
 			if p[4] then
 				check(f.height >= p[4] and (f.height == p[3] or not f.scroll or f.height == p[4]), `{p[1]} at {view[1]}x{view[2]}: gets shorter instead`)
 			end

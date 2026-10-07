@@ -334,6 +334,7 @@ pipPad.PaddingLeft, pipPad.PaddingRight = UDim.new(0, 14), UDim.new(0, 14)
 Ui.text(pipBubble, "🐴 " .. Advice.PIP_HINT, 18, { Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, TextWrapped = false })
 
 local current = nil
+local inLine = false
 local shownAt, hinted = 0, false
 local function placePill()
 	local cam = workspace.CurrentCamera
@@ -362,6 +363,9 @@ local function renderPill()
 		return
 	end
 	local nxt = Advice.nextThing(d, workspace:GetServerTimeNow())
+	if inLine and nxt.go == "race" then -- already waiting for a race: nothing to press
+		nxt = { key = "inline", emoji = "🏁", icon = "flag_ready", text = "You're in line. Race soon!", go = nil }
+	end
 	if not current or current.key ~= nxt.key then
 		shownAt, hinted = os.clock(), false
 		pipBubble.Visible = false
@@ -374,12 +378,24 @@ local function renderPill()
 	pillText.Size = UDim2.new(1, if nxt.go then -176 else -68, 1, 0)
 end
 PlayerState.watch(renderPill)
+ReplicatedStorage:WaitForChild("RaceRemotes"):WaitForChild("QueueStatus").OnClientEvent:Connect(function(isIn)
+	inLine = isIn == true
+	renderPill()
+end)
 
 pillGo.Activated:Connect(function()
 	if not current or not current.go then return end
 	pipBubble.Visible = false
 	local go = current.go
 	if go == "board" then
+		-- open on the first tab with a prize waiting
+		local jobs = (PlayerState.data and PlayerState.data.jobs) or {}
+		for _, t in TABS do
+			if claimable(jobs[t[1]] or {}) > 0 then
+				tab = t[1]
+				break
+			end
+		end
 		open()
 	elseif go == "race" then
 		localEvent("PressRace"):Fire()
@@ -393,6 +409,7 @@ end)
 -- Pip's hint: the same suggestion for pipHintSeconds and you haven't moved in that time.
 local lastMovedAt, anchor = os.clock(), nil
 local nextCheck = 0
+local lastPillAt = 0
 RunService.Heartbeat:Connect(function()
 	local racing = RaceState.active and RaceState.myLane ~= nil
 	local replay = player.PlayerGui:FindFirstChild("ReplayUI")
@@ -407,6 +424,11 @@ RunService.Heartbeat:Connect(function()
 	local now = os.clock()
 	if now < nextCheck then return end
 	nextCheck = now + 0.5
+	if now - lastPillAt > 5 then -- time-based suggestions (crops ready) show without a data change
+		lastPillAt = now
+		renderPill()
+		if not current then return end
+	end
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if root then
 		if not anchor or (root.Position - anchor).Magnitude > NEXT.stillStuds then

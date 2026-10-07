@@ -210,7 +210,7 @@ QuickStart.OnServerEvent:Connect(function(player: Player, horseId: any, stat: an
 	history[player] = history[player] or {}
 	local ok = TrainingRide.rateCheck(history[player], os.clock(), CFG)
 	if not ok then
-		Profiles.notify(player, "That's lots of training for today. Try a race!", "heart")
+		Profiles.notify(player, "That's lots of training for now. Try a race!", "heart")
 		return
 	end
 	local prevTrain = lastTrain[player]
@@ -453,7 +453,7 @@ local function startCourse(player: Player, horseId: any, requested: any, opts: a
 	local ok, why = TrainingRide.rateCheck(history[player], os.clock(), CFG)
 	if not ok then
 		Profiles.notify(player, if why == "gap" then "Your horse is catching its breath. Try again soon!"
-			else "That's lots of riding for today. Try a race!", "heart")
+			else "That's lots of riding for now. Try a race!", "heart")
 		return
 	end
 	local data = Profiles.get(player)

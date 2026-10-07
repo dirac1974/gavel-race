@@ -38,7 +38,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(ResultsText.oneRow(1, 3, 0) == "You rode ★☆☆" and ResultsText.tripStars(3, 0) == nil,
 		"no trip in the row while steering is cosmetic (scale 0)")
 	check(ResultsText.gainedLine("Comet", 1) == "Your taps gained Comet 1 place!" and ResultsText.gainedLine("Comet", 2) == "Your taps gained Comet 2 places!"
-		and ResultsText.gainedLine("Comet", 2, 1, 1) == "Your taps and steering gained Comet 3 places!"
+		and ResultsText.gainedLine("Comet", 2, 1, 1) == "Your taps and steering gained Comet 2 places!"
 		and ResultsText.gainedLine("Comet", 0, 2, 1) == "Your steering gained Comet 2 places!"
 		and ResultsText.gainedLine("Comet", 2, 1, 0) == "Your taps gained Comet 2 places!", "gains, in words")
 	local onlyGains = true
@@ -140,7 +140,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		and string.find(rc, "ReplayTrip.saved(t, s.start, turn[1], turn[2], SPEED)", 1, true) ~= nil
 		and string.find(rc, "ReplayTrip.tuck(s.tuckFrom, t)", 1, true) ~= nil
 		and string.find(rc, "RaceState.recording.steer = true", 1, true) ~= nil
-		and string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale)", 1, true) ~= nil,
+		and string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)", 1, true) ~= nil,
 		"the race records lanes, the lock, saved turns, tucked spans and the buttons; the card asks ResultsText")
 	check(string.find(replay, "ReplayTrip.laneCurve(rec, k, f, i)", 1, true) ~= nil and string.find(replay, "lanes[subject] or subject", 1, true) ~= nil
 		and string.find(replay, "RaceState.finishFollowed()", 1, true) ~= nil and string.find(replay, "RaceState.restHorses(rec.course, rec.lanes)", 1, true) ~= nil,

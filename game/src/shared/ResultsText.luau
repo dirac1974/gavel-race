@@ -30,17 +30,25 @@ function ResultsText.tripStars(tripStars: number?, scale: number?): number?
 end
 
 -- The stars on the one row: the ride's, or with a trip that counts, the ride and the trip
--- together (their average, halves rounded up).
-function ResultsText.rowStars(stars: number, tripStars: number?, scale: number?): number
+-- together (their average, halves rounded up). `tripRow` (GameConfig.results.tripRow, the
+-- switch-back to D-054's second row) keeps the ride's stars alone.
+function ResultsText.rowStars(stars: number, tripStars: number?, scale: number?, tripRow: boolean?): number
 	local ride = if finite(stars) then math.clamp(math.floor(stars), 0, 3) else 0
 	local trip = ResultsText.tripStars(tripStars, scale)
-	if not trip then return ride end
+	if not trip or tripRow then return ride end
 	return math.clamp(math.floor((ride + trip) / 2 + 0.5), 0, 3)
 end
 
 -- The one row: "You rode ★★☆".
-function ResultsText.oneRow(stars: number, tripStars: number?, scale: number?): string
-	return ResultsText.rideLine(ResultsText.rowStars(stars, tripStars, scale))
+function ResultsText.oneRow(stars: number, tripStars: number?, scale: number?, tripRow: boolean?): string
+	return ResultsText.rideLine(ResultsText.rowStars(stars, tripStars, scale, tripRow))
+end
+
+-- The switch-back only (GameConfig.results.tripRow = true): D-054's second row "Good trip ★★☆",
+-- nil without a trip that counts.
+function ResultsText.tripLine(tripStars: number?, scale: number?): string?
+	local trip = ResultsText.tripStars(tripStars, scale)
+	return if trip then "Good trip " .. ResultsText.stars(trip) else nil
 end
 
 local function places(v: number?): number
@@ -49,12 +57,13 @@ local function places(v: number?): number
 end
 
 -- "Your taps gained Comet 2 places!", only for a gain of at least one place ("" otherwise). With a
--- trip that counts and gained places too: "Your taps and steering gained Comet 3 places!" (or "Your
--- steering gained …" when only the trip gained). A loss is never added in or shown.
+-- trip that counts and gained places too: "Your taps and steering gained Comet 2 places!" (or "Your
+-- steering gained …" when only the trip gained). The two gains are separate what-ifs that can count
+-- the same place, so together they claim the larger, never the sum. A loss is never shown.
 function ResultsText.gainedLine(horse: string, gain: number?, tripGain: number?, scale: number?): string
 	local taps = places(gain)
 	local trip = if scale == 0 then 0 else places(tripGain)
-	local n = taps + trip
+	local n = math.max(taps, trip)
 	if n < 1 then return "" end
 	local who = if taps > 0 and trip > 0 then "taps and steering" elseif trip > 0 then "steering" else "taps"
 	local name = if type(horse) == "string" and horse ~= "" then horse else "your horse"

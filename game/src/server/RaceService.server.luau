@@ -566,7 +566,7 @@ local function recordIntegrity(players: { Player }, errors: { [number]: { number
 				print(string.format("[Integrity] %s (%d): strike %d, timing spread %.1f ms, action %s",
 					p.Name, p.UserId, strikes, spread * 1000, action))
 				if action == "warn" then
-					IntegrityNote:FireClient(p, "Your taps looked automatic, so this race is practice.")
+					IntegrityNote:FireClient(p, "Your taps looked automatic, so races are practice for now.")
 				end
 			end
 		end

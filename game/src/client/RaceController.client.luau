@@ -436,6 +436,12 @@ rideLine.Font = Enum.Font.GothamBlack
 rideLine.TextColor3 = Color3.fromHex("FFD34D")
 local gainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, CARD_HEIGHT - 4), "", 20)
 gainLine.ZIndex = 7
+-- The switch-back only (GameConfig.results.tripRow): D-054's "Good trip" row above the ride row.
+local TRIP_ROW = (GameConfig.results or {}).tripRow == true
+local tripRowLine = label(results, UDim2.new(1, -24, 0, 26), UDim2.new(0, 12, 0, -72), "", 22)
+tripRowLine.ZIndex = 7
+tripRowLine.Font = Enum.Font.GothamBlack
+tripRowLine.TextColor3 = Color3.fromHex("9FE07A")
 
 local function button(parent, text: string, size: UDim2, pos: UDim2, colour: Color3): TextButton
 	local b = Instance.new("TextButton")
@@ -1639,10 +1645,11 @@ local function showResults(summary, raceId: number)
 		for _, row in summary do
 			if row.id == myId then horse = row.name end
 		end
-		rideLine.Text = ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale)
+		rideLine.Text = ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)
 		gainLine.Text = ResultsText.gainedLine(horse, rideReport.gain, rideReport.tripGain, STEER.scale)
+		tripRowLine.Text = if TRIP_ROW then ResultsText.tripLine(rideReport.tripStars, STEER.scale) or "" else ""
 	else
-		rideLine.Text, gainLine.Text = "", ""
+		rideLine.Text, gainLine.Text, tripRowLine.Text = "", "", ""
 	end
 	results.Size = UDim2.fromOffset(360, CARD_HEIGHT + (if gainLine.Text ~= "" then GAIN_ROW else 0))
 	local hasRecording = RaceState.recording ~= nil and #RaceState.recording.frames > 10

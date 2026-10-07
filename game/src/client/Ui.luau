@@ -253,13 +253,16 @@ function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?)
 	column.BorderSizePixel = 0
 	column.AnchorPoint = Vector2.new(0.5, 0)
 	column.Position = UDim2.fromScale(0.5, 0)
-	column.ScrollingDirection = Enum.ScrollingDirection.Y
+	column.ScrollingDirection = Enum.ScrollingDirection.XY
 	column.ScrollBarThickness = 8
 	column.ZIndex = 2
+	-- The column is only as wide as the panel (+20 px), so on a wide screen taps beside it still
+	-- reach the dim, which closes the panel; on a phone the panel's ✕ does.
 	column.Parent = panel.Parent
 	panel.AnchorPoint = Vector2.new(0.5, 0)
 	panel.Parent = column
 	local top = 0
+	local centre = UDim.new(0.5, 0)
 	local function apply()
 		local cam = workspace.CurrentCamera
 		if not cam then return end
@@ -267,11 +270,13 @@ function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?)
 		local f = PanelFit.layout(v.X, v.Y, w, h, cfg.panelMinText, cfg.panelButtonPx, cfg, minHeight)
 		scale.Scale = f.scale
 		panel.Size = UDim2.fromOffset(w, f.height)
-		column.Size = UDim2.new(0, math.min(v.X, math.ceil(w * f.scale) + 20), 1, 0)
-		column.CanvasSize = UDim2.fromOffset(0, f.canvas)
-		column.ScrollingEnabled = f.scroll
+		local colW = math.min(v.X, math.ceil(w * f.scale) + 20)
+		column.Size = UDim2.new(0, colW, 1, 0)
+		column.CanvasSize = UDim2.fromOffset(if f.scrollX then f.canvasX else 0, f.canvas)
+		column.ScrollingEnabled = f.scroll or f.scrollX
 		top = math.floor((f.canvas - f.height * f.scale) / 2)
-		panel.Position = UDim2.new(0.5, 0, 0, top)
+		centre = if f.scrollX then UDim.new(0, math.floor(f.canvasX / 2)) else UDim.new(0.5, 0)
+		panel.Position = UDim2.new(centre, UDim.new(0, top))
 	end
 	apply()
 	task.spawn(function()
@@ -282,8 +287,8 @@ function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?)
 	return function()
 		apply()
 		column.CanvasPosition = Vector2.zero
-		panel.Position = UDim2.new(0.5, 0, 0, top + 30)
-		TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.new(0.5, 0, 0, top) }):Play()
+		panel.Position = UDim2.new(centre, UDim.new(0, top + 30))
+		TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.new(centre, UDim.new(0, top)) }):Play()
 	end
 end
 

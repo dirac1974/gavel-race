@@ -217,6 +217,8 @@ GameConfig.ui = {
 	panelButtonPx = 64,   -- stage 3: the smallest button on those panels, unscaled (PanelFit keeps both at the floors)
 	pickerLineWords = 5,  -- stage 3: a race card's one line, at most this many words
 }
+-- The results card (D-064): one row; tripRow = true brings back D-054's "Good trip ★★☆" row.
+GameConfig.results = { tripRow = false }
 -- The "Next thing" pill (D-064, stage 3): one suggestion above the dock from Advice.nextThing, with
 -- GO; Pip gives a hint when the same suggestion has been up this long and you haven't moved.
 GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6 }

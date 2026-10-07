@@ -9,7 +9,7 @@ local PanelFit = {}
 PanelFit.MARGIN = 20 -- px kept free around a panel
 
 export type UiConfig = { minTouchPx: number, minTextPx: number }
-export type Fit = { scale: number, height: number, scroll: boolean, canvas: number }
+export type Fit = { scale: number, height: number, scroll: boolean, canvas: number, scrollX: boolean, canvasX: number }
 
 -- The smallest scale that keeps text of `minText` px and buttons of `minButton` px at the floors.
 function PanelFit.floor(minText: number, minButton: number, cfg: UiConfig): number
@@ -32,7 +32,11 @@ function PanelFit.layout(viewX: number, viewY: number, w: number, h: number, min
 	if minHeight and minHeight > 0 and h > room then height = math.max(minHeight, math.floor(room)) end
 	local scaled = height * s
 	local scroll = scaled > viewY - PanelFit.MARGIN
-	return { scale = s, height = height, scroll = scroll, canvas = math.max(viewY, scaled + PanelFit.MARGIN) }
+	-- A panel still wider than the screen at the floor scrolls sideways too (never cut off).
+	local wide = w * s
+	local scrollX = wide > viewX - PanelFit.MARGIN
+	return { scale = s, height = height, scroll = scroll, canvas = math.max(viewY, scaled + PanelFit.MARGIN),
+		scrollX = scrollX, canvasX = math.max(viewX, wide + PanelFit.MARGIN) }
 end
 
 return PanelFit
