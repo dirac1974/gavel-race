@@ -13,10 +13,11 @@ local Horse = {}
 Horse.STATS = { "speed", "accel", "stamina", "grit" }
 Horse.COATS = { "bay", "chestnut", "grey", "black", "palomino", "pinto", "appaloosa", "buckskin", "dun", "roan", "white", "chestnut_blaze" }
 Horse.STYLES = { "FrontRunner", "Stalker", "Closer" }
+Horse.ORIGINS = { "starter", "market", "tamed", "gift" }
 
 export type Stats = { speed: number, accel: number, stamina: number, grit: number }
 export type Care = { day: number, fed: boolean, groomed: boolean, feedAt: number, groomAt: number }
-export type Record = { races: number, wins: number, places: number, cash: number }
+export type Record = { races: number, wins: number, places: number, cash: number, cups: number? }
 export type Horse = {
 	id: string,
 	name: string,
@@ -35,6 +36,13 @@ export type Horse = {
 	born: number,
 	lastRaceAt: number,
 	daily: { day: number, treats: number, petted: boolean },
+	-- Careers and rehoming (D-059, stage 7)
+	origin: string?,   -- "starter" | "market" | "tamed" | "gift": how it came home
+	paid: number?,     -- Green Cash paid for it (0 unless bought at the market)
+	stall: number?,    -- its stall (1..stalls), nil in the pasture or as a Legend
+	legend: number?,   -- when it became a Legend (os.time()), nil while racing
+	legendAsked: boolean?, -- the one-time Legend suggestion has been shown
+	goodbyeRosette: boolean?, -- a goodbye rosette was given for it (once per horse)
 }
 
 export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number, restingLabelAt: number?, yawnAt: number? }
@@ -66,7 +74,7 @@ function Horse.new(id: string, name: string, coat: string, stats: Stats, potenti
 		energyAt = now,
 		care = { day = day(now), fed = false, groomed = false, feedAt = 0, groomAt = 0 },
 		bond = 0,
-		record = { races = 0, wins = 0, places = 0, cash = 0 },
+		record = { races = 0, wins = 0, places = 0, cash = 0, cups = 0 },
 		stamps = {},
 		born = now,
 		lastRaceAt = 0,
@@ -79,7 +87,9 @@ function Horse.starter(id: string, name: string, coat: string, rng: any, now: nu
 	local s = Horse.STARTER_STAT
 	local pot = {}
 	for _, k in Horse.STATS do pot[k] = rng:NextInteger(70, 85) end
-	return Horse.new(id, name, coat, { speed = s, accel = s, stamina = s, grit = s }, pot :: any, now)
+	local h = Horse.new(id, name, coat, { speed = s, accel = s, stamina = s, grit = s }, pot :: any, now)
+	h.origin = "starter" -- D-059: the starter is never rehomed
+	return h
 end
 
 -- Energy ------------------------------------------------------------------------
@@ -208,6 +218,11 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		pettedToday = h.daily ~= nil and h.daily.day == day(now) and h.daily.petted,
 		record = table.clone(h.record),
 		stamps = table.clone(h.stamps),
+		-- careers and rehoming (D-059): the client never decides with these, the server does
+		origin = h.origin,
+		paid = h.paid or 0,
+		stall = h.stall,
+		legend = h.legend ~= nil,
 		-- training rides (D-053): best ribbon and best run per course
 		ribbons = table.clone((h :: any).ribbons or {}),
 		trainingBest = (function()
@@ -238,7 +253,7 @@ function Horse.repair(h: any, now: number): Horse
 	h.care.feedAt, h.care.groomAt = tonumber(h.care.feedAt) or 0, tonumber(h.care.groomAt) or 0
 	h.bond = math.clamp(tonumber(h.bond) or 0, 0, 100)
 	h.record = h.record or {}
-	for _, k in { "races", "wins", "places", "cash" } do h.record[k] = tonumber(h.record[k]) or 0 end
+	for _, k in { "races", "wins", "places", "cash", "cups" } do h.record[k] = math.max(0, tonumber(h.record[k]) or 0) end
 	h.stamps = h.stamps or {}
 	h.born = tonumber(h.born) or now
 	h.lastRaceAt = tonumber(h.lastRaceAt) or 0
@@ -254,6 +269,16 @@ function Horse.repair(h: any, now: number): Horse
 	h.spaDays = math.max(0, math.floor(tonumber(h.spaDays) or 0))
 	h.shine = h.shine == true
 	h.name = if typeof(h.name) == "string" and #h.name > 0 then string.sub(h.name, 1, 40) else "Comet"
+	-- Careers and rehoming (D-059): where it came from, what was paid, its stall, Legend status.
+	if not table.find(Horse.ORIGINS, h.origin) then h.origin = nil end
+	h.paid = math.max(0, math.floor(tonumber(h.paid) or 0))
+	local stall = tonumber(h.stall)
+	h.stall = if stall and stall >= 1 and stall == math.floor(stall) then stall else nil
+	local legend = tonumber(h.legend)
+	h.legend = if legend and legend == legend then legend else nil
+	if h.legend then h.stall = nil end
+	h.legendAsked = h.legendAsked == true
+	h.goodbyeRosette = h.goodbyeRosette == true
 	return h :: Horse
 end
 

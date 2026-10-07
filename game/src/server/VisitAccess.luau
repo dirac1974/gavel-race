@@ -65,9 +65,13 @@ end
 -- The horses in the owner's barn right now: stalled, and not out riding or at the races.
 function VisitAccess.barnHorses(owner: Player, data): { string }
 	local ids = {}
-	for k = 1, math.min(data.stalls, #data.horses) do
-		local id = data.horses[k].id
-		if owner:GetAttribute("RacingHorse") ~= id and owner:GetAttribute("RidingHorse") ~= id then table.insert(ids, id) end
+	for k = 1, data.stalls do -- stalls stored per horse (D-059): an empty stall has no horse to pat
+		local h = nil
+		for _, x in data.horses do
+			if x.stall == k then h = x end
+		end
+		local id = h and h.id
+		if id and owner:GetAttribute("RacingHorse") ~= id and owner:GetAttribute("RidingHorse") ~= id then table.insert(ids, id) end
 	end
 	return ids
 end

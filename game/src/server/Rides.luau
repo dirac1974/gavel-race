@@ -382,11 +382,13 @@ function Rides.travel(player: Player, cf: CFrame): boolean
 	return true
 end
 
-function Rides.call(player: Player): (boolean, string?)
+-- `legendId` (D-059): ride one of your Legends from the Hall of Fame paddock instead of the
+-- active horse.
+function Rides.call(player: Player, legendId: string?): (boolean, string?)
 	if player:GetAttribute("Racing") then return false, "You're in a race!" end
 	if active[player] then return false, nil end
 	local data = Profiles.get(player)
-	local h = data and Profile.activeHorse(data)
+	local h = data and Profile.rideHorse(data, legendId)
 	if not h then return false, "Pick your first horse to ride" end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -452,17 +454,17 @@ end
 -- Bring the horse and ride, at most once every CALL_GAP seconds (the Ride button and training
 -- both come through here). Returns (ok, why).
 local CALL_GAP = 1.5
-function Rides.request(player: Player): (boolean, string?)
+function Rides.request(player: Player, legendId: string?): (boolean, string?)
 	if os.clock() - (lastCall[player] or 0) < CALL_GAP then return false, nil end
 	lastCall[player] = os.clock()
-	local ok, why = Rides.call(player)
+	local ok, why = Rides.call(player, legendId)
 	if ok then Progress.record(player, "ride", 1) end
 	return ok, why
 end
 
 function Rides.start()
-	CallHorse.OnServerEvent:Connect(function(player: Player)
-		local ok, why = Rides.request(player)
+	CallHorse.OnServerEvent:Connect(function(player: Player, legendId: any)
+		local ok, why = Rides.request(player, if typeof(legendId) == "string" then legendId else nil)
 		if not ok and why then Profiles.notify(player, why, "heart") end
 	end)
 	local function onPlayer(player: Player)
@@ -495,6 +497,8 @@ function Rides.start()
 		local rig = active[player]
 		local data = Profiles.get(player)
 		local h = data and Profile.activeHorse(data)
+		local ridden = data and rig and Profile.horse(data, rig:GetAttribute("HorseId"))
+		if ridden and ridden.legend ~= nil then return end -- a Legend ride (D-059) isn't the active horse
 		if rig and (not h or h.id ~= rig:GetAttribute("HorseId")) then Rides.dismount(player) end
 	end)
 end

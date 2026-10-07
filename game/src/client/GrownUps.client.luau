@@ -23,6 +23,7 @@ local Guide = require(script.Parent:WaitForChild("Guide"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tour = require(Shared:WaitForChild("Tour"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
@@ -155,6 +156,11 @@ local function grownUpsTab()
 	para("👫 Ride together: only Roblox friends can invite each other to a training ride, and only if the invite is accepted (it can always be declined, lapses by itself and is limited to a few). Riders see each other's stars and ribbons, never times or who was first. Setting stable visits to Nobody turns invites off.", 16, 61)
 	para("👻 Ghosts: a see-through horse shows your child's own best training ride. Friends see it only if \"Share my ghost with friends\" is turned on in Settings (it's off at first).", 16, 62)
 	para("🏡 Visiting friends' barns: the Map lists only Roblox friends who are in the same game server, and only if their stable visits are set to Friends. A visit is patting horses (no stats), one free treat a day and a carrot in the post box. Owners see how many carrots arrived, never who sent them, and nobody sees visitor counts, likes or rankings. The owner can close the gate in one tap, which walks visitors back to the lane.", 16, 63)
+	local career, rehome = GameConfig.career, GameConfig.rehome
+	para(string.format("🎖️ Careers: horses never get old or slower. Every %d races a horse earns a career badge, and at %d races it's a Veteran. A Veteran may retire as a 👑 Legend, only if your child chooses (we suggest it once): it moves to the Hall of Fame paddock beside the barn, keeps its stats and can still be ridden; its stall goes to another horse.",
+		career.badgeEvery, career.veteranAt), 16, 64)
+	para(string.format("🏫 Rehoming: at the Market Corral a horse can go to %s, a riding school where other children ride it. The school pays half of what your child paid for it (never more, and nothing for a tamed or gifted horse, which earns a goodbye rosette instead). It takes two taps, and for %d days the horse can come back for the same Green Cash, with its name and stats. The first horse and the last racing horse always stay. Horses are never traded between players.",
+		rehome.school, rehome.undoHours // 24), 16, 65)
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 70)
 end
 

@@ -25,7 +25,10 @@ end
 
 local function ids(p: any): { string }
 	local out = {}
-	for k = 1, math.min(p.stalls, #p.horses) do table.insert(out, p.horses[k].id) end
+	for k = 1, p.stalls do -- stalls stored per horse (D-059)
+		local h = Profile.stallHorse(p, k)
+		if h then table.insert(out, h.id) end
+	end
 	return out
 end
 

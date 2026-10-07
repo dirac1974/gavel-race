@@ -384,6 +384,22 @@
   "sha256": "01e6275aba4bf801d1fffe576880e2c696d80087de57dbd51117cec9df572c2d",
   "uploadedAt": "2026-10-05T06:55:14Z"
  },
+ "legend_paddock_arch": {
+  "assetId": 129962389179647,
+  "file": "Models/generated/legend_paddock_arch/legend_paddock_arch.glb",
+  "kind": "Model",
+  "moderation": "Approved",
+  "sha256": "b086ba41ea13e3da60fb59642e7c800b0a2bb44bcafd4f0de7a37c9e067fa625",
+  "uploadedAt": "2026-10-07T18:21:58Z"
+ },
+ "legend_plaque_post": {
+  "assetId": 125330987786071,
+  "file": "Models/generated/legend_plaque_post/legend_plaque_post.glb",
+  "kind": "Model",
+  "moderation": "Approved",
+  "sha256": "36f025640d43f266fa4a53b2565cdc0ed8f7ac78762ecee0bb21f2db82ac2fb0",
+  "uploadedAt": "2026-10-07T18:22:05Z"
+ },
  "log_jump": {
   "assetId": 128071509812566,
   "file": "Models/generated/log_jump/log_jump.glb",
@@ -453,6 +469,14 @@
   "kind": "Model",
   "sha256": "d20b5ff14e8c30216ae48598d182e5b37b48f92fdee8ad4a5ea4636fddad1001",
   "uploadedAt": "2026-10-05T06:52:20Z"
+ },
+ "riding_school_sign": {
+  "assetId": 96463453328758,
+  "file": "Models/generated/riding_school_sign/riding_school_sign.glb",
+  "kind": "Model",
+  "moderation": "Approved",
+  "sha256": "5ec66f6f9270d25993b471bb61d27f086571abce2a510ed11983e913c1fda3cf",
+  "uploadedAt": "2026-10-07T18:22:26Z"
  },
  "rosette_ribbon": {
   "assetId": 123127469123176,

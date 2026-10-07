@@ -4,6 +4,9 @@
 -- corral for everyone to see (it's the same on every server); buying is personal.
 -- Wild horses wander the meadow on every client from a shared seed (WildHorses client);
 -- the server only checks that a tamer is in the meadow and hasn't made a friend today.
+-- Rehoming (D-059, stage 7): the Sunny Meadow Riding School sign at the corral (its RehomeSpot
+-- opens the client's Rehome card), RehomeHorse at the corral only, UndoRehome anywhere within
+-- rehome.undoHours, and Legend Retirement (RetireHorse) with its one-time suggestion (LegendAsked).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -13,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Market = require(Shared:WaitForChild("Market"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local WorldScene = require(script.Parent:WaitForChild("WorldScene"))
@@ -23,7 +27,11 @@ local TameResult = Profiles.remote("TameResult")   -- server -> client: true whe
 local BuyStall = Profiles.remote("BuyStall")       -- client -> server
 local SwapStall = Profiles.remote("SwapStall")     -- client -> server: stalled id, pasture id
 local Rename = Profiles.remote("RenameHorse")      -- client -> server: horse id, first word, second word
-local Retire = Profiles.remote("RetireHorse")      -- client -> server: horse id (player's choice, D-046)
+local Retire = Profiles.remote("RetireHorse")      -- client -> server: horse id (Legend Retirement, player's choice, D-046/D-059)
+local LegendAsked = Profiles.remote("LegendAsked")  -- client -> server: horse id (the one-time suggestion was shown)
+local Rehome = Profiles.remote("RehomeHorse")      -- client -> server: horse id (at the Market Corral, D-059)
+local UndoRehome = Profiles.remote("UndoRehome")   -- client -> server: horse id (within rehome.undoHours)
+local RehomeResult = Profiles.remote("RehomeResult") -- server -> client: the goodbye card { name, coat, id, cash, rosette, days }
 local Leagues = require(Shared:WaitForChild("Leagues"))
 
 local last: { [Player]: number } = {}
@@ -73,6 +81,20 @@ local function buildCorral()
 		WorldScene.sign(corral, (cf * CFrame.new(0, WorldScene.GROUND_Y + 9, -3)).Position, cf.LookVector,
 			string.format("%s %s · %d", l.name, string.rep(Market.FAMILY_EMOJI, l.stars), l.price), "💵", 16, 2.6)
 	end
+	-- Sunny Meadow Riding School's sign by the gate (D-059): its prompt opens the Rehome card.
+	local sx, sz = p.x + p.w / 2 - 12, p.z + 14
+	local scf = CFrame.lookAt(Vector3.new(sx, WorldScene.GROUND_Y, sz), Vector3.new(sx, WorldScene.GROUND_Y, p.z - 10))
+	if not WorldScene.placeModel(corral, "riding_school_sign", scf) then
+		for _, dx in { -3.4, 3.4 } do
+			WorldScene.part({ Name = "SchoolPost", Size = Vector3.new(0.6, 7, 0.6), Color = Color3.fromHex("FFF4DC"),
+				CFrame = scf * CFrame.new(dx, 3.5, 0) }, corral)
+		end
+	end
+	WorldScene.sign(corral, (scf * CFrame.new(0, WorldScene.GROUND_Y + 9.4, -0.6)).Position, scf.LookVector,
+		GameConfig.rehome.school, "🏫", 14, 2.4, Color3.fromHex("CDEBFA"))
+	local spot = WorldScene.part({ Name = "RehomeSpot", Size = Vector3.new(4, 6, 2), Transparency = 1, CanCollide = false,
+		CanQuery = false, CanTouch = false, CFrame = scf * CFrame.new(0, 3, -1.5) }, corral)
+	spot:SetAttribute("Rehome", GameConfig.rehome.enabled)
 	corral.Parent = world
 end
 
@@ -89,14 +111,36 @@ Profiles.addDecorator(function(data, view)
 		canTame = (Market.canTame(data, now)),
 		maxHorses = Market.MAX_HORSES,
 	}
+	-- Rehoming (D-059): what the school would pay for each horse, or why it stays (busy checks
+	-- happen on the server when it's asked).
+	Market.pruneRehomed(data, now)
+	for i, hv in view.horses or {} do
+		local h = data.horses[i]
+		if h and h.id == hv.id then
+			hv.rehomeValue = Market.rehomeValue(h)
+			hv.rehomeBlock = Market.rehomeBlock(data, h.id, {})
+		end
+	end
 end, "market")
+
+local function busyState(player: Player)
+	return {
+		racing = player:GetAttribute("Racing"), inLine = player:GetAttribute("InLine"),
+		racingHorse = player:GetAttribute("RacingHorse"), ridingHorse = player:GetAttribute("RidingHorse"),
+		trainingRide = player:GetAttribute("TrainingRide"),
+	}
+end
+
+local function atCorral(player: Player): boolean
+	local p = WorldLayout.places.market
+	return near(player, p.x, p.z + p.d / 2, p.w)
+end
 
 MarketBuy.OnServerEvent:Connect(function(player: Player, id: any)
 	if busy(player) or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
-	local p = WorldLayout.places.market
-	if not near(player, p.x, p.z + p.d / 2, p.w) then
+	if not atCorral(player) then
 		Profiles.notify(player, "Visit the Market Corral on Fair Street", "map_fair")
 		return
 	end
@@ -153,8 +197,10 @@ BuyStall.OnServerEvent:Connect(function(player: Player)
 	if ok then Profiles.changed(player) end
 end)
 
+-- stalledId "" moves the pasture horse into a free stall (stalls stored per horse, D-059).
 SwapStall.OnServerEvent:Connect(function(player: Player, stalledId: any, pastureId: any)
 	if busy(player) or typeof(stalledId) ~= "string" or typeof(pastureId) ~= "string" then return end
+	if stalledId == "" then stalledId = nil end
 	local data = Profiles.get(player)
 	if not data or player:GetAttribute("Racing") then return end
 	if Profile.swapStall(data, stalledId, pastureId) then
@@ -179,28 +225,58 @@ Retire.OnServerEvent:Connect(function(player: Player, id: any)
 	if not data then return end
 	local h = Profile.horse(data, id)
 	if not h then return end
-	local why = Leagues.retireBlock(h.name, id, {
-		racing = player:GetAttribute("Racing"), inLine = player:GetAttribute("InLine"),
-		racingHorse = player:GetAttribute("RacingHorse"), ridingHorse = player:GetAttribute("RidingHorse"),
-		trainingRide = player:GetAttribute("TrainingRide"),
-	})
+	local why = Leagues.retireBlock(h.name, id, busyState(player))
 	if why then
 		Profiles.notify(player, why, "heart")
 		return
 	end
-	if #data.horses <= 1 then
-		Profiles.notify(player, "Keep at least one horse in your stable!", "heart")
+	local plaque, no = Leagues.retire(data, id, os.time())
+	if plaque then
+		Profiles.notify(player, string.format("👑 %s is a Legend! See the Hall of Fame paddock.", plaque.name), "trophy")
+		Profiles.changed(player)
+	elseif no then
+		Profiles.notify(player, no, "heart")
+	end
+end)
+
+LegendAsked.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player, 0.5, "asked") or typeof(id) ~= "string" then return end
+	local data = Profiles.get(player)
+	if data and Leagues.markAsked(data, id) then Profiles.changed(player) end
+end)
+
+-- Rehoming (D-059): at the Market Corral only; undo anywhere within rehome.undoHours.
+Rehome.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player, 1, "rehome") or typeof(id) ~= "string" then return end
+	local data = Profiles.get(player)
+	if not data then return end
+	if not atCorral(player) then
+		Profiles.notify(player, "Rehoming happens at the Market Corral", "map_fair")
 		return
 	end
-	local plaque = Leagues.retire(data, id, os.time())
-	if plaque then
-		Profiles.notify(player, string.format("Legend %s: %d races, %d wins. See Hall of Fame!", plaque.name, plaque.races, plaque.wins), "trophy")
+	local ok, msg, info = Market.rehome(data, id, os.time(), busyState(player))
+	if not ok then
+		Profiles.notify(player, msg, "heart")
+		return
+	end
+	RehomeResult:FireClient(player, info)
+	Profiles.changed(player)
+end)
+
+UndoRehome.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player, 1, "rehome") or typeof(id) ~= "string" then return end
+	local data = Profiles.get(player)
+	if not data then return end
+	local ok, msg = Market.undoRehome(data, id, os.time())
+	Profiles.notify(player, msg, if ok then "heart" else "cash")
+	if ok then
+		RehomeResult:FireClient(player, nil)
 		Profiles.changed(player)
 	end
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
-	for _, k in { "market", "tame", "rename", "retire" } do last[k .. ":" .. player.UserId] = nil end
+	for _, k in { "market", "tame", "rename", "retire", "asked", "rehome" } do last[k .. ":" .. player.UserId] = nil end
 end)
 
 -- Build the corral now, rebuild when models load and when the week turns.

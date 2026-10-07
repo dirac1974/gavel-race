@@ -13,6 +13,10 @@
 -- Rest cues (D-058, stage 4): a stalled horse at energy.yawnAt (1) shows a "🥱 Yawn!" bubble; at
 -- 0 it naps in a straw bed with "💤 Napping" (the horse_lie_<coat> model when it's uploaded, else
 -- the standing horse sunk into the straw). Happy-tired only: never sore, hurt or ill.
+-- Careers (D-059, stage 7): stalls are stored per horse (Profile.stallHorse), so an empty stall
+-- stays put; Legends stand in the Hall of Fame paddock beside the barn (an arch, a plaque post
+-- for each, a soft gold sheen and sparkle that the client turns off with Reduced Motion), and the
+-- owner can ride one from there (the Ride prompt on it, CallHorse with its id).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -188,7 +192,7 @@ end
 -- (inward from the lane, across to the right looking in), each facing out to the lane.
 local YARD_SPOTS = {
 	yard_bench = { 22, 18 }, yard_lanterns = { 2, 20 }, yard_saddlerack = { 16, 32 },
-	yard_picnic = { 36, -16 }, yard_haycart = { 70, -14 }, yard_bridge = { 12, -28 },
+	yard_picnic = { 36, -16 }, yard_haycart = { 76, 16 }, yard_bridge = { 12, -28 },
 }
 
 -- Training rides (D-053): a gold rosette on the stall for each course this horse has a gold
@@ -217,6 +221,94 @@ local function rosettes(barn: Instance, bay: CFrame, h)
 			end
 		end
 	end
+end
+
+-- The Hall of Fame paddock (D-059): beside the barn on the garden side, a low white fence, the
+-- arch facing the lane, and up to career.paddockShown Legends, each with a plaque post (name and
+-- record) and a soft gold sheen (a Highlight) and sparkle. The owner's Ride prompt is added by the
+-- client (HorsesClient) to any model with LegendId whose Owner is them.
+local PADDOCK = { inward = 71, across = -22, w = 24, d = 18 } -- inward 62..80, across -34..-10 (the hay cart moved to make room)
+local LEGEND_GOLD = Color3.fromHex("FFD23F")
+local function buildPaddock(i: number, owner: Player, data, barn: Instance)
+	local legends = Profile.legends(data)
+	if #legends == 0 then return end
+	local pad = Instance.new("Model")
+	pad.Name = "LegendPaddock"
+	local cx, ca, w, d = PADDOCK.inward, PADDOCK.across, PADDOCK.w, PADDOCK.d
+	-- fence: three sides and the front either side of the arch
+	local function rail(a0: number, c0: number, a1: number, c1: number)
+		local p0, p1 = plotCF(i, a0, c0, GROUND_Y + 2.2).Position, plotCF(i, a1, c1, GROUND_Y + 2.2).Position
+		local len = (p1 - p0).Magnitude
+		part({ Name = "PaddockRail", Size = Vector3.new(0.4, 0.5, len), Color = C.white or Color3.new(1, 1, 1),
+			CFrame = CFrame.lookAt((p0 + p1) / 2, p1) }, pad)
+		part({ Name = "PaddockRail", Size = Vector3.new(0.4, 0.5, len), Color = C.white or Color3.new(1, 1, 1),
+			CFrame = CFrame.lookAt((p0 + p1) / 2, p1) * CFrame.new(0, -1.2, 0) }, pad)
+	end
+	local a0, a1, c0, c1 = cx - d / 2, cx + d / 2, ca - w / 2, ca + w / 2
+	rail(a1, c0, a1, c1)
+	rail(a0, c0, a1, c0)
+	rail(a0, c1, a1, c1)
+	rail(a0, c0, a0, ca - 7)
+	rail(a0, ca + 7, a0, c1)
+	local archCF = plotCF(i, a0, ca, GROUND_Y)
+	if not WorldScene.placeModel(pad, "legend_paddock_arch", archCF) then
+		for _, sd in { -1, 1 } do
+			part({ Name = "ArchPost", Size = Vector3.new(0.8, 10, 0.8), Color = Color3.new(1, 1, 1), CFrame = archCF * CFrame.new(sd * 6.5, 5, 0) }, pad)
+			part({ Name = "ArchStar", Shape = Enum.PartType.Ball, Size = Vector3.new(1.2, 1.2, 1.2), Color = LEGEND_GOLD,
+				CanCollide = false, CFrame = archCF * CFrame.new(sd * 6.5, 10.6, 0) }, pad)
+		end
+		part({ Name = "ArchTop", Size = Vector3.new(14, 1.2, 0.8), Color = Color3.new(1, 1, 1), CFrame = archCF * CFrame.new(0, 10, 0) }, pad)
+	end
+	WorldScene.sign(pad, (archCF * CFrame.new(0, 12.4, -0.6)).Position, archCF.LookVector, "Hall of Fame", "👑", 12, 2.2)
+	local shown = math.min(#legends, GameConfig.career.paddockShown)
+	local riding = owner:GetAttribute("RidingHorse")
+	for k = 1, shown do
+		local h = legends[k]
+		local across = c0 + (k - 0.5) * (w / shown)
+		local at = plotCF(i, cx + 1, across, GROUND_Y) * CFrame.Angles(0, math.rad(15 * (k % 2 == 0 and 1 or -1)), 0)
+		if riding ~= h.id then
+			local hm = horseModel(h.coat)
+			hm.Name = "Legend_" .. h.id
+			hm:PivotTo(at)
+			for _, dd in hm:GetDescendants() do
+				if dd:IsA("BasePart") then dd.Anchored, dd.CanCollide = true, false end
+			end
+			hm:SetAttribute("LegendId", h.id)
+			hm:SetAttribute("Owner", owner.UserId)
+			hm:SetAttribute("HorseName", h.name)
+			local glow = Instance.new("Highlight")
+			glow.Name = "LegendSheen"
+			glow.FillColor = LEGEND_GOLD
+			glow.FillTransparency = 0.82
+			glow.OutlineTransparency = 1
+			glow.DepthMode = Enum.HighlightDepthMode.Occluded
+			glow.Parent = hm
+			local anchor = hm.PrimaryPart or hm:FindFirstChildWhichIsA("BasePart", true)
+			if anchor and GameConfig.career.sparkle then
+				local sp = Instance.new("ParticleEmitter")
+				sp.Name = "LegendSparkle"
+				sp.Rate = 2
+				sp.Lifetime = NumberRange.new(1, 1.6)
+				sp.Speed = NumberRange.new(0.3, 0.8)
+				sp.Size = NumberSequence.new(0.45, 0)
+				sp.LightEmission = 1
+				sp.Color = ColorSequence.new(LEGEND_GOLD)
+				sp.Parent = anchor
+			end
+			hm.Parent = pad
+		end
+		-- the plaque post in front of it, facing the lane
+		local postCF = plotCF(i, cx - 5, across, GROUND_Y)
+		if not WorldScene.placeModel(pad, "legend_plaque_post", postCF) then
+			part({ Name = "PlaquePost", Size = Vector3.new(0.6, 3.6, 0.6), Color = C.wood, CFrame = postCF * CFrame.new(0, 1.8, 0) }, pad)
+		end
+		local _, label = WorldScene.sign(pad, (postCF * CFrame.new(0, 3.2, -0.5)).Position, postCF.LookVector,
+			string.format("%s · %d races", h.name, h.record.races), "👑", math.min(7, w / shown - 1), 1.6, Color3.fromHex("FFF4C7"))
+		label.Name = "PlaqueLabel"
+		part({ Name = "PlaqueRosette", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, 0.9, 0.9), Color = LEGEND_GOLD,
+			CanCollide = false, CFrame = postCF * CFrame.new(0, 4.4, -0.7) * CFrame.Angles(0, math.pi / 2, 0) }, pad)
+	end
+	pad.Parent = barn
 end
 
 local function buildBarn(i: number, owner: Player, data)
@@ -268,7 +360,7 @@ local function buildBarn(i: number, owner: Player, data)
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn)
 		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = wallC,
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
-		local h = data.horses[k]
+		local h = Profile.stallHorse(data, k)
 		local door = barn:FindFirstChild("Stall" .. k)
 		if door and h then door:SetAttribute("HorseId", h.id) door:SetAttribute("HorseName", h.name) end
 		if h then
@@ -312,9 +404,8 @@ local function buildBarn(i: number, owner: Player, data)
 			CanCollide = false, CFrame = plotCF(i, front - 6, propB, GROUND_Y + 1.9) }, barn)
 	end
 	-- Pasture horses graze in the front yard (up to three shown).
-	for k = stalls + 1, math.min(#data.horses, stalls + 3) do
-		local h = data.horses[k]
-		local slot = k - stalls
+	for slot, h in Profile.pasture(data) do
+		if slot > 3 then break end
 		local hm = horseModel(h.coat)
 		hm.Name = "Pasture_" .. h.id
 		hm:PivotTo(plotCF(i, 30 + slot * 12, WorldLayout.PLOT_FRONT / 2 - 18 - (slot % 2) * 6, GROUND_Y)
@@ -324,6 +415,7 @@ local function buildBarn(i: number, owner: Player, data)
 		end
 		hm.Parent = barn
 	end
+	buildPaddock(i, owner, data, barn)
 	-- Yard decor you've placed (Tack & Paint shop).
 	for _, it in Style.yard(data) do
 		local spot = YARD_SPOTS[it.id]
@@ -503,9 +595,9 @@ local function applyCare(i: number, data, now: number)
 	local barn = plotModels[i]:FindFirstChild("Barn")
 	if not barn then return end
 	local today = now // 86400
-	for k = 1, math.min(data.stalls, #data.horses) do
-		local h = data.horses[k]
-		local hm = barn:FindFirstChild("Horse_" .. h.id)
+	for k = 1, data.stalls do
+		local h = Profile.stallHorse(data, k)
+		local hm = h and barn:FindFirstChild("Horse_" .. h.id)
 		if hm then
 			local shiny = h.care.day == today and h.care.groomed
 			local fed = h.care.day == today and h.care.fed
@@ -542,11 +634,11 @@ end
 local function applyAway(i: number, player: Player, data)
 	local barn = plotModels[i]:FindFirstChild("Barn")
 	if not barn or not GameConfig.stable.awaySign then return end
-	for k = 1, math.min(data.stalls, #data.horses) do
-		local h = data.horses[k]
-		local hm = barn:FindFirstChild("Horse_" .. h.id)
+	for k = 1, data.stalls do
+		local h = Profile.stallHorse(data, k)
+		local hm = h and barn:FindFirstChild("Horse_" .. h.id)
 		local door = barn:FindFirstChild("Stall" .. k)
-		local away = awayKind(player, h.id)
+		local away = h and awayKind(player, h.id)
 		if hm then
 			for _, d in hm:GetDescendants() do
 				if d:IsA("BasePart") then
@@ -561,7 +653,7 @@ local function applyAway(i: number, player: Player, data)
 		if door then
 			door:SetAttribute("Away", away ~= nil)
 			local old = barn:FindFirstChild("AwaySign" .. k)
-			local text = if away == "races" then h.name .. " is at the races" elseif away then h.name .. " is out riding" else nil
+			local text = if h and away == "races" then h.name .. " is at the races" elseif h and away then h.name .. " is out riding" else nil
 			if old and old:GetAttribute("Text") ~= text then
 				old:Destroy()
 				old = nil
@@ -578,8 +670,13 @@ local function applyAway(i: number, player: Player, data)
 	end
 end
 
-local function signature(data, now: number): string
+local function signature(data, now: number, player: Player?): string
 	local parts = { tostring(data.stalls), tostring(data.activeHorse), tostring(#data.horses) }
+	-- stalls stored per horse and Legends (D-059); a Legend out riding leaves the paddock
+	local riding = player and player:GetAttribute("RidingHorse")
+	for _, h in data.horses do
+		table.insert(parts, tostring(h.stall) .. (if h.legend then "L" .. (if riding == h.id then "r" else "") else ""))
+	end
 	-- the look from the shop
 	for _, slot in { "paint", "plate" } do
 		local it = Style.worn(data, slot)
@@ -592,8 +689,9 @@ local function signature(data, now: number): string
 		local golds = table.concat(Profile.rosettes(h), ",")
 		table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name .. ":" .. golds) -- gold rosettes (D-053)
 	end
-	for k = 1, math.min(data.stalls, #data.horses) do -- rest cues (D-058): yawning or napping
-		table.insert(parts, restPose(data.horses[k], now) or "")
+	for k = 1, data.stalls do -- rest cues (D-058): yawning or napping
+		local h = Profile.stallHorse(data, k)
+		table.insert(parts, if h then restPose(h, now) or "" else "-")
 	end
 	return table.concat(parts, "|")
 end
@@ -609,7 +707,7 @@ local function refresh(player: Player)
 	local label = shell:FindFirstChild("OwnerLabel", true)
 	if label then label.Text = "🏡 " .. player.DisplayName .. "'s Stable" end
 	local now = os.time()
-	local sig = signature(data, now)
+	local sig = signature(data, now, player)
 	if signatures[i] ~= sig then
 		signatures[i] = sig
 		buildBarn(i, player, data)

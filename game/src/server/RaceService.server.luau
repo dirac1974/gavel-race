@@ -37,6 +37,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Leagues = require(Shared:WaitForChild("Leagues"))
+local Career = require(Shared:WaitForChild("Career"))
 local Style = require(Shared:WaitForChild("Style"))
 local Spa = require(Shared:WaitForChild("Spa"))
 local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
@@ -1021,13 +1022,28 @@ local function runRace(c, players: { Player })
 			local data = player and Profiles.get(player)
 			if data and horseOf[player.UserId] then
 				if not card.practice then
-					Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+					local before, after = Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+					-- Careers (D-059): a badge every career.badgeEvery races, Veteran at career.veteranAt.
+					local badge, veteran = Career.crossed(before, after)
+					local hc = (badge or veteran) and Profile.horse(data, horseOf[player.UserId])
+					if hc then
+						local name = hc.name
+						task.delay(GameConfig.runInSeconds + 2, function()
+							if not player.Parent then return end
+							if veteran then
+								Profiles.notify(player, Career.veteranToast(name), "trophy")
+							elseif badge then
+								Profiles.notify(player, Career.badgeToast(name, badge), "trophy")
+							end
+						end)
+					end
 				end
 				-- The Horse Book (D-063): this course, and a top-three place in a race that counts.
 				HorseBook.record(data, "courses", c.id)
 				if not card.practice and prize.place <= 3 then HorseBook.record(data, "places", tostring(prize.place)) end
 				if card.cup and prize.place == 1 then
 					local h = Profile.horse(data, horseOf[player.UserId])
+					if h then h.record.cups = (h.record.cups or 0) + 1 end -- career Cups (D-059)
 					local nxt = h and Leagues.promote(h)
 					if nxt then
 						HorseBook.record(data, "cups", leagueName)
