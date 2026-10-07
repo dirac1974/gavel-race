@@ -1252,3 +1252,117 @@ Template:
   - `GameConfig.steerView` (new): `yawGain = 1`, `yawMaxDeg = 10`, `yawSmoothSeconds = 0.15`, `leanDegPerFtps2 = 0.12`, `leanMaxDeg = 3`, `lookDeg = 3`, `lookRelaxSeconds = 0.3`, `brushLeanFeet = 1`, `brushLeanSeconds = 0.4`, `brushNodDeg = 2`, `brushVolume = 0.5`, `brushLateSeconds = 1/30` (N5 review), `headTurnDeg = 0` (the art follow-up sets 12);
   - `GameConfig.steerHud`: `greyArrows = true`, `waitRing = true`, `noRoomChipAfter = 1`, `noRoomChipEvery = 10`, `gapChipAfterWait = 0.5`, `chipMinGap = 2`.
 - Links: debate 012 (`docs/debates/012-natural-steering.md`), src/trip.py, sims/steering.py, game/src/shared/Trip.luau, game/src/shared/SteerPredict.luau, game/src/client/RaceView.client.luau, game/src/client/RaceController.client.luau, game/src/server/RaceService.server.luau, game/src/client/Replay.client.luau
+
+## D-058 — Rest and the Spa Day (no injury)
+- Date: 2026-10-07
+- Status: Accepted (provisional). **Flagged for David** (OPEN_QUESTIONS 5): he asked on 2026-10-07 for "injury or care at the vet" from over-running; this decision gives vet care without injury.
+- Decided by: team, debate 013 (4/4 against any sore or injured state; Spa details settled in rebuttal)
+- Context: David's 2026-10-07 wish for injury and vet care meets hard rule 3 ("never … sicken"), D-039 ("sore legs after hard races" rejected) and his own 2026-10-05 "skip sick horses". The audit also found "Resting" shows after one cash race while the horse can race 4 more times, so today's rest words are wrong.
+- Decision:
+  - **Tired cues only when they're true:** the horse yawns at 1 Energy and lies down in the straw with Zzz at 0. The dock and picker show Energy as 5 horseshoe pips and say "Ready" from 1 up and "Napping" only at 0 (`energy.restingLabelAt = 0`, `energy.yawnAt = 1`). When every horse is napping: "Great day! Comet's dreaming of tomorrow."
+  - **Spa Day at the vet:** free, about 30 s: hose (D-039's cool-down hose, finally built), brush and a towel, tapping only. Once per horse per server day (`spa.perDay = 1`); it says "Spa opens again tomorrow", never a countdown. Gives +1 Energy (`spa.energy = 1`, never above max), a Health Passport stamp and a cosmetic shine on the horse's next race. **No bond, no Rating, no win chance.**
+  - **Never:** a sore, hurt, limping, injured or sick state, a vet bill, a cure for sale, or the words hurt, sore, injury, limp, sick in game text.
+- Consequences: David's "care at the vet" exists as a daily, positive ritual. Energy is unchanged as the only limit on cash races (D-015). Rookie horses (free races) still never tire; the Spa's Energy matters from Bronze.
+- Alternatives: a mild non-blocking "sore" state fixed by a free vet visit (closest to David's words; 0/4: kids read it as "I hurt my horse", D-039, maturity rating risk); sore that lowers Rating (rule 3 and D-015: care would become win chance); a "Puffed & muddy" look after 3 cash races (dropped in rebuttal: mud and sweat can read as hurt; Child safety's grinning "Muddy & happy" variant kept as the minority view, `spa.muddyLook = false`); Spa +1 bond (bond is Rating, D-014); a 20 h cooldown (a timer kids watch).
+- Links: debate 013, docs/plans/horse-life-and-retention.md (stages 1 and 4), docs/research/2026-10-07-retention-and-horse-life.md
+
+## D-059 — Careers, Legend Retirement and Rehoming
+- Date: 2026-10-07
+- Status: Accepted (provisional)
+- Decided by: team, debate 013 (4/4; rehome undo 3–1)
+- Context: David: "Horses can age and become less effective, be sold". D-037 rules out ageing, decline and trading; the research shows kid games make age a gain.
+- Decision:
+  - **No ageing, no decline.** Each horse has a **career** (races, wins, Cups) with a badge every 25 races (`career.badgeEvery = 25`).
+  - At 100 races a horse is a **Veteran** and may take an opt-in **Legend Retirement**: it moves to the Hall of Fame paddock beside the owner's barn with a plaque and a glow coat, stays rideable and visitable, and frees its stall. Never forced, never prompted more than once per horse. With breeding (D-047), a Legend passes at most +2 starting Potential to one foal (`career.legacyMax = 2`), after the bloodline sim.
+  - **Rehome** at the Market Corral: an NPC pays 50% of what you paid, never more (`rehome.share = 0.5`; tamed and gifted horses pay 0 and get a goodbye rosette). Two-tap confirm and a goodbye card: "Comet is joining Sunny Meadow Riding School!" Undo for 72 h at the same price (`rehome.undoHours = 72`). The starter horse and your last horse can't be rehomed; nor can a horse that's ridden, training, queued or racing.
+  - **No player trading**, no auctions.
+- Consequences: "sold" exists without loss, and the 50% cap stops buy-and-sell farming. Retiring and rehoming both need the in-use check (D-065).
+- Alternatives: decline after N races (loss, unreadable cause and effect); 40% buy-back (Competitive's opening; 50% capped at the price paid is just as safe); 24 h or 48 h undo (too short for weekend players); "going to a farm" copy (parents know it as a death euphemism); player trading (scams, paid-item gating, D-037).
+- Links: debate 013, docs/plans/horse-life-and-retention.md (stage 7)
+
+## D-060 — Visiting friends' barns
+- Date: 2026-10-07
+- Status: Accepted (provisional)
+- Decided by: team, debate 013 (4/4 after rebuttal)
+- Context: David: "People could go around and visit other users' stables". D-042 set the safety rules, but there's no visit button and nothing to do on a visit.
+- Decision:
+  - **Map → "Friends' barns":** the faces of Roblox friends in this server whose visit setting lets you in. Tap a face to teleport to their gate (never inside the barn).
+  - **Things to do:** pat each horse once for a **Tour stamp** (each friend's stamps count once); one free treat a day (D-042); drop a carrot in the post box (the owner sees an anonymous count). Bond from all visitors is capped at 1 per horse per day (`visit.bondPerHorsePerDay = 1`); pats give no bond.
+  - **Owner control:** a one-tap gate button in the dock while anyone is visiting; closing it walks visitors out gently to Barn Lane. "Club" stays hidden until Clubs exist.
+  - **Show-off:** the Rosette Wall (D-062) and the Legend paddock (D-059) are what visitors see.
+  - **Never:** visitor counts, likes, rankings or guestbook text.
+- Consequences: only friends are ever listed, so the teleport can't help a stranger follow a kid. The server keeps refusing every care action on another plot except pat, treat and post box.
+- Alternatives: walking Barn Lane with golden hoofprints (a long walk for phone kids; kept as the fallback guide); a list of all barns (strangers); pats that give bond (alt accounts farm Rating, D-014); a "Help a friend" chore (later, if visits catch on).
+- Links: debate 013, D-042, docs/plans/horse-life-and-retention.md (stage 5)
+
+## D-061 — One race button and a visible queue
+- Date: 2026-10-07
+- Status: Accepted (provisional)
+- Decided by: team, debate 013 (4/4 after rebuttal)
+- Context: David: "how does the queue work for each [race]?" The audit found a **league lockout**: two course cards, each claimed by the first rider's league; a Rookie can't race while a Bronze rider holds one card and a race runs on the other, and the picker preselects the wrong league's card. Bots sit at the human median ± 6, so training barely shows solo.
+- Decision:
+  - **"Race with Comet ▶"** joins the queue for the active horse's league and kind (Race, Cup or Practice). Each league-and-kind has its own queue; the server sends a queue to whichever course frees first. The course picker stays as "More choices" (pick a horse, Practice, Cup).
+  - **A card for another league never takes a rider:** it shows that league's badge and "Watch" (spectate). `bestCourse` and the picker only pick a course the rider can join.
+  - **Show the wait:** a countdown ring, the gate filling with names, "Bots join at 0". `lobbyFillSeconds = 15` (was 20). Kids can groom, ride or visit while queued; "Race time!" brings them to the gate.
+  - **Bots by league:** rated at a fixed anchor ± 6: Rookie 50, Bronze 63, Silver 73, Gold 83, Champion 90 (`botRatingAnchor`, `botRatingSpread = 6`; Champion is the moderator's extension). Shipped only if the sim shows a solo Rookie wins 20–35% of races; otherwise the anchors are tuned. Bot names come from the horse-name list, never username-like.
+- Consequences: no rider is ever locked out by another league; the longest wait is one race plus results plus 15 s. Training shows in solo races. Changes `RaceService` queueing, not race math.
+- Alternatives: grey the unjoinable card only (a Rookie can still be locked out); reserve the next card for a league waiting ≥ 8 s (Competitive's opening, superseded by per-league queues); bots at league midpoint ± 8 (fuzzy for Rookie); separate class queues (more lockouts on 2 courses).
+- Links: debate 013, D-036, D-011, docs/plans/horse-life-and-retention.md (stages 1 and 2)
+
+## D-062 — Class badges, first-win points and the Rosette Wall
+- Date: 2026-10-07
+- Status: Accepted (provisional). The Silver Cup target is **not changed** until the economy sim.
+- Decided by: team, debate 013 (4/4 on badges and the wall; the Silver target split, sim decides)
+- Context: David: "Horse classes to qualify for certain races/prestige?" The research suggests real racing's maiden → allowance → stakes ladder, without claiming races. The audit: Silver Cup at 1,400 points takes about 470 Silver races.
+- Decision:
+  - **Class badges on one queue per league:** First Win (no wins in this league), Rising Star (fewer than 3), Open, then the league's Cup. They're labels on the picker and the horse card, not separate races, and never affect win chance or demotion (there is none, D-046).
+  - **A horse's first win in each league earns +10 League Points** (`leagues.firstWinBonus = 10`).
+  - **Silver Cup target:** the economy sim aims for a casual player reaching the Silver Cup in 150–200 Silver races (about 600 points). D-013's values stay until the sim is run and logged.
+  - **Prestige:** a **Rosette Wall** in each stable shows rosettes, Cups and Legend plaques; visitors see it; no number. It's filled by private **Stable Star** goal cards (care, collection and skill goals such as "3 races with Great taps"). No claiming races; no public ranking.
+- Alternatives: separate condition-race queues (splits fields on 2 courses); Silver at 60–90 races (makes the Cup trivial) or 600–700 points without a sim; a public prestige number (D-042).
+- Links: debate 013, D-013, D-046, D-048, docs/plans/horse-life-and-retention.md (stage 8)
+
+## D-063 — Reasons to come back
+- Date: 2026-10-07
+- Status: Accepted (provisional)
+- Decided by: team, debate 013 (4/4)
+- Context: David: "make them want to come back". Roblox's guidance: fun within 5 minutes (D1), clear goals (D7), updates every 2–4 weeks and social features (D30). The monthly stamps are half built and lead nowhere.
+- Decision:
+  - **First 5 minutes:** in a race within 2 minutes of joining (the tour's first GO opens "Race with Comet"); the tour ends on a joyful moment.
+  - **Monthly stamps pay out:** 8 stamps give the month's saddle cloth (earned, never sold); every month's cloth comes back in the same month next year. Until the cloths exist, "This month" is hidden.
+  - **Horse Book:** coats, breeds, rosettes, courses and Cups, each a silhouette until earned.
+  - **Welcome Back Hay Bale:** after 3+ days away, the active horse trots up with a flat gift of hay, seeds and a treat (the same size however long you were away).
+  - **Personal bests** per distance ("New best!"), private.
+  - **Photo Finish:** a camera button on the win card and in the stable, using CaptureService's own share prompt.
+  - **Later:** a free-only Ribbon Trail season with no end date or "last chance" anywhere; a weekend Fun Run that always comes back.
+  - **Never:** login streaks, resets, countdowns to an offer, guilt copy.
+- Alternatives: a paid season pass (D-050); a login calendar with streaks (rule 3); a welcome-back gift that grows with absence (guilt).
+- Links: debate 013, D-043, D-050, docs/plans/horse-life-and-retention.md (stages 3 and 6)
+
+## D-064 — One symbol per meaning, phones first
+- Date: 2026-10-07
+- Status: Accepted (provisional). Reverses part of D-054's results card ("Good trip" row).
+- Decided by: team, debate 013 (4/4 on symbols and floors; 3–1 on the 3-item phone dock)
+- Context: the audit found stars meaning 8 things, Energy with 3 looks and ⚡ also meaning Sprint, phone dock buttons rendered about 35 px with 8 px labels, panels at about 10 px text, a picker that reads like a test, and two star rows on the results card.
+- Decision:
+  - **Symbols:** horseshoe = Energy everywhere (5 pips); ★ = how you rode, only; ❤️ = care; 📣 = fans; 🎀 = monthly stamps; 🌱 = good family line in the market; Sprint = 🐇 Short (⚡ removed).
+  - **Phone dock:** horse card, RACE!, ☰ More (everything else in More). Rendered floors: buttons ≥ 56 px, main labels ≥ 16 px, nothing below 14 px; panels re-lay out instead of shrinking under the floor (`ui.minTouchPx = 56`, `ui.minTextPx = 14`, `ui.labelPx = 16`, `ui.dockPhoneItems = 3`).
+  - **Results:** one row, "You rode ★★☆", plus "Your taps gained Comet N places!" only when positive. No %, no purse (D-055). The trip folds into the one row.
+  - **Words:** picker cards one line, ≤ 5 words, plus the league colour; toasts ≤ 10 words; Grade 3 copy.
+  - **One "Next thing" pill** at a time, from the Stable Board's advice. Weekly and monthly jobs show inline, not as a burst of toasts.
+- Alternatives: floors only with ≤ 5 dock items (Competitive; `ui.dockPhoneItems = 5`); a win-chance line "12% → 19%" (breaks D-055, reads as odds); a tap-closeness bar (more to read).
+- Links: debate 013, D-054, D-055, docs/plans/horse-life-and-retention.md (stages 1 and 3)
+
+## D-065 — Playtest-safety fixes
+- Date: 2026-10-07
+- Status: Accepted (engineering, team)
+- Decided by: team, debate 013 (4/4) and the systems audit
+- Decision:
+  - Each `Profiles.decorators` call runs in `pcall`; a failing decorator is logged and skipped, so ProfileSync always reaches the client.
+  - A locked save shows "Opening your stable…" and keeps retrying until the lock goes stale (`LOCK_STALE`, 5 min), with a "Try again" button that rejoins; no kick. Leaving and coming back works as before.
+  - No retiring or rehoming a horse that's ridden, training, queued or racing (server check).
+  - Taming is scored by the server from its own timestamps.
+  - Green Cash and Wins leave public `leaderstats` (D-042: no rankings).
+  - The race picker's redraw key includes league, kind and Cup state.
+  - Stall assignment is stored per horse, so retiring a stalled horse never moves another one silently.
+- Links: docs/research/2026-10-07-systems-audit.md (code health risks), docs/plans/horse-life-and-retention.md (stage 1)

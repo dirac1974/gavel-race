@@ -56,3 +56,4 @@ Date: YYYY-MM-DD · Status: Proposed | Decided (D-NNN)
 9. ~~010 — Race steering~~: decided as D-054. Record: [010](010-race-steering.md).
 10. ~~011 — Play-test quirks~~: decided as D-055 and D-056. Record: [011](011-playtest-quirks.md).
 11. ~~012 — Natural steering, boxed in and brushes~~: decided as D-057. Record: [012](012-natural-steering.md).
+12. ~~013 — Retention and horse life~~: decided as D-058 to D-065 (rest and Spa Day, careers and rehoming, visits, the race queue, classes, coming back, UI clarity, playtest fixes). Record: [013](013-retention-and-horse-life.md). Plan: [horse-life-and-retention](../plans/horse-life-and-retention.md).
