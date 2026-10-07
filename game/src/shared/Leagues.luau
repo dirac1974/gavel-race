@@ -29,7 +29,8 @@ end
 
 -- Class badges and first wins (D-062, stage 8) -----------------------------------------------
 -- h.leagueWins = { [league] = wins there }. Older saves have none: every league below the
--- horse's own was left by a Cup win (so 1 there); its own league starts at 0.
+-- horse's own was left by a Cup win (so 1 there); its own league starts at 0, except Rookie,
+-- where every recorded win was a Rookie win.
 Leagues.FIRST_WIN_BONUS = GameConfig.firstWinBonus or 10
 Leagues.RISING_STAR_BELOW = (GameConfig.classes or {}).risingStarBelow or 3
 Leagues.CLASSES = { "FirstWin", "RisingStar", "Open", "Cup" } -- the words: PickerText.classBadge
@@ -39,6 +40,8 @@ function Leagues.wins(h: any): { [string]: number }
 		local w = {}
 		local own = table.find(Leagues.ORDER, h.league or "Rookie") or 1
 		for k = 1, own - 1 do w[Leagues.ORDER[k]] = 1 end
+		-- a horse still in Rookie won every counted race there (Practice never records a race)
+		if own == 1 and typeof(h.record) == "table" then w.Rookie = math.max(0, math.floor(tonumber(h.record.wins) or 0)) end
 		h.leagueWins = w
 	end
 	local clean = {}

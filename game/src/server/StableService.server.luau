@@ -314,12 +314,12 @@ local function buildPaddock(i: number, owner: Player, data, barn: Instance)
 	pad.Parent = barn
 end
 
--- The Rosette Wall (D-062, stage 8): what StableStar.wall lists, hung in a 6 × 4 grid on a felt
+-- The Rosette Wall (D-062, stage 8): what StableStar.wall lists, hung in a 6 × 6 grid on a felt
 -- panel in front of the rosette_wall model (or on posts when the art hasn't loaded). Rosettes are
 -- the uploaded rosette_ribbon repainted in code (league colour for a first win, the goal kind's
 -- colour for a Stable Star goal), Cups the trophy_cup on a shelf in the league's colour, Legend
 -- plaques gold plates with the horse's name. Everyone in the server sees it; no numbers.
-local WALL_COLS, WALL_ROWS = 6, 4
+local WALL_COLS, WALL_ROWS = 6, 6
 local function quiet(m: Instance)
 	for _, d in m:GetDescendants() do
 		if d:IsA("BasePart") then d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch = true, false, false, false end
@@ -405,20 +405,20 @@ end
 
 local function rosetteWall(barn: Instance, wallCF: CFrame, data)
 	local wall = WorldScene.placeModel(barn, "rosette_wall", wallCF)
-	local width, height, front, mid = 8, 6, 0.4, 4.5
+	local width, height, front, mid, midX = 8, 6, 0.4, 4.5, 0
 	if wall then
 		local bb, ext = wall:GetBoundingBox()
 		local centre = wallCF:PointToObjectSpace(bb.Position)
 		width = math.clamp(ext.X * 0.85, 5, 10)
 		height = math.clamp(ext.Y * 0.7, 4, 7)
 		front = -centre.Z + ext.Z / 2 + 0.15 -- just in front of the face toward the lane (-Z)
-		mid = centre.Y
+		mid, midX = centre.Y, centre.X
 	else
 		for _, dx in { -4.4, 4.4 } do
 			part({ Name = "WallPost", Size = Vector3.new(0.6, 8, 0.6), Color = C.wood, CFrame = wallCF * CFrame.new(dx, 4, 0) }, barn)
 		end
 	end
-	local panelCF = wallCF * CFrame.new(0, mid, -front)
+	local panelCF = wallCF * CFrame.new(midX, mid, -front)
 	part({ Name = "RosetteFelt", Size = Vector3.new(width, height, 0.12), Color = Color3.fromHex("2E5E4E"), Material = Enum.Material.Fabric,
 		CanCollide = false, CanQuery = false, CanTouch = false, CFrame = panelCF }, barn)
 	local cell = math.min(width / WALL_COLS, height / WALL_ROWS)

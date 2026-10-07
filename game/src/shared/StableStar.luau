@@ -25,7 +25,7 @@ StableStar.KIND_HEX = { care = "FF8FB8", collection = "56B4E9", skill = "FF9F1C"
 StableStar.LEAGUE_HEX = { Rookie = "9EDB86", Bronze = "E8B48A", Silver = "D5DCE6", Gold = "FFE08A", Champion = "B9B9F0" }
 StableStar.LEAGUES = { "Rookie", "Bronze", "Silver", "Gold", "Champion" }
 StableStar.KIND_WORD = { care = "Care", collection = "Collect", skill = "Riding" }
-StableStar.MAX_WALL = 24
+StableStar.MAX_WALL = 36 -- 6 × 6: room for every Cup, plaque, first win and goal (31)
 StableStar.MAX_PLAQUES = 4
 
 -- In order within each kind: the card shows the first one not yet done.

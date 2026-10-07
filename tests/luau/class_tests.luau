@@ -70,6 +70,14 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		check(w.Rookie == 1 and w.Bronze == 1 and (w.Silver or 0) == 0, "repair: lower leagues 1, own 0")
 		check(Leagues.classOf(h, false) == "FirstWin", "an older Silver horse is First Win in Silver")
 		check(Leagues.recordWin(h, "Rookie") == false, "no bonus for a league it already won in")
+		-- an older Rookie horse: every recorded win was a Rookie win, so no second "first win"
+		local r = horse("r", "Rookie")
+		r.record.wins = 2
+		check(Leagues.wins(r).Rookie == 2 and Leagues.classOf(r, false) == "RisingStar", "repair: a Rookie keeps its wins")
+		local rp = r.points
+		check(Leagues.recordWin(r, "Rookie") == false and r.points == rp, "no bonus for an older Rookie winner")
+		local r0 = horse("r0", "Rookie")
+		check(Leagues.wins(r0).Rookie == 0 and Leagues.classOf(r0, false) == "FirstWin", "repair: a Rookie with no wins is First Win")
 		h.leagueWins = { Rookie = "2", Moon = 5, Bronze = -3, Silver = 0 / 0 }
 		local c = Leagues.wins(h)
 		check(c.Rookie == 2 and c.Moon == nil and c.Bronze == 0 and c.Silver == nil, "junk leagueWins cleaned")
@@ -148,7 +156,12 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		-- the wall caps at MAX_WALL items
 		for _, g in StableStar.GOALS do p.stableStar.done[g.id] = true end
 		for _, lg in StableStar.LEAGUES do StableStar.firstWin(p, lg) end
-		check(#StableStar.wall(p) <= StableStar.MAX_WALL, "wall capped")
+		for _, lg in StableStar.LEAGUES do HorseBook.record(p, "cups", lg) end
+		p.hallOfFame = { { name = "A" }, { name = "B" }, { name = "C" }, { name = "D" }, { name = "E" } }
+		local full = StableStar.wall(p)
+		-- everything that can qualify fits: 4 Cups + 4 plaques + 5 first wins + every goal
+		check(#full == 4 + StableStar.MAX_PLAQUES + 5 + #StableStar.GOALS and #full <= StableStar.MAX_WALL,
+			"every rosette fits on the wall (" .. #full .. ")")
 		check(#StableStar.cards(p) == 0, "every goal done: no cards")
 	end
 

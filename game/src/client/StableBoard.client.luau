@@ -112,10 +112,11 @@ local swapping = false
 local function goTo(go: string?)
 	if not go then return end
 	gui.Enabled = false
-	if go == "stable" then
+	if go == "stable" or go == "wall" then
 		local i = player:GetAttribute("PlotIndex")
 		if i then
-			local x, z = WorldLayout.plotPoint(i, 40, 0)
+			-- the Rosette Wall stands at (52, 12) in the plot (StableService); stop just in front of it
+			local x, z = if go == "wall" then WorldLayout.plotPoint(i, 46, 12) else WorldLayout.plotPoint(i, 40, 0)
 			Guide.to(x, z)
 		end
 	elseif go == "raceBoard" then
@@ -337,7 +338,7 @@ end
 
 actionBtn.Activated:Connect(function()
 	if tab == "goals" then
-		goTo("stable") -- walk to your barn's Rosette Wall
+		goTo("wall") -- walk to your barn's Rosette Wall
 	elseif tab == "daily" then
 		swapping = not swapping
 		render()
