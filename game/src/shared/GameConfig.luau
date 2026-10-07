@@ -321,6 +321,22 @@ GameConfig.energy = {
 	careCooldownSeconds = 2 * 60 * 60,
 	freeLeagues = { Rookie = true }, -- Rookie races cost no Energy
 	restingLabelAt = 0,              -- D-058: "Napping" only at this Energy or less; "Ready" above it
+	yawnAt = 1,                      -- D-058: the horse yawns in its stall at this Energy (above restingLabelAt)
+}
+
+-- Spa Day at the Vet (D-058, stage 4): hose, brush and towel, tapping only. Free, perDay times per
+-- horse per server day; then "Spa opens again tomorrow" (no countdown). +energy (never above the
+-- cap), a Health Passport stamp, and a cosmetic shine on the next race. Never bond, Rating or win chance.
+GameConfig.spa = {
+	enabled = true,
+	perDay = 1,
+	energy = 1,
+	minSeconds = 8,                  -- the server takes a Spa only this long after it started (a real wash)
+	lagAllowance = 1.5,              -- seconds off minSeconds for the trip SpaStart takes to the server
+	taps = { hose = 6, brush = 6, towel = 4 }, -- taps per step (about 30 s in all)
+	shine = true,                    -- sparkle on the horse in its next race
+	muddyLook = false,               -- D-058 minority view ("Muddy & happy"), off
+	napLowerStuds = 1.8,             -- no lying model for this coat: the standing horse sinks into a straw bed
 }
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and

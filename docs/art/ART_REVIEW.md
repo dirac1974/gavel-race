@@ -96,3 +96,15 @@ Balance checked before each batch: 460 → 360 (floor 150). The plan asked for a
 | **Total** | **100** | | 2 text-to-3D, 1 retexture, 1 re-roll. Uploaded to the LlamaWorks group; moderation pending. |
 
 Guardrail check: no text, numbers or logos; nothing that reads as a counter, score or ranking; no wagering shapes.
+
+## Horse life stage 4: Spa Day (2026-10-07)
+
+Plan `docs/plans/horse-life-and-retention.md` stage 4 (≈ 90 credits asked). The balance was checked before every job (another builder was using Meshy for stage 5): 360 before, 250 after, never near the 150 floor. Checked on the Meshy thumbnails. Uploaded to the LlamaWorks group with `tools/roblox/upload_assets.py` (moderation pending; the game keeps its placeholder shapes until Roblox approves them).
+
+| Slot | Credits | Verdict | Notes |
+| --- | --- | --- | --- |
+| `spa_wash_stall` | 30 | PASS | Pale-blue open bay, white scalloped roof, green hose on a wall reel, soapy bucket, yellow sponge, dark mat. No horse, no cross. |
+| `horse_lie_bay` | 30 | PASS (note) | Lying in a sphinx pose with the front legs stretched forward, head up, ears forward, calm, bridle, healthy glossy coat: reads as resting, not unwell. Hooves dark with pale tips; `darken_hooves.py` only finds the legs of a standing horse (it found 1 of 4), so the raw file is uploaded. No straw on the model: it lies on the barn's straw floor. |
+| `horse_lie_palomino`, `horse_lie_grey` | 2 × 10 | PASS | Retextures of the bay (the starter coats). Golden with a cream mane and black hooves; steel grey with dapples, silver mane, dark hooves. The other nine coats sink a standing horse into a straw bed instead (90 credits saved). |
+| `towel_rack` | 30 | PASS (note) | Honey-wood stand with a red-and-white striped towel over the top; the brush caddy is small and odd-shaped. |
+| **Total** | **110** | | 3 text-to-3D (90) + 2 retextures (20). Balance 360 → 250. |

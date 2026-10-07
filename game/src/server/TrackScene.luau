@@ -405,8 +405,32 @@ function Course:laneCFrame(i: number, p: number, x: number?): CFrame
 	return CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
 end
 
--- Per race: the gate where this distance starts, and the horses in it.
-function Course:build(plan, coats: { string? }?)
+-- A Spa Day's shine (D-058): sparkles drifting up off a horse's body for one race. Cosmetic only.
+local function spaShine(horse: Model)
+	local body = horse:FindFirstChild("Body", true) or horse.PrimaryPart
+	if not (body and body:IsA("BasePart")) then
+		local biggest = 0
+		for _, d in horse:GetDescendants() do
+			if d:IsA("BasePart") and d.Name ~= "Saddle" and d.Size.Magnitude > biggest then body, biggest = d, d.Size.Magnitude end
+		end
+	end
+	if not (body and body:IsA("BasePart")) then return end
+	local e = Instance.new("ParticleEmitter")
+	e.EmissionDirection = Enum.NormalId.Top
+	e.Name = "SpaShine"
+	e.Rate = 6
+	e.Lifetime = NumberRange.new(0.8, 1.4)
+	e.Speed = NumberRange.new(0.5, 1.5)
+	e.SpreadAngle = Vector2.new(60, 60)
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	e.LightEmission = 1
+	e.Color = ColorSequence.new(Color3.fromHex("FFF6C2"), Color3.new(1, 1, 1))
+	e.Parent = body
+end
+
+-- Per race: the gate where this distance starts, and the horses in it. shines[i]: the horse in
+-- lane i had a Spa Day since its last race (D-058).
+function Course:build(plan, coats: { string? }?, shines: { [number]: boolean }?)
 	if not venue or not venue.Parent then
 		Lighting.ClockTime = 15
 		venue = buildVenue()
@@ -466,6 +490,7 @@ function Course:build(plan, coats: { string? }?)
 		saddle.CanTouch = false -- nobody sits by walking into it; the server seats riders
 		saddle.CFrame = horse:GetPivot() * CFrame.new(0, seatY, seatZ)
 		saddle.Parent = horse
+		if shines and shines[i] then spaShine(horse) end
 		horse.Parent = horseFolder
 		self.horses[i] = horse
 		self.saddles[i] = saddle
@@ -621,7 +646,7 @@ end
 
 -- The dirt course, for callers that don't care about courses.
 local dirt = TrackScene.course("dirt", CFG)
-function TrackScene.build(plan, coats) dirt:build(plan, coats) end
+function TrackScene.build(plan, coats, shines) dirt:build(plan, coats, shines) end
 function TrackScene.laneCFrame(i: number, p: number): CFrame return dirt:laneCFrame(i, p) end
 function TrackScene.dismountAll() for _, c in courses do c:dismountAll() end end
 

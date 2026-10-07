@@ -38,6 +38,7 @@ local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Leagues = require(Shared:WaitForChild("Leagues"))
 local Style = require(Shared:WaitForChild("Style"))
+local Spa = require(Shared:WaitForChild("Spa"))
 local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
 local NameGen = require(Shared:WaitForChild("NameGen"))
 
@@ -107,13 +108,14 @@ local function today(): number
 end
 
 -- Courses -------------------------------------------------------------------------
--- course = { id, cfg, scene, surface, queue, fillDeadline, current, card, charged, nextDistance }
+-- course = { id, cfg, scene, surface, queue, fillDeadline, current, card, charged, shined, nextDistance }
+-- (shined: player -> horse id whose Spa shine this race took, D-058; given back if the race aborts)
 local courses: { [string]: any } = {}
 for _, id in COURSE_ORDER do
 	local cfg = TrackLayout.courses[id]
 	courses[id] = {
 		id = id, cfg = cfg, scene = TrackScene.course(id, cfg), surface = SURFACE[id],
-		queue = {}, fillDeadline = nil, current = nil, card = nil, charged = {}, nextDistance = if id == "dirt" then 1 else 2,
+		queue = {}, fillDeadline = nil, current = nil, card = nil, charged = {}, shined = {}, nextDistance = if id == "dirt" then 1 else 2,
 	}
 end
 
@@ -599,6 +601,7 @@ local function runRace(c, players: { Player })
 	local humans = {}
 	local horseOf: { [number]: string } = {}
 	local coatOf: { [string]: string } = {}
+	local shineOf: { [string]: boolean } = {} -- a Spa Day's shine, for this race (D-058)
 	local riders = {}
 	for _, p in players do
 		local h = rideable(p, chosen[p], card)
@@ -610,6 +613,11 @@ local function runRace(c, players: { Player })
 			table.insert(humans, { id = tostring(p.UserId), name = h.name, rating = rating, isBot = false })
 			horseOf[p.UserId] = h.id
 			coatOf[tostring(p.UserId)] = h.coat
+			if GameConfig.spa.shine and Spa.takeShine(h) then
+				shineOf[tostring(p.UserId)] = true
+				c.shined[p] = h.id
+				Profiles.changed(p)
+			end
 			table.insert(riders, p)
 			if cost > 0 then
 				c.charged[p] = h.id
@@ -626,7 +634,11 @@ local function runRace(c, players: { Player })
 	-- Bots rated by league (D-061 stage 2), named from the horse-name chips.
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng, { league = leagueName, nameParts = NameGen })
 	local coats = {}
-	for i, lane in lanes do coats[i] = coatOf[lane.id] end -- bots keep the default coats
+	local shines = {}
+	for i, lane in lanes do
+		coats[i] = coatOf[lane.id] -- bots keep the default coats
+		shines[i] = shineOf[lane.id]
+	end
 	local session = RaceSession.new({
 		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape },
 		config = GameConfig,
@@ -676,8 +688,9 @@ local function runRace(c, players: { Player })
 	local order = RaceSession.postOrder(GameConfig, #session.lanes, rng)
 	session:assignPosts(order)
 	local postCoats = {}
-	for post, old in order do postCoats[post] = coats[old] end
-	coats = postCoats
+	local postShines = {}
+	for post, old in order do postCoats[post], postShines[post] = coats[old], shines[old] end
+	coats, shines = postCoats, postShines
 
 	-- Steering (D-054): the trip state, built after the posts (lane index = post), drawing its
 	-- two uniforms per lane after every other gate draw. Bots steer with Smart Steer and its bot
@@ -707,7 +720,7 @@ local function runRace(c, players: { Player })
 	end
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
-	c.scene:build(plan, coats) -- rebuilt each race: the gate moves with the distance, riders' own coats
+	c.scene:build(plan, coats, shines) -- rebuilt each race: the gate moves with the distance, riders' own coats
 	local title = if card.cup then leagueName .. " Cup" elseif card.practice then "Practice" else leagueName
 	RaceStarted:FireAllClients(title, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
 	if trip then
@@ -1026,7 +1039,18 @@ local function runRace(c, players: { Player })
 	end
 	RaceFinished:FireAllClients(summary, c.id)
 	fans("finish", c.id, result.order[1])
+	-- D-058: the race used a rider's last Energy and every one of their horses is napping now.
+	for p in c.charged do
+		local data = Profiles.get(p)
+		local h = data and Profile.horse(data, horseOf[p.UserId] or "")
+		if h and Spa.allNapping(data.horses, os.time(), GameConfig.energy) then
+			task.delay(GameConfig.runInSeconds + 3, function()
+				if p.Parent then Profiles.notify(p, Spa.dreamLine(h.name), "sleeping_horse") end
+			end)
+		end
+	end
 	table.clear(c.charged) -- the race counted
+	table.clear(c.shined)
 	-- Your ride: stars from your score, and places your riding gained versus riding at the race
 	-- average (same luck, everything else the same). Only gains are shown to the rider.
 	local S = session:scoresSoFar()
@@ -1126,6 +1150,15 @@ local function courseLoop(c)
 					end
 				end
 				table.clear(c.charged)
+				for p, horseId in c.shined do -- and the Spa shine (D-058)
+					local data = Profiles.get(p)
+					local h = data and Profile.horse(data, horseId)
+					if h then
+						h.shine = true
+						Profiles.changed(p)
+					end
+				end
+				table.clear(c.shined)
 				if #c.queue == 0 then openCard(c) end
 				for _, p in racers do
 					p:SetAttribute("Racing", nil)

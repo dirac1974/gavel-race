@@ -487,6 +487,20 @@ Use Test → Clients and Servers with 2 players, plus Device emulator → a phon
 - [ ] A horse out riding or at the races has an empty stall: no Pat or Treat prompt on that door.
 - [ ] For grown-ups page: the 🏡 Visiting friends' barns paragraph reads clearly.
 
+## Spa Day and rest cues (horse life stage 4, D-058)
+Use Play Solo (or 2 players), plus Device emulator → a phone in landscape. No tools needed. Spa Days count by the server's UTC day.
+- [ ] **Yawn.** Race a Bronze horse until it has 1 Energy (4 cash races from full): in its stall it has a **🥱 Yawn!** bubble, and the dock still says **Ready**.
+- [ ] **Nap.** One more race (0 Energy): it lies down in the straw with **💤 Napping** over it, and the dock says **Napping**. A bay, palomino or grey horse lies down (the new model, once Roblox approves it); other coats sink into a straw bed. While it's out riding or racing, its stall is empty and no bubble floats there.
+- [ ] If that race left every one of your horses napping, a toast after the results says "Great day! Comet's dreaming of tomorrow."
+- [ ] **Spa Day.** Walk to the Vet: a pale-blue wash bay with a "🛁 Spa Day" sign stands beside it, with a towel rack. Its prompt says **Spa Day**. Pick the napping horse: tap to rinse, brush and dry (the chips along the top go Rinse → Brush → Dry). The whole Spa takes under a minute.
+- [ ] Afterwards: a toast "✨ Comet is squeaky clean! +1 Energy", the dock shows one horseshoe back and says **Ready**, the stall's bubble changes from Napping to Yawn, and the horse can race once more. Its next race shows sparkles drifting off it; the race after that, none.
+- [ ] **Opens again tomorrow.** Go back to the Spa with the same horse: the button says **🌙 Spa opens again tomorrow**, with no clock or countdown anywhere. Another horse can still have its Spa today.
+- [ ] At the Vet's door (Check-up) pick a horse: the card shows the Health Passport with a 🛁 Spa Day stamp, and two buttons, 🩺 Check-up and 🛁 Spa Day.
+- [ ] The Stable Board can show the job "Give a horse a Spa Day", and a napping horse's tip says "Next: a Spa Day at the Vet" with GO taking you there.
+- [ ] Nothing anywhere says hurt, sore, injured, limping or sick, and the horse never looks unwell: tired means a yawn and a happy nap.
+- [ ] On the phone emulator the Spa's tap button, the chips and the Check-up / Spa Day buttons are fingertip-sized and every word is readable.
+- [ ] Studio check: the wash bay doesn't block the street or the Vet's door, and the "Spa Day" prompt and the Vet's "Check-up" prompt don't overlap.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

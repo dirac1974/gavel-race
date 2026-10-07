@@ -10,6 +10,9 @@
 -- friend's gate (VisitFriend), the owner's one-tap gate (GateToggle, GateState to the owner
 -- only) and the post box (PostBox). Once a second, anyone standing in a plot who isn't let in
 -- (not a friend, "Nobody", or the gate closed) is walked out to Barn Lane.
+-- Rest cues (D-058, stage 4): a stalled horse at energy.yawnAt (1) shows a "🥱 Yawn!" bubble; at
+-- 0 it naps in a straw bed with "💤 Napping" (the horse_lie_<coat> model when it's uploaded, else
+-- the standing horse sunk into the straw). Happy-tired only: never sore, hurt or ill.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -26,6 +29,8 @@ local Care = require(Shared:WaitForChild("Care"))
 local Style = require(Shared:WaitForChild("Style"))
 local Visits = require(Shared:WaitForChild("Visits"))
 local VisitAccess = require(script.Parent:WaitForChild("VisitAccess"))
+local Horse = require(Shared:WaitForChild("Horse"))
+local Spa = require(Shared:WaitForChild("Spa"))
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
 local FriendBarns = Profiles.remote("FriendBarns")  -- client -> server: ask; server -> client: { {userId, name, closed} }
@@ -130,6 +135,55 @@ local function horseModel(coat: string): Model
 	return m
 end
 
+-- Rest cues (D-058): the pose for a stalled horse's Energy now ("nap", "yawn" or nil).
+local function restPose(h, now: number): string?
+	return Spa.restPose(Horse.syncEnergy(h, now, GameConfig.energy), GameConfig.energy)
+end
+
+local function bubble(hm: Model, text: string, name: string)
+	local anchor = hm.PrimaryPart or hm:FindFirstChildWhichIsA("BasePart", true)
+	if not anchor then return end
+	local box, size = hm:GetBoundingBox()
+	local bb = Instance.new("BillboardGui")
+	bb.Name = name
+	bb.Size = UDim2.fromOffset(150, 48)
+	bb.StudsOffsetWorldSpace = box.Position + Vector3.new(0, size.Y / 2 + 1.5, 0) - anchor.Position
+	bb.MaxDistance = 70
+	bb.AlwaysOnTop = true -- over the half door and the stall walls
+	bb.LightInfluence = 0
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1)
+	t.BackgroundColor3 = Color3.fromHex("FFF8E7")
+	t.BackgroundTransparency = 0.05
+	t.Font = Enum.Font.FredokaOne
+	t.TextScaled = true
+	t.TextColor3 = Color3.fromHex("2D2A32")
+	t.Text = text
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = t
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 8), UDim.new(0, 8)
+	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 4), UDim.new(0, 4)
+	pad.Parent = t
+	t.Parent = bb
+	bb.Parent = anchor
+end
+
+-- A napping horse: the lying model, or the standing one sunk into a straw bed (the bed hides its legs).
+local function nappingHorse(coat: string, at: CFrame): Model
+	local lying = WorldScene.model("horse_lie_" .. coat)
+	if lying then
+		lying:PivotTo(at)
+		return lying
+	end
+	local hm = horseModel(coat)
+	hm:PivotTo(at * CFrame.new(0, -GameConfig.spa.napLowerStuds, 0))
+	part({ Name = "StrawBed", Size = Vector3.new(6, GameConfig.spa.napLowerStuds + 0.6, 10), Color = Color3.fromHex("E8C76A"),
+		Material = Enum.Material.Fabric, CanCollide = false, CFrame = at * CFrame.new(0, (GameConfig.spa.napLowerStuds + 0.6) / 2, 0) }, hm)
+	return hm
+end
+
 -- Fixed spots in the front yard for decor from the Tack & Paint shop (D-050), in plot space
 -- (inward from the lane, across to the right looking in), each facing out to the lane.
 local YARD_SPOTS = {
@@ -218,13 +272,21 @@ local function buildBarn(i: number, owner: Player, data)
 		local door = barn:FindFirstChild("Stall" .. k)
 		if door and h then door:SetAttribute("HorseId", h.id) door:SetAttribute("HorseName", h.name) end
 		if h then
-			local hm = horseModel(h.coat)
+			local at = plotCF(i, front + BARN_D / 2 + 1, across, GROUND_Y)
+			local pose = restPose(h, os.time())
+			local hm = if pose == "nap" then nappingHorse(h.coat, at) else horseModel(h.coat)
 			hm.Name = "Horse_" .. h.id
-			hm:PivotTo(plotCF(i, front + BARN_D / 2 + 1, across, GROUND_Y))
+			if pose ~= "nap" then hm:PivotTo(at) end
 			for _, d in hm:GetDescendants() do
 				if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
 			end
+			hm:SetAttribute("Rest", pose or "")
 			hm.Parent = barn
+			if pose == "nap" then
+				bubble(hm, Spa.NAP, "RestBubble")
+			elseif pose == "yawn" then
+				bubble(hm, Spa.YAWN, "RestBubble")
+			end
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
 				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)
 			nameLabel.Name = "HorseName"
@@ -474,7 +536,7 @@ local function applyAway(i: number, player: Player, data)
 				if d:IsA("BasePart") then
 					if d:GetAttribute("BaseT") == nil then d:SetAttribute("BaseT", d.Transparency) end
 					d.Transparency = if away then 1 else d:GetAttribute("BaseT")
-				elseif d:IsA("ParticleEmitter") then
+				elseif d:IsA("ParticleEmitter") or d:IsA("BillboardGui") then -- (the rest bubble, D-058)
 					if d:GetAttribute("BaseOn") == nil then d:SetAttribute("BaseOn", d.Enabled) end
 					d.Enabled = not away and d:GetAttribute("BaseOn")
 				end
@@ -500,7 +562,7 @@ local function applyAway(i: number, player: Player, data)
 	end
 end
 
-local function signature(data): string
+local function signature(data, now: number): string
 	local parts = { tostring(data.stalls), tostring(data.activeHorse), tostring(#data.horses) }
 	-- the look from the shop
 	for _, slot in { "paint", "plate" } do
@@ -513,6 +575,9 @@ local function signature(data): string
 	for _, h in data.horses do
 		local golds = table.concat(Profile.rosettes(h), ",")
 		table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name .. ":" .. golds) -- gold rosettes (D-053)
+	end
+	for k = 1, math.min(data.stalls, #data.horses) do -- rest cues (D-058): yawning or napping
+		table.insert(parts, restPose(data.horses[k], now) or "")
 	end
 	return table.concat(parts, "|")
 end
@@ -527,12 +592,12 @@ local function refresh(player: Player)
 	shell:SetAttribute("GateClosed", VisitAccess.gateClosed(player))
 	local label = shell:FindFirstChild("OwnerLabel", true)
 	if label then label.Text = "🏡 " .. player.DisplayName .. "'s Stable" end
-	local sig = signature(data)
+	local now = os.time()
+	local sig = signature(data, now)
 	if signatures[i] ~= sig then
 		signatures[i] = sig
 		buildBarn(i, player, data)
 	end
-	local now = os.time()
 	local gsig = gardenSignature(data, now)
 	if gardenSigs[i] ~= gsig then
 		gardenSigs[i] = gsig

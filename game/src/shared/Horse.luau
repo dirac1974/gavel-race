@@ -37,7 +37,7 @@ export type Horse = {
 	daily: { day: number, treats: number, petted: boolean },
 }
 
-export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number, restingLabelAt: number? }
+export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number, restingLabelAt: number?, yawnAt: number? }
 
 local function day(t: number): number
 	return t // 86400
@@ -194,6 +194,12 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		-- D-058: "Ready" from 1 Energy up; napping only at restingLabelAt (0), when it truly can't race.
 		ready = h.energy >= 1,
 		resting = h.energy <= (cfg.restingLabelAt or 0),
+		-- D-058 stage 4: yawning at yawnAt (1); Spa Days used today (the Spa says "opens again
+		-- tomorrow" once spa.perDay are used), Spa Days ever, and the shine waiting for the next race.
+		yawning = h.energy > (cfg.restingLabelAt or 0) and h.energy <= (cfg.yawnAt or 1),
+		spaToday = if typeof((h :: any).spa) == "table" and (h :: any).spa.day == day(now) then tonumber((h :: any).spa.count) or 0 else 0,
+		spaDays = tonumber((h :: any).spaDays) or 0,
+		shine = (h :: any).shine == true,
 		care = Horse.care(h, now),
 		fed = h.care.fed,
 		groomed = h.care.groomed,
@@ -241,6 +247,12 @@ function Horse.repair(h: any, now: number): Horse
 	h.daily.treats = math.max(0, math.floor(tonumber(h.daily.treats) or 0))
 	h.daily.petted = h.daily.petted == true
 	h.daily.pets = math.max(0, math.floor(tonumber(h.daily.pets) or 0))
+	-- Spa Day (D-058): { day, count } today, Spa Days ever, the shine for the next race
+	if typeof(h.spa) ~= "table" then h.spa = { day = -1, count = 0 } end
+	h.spa.day = tonumber(h.spa.day) or -1
+	h.spa.count = math.max(0, math.floor(tonumber(h.spa.count) or 0))
+	h.spaDays = math.max(0, math.floor(tonumber(h.spaDays) or 0))
+	h.shine = h.shine == true
 	h.name = if typeof(h.name) == "string" and #h.name > 0 then string.sub(h.name, 1, 40) else "Comet"
 	return h :: Horse
 end

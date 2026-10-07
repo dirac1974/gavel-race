@@ -5,6 +5,7 @@
 -- profile view, tested under Lune.
 
 local Care = if script then require(script.Parent.Care) :: any else require("./Care")
+local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 
 local Advice = {}
 
@@ -40,6 +41,9 @@ function Advice.forHorse(h: any, profile: any, now: number): Tip
 		return { emoji = "🌾", fact = fact, next = "Next: a meal of hay", go = "stable" }
 	elseif not h.groomed then
 		return { emoji = "🪮", fact = fact, next = "Next: a good brushing", go = "stable" }
+	elseif h.resting and GameConfig.spa.enabled and (h.spaToday or 0) < GameConfig.spa.perDay then
+		-- D-058: a napping horse's free Spa Day (+1 Energy), while it's open today
+		return { emoji = "🛁", fact = fact, next = "Next: a Spa Day at the Vet", go = "vet" }
 	elseif h.cupOpen and not h.resting then
 		return { emoji = "🏆", fact = fact, next = "Next: win the " .. (h.league or "Rookie") .. " Cup to move up!", go = "raceBoard" }
 	elseif h.trainingReady then
