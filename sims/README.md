@@ -18,6 +18,7 @@ Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the 
 python sims/economy.py                       # current thresholds (D-013)
 python sims/economy.py --thresholds 100,100,100,100 --days 40
 python sims/economy.py --solo                # solo win rate vs league-anchored bots (D-061 stage 2)
+python sims/economy.py --silver --players 300 --seed 2   # Silver Cup races-to-open by threshold (D-062 stage 8)
 ```
 
 `--solo`: one rider against seven bots rated `BOT_RATING_ANCHOR` ± 6 (mirrors `GameConfig.botRatingAnchor`; `tests/test_sims.py` checks they agree), bots scoring as in `GameConfig`, kids at slider 60 / 70 / 80 and Final Burst 50 / 60 / 70 (new / average / skilled). The D-061 gate is a fresh starter (Rating 46.1) with an average kid winning 20–35% of solo Rookie races. The debate's anchors (50 / 63 / 73 / 83 / 90) gave 12.2%; the tuned ones (32 / 46 / 56 / 69 / 80) give, with 20,000 races a cell:
@@ -31,6 +32,16 @@ python sims/economy.py --solo                # solo win rate vs league-anchored 
 | Silver | entry 68 | 20.8% | 24.3% | 28.0% |
 | Gold | entry 78 | 20.0% | 23.4% | 27.0% |
 | Champion | entry 88 | 20.6% | 24.0% | 27.7% |
+
+`--silver` (D-062 stage 8): median Silver races until a horse has the points to open the Silver Cup, racing league-anchored bots solo with the full finish draw (10 / 6 / 4 / 2 / 1 points) and +10 for its first Silver win (`FIRST_WIN_BONUS`, mirrors `GameConfig.firstWinBonus`). Casual = new kid on a Silver-entry horse (68) that isn't trained further (training only shortens the trip: past the 78 ceiling the Cup opens anyway). Target: casual 150–200 races. 300 players a cell, seed 2:
+
+| Cohort | Kid | Rating | 600 | 700 | **750** | 800 | 1,400 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Casual | new | 68 | 133 | 156 | **167** | 178 | 313 |
+| Regular | average | 73 | 108 | 125 | 135 | 144 | 252 |
+| Skilled | skilled | 73 | 100 | 117 | 125 | 133 | 235 |
+
+So `GameConfig.stakesUnlockPoints.Silver` is **750** (was 1,400, about 313 casual races; the plan's "about 600" gives 133, under the band). In the older matched-field progression sim below, 750 moves an engaged player's Gold from day 20 to day 12 and a casual player's from after day 90 to day 59.
 
 Results with D-013 thresholds (100, 110, 1,400, 3,000 League Points; 100 players per cohort, 90 days, seed 1). "Hours" = hours of play at 12 races per hour:
 

@@ -278,8 +278,17 @@ GameConfig.rFloor = -0.5
 GameConfig.placePrizes = { 1.2, 0.8, 0.4 }       -- 2nd, 3rd, 4th, in units of B
 GameConfig.leaguePoints = { 10, 6, 4, 2 }        -- 1st..4th; everyone else gets finishPoints
 GameConfig.finishPoints = 1
--- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py)
-GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 1400, Gold = 3000 }
+-- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py).
+-- Silver 750 (was 1,400; D-062 stage 8): `python sims/economy.py --silver` gives a casual player
+-- (new kid, Silver-entry horse 68, against the league-anchored bots) the Cup in about 167 Silver
+-- races (target 150-200); 600 gave 133 and 1,400 about 313.
+GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 750, Gold = 3000 }
+-- Class badges and first wins (D-062 stage 8): a horse's first win in each league earns
+-- firstWinBonus League Points once; its badge is First Win (no wins in this league), Rising Star
+-- (fewer than risingStarBelow), Open, or Cup when its Cup is open. Labels only: one queue per
+-- league, no demotion, never a change to win chance.
+GameConfig.firstWinBonus = 10
+GameConfig.classes = { risingStarBelow = 3 }
 -- League ceilings (D-046): a horse whose best base Rating passes this has its Cup opened and
 -- its league's regular races closed. The Cup winner gets cupPurseB × B (D-048).
 GameConfig.leagueCeiling = { Rookie = 58, Bronze = 68, Silver = 78, Gold = 88 }

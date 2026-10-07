@@ -25,6 +25,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local NameGen = require(Shared:WaitForChild("NameGen"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Market = require(Shared:WaitForChild("Market"))
+local PickerText = require(Shared:WaitForChild("PickerText")) -- class badges (D-062)
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
@@ -109,7 +110,9 @@ local function horseCard(h, order: number)
 	dot.Parent = card
 	local name = Ui.text(card, (if active then "🏇 " else "") .. h.name, 20, { Position = UDim2.new(0, 58, 0, 6), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	local leagueLine = (h.league or "Rookie") .. (if h.cupOpen then " · 🏆 Cup open!" else "")
+	-- the class badge (D-062): First Win, Rising Star, Open class, or the Cup when it's open
+	local badge = if h.cupOpen then "🏆 Cup open!" else PickerText.classBadge(h.class)
+	local leagueLine = (h.league or "Rookie") .. (if badge ~= "" then " · " .. badge else "")
 	local place = if h.legend then "👑 Hall of Fame paddock" elseif h.stalled then "Stall " .. tostring(h.stall or "") else "Pasture"
 	local sub = Ui.text(card, if h.legend then place else string.format("%s · %s", place, leagueLine), TEXT,
 		{ Position = UDim2.new(0, 58, 0, 30), Size = UDim2.new(1, -66, 0, 20), TextXAlignment = Enum.TextXAlignment.Left })

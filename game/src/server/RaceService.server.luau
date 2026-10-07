@@ -43,6 +43,7 @@ local Spa = require(Shared:WaitForChild("Spa"))
 local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
 local NameGen = require(Shared:WaitForChild("NameGen"))
 local HorseBook = require(Shared:WaitForChild("HorseBook"))
+local StableStar = require(Shared:WaitForChild("StableStar")) -- first-win rosettes on the Rosette Wall (D-062)
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -368,6 +369,9 @@ Profiles.addDecorator(function(data, view)
 			hv.cupOpen = Leagues.cupOpen(h, best)
 			hv.pointsToCup = Leagues.pointsToCup(h)
 			hv.overCeiling = Leagues.overCeiling(h, best)
+			-- Class badge (D-062): First Win, Rising Star, Open or Cup, a label only.
+			hv.class = Leagues.classOf(h, hv.cupOpen)
+			hv.leagueWins = table.clone(Leagues.wins(h))
 		end
 	end
 	view.hallOfFame = data.hallOfFame or {}
@@ -1037,6 +1041,20 @@ local function runRace(c, players: { Player })
 							end
 						end)
 					end
+					-- A horse's first win in a league (D-062): +firstWinBonus points once, before any
+					-- Cup promotion, and a rosette in the league's colour on the Rosette Wall.
+					local wh = prize.place == 1 and Profile.horse(data, horseOf[player.UserId])
+					if wh and Leagues.recordWin(wh, leagueName) then
+						StableStar.firstWin(data, leagueName)
+						if not card.cup then
+							local bonus = Leagues.FIRST_WIN_BONUS
+							task.delay(GameConfig.runInSeconds + 1, function()
+								if player.Parent then
+									Profiles.notify(player, string.format("🐣 First %s win! +%d League Points", leagueName, bonus), "rosette")
+								end
+							end)
+						end
+					end
 				end
 				-- The Horse Book (D-063): this course, and a top-three place in a race that counts.
 				HorseBook.record(data, "courses", c.id)
@@ -1099,6 +1117,7 @@ local function runRace(c, players: { Player })
 	for _, p in players do
 		Progress.record(p, "race", 1)
 		Progress.record(p, "great_tap", greatTaps[p.UserId] or 0)
+		if (greatTaps[p.UserId] or 0) > 0 then Progress.record(p, "great_race", 1) end -- a Stable Star skill goal (D-062)
 		if greatBurst[p.UserId] then Progress.record(p, "burst_great", 1) end
 	end
 	-- Riders stay on their horse for the results and replay; they press Done to get off.

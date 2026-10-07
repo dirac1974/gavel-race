@@ -14,6 +14,12 @@ Assumptions (edit the CONFIG block; each is logged in docs/memory/DECISIONS.md):
 `--solo` reports the solo win rate (D-061 stage 2): one rider against seven league-anchored bots
 (`BOT_RATING_ANCHOR` +- `BOT_RATING_SPREAD`, mirrors GameConfig.botRatingAnchor), by horse and kid.
 The D-061 gate: a fresh starter ridden by an average kid wins 20-35% of solo Rookie races.
+
+`--silver` is the D-062 stage 8 Silver Cup sim: League Points per Silver race against
+league-anchored bots (full Harville finish order, so 2nd-4th count), +10 for the horse's first
+Silver win, and the races each cohort needs to open the Silver Cup at a given threshold. The
+target: a casual player (new-kid riding on a Silver horse that is not trained past entry) opens
+the Cup in 150-200 Silver races.
 """
 
 from __future__ import annotations
@@ -106,6 +112,69 @@ def solo_report(races: int = 20000, seed: int = 1, anchors: dict | None = None) 
     return out
 
 
+# Silver Cup target (D-062 stage 8). Cohorts are (kid, horse Rating) for the whole Silver stay.
+# Casual: a new kid on a horse that just came up from Bronze and is not trained further
+# (training only shortens the trip: past the ceiling, 78, the Cup opens anyway, D-046).
+SILVER_TARGET = (150, 200)
+FIRST_WIN_BONUS = 10          # GameConfig.firstWinBonus (a test checks)
+SILVER_COHORTS = {
+    "casual": ("new", LEAGUE_ENTRY["Silver"]),
+    "regular": ("average", (LEAGUE_ENTRY["Silver"] + LEAGUE_TOP["Silver"]) / 2),
+    "skilled": ("skilled", (LEAGUE_ENTRY["Silver"] + LEAGUE_TOP["Silver"]) / 2),
+}
+
+
+def _solo_place(rng: random.Random, league: str, rating: float, kid: str) -> int:
+    """One solo race against league-anchored bots; returns the rider's place (full finish draw)."""
+    anchor = BOT_RATING_ANCHOR[league]
+    cfg = m.Config(T=T[league])
+    kid_pace, kid_burst = KIDS[kid]
+    wsum = sum(SEGMENT_WEIGHTS)
+    ratings = [rating] + [anchor + (rng.random() * 2 - 1) * BOT_RATING_SPREAD for _ in range(LANES - 1)]
+    q = m.base_chances(ratings, cfg)
+    S = []
+    for lane in range(LANES):
+        seg_scores = []
+        for kind in SEGMENTS:
+            if lane == 0:
+                mean, sd = (kid_burst, 20) if kind == "burst" else (kid_pace, 10)
+            else:
+                mean, sd = BOT_BURST if kind == "burst" else BOT_PACE
+            seg_scores.append(_clamp(rng.gauss(mean, sd)))
+        S.append(sum(w * x for w, x in zip(SEGMENT_WEIGHTS, seg_scores)) / wsum)
+    p = m.live_chances(q, m.skills(S, cfg), cfg)
+    return m.draw_finish(p, rng).index(0) + 1
+
+
+def _points(place: int) -> int:
+    return POINTS[place - 1] if place <= len(POINTS) else FINISH_POINTS
+
+
+def races_to_cup(threshold: int, league: str, rating: float, kid: str, players: int = 200,
+                 seed: int = 1, first_win_bonus: int = FIRST_WIN_BONUS, cap: int = 2000) -> float:
+    """Median races a horse needs in `league` to reach `threshold` League Points (its Cup opens),
+    with +first_win_bonus on its first win there (D-062)."""
+    rng = random.Random(seed)
+    counts = []
+    for _ in range(players):
+        pts, won, n = 0, False, 0
+        while pts < threshold and n < cap:
+            place = _solo_place(rng, league, rating, kid)
+            pts += _points(place)
+            if place == 1 and not won:
+                won = True
+                pts += first_win_bonus
+            n += 1
+        counts.append(n)
+    return st.median(counts)
+
+
+def silver_report(thresholds=(600, 700, 750, 800, 1400), players: int = 200, seed: int = 1) -> dict:
+    """{cohort: {threshold: median Silver races to open the Silver Cup}}."""
+    return {name: {th: races_to_cup(th, "Silver", rating, kid, players, seed) for th in thresholds}
+            for name, (kid, rating) in SILVER_COHORTS.items()}
+
+
 def race(rng: random.Random, my_mean: float, league: str):
     """One race; returns (place, cash)."""
     cfg = m.Config(T=14.4)
@@ -176,10 +245,21 @@ def main(argv=None):
     ap.add_argument("--players", type=int, default=150)
     ap.add_argument("--days", type=int, default=60)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--thresholds", default="100,110,1400,3000", help="points to unlock Stakes, Rookie..Gold")
+    ap.add_argument("--thresholds", default="100,110,750,3000", help="points to unlock Stakes, Rookie..Gold")
     ap.add_argument("--solo", action="store_true", help="solo win rate against league-anchored bots (D-061)")
     ap.add_argument("--races", type=int, default=20000, help="--solo: races per cell")
+    ap.add_argument("--silver", action="store_true", help="Silver Cup races-to-open by threshold (D-062)")
     args = ap.parse_args(argv)
+    if args.silver:
+        rep = silver_report(players=args.players, seed=args.seed)
+        ths = next(iter(rep.values())).keys()
+        print(f"Median Silver races to open the Silver Cup (+{FIRST_WIN_BONUS} first win; "
+              f"target casual {SILVER_TARGET[0]}-{SILVER_TARGET[1]})")
+        print(f"{'cohort':8} {'kid':>8} {'rating':>6}  " + "  ".join(f"{t:>6}" for t in ths))
+        for name, row in rep.items():
+            kid, rating = SILVER_COHORTS[name]
+            print(f"{name:8} {kid:>8} {rating:6.1f}  " + "  ".join(f"{v:6.0f}" for v in row.values()))
+        return
     if args.solo:
         rep = solo_report(args.races, args.seed)
         print(f"Solo win rate vs bots at {BOT_RATING_ANCHOR} +- {BOT_RATING_SPREAD} "

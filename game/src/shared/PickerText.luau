@@ -37,4 +37,12 @@ function PickerText.suits(diff: number?, napping: boolean): string
 	return "An okay day"
 end
 
+-- A horse's class badge (D-062): icon + word, a label only (one queue per league, no demotion).
+PickerText.CLASS_BADGE = {
+	FirstWin = "🐣 First Win", RisingStar = "🚀 Rising Star", Open = "🎽 Open class", Cup = "🏆 Cup",
+}
+function PickerText.classBadge(class: string?): string
+	return PickerText.CLASS_BADGE[class or ""] or ""
+end
+
 return PickerText

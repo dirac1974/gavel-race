@@ -17,6 +17,8 @@
 -- stays put; Legends stand in the Hall of Fame paddock beside the barn (an arch, a plaque post
 -- for each, a soft gold sheen and sparkle that the client turns off with Reduced Motion), and the
 -- owner can ride one from there (the Ride prompt on it, CallHorse with its id).
+-- The Rosette Wall (D-062, stage 8): rosettes, Cups and Legend plaques from StableStar.wall,
+-- rebuilt with the barn when the wall changes.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -35,6 +37,7 @@ local Visits = require(Shared:WaitForChild("Visits"))
 local VisitAccess = require(script.Parent:WaitForChild("VisitAccess"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local Spa = require(Shared:WaitForChild("Spa"))
+local StableStar = require(Shared:WaitForChild("StableStar"))
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
 local FriendBarns = Profiles.remote("FriendBarns")  -- client -> server: ask; server -> client: { {userId, name, closed} }
@@ -311,6 +314,123 @@ local function buildPaddock(i: number, owner: Player, data, barn: Instance)
 	pad.Parent = barn
 end
 
+-- The Rosette Wall (D-062, stage 8): what StableStar.wall lists, hung in a 6 × 6 grid on a felt
+-- panel in front of the rosette_wall model (or on posts when the art hasn't loaded). Rosettes are
+-- the uploaded rosette_ribbon repainted in code (league colour for a first win, the goal kind's
+-- colour for a Stable Star goal), Cups the trophy_cup on a shelf in the league's colour, Legend
+-- plaques gold plates with the horse's name. Everyone in the server sees it; no numbers.
+local WALL_COLS, WALL_ROWS = 6, 6
+local function quiet(m: Instance)
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") then d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch = true, false, false, false end
+	end
+end
+
+local function paint(m: Model, color: Color3)
+	for _, d in m:GetDescendants() do
+		if d:IsA("SurfaceAppearance") or d:IsA("Decal") or d:IsA("Texture") then
+			d:Destroy()
+		elseif d:IsA("MeshPart") then
+			pcall(function() (d :: any).TextureID = "" end) -- the colour shows only without the texture
+			d.Color = color
+			d.Material = Enum.Material.Fabric
+		elseif d:IsA("BasePart") then
+			d.Color = color
+		end
+	end
+end
+
+local function wallRosette(parent: Instance, cf: CFrame, cell: number, color: Color3, name: string)
+	local m = WorldScene.model("rosette_ribbon")
+	if m then
+		local _, ext = m:GetBoundingBox()
+		if ext.Y > 0 then m:ScaleTo(m:GetScale() * cell * 0.9 / ext.Y) end
+		paint(m, color)
+		quiet(m)
+		m:PivotTo(cf * CFrame.new(0, -cell * 0.45, 0))
+		m.Name = name
+		m.Parent = parent
+		return
+	end
+	local d = cell * 0.55
+	part({ Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.15, d, d), Color = color, Material = Enum.Material.Fabric,
+		CanCollide = false, CanQuery = false, CanTouch = false, CFrame = cf * CFrame.new(0, cell * 0.12, 0) * CFrame.Angles(0, math.pi / 2, 0) }, parent)
+	part({ Name = name .. "Middle", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.18, d * 0.45, d * 0.45), Color = Color3.fromHex("FBFBF5"),
+		CanCollide = false, CanQuery = false, CanTouch = false, CFrame = cf * CFrame.new(0, cell * 0.12, -0.03) * CFrame.Angles(0, math.pi / 2, 0) }, parent)
+	for _, sd in { -1, 1 } do
+		part({ Name = name .. "Tail", Size = Vector3.new(cell * 0.16, cell * 0.42, 0.08), Color = color, Material = Enum.Material.Fabric,
+			CanCollide = false, CanQuery = false, CanTouch = false,
+			CFrame = cf * CFrame.new(sd * cell * 0.1, -cell * 0.22, 0.04) * CFrame.Angles(0, 0, sd * 0.25) }, parent)
+	end
+end
+
+local function wallItem(parent: Instance, it, cf: CFrame, cell: number)
+	local color = Color3.fromHex(it.hex)
+	if it.kind == "cup" then
+		-- a little shelf in the league's colour, the gold Cup standing on it
+		local shelf = part({ Name = "CupShelf_" .. it.id, Size = Vector3.new(cell * 0.9, 0.18, 0.7), Color = color,
+			CanCollide = false, CanQuery = false, CanTouch = false, CFrame = cf * CFrame.new(0, -cell * 0.4, -0.3) }, parent)
+		local m = WorldScene.model("trophy_cup")
+		if m then
+			local _, ext = m:GetBoundingBox()
+			if ext.Y > 0 then m:ScaleTo(m:GetScale() * cell * 0.75 / ext.Y) end
+			quiet(m)
+			m:PivotTo(shelf.CFrame * CFrame.new(0, 0.09, 0))
+			m.Name = "Cup_" .. it.id
+			m.Parent = parent
+		else
+			part({ Name = "Cup_" .. it.id, Shape = Enum.PartType.Cylinder, Size = Vector3.new(cell * 0.5, cell * 0.4, cell * 0.4),
+				Color = Color3.fromHex("FFD23F"), Material = Enum.Material.Metal, CanCollide = false, CanQuery = false, CanTouch = false,
+				CFrame = shelf.CFrame * CFrame.new(0, cell * 0.3, 0) * CFrame.Angles(0, 0, math.pi / 2) }, parent)
+		end
+	elseif it.kind == "plaque" then
+		local plate = part({ Name = "LegendPlaque", Size = Vector3.new(cell * 0.95, cell * 0.6, 0.12), Color = color, Material = Enum.Material.Metal,
+			CanCollide = false, CanQuery = false, CanTouch = false, CFrame = cf }, parent)
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = Enum.NormalId.Front
+		sg.CanvasSize = Vector2.new(200, 120)
+		sg.Parent = plate
+		local t = Instance.new("TextLabel")
+		t.Size = UDim2.fromScale(1, 1)
+		t.BackgroundTransparency = 1
+		t.Font = Enum.Font.FredokaOne
+		t.TextScaled = true
+		t.TextColor3 = C.ink
+		t.Text = "🏅 " .. it.label
+		t.Parent = sg
+	else
+		wallRosette(parent, cf, cell, color, (if it.kind == "first" then "FirstWin_" else "StarRosette_") .. it.id)
+	end
+end
+
+local function rosetteWall(barn: Instance, wallCF: CFrame, data)
+	local wall = WorldScene.placeModel(barn, "rosette_wall", wallCF)
+	local width, height, front, mid, midX = 8, 6, 0.4, 4.5, 0
+	if wall then
+		local bb, ext = wall:GetBoundingBox()
+		local centre = wallCF:PointToObjectSpace(bb.Position)
+		width = math.clamp(ext.X * 0.85, 5, 10)
+		height = math.clamp(ext.Y * 0.7, 4, 7)
+		front = -centre.Z + ext.Z / 2 + 0.15 -- just in front of the face toward the lane (-Z)
+		mid, midX = centre.Y, centre.X
+	else
+		for _, dx in { -4.4, 4.4 } do
+			part({ Name = "WallPost", Size = Vector3.new(0.6, 8, 0.6), Color = C.wood, CFrame = wallCF * CFrame.new(dx, 4, 0) }, barn)
+		end
+	end
+	local panelCF = wallCF * CFrame.new(midX, mid, -front)
+	part({ Name = "RosetteFelt", Size = Vector3.new(width, height, 0.12), Color = Color3.fromHex("2E5E4E"), Material = Enum.Material.Fabric,
+		CanCollide = false, CanQuery = false, CanTouch = false, CFrame = panelCF }, barn)
+	local cell = math.min(width / WALL_COLS, height / WALL_ROWS)
+	for k, it in StableStar.wall(data) do
+		local col, row = (k - 1) % WALL_COLS, (k - 1) // WALL_COLS
+		if row >= WALL_ROWS then break end
+		local x = (col - (WALL_COLS - 1) / 2) * (width / WALL_COLS)
+		local y = ((WALL_ROWS - 1) / 2 - row) * (height / WALL_ROWS)
+		wallItem(barn, it, panelCF * CFrame.new(x, y, -0.12), cell)
+	end
+end
+
 local function buildBarn(i: number, owner: Player, data)
 	-- Your look from the Tack & Paint shop (free classic red until you choose).
 	local paint = Style.worn(data, "paint")
@@ -462,8 +582,8 @@ local function buildBarn(i: number, owner: Player, data)
 		part({ Name = "Bell", Shape = Enum.PartType.Ball, Size = Vector3.new(1.2, 1.2, 1.2), Color = Color3.fromHex("D4A537"),
 			Material = Enum.Material.Metal, CanCollide = false, CFrame = bellCF * CFrame.new(0, 4.6, -0.8) }, barn)
 	end
-	-- The Rosette Wall (D-060, D-062): what visitors see; stage 8 hangs the rosettes on it.
-	WorldScene.placeModel(barn, "rosette_wall", plotCF(i, 52, 12, GROUND_Y))
+	-- The Rosette Wall (D-060, D-062): what visitors see, with the stable's rosettes, Cups and plaques.
+	rosetteWall(barn, plotCF(i, 52, 12, GROUND_Y), data)
 	-- The photo board (D-063 Photo Finish): its prompt opens Roblox's own capture and share
 	-- prompts on the client (ComeBackClient); nothing is uploaded by the game.
 	if (GameConfig.comeback or {}).photo ~= false then
@@ -684,6 +804,7 @@ local function signature(data, now: number, player: Player?): string
 	end
 	table.insert(parts, tostring(Style.hasSet(data, "star")))
 	table.insert(parts, tostring(data.postBox and data.postBox.day == os.time() // 86400 and data.postBox.today > 0)) -- D-060
+	table.insert(parts, StableStar.wallKey(data)) -- the Rosette Wall (D-062)
 	for _, it in Style.yard(data) do table.insert(parts, it.id) end
 	for _, h in data.horses do
 		local golds = table.concat(Profile.rosettes(h), ",")

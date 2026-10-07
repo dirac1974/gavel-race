@@ -9,6 +9,8 @@
 --   a fully trained horse can't farm the Rookies.
 --   Retiring is always the player's choice: a Legend (D-059) keeps its stats in the Hall of Fame
 --   paddock, and a plaque keeps its career record.
+--   Class badges (D-062): First Win, Rising Star, Open or Cup, from the horse's wins in its own
+--   league; its first win in each league adds GameConfig.firstWinBonus points once.
 
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 
@@ -23,6 +25,51 @@ Leagues.MAX_PLAQUES = 50
 function Leagues.next(league: string): string?
 	local i = table.find(Leagues.ORDER, league)
 	return if i and i < #Leagues.ORDER then Leagues.ORDER[i + 1] else nil
+end
+
+-- Class badges and first wins (D-062, stage 8) -----------------------------------------------
+-- h.leagueWins = { [league] = wins there }. Older saves have none: every league below the
+-- horse's own was left by a Cup win (so 1 there); its own league starts at 0, except Rookie,
+-- where every recorded win was a Rookie win.
+Leagues.FIRST_WIN_BONUS = GameConfig.firstWinBonus or 10
+Leagues.RISING_STAR_BELOW = (GameConfig.classes or {}).risingStarBelow or 3
+Leagues.CLASSES = { "FirstWin", "RisingStar", "Open", "Cup" } -- the words: PickerText.classBadge
+
+function Leagues.wins(h: any): { [string]: number }
+	if typeof(h.leagueWins) ~= "table" then
+		local w = {}
+		local own = table.find(Leagues.ORDER, h.league or "Rookie") or 1
+		for k = 1, own - 1 do w[Leagues.ORDER[k]] = 1 end
+		-- a horse still in Rookie won every counted race there (Practice never records a race)
+		if own == 1 and typeof(h.record) == "table" then w.Rookie = math.max(0, math.floor(tonumber(h.record.wins) or 0)) end
+		h.leagueWins = w
+	end
+	local clean = {}
+	for k, v in h.leagueWins do
+		local n = tonumber(v)
+		if table.find(Leagues.ORDER, k) and n and n == n then clean[k] = math.clamp(math.floor(n), 0, 1e6) end
+	end
+	h.leagueWins = clean
+	return clean
+end
+
+-- The horse's class in its own league: a label on the picker and its card, never a queue.
+function Leagues.classOf(h: any, cupOpen: boolean?): string
+	if cupOpen then return "Cup" end
+	local n = Leagues.wins(h)[h.league or "Rookie"] or 0
+	if n == 0 then return "FirstWin" end
+	if n < Leagues.RISING_STAR_BELOW then return "RisingStar" end
+	return "Open"
+end
+
+-- A win that counts (not Practice) in `league`; call it before any Cup promotion. The horse's
+-- first win there adds FIRST_WIN_BONUS League Points, once, and returns true.
+function Leagues.recordWin(h: any, league: string): boolean
+	local w = Leagues.wins(h)
+	local first = (w[league] or 0) == 0
+	w[league] = (w[league] or 0) + 1
+	if first then h.points = (tonumber(h.points) or 0) + Leagues.FIRST_WIN_BONUS end
+	return first
 end
 
 -- Points still needed for the Cup (0 when it's open); nil in the top league.

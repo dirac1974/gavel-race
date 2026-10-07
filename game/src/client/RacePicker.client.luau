@@ -243,12 +243,16 @@ local function horseCard(h, card)
 	Ui.corner(dot, 20)
 	Ui.stroke(dot, 2)
 	dot.Parent = b
-	local name = Ui.text(b, h.name, 20, { Position = UDim2.new(0, 54, 0, 6), Size = UDim2.new(1, -60, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
+	local name = Ui.text(b, h.name, 20, { Position = UDim2.new(0, 54, 0, 4), Size = UDim2.new(1, -60, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	Ui.energyPips(b, h.energy, GameConfig.energy.maxPerRacer, 18, UDim2.new(0, 54, 0, 31)) -- the one Energy icon (D-064)
+	Ui.energyPips(b, h.energy, GameConfig.energy.maxPerRacer, 16, UDim2.new(0, 54, 0, 29)) -- the one Energy icon (D-064)
+	-- Class badge (D-062): First Win, Rising Star, Open class or Cup, a label only.
+	local badge = Ui.text(b, PickerText.classBadge(h.class), TEXT, { Position = UDim2.new(0, 8, 0, 50), Size = UDim2.new(1, -16, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	badge.TextColor3 = C.ink
+	badge.TextTruncate = Enum.TextTruncate.AtEnd
 	local diff = suits(h, card)
 	local line = PickerText.suits(diff, tired) -- words, never a number (D-064)
-	local l = Ui.text(b, line, TEXT, { Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 30), TextXAlignment = Enum.TextXAlignment.Left })
+	local l = Ui.text(b, line, TEXT, { Position = UDim2.new(0, 8, 0, 74), Size = UDim2.new(1, -16, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	l.TextColor3 = if diff and diff > 0.5 then C.green elseif diff and diff < -0.5 then C.orangeDark else C.plum
 	b.Activated:Connect(function()
 		if tired then

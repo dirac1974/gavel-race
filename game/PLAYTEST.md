@@ -537,6 +537,17 @@ Use Play Solo (or 2 players), plus Device emulator → a phone in landscape. No 
 - [ ] A tamed horse's row says "🏵️ Goodbye rosette"; rehoming it pays nothing and the Hall of Fame page counts the rosette.
 - [ ] On the phone emulator the rehome list, the goodbye card and the Legend card have fingertip-sized buttons and readable words; the For grown-ups page explains careers and rehoming.
 - [ ] Studio check: the paddock doesn't overlap the garden beds, the trough or the pasture horses; the riding school sign doesn't block the corral gate or the market horses.
+## Classes and the Rosette Wall (horse life stage 8, D-062)
+Use Play Solo, then 2 friend accounts on a published server for the visitor check, plus Device emulator → a phone in landscape.
+- [ ] **First Win badge.** With a new horse, open RACE! → 🔀 More choices: its horse card says **🐣 First Win** under the Energy row. My Horses says "Stall · Rookie · 🐣 First Win".
+- [ ] **First win.** Win a Rookie race (good taps; solo Rookie wins about a quarter of races). After the results a toast says **"🐣 First Rookie win! +10 League Points"**, and the League Points jump by 10 once on top of the 10 for 1st. The badge now says **🚀 Rising Star**. Win again: no second +10. After a third Rookie win it says **🎽 Open class**; once the Cup opens it says **🏆 Cup** (My Horses: "🏆 Cup open!").
+- [ ] **New league.** Win the Rookie Cup: in Bronze the horse is **🐣 First Win** again, and its first Bronze win gives the +10 and the toast again.
+- [ ] **Practice doesn't count.** A Practice race win gives no +10, no badge change, no rosette.
+- [ ] **Rosette Wall.** Walk to the wall in your yard (beside the photo board): after the first Rookie win a **green** rosette hangs on the dark felt panel (Bronze's is tan, Silver's pale grey, Gold's yellow). A Cup won shows the gold Cup on a shelf in that league's colour. Check in Studio that the panel sits on the front of the `rosette_wall` model (not inside it or floating behind it) and that the rosettes are coloured, not the uploaded texture.
+- [ ] **A visiting friend sees it.** A friend visits your barn (Map → 👫 Friends' barns): the same rosettes and Cups on your wall. They never see your goal cards.
+- [ ] **Stable Star goals.** Stable Board → **🏵️ Goals**: three cards, Care / Collect / Riding, each with a coloured strip, a goal ("Brush your horses 10 times", "Find 2 coats for your Horse Book", "3 races with Great taps") and n/target. Finish one (brush 10 times): "🏵️ New rosette on your Rosette Wall!", the card moves on to the next goal of that kind, and a rosette in that colour (care pink, collect blue, riding orange) appears on the wall. **🏵️ See my wall** walks you home. No card ever asks you to win or place in a race.
+- [ ] **Nothing is lost.** Rehome or retire a horse (stage 7): its rosettes and Cups stay on the wall.
+- [ ] On the phone emulator the picker's horse card shows name, Energy, badge and "suits" line without overlapping; the Goals tab's four tabs and cards are fingertip-sized and readable.
 
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
