@@ -20,6 +20,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local WelcomeBack = require(Shared:WaitForChild("WelcomeBack"))
 
 local STORE_NAME = "GiddyUp_Profiles_v1"
 local LOCK_STALE = 5 * 60
@@ -243,6 +244,15 @@ local function onPlayerAdded(player: Player)
 			end)
 		end
 		return
+	end
+	-- Welcome Back Hay Bale (D-063): from the saved last visit, before this join updates it. A
+	-- failure here never stops the profile from loading.
+	local cb = GameConfig.comeback
+	if cb and cb.welcome then
+		local seen = tonumber(data.lastSeen) or now()
+		if RunService:IsStudio() and (cb.studioAwayDays or 0) > 0 then seen = now() - cb.studioAwayDays * 86400 end
+		local ok, err = pcall(WelcomeBack.onJoin, data, seen, now(), cb.welcome)
+		if not ok then warn("[Profiles] welcome back: " .. tostring(err)) end
 	end
 	Profile.touchDay(data, now())
 	entries[player] = {

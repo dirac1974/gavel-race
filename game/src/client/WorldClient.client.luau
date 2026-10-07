@@ -177,7 +177,7 @@ facesLayout.SortOrder = Enum.SortOrder.LayoutOrder
 facesLayout.Parent = faces
 local empty = Ui.text(friendsPage, "", 22, { Position = UDim2.new(0, 10, 0, 30), Size = UDim2.new(1, -20, 0, 110) })
 empty.TextColor3 = C.plum
--- Your Tour stamps (the Horse Book gets this card in stage 6).
+-- Your Tour stamps (the Horse Book has the full card with faces, D-063).
 local stampRow = Instance.new("Frame")
 stampRow.BackgroundTransparency = 1
 stampRow.Size = UDim2.new(1, 0, 0, 40)

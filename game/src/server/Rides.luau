@@ -42,6 +42,7 @@ local function addCloth(rig: Model, item)
 	cloth.Transparency = 0
 	cloth.CastShadow = true
 	local text = PATTERN_TEXT[item.pattern or "plain"] or ""
+	if item.pattern == "month" then text = item.emoji or "" end -- a monthly stamp cloth (D-063)
 	if text == "" and item.pattern ~= "goldtrim" then return end
 	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
 		local sg = Instance.new("SurfaceGui")

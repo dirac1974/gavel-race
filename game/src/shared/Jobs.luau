@@ -8,8 +8,13 @@
 --   the set rolls over, so nothing is ever lost. No streaks, no countdowns.
 --   Rewards: hay, seeds, treats, small Green Cash (daily total about 10% of a day's races) and
 --   monthly stamps toward the month's cosmetic. Never League Points, Energy or win chance.
+--   Monthly stamps (D-063, stage 6): every monthly job gives 2 🎀, and STAMPS_FOR_COSMETIC (8) in
+--   one month earn that month's saddle cloth (Style, never sold): 4 of the 5 monthly jobs. Jobs
+--   finished but unclaimed when the month ends still count for their own month (auto-claim).
+--   No dates or countdowns anywhere; the cloth comes back in the same month next year.
 
 local Profile = if script then require(script.Parent.Profile) :: any else require("./Profile")
+local Style = if script then require(script.Parent.Style) :: any else require("./Style")
 
 local Jobs = {}
 
@@ -52,12 +57,12 @@ Jobs.WEEKLY = {
 Jobs.MONTHLY = {
 	{ id = "m_race40", event = "race", target = 40, text = "Ride in 40 races", icon = "flag_ready", go = "raceBoard", reward = { stamps = 2, items = { treat = 5 } } },
 	{ id = "m_great150", event = "great_tap", target = 150, text = "Land 150 Great or Perfect taps", icon = "label_perfect", go = "raceBoard", reward = { stamps = 2, items = { grain = 5 } } },
-	{ id = "m_harvest20", event = "harvest", target = 20, text = "Pick 20 crops", icon = "carrot", go = "stable", reward = { stamps = 1, items = { seed_apple = 4 } } },
-	{ id = "m_bond", event = "pet", target = 20, text = "Pet your horses 20 times", icon = "heart", go = "stable", reward = { stamps = 1, items = { treat = 4 } } },
+	{ id = "m_harvest20", event = "harvest", target = 20, text = "Pick 20 crops", icon = "carrot", go = "stable", reward = { stamps = 2, items = { seed_apple = 4 } } },
+	{ id = "m_bond", event = "pet", target = 20, text = "Pet your horses 20 times", icon = "heart", go = "stable", reward = { stamps = 2, items = { treat = 4 } } },
 	{ id = "m_days10", event = "day", target = 10, text = "Visit your stable on 10 days", icon = "map_stable", go = "stable", reward = { stamps = 2, items = { hay = 20 } } },
-	{ id = "m_cheer10", event = "cheer", target = 10, text = "Cheer in 10 races", icon = "job_cheer", go = "track", reward = { stamps = 1, items = { treat = 3 } } },
+	{ id = "m_cheer10", event = "cheer", target = 10, text = "Cheer in 10 races", icon = "job_cheer", go = "track", reward = { stamps = 2, items = { treat = 3 } } },
 	{ id = "m_tame", event = "tame", target = 1, text = "Make friends with a wild horse", icon = "heart", go = "trailGate", reward = { stamps = 2, items = { apple = 4 } } },
-	{ id = "m_trail5", event = "visit_trail", target = 5, text = "Visit the flower meadow 5 times", icon = "map_trail", go = "trailGate", reward = { stamps = 1, items = { apple = 5 } } },
+	{ id = "m_trail5", event = "visit_trail", target = 5, text = "Visit the flower meadow 5 times", icon = "map_trail", go = "trailGate", reward = { stamps = 2, items = { apple = 5 } } },
 } :: { Def }
 
 Jobs.COUNTS = { daily = 3, weekly = 5, monthly = 5 }
@@ -118,10 +123,38 @@ local function newSet(ids: { string }): { Job }
 	return out
 end
 
+-- The month's cloth once the month has enough stamps (D-063). JobService tells the player
+-- (clothDue holds the ids earned since it last looked).
+local function payCloth(p: any)
+	local J = p.jobs
+	local period = tonumber(J.monthlyPeriod)
+	if not period or (tonumber(J.monthStamps) or 0) < Jobs.STAMPS_FOR_COSMETIC then return end
+	local it = Style.earnMonthCloth(p, Style.monthOfPeriod(period))
+	if it then
+		J.clothDue = J.clothDue or {}
+		table.insert(J.clothDue, it.id)
+	end
+end
+
 local function grant(p: any, reward: Reward)
 	if reward.cash and reward.cash > 0 then Profile.addCash(p, reward.cash) end
 	for item, n in reward.items or {} do Profile.addItem(p, item, n) end
-	if reward.stamps then p.jobs.stamps += reward.stamps end
+	if reward.stamps then
+		p.jobs.stamps += reward.stamps
+		p.jobs.monthStamps = (tonumber(p.jobs.monthStamps) or 0) + reward.stamps
+		payCloth(p)
+	end
+end
+
+-- Stamps already claimed in a monthly set (an older save's count for this month).
+local function claimedStamps(set: any): number
+	local n = 0
+	if typeof(set) ~= "table" then return 0 end
+	for _, j in set do
+		local d = typeof(j) == "table" and byId[j.id]
+		if d and j.claimed and d.reward.stamps then n += d.reward.stamps end
+	end
+	return n
 end
 
 -- Claim every finished, unclaimed job in a set (used at rollover).
@@ -148,6 +181,10 @@ function Jobs.refresh(p: any, userId: number, now: number): number
 	local J = p.jobs
 	J.stamps = tonumber(J.stamps) or 0
 	J.rerollDay = tonumber(J.rerollDay) or -1
+	if tonumber(J.monthStamps) == nil then
+		J.monthStamps = claimedStamps(J.monthly) -- an older save: this month's claimed jobs
+		payCloth(p) -- already 8 or more: the cloth now, since no later claim would pay it
+	end
 	local auto = 0
 	for kind in POOLS do
 		local key = kind .. "Period"
@@ -168,6 +205,7 @@ function Jobs.refresh(p: any, userId: number, now: number): number
 			end
 			J[key] = per[kind]
 			J[kind] = newSet(Jobs.pick(kind, userId, per[kind]))
+			if kind == "monthly" then J.monthStamps = 0 end -- a new month's stamps (the cloths earned stay)
 		end
 	end
 	return auto
@@ -236,9 +274,17 @@ end
 
 -- What the client sees.
 function Jobs.view(p: any): { [string]: any }
-	local out = { stamps = p.jobs and p.jobs.stamps or 0, rerollUsed = false }
+	local out = { stamps = p.jobs and p.jobs.stamps or 0, rerollUsed = false, monthStamps = 0, stampsNeeded = Jobs.STAMPS_FOR_COSMETIC }
 	if typeof(p.jobs) ~= "table" then return out end
 	out.rerollUsed = p.jobs.rerollDay == p.jobs.dailyPeriod
+	-- This month's stamps and its cloth (D-063)
+	out.monthStamps = tonumber(p.jobs.monthStamps) or 0
+	local period = tonumber(p.jobs.monthlyPeriod)
+	local cloth = period and Style.monthCloth(Style.monthOfPeriod(period))
+	if cloth then
+		out.monthCloth = cloth.id
+		out.clothEarned = Style.owns(p, cloth.id)
+	end
 	for kind in POOLS do
 		local list = {}
 		for _, j in p.jobs[kind] or {} do

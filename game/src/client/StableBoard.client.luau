@@ -245,7 +245,10 @@ render = function()
 		local b = tabButtons[t[1]]
 		local n = claimable(jobs[t[1]] or {})
 		b.BackgroundColor3 = if tab == t[1] then C.gold else C.white
-		local label = if t[1] == "monthly" then string.format("%s %d", t[2], jobs.stamps or 0) else t[2]
+		-- This month's stamps toward its cloth (D-063): "🎀 Month 6/8"
+		local label = if t[1] == "monthly"
+			then string.format("%s %d/%d", t[2], math.min(jobs.monthStamps or 0, jobs.stampsNeeded or 8), jobs.stampsNeeded or 8)
+			else t[2]
 		b.Text = if n > 0 and tab ~= t[1] then label .. " 🎁" else label
 	end
 	local list = jobs[tab] or {}

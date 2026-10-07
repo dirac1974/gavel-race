@@ -43,6 +43,11 @@ local ModelSpecs: { [string]: Spec } = {
 	spa_wash_stall = { axis = "Y", studs = 11.0, yaw = 0, collide = false },
 	towel_rack = { axis = "Y", studs = 4.5, yaw = 0, collide = true },
 
+	-- Reasons to come back (D-063): the Welcome Back Hay Bale (a little bigger than the yard's bale,
+	-- with a part-built bow on top) and the photo board in every yard.
+	welcome_hay_bale = { axis = "Y", studs = 3.4, yaw = 0, collide = false },
+	photo_frame_stand = { axis = "Y", studs = 9.0, yaw = 0, collide = true },
+
 	-- Garden. Crops are sized to sit two to a garden_bed (6 x 2.6 studs).
 	carrot_crop = { axis = "Z", studs = 2.4, yaw = 0, collide = false },
 	apple_tree_small = { axis = "Y", studs = 12.0, yaw = 0, collide = true },

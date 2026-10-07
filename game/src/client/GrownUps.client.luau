@@ -205,6 +205,9 @@ local function goTo(go: string?)
 			local x, z = WorldLayout.plotPoint(i, 40, 0)
 			Guide.to(x, z)
 		end
+	elseif go == "race" then -- the tour's first GO: the RACE! button's one tap (D-063)
+		local quick = HudEvents:FindFirstChild("QuickRace")
+		if quick then quick:Fire() end
 	elseif go == "raceBoard" then
 		local p = WorldLayout.places.raceBoard
 		Guide.to(p.x, p.z + 10)
