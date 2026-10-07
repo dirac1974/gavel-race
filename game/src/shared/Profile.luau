@@ -359,4 +359,16 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 	}
 end
 
+-- The owner's view with every decorator's fields (D-065): each decorator runs in pcall, so one
+-- that throws is reported through onError (index, error) and skipped, and the view still goes out.
+function Profile.decoratedView(p: Profile, now: number, energyCfg: Horse.EnergyConfig,
+	decorators: { (any, any) -> () }, onError: ((number, any) -> ())?): { [string]: any }
+	local view = Profile.view(p, now, energyCfg)
+	for i, decorate in decorators do
+		local ok, err = pcall(decorate, p, view)
+		if not ok and onError then onError(i, err) end
+	end
+	return view
+end
+
 return Profile

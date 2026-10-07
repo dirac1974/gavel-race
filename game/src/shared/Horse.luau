@@ -37,7 +37,7 @@ export type Horse = {
 	daily: { day: number, treats: number, petted: boolean },
 }
 
-export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number }
+export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number, restingLabelAt: number? }
 
 local function day(t: number): number
 	return t // 86400
@@ -191,7 +191,9 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		league = h.league,
 		points = h.points,
 		energy = h.energy,
-		resting = h.energy < cfg.maxPerRacer,
+		-- D-058: "Ready" from 1 Energy up; napping only at restingLabelAt (0), when it truly can't race.
+		ready = h.energy >= 1,
+		resting = h.energy <= (cfg.restingLabelAt or 0),
 		care = Horse.care(h, now),
 		fed = h.care.fed,
 		groomed = h.care.groomed,

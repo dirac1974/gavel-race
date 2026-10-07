@@ -1265,6 +1265,7 @@ Template:
 - Consequences: David's "care at the vet" exists as a daily, positive ritual. Energy is unchanged as the only limit on cash races (D-015). Rookie horses (free races) still never tire; the Spa's Energy matters from Bronze.
 - Alternatives: a mild non-blocking "sore" state fixed by a free vet visit (closest to David's words; 0/4: kids read it as "I hurt my horse", D-039, maturity rating risk); sore that lowers Rating (rule 3 and D-015: care would become win chance); a "Puffed & muddy" look after 3 cash races (dropped in rebuttal: mud and sweat can read as hurt; Child safety's grinning "Muddy & happy" variant kept as the minority view, `spa.muddyLook = false`); Spa +1 bond (bond is Rating, D-014); a 20 h cooldown (a timer kids watch).
 - Links: debate 013, docs/plans/horse-life-and-retention.md (stages 1 and 4), docs/research/2026-10-07-retention-and-horse-life.md
+- Built, the label only (stage 1, 2026-10-07; not yet played in Studio): `Horse.view` gives `ready = energy ≥ 1` and `resting` only at `energy.restingLabelAt` (0); the dock says "Ready" / "Napping", the picker "😴 Napping", and `Advice` says "napping" only at 0. The yawn, the lying pose and Spa Day are stage 4.
 
 ## D-059 — Careers, Legend Retirement and Rehoming
 - Date: 2026-10-07
@@ -1308,6 +1309,7 @@ Template:
 - Consequences: no rider is ever locked out by another league; the longest wait is one race plus results plus 15 s. Training shows in solo races. Changes `RaceService` queueing, not race math.
 - Alternatives: grey the unjoinable card only (a Rookie can still be locked out); reserve the next card for a league waiting ≥ 8 s (Competitive's opening, superseded by per-league queues); bots at league midpoint ± 8 (fuzzy for Rookie); separate class queues (more lockouts on 2 courses).
 - Links: debate 013, D-036, D-011, docs/plans/horse-life-and-retention.md (stages 1 and 2)
+- Built, the core (stage 1, 2026-10-07; not yet played in Studio): `RaceQueues.luau` (pure, Lune-tested) keeps one queue per `league|kind`; RaceService puts a joining rider in their queue and `pumpQueues` (on join, leave and every second) moves riders onto a card already theirs with room, else gives an open course with an empty line to the longest-waiting queue, which claims its card. A picked course is only a wish; a claimed card never takes another league or kind. Waiting riders see "In line! next race". The picker preselects only a joinable card, greys other leagues' cards with their badge and "👀 Watch" (hoofprints to the grandstand), and offers "Join the line!" when none fits. `lobbyFillSeconds` 15. `GameConfig.queue.mode = "cards"` restores D-036 claiming. The one race button, the countdown ring and league-anchored bots are stage 2.
 
 ## D-062 — Class badges, first-win points and the Rosette Wall
 - Date: 2026-10-07
@@ -1352,6 +1354,7 @@ Template:
   - **One "Next thing" pill** at a time, from the Stable Board's advice. Weekly and monthly jobs show inline, not as a burst of toasts.
 - Alternatives: floors only with ≤ 5 dock items (Competitive; `ui.dockPhoneItems = 5`); a win-chance line "12% → 19%" (breaks D-055, reads as odds); a tap-closeness bar (more to read).
 - Links: debate 013, D-054, D-055, docs/plans/horse-life-and-retention.md (stages 1 and 3)
+- Built, the basics (stage 1, 2026-10-07; not yet played in Studio): `GameConfig.ui` (`minTouchPx` 56, `minTextPx` 14, `labelPx` 16, `dockPhoneItems` 3, `phoneShortSide` 500); `DockLayout` keeps the dock's scale at or above the floors (70 px buttons, the 16 px label and the new 64 px ✕ never render under 56 / 14); on a phone (touch, short side ≤ 500 px) the dock is the horse card, RACE! and ☰ More, and Green Cash, My Horses, the Stable Board, the Map and Ride move into the More panel. Energy is one horseshoe row (`Ui.energyPips`) in the dock, the picker and My Horses; Sprint reads 🐇 Short. The dock's care stars are gone (★ is for riding). The rest (results row, one-line cards, toasts, Next-thing pill) is stage 3.
 
 ## D-065 — Playtest-safety fixes
 - Date: 2026-10-07
@@ -1366,3 +1369,4 @@ Template:
   - The race picker's redraw key includes league, kind and Cup state.
   - Stall assignment is stored per horse, so retiring a stalled horse never moves another one silently.
 - Links: docs/research/2026-10-07-systems-audit.md (code health risks), docs/plans/horse-life-and-retention.md (stage 1)
+- Built (stage 1, 2026-10-07; not yet played in Studio): `Profile.decoratedView` runs each decorator in `pcall` (Profiles warns once per decorator name: races, jobs, market); `Profiles.load` never kicks: a live lock retries every 10 s until released or stale, DataStore errors back off, and after a lock (or 6 failed tries) the client gets `ProfileWaiting` and GrownUps shows "Opening your stable…" with Try again (TeleportService to the same place); leaving cancels the wait and releases any lock taken. `Leagues.retireBlock` refuses Retire while racing, in line, riding that horse or on a training ride. `PlayerData` no longer makes leaderstats. The picker's redraw key has league, open, Cup and Practice. Not in stage 1 (later stages): server-scored taming, stalls stored per horse.

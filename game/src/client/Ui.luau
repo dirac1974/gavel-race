@@ -193,6 +193,36 @@ function Ui.icon(parent: Instance, name: string, emoji: string, size: UDim2, pos
 	return holder
 end
 
+-- Energy (D-064): one horseshoe icon everywhere, a row of `max` pips with the spent ones faded.
+-- "∩" stands in for the horseshoe until the atlas loads (⚡ meant Sprint too, so it's gone).
+Ui.ENERGY_ICON, Ui.ENERGY_EMOJI = "energy_hoof", "∩"
+function Ui.energyPips(parent: Instance, energy: number, max: number, px: number, pos: UDim2?): Frame
+	local row = Instance.new("Frame")
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.fromOffset(max * (px + 3), px)
+	row.Position = pos or UDim2.new()
+	local l = Instance.new("UIListLayout")
+	l.FillDirection = Enum.FillDirection.Horizontal
+	l.Padding = UDim.new(0, 3)
+	l.VerticalAlignment = Enum.VerticalAlignment.Center
+	l.Parent = row
+	for k = 1, max do
+		local icon = Ui.icon(row, Ui.ENERGY_ICON, Ui.ENERGY_EMOJI, UDim2.fromOffset(px, px))
+		icon.LayoutOrder = k
+		Ui.dim(icon, k > energy)
+	end
+	row.Parent = parent
+	return row
+end
+
+-- Fade an icon (a spent Energy pip) or bring it back.
+function Ui.dim(icon: Instance, faded: boolean)
+	for _, d in icon:GetDescendants() do
+		if d:IsA("ImageLabel") then d.ImageTransparency = if faded then 0.75 else 0 end
+		if d:IsA("TextLabel") then d.TextTransparency = if faded then 0.75 else 0 end
+	end
+end
+
 -- A quick bounce to draw the eye.
 function Ui.pop(obj: GuiObject)
 	local scale = obj:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")

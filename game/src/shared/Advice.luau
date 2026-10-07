@@ -27,6 +27,7 @@ function Advice.forHorse(h: any, profile: any, now: number): Tip
 	local name = h.name
 	-- Facts first: what's true right now.
 	local fact
+	-- "napping" only when it's true (D-058): the view's resting means 0 Energy, not "a bit tired".
 	if h.resting then
 		fact = name .. " is napping in the straw"
 	elseif h.fed and h.groomed then
@@ -53,7 +54,7 @@ function Advice.forHorse(h: any, profile: any, now: number): Tip
 			return { emoji = "🥕", fact = fact, next = "Next: crops are ready to pick", go = "stable" }
 		end
 	end
-	return { emoji = "😴", fact = fact, next = "Resting. Try a ride on the Trail!", go = "trailGate" }
+	return { emoji = "😴", fact = fact, next = "Napping. Try a ride on the Trail!", go = "trailGate" }
 end
 
 return Advice

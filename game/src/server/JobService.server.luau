@@ -60,7 +60,7 @@ Profiles.addDecorator(function(data, view)
 			hv.rested = Training.isRested(h, now)
 		end
 	end
-end)
+end, "jobs")
 
 Profiles.Loaded.Event:Connect(function(player: Player)
 	local data = Profiles.get(player)

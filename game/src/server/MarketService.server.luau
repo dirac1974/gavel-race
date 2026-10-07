@@ -89,7 +89,7 @@ Profiles.addDecorator(function(data, view)
 		canTame = (Market.canTame(data, now)),
 		maxHorses = Market.MAX_HORSES,
 	}
-end)
+end, "market")
 
 MarketBuy.OnServerEvent:Connect(function(player: Player, id: any)
 	if busy(player) or typeof(id) ~= "string" then return end
@@ -177,8 +177,15 @@ Retire.OnServerEvent:Connect(function(player: Player, id: any)
 	if busy(player, 1, "retire") or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
-	if player:GetAttribute("Racing") or player:GetAttribute("InLine") then
-		Profiles.notify(player, "Retire after your race!", "heart")
+	local h = Profile.horse(data, id)
+	if not h then return end
+	local why = Leagues.retireBlock(h.name, id, {
+		racing = player:GetAttribute("Racing"), inLine = player:GetAttribute("InLine"),
+		racingHorse = player:GetAttribute("RacingHorse"), ridingHorse = player:GetAttribute("RidingHorse"),
+		trainingRide = player:GetAttribute("TrainingRide"),
+	})
+	if why then
+		Profiles.notify(player, why, "heart")
 		return
 	end
 	if #data.horses <= 1 then
