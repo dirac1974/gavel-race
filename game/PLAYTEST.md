@@ -210,7 +210,7 @@ This week's course (T5):
 - [ ] An empty course card says "Open · your horse's league"; the first rider's horse sets its league (and Race / 🏆 Cup / 🎈 Practice).
 - [ ] Below the horses: Race, Cup ("🏆 64 pts" until unlocked) and Practice; Practice works for tired horses and pays nothing; Bronze races and up cost 1 Energy.
 - [ ] A horse with 100 League Points (Rookie) can enter the Rookie Cup; winning it pays 3× the league's purse and shows "🏆 … moves up to Bronze!"; its points start again.
-- [ ] A horse whose best Rating passes its league ceiling (Rookie 58) sees "too strong for Rookie races now"; its Cup opens; Practice stays open.
+- [ ] A horse whose best Rating passes its league ceiling (Rookie 58) sees "Comet is too good for Rookie now. Win the Cup!"; its Cup opens; Practice stays open.
 - [ ] Joining a card claimed by another league says "That race is for Bronze horses".
 - [ ] Bronze cards can be Sprint, Mile or Classic; Silver and up every distance.
 - [ ] My Horses: league line with points to the Cup or "🏆 Cup open!"; Retire asks once more, then the horse's plaque appears in the 🏅 Hall of Fame (you can't retire your last horse).
@@ -459,7 +459,7 @@ Use Play Solo, or Test → Clients and Servers with 2 players, plus Device emula
 ## One race button and the queue card (horse life stage 2, D-061)
 Use Play Solo, or Test → Clients and Servers with 2 players, plus Device emulator → a phone in landscape. No tools needed.
 - [ ] **One tap.** A new player picks a starter, then taps the big **🏁 RACE!** button ("with Comet ▶" under it) once: no picker opens, and they are in a gate within 20 seconds (15 s countdown plus the 3, 2, 1).
-- [ ] **The queue card.** While in line a card sits at the top: a ring of dots that empties as the big number counts down from 15, the gate's 8 slots with your horse's name and coat dot in gold (★), and "🤖 Bots join at 0". With 2 players, the second player's horse name and coat dot appear in the next slot on both screens.
+- [ ] **The queue card.** While in line a card sits at the top: a ring of dots that empties as the big number counts down from 15, the gate's 8 slots with your horse's name and coat dot in gold (▶), and "🤖 Bots join at 0". With 2 players, the second player's horse name and coat dot appear in the next slot on both screens.
 - [ ] **Wait away from the track.** After tapping RACE!, walk to your barn and brush your horse (Care → Groom): it works, and the card stays on top. About 3 seconds before the gate, the card turns gold and says **Race time!** with hoofprints stepping to **GO!**; the care card closes and you are in the gate for the 3, 2, 1. The same while riding your own horse or walking on Fair Street.
 - [ ] Waiting while the other course's race runs: the card says "You race next!" (🏇); with no course free, "Finding a race…". The ring's dots chase each other while you wait (still under Reduced Motion).
 - [ ] ✕ on the card leaves the line (the RACE! button comes back). 🔀 **More** opens "More choices" (another horse, Practice, the Cup, a course); joining there moves you.
@@ -477,10 +477,10 @@ Use Test → Clients and Servers with 2 players, plus Device emulator → a phon
 - [ ] Nothing anywhere shows how many people visited, liked or toured a barn.
 
 **Two friend accounts (published test server):**
-- [ ] Player 2: Map → 👫 Friends' barns shows player 1's **face and name** with "🏡 Visit ▶". Tap it: player 2 lands on Barn Lane **just outside player 1's gate**, facing in (never inside the barn), with "Welcome to …'s barn! Pat each horse for a Tour stamp".
-- [ ] At each stall door, **Pat** works: hearts over the horse, "Comet nuzzles you! Pat 1 more for a Tour stamp", then "Tour stamp! You toured …'s barn". Player 1's horses gain **no bond** from pats (My Horses). Patting again later never gives a second stamp; the Map's line reads "Tour stamps: 1 barn toured".
+- [ ] Player 2: Map → 👫 Friends' barns shows player 1's **face and name** with "🏡 Visit ▶". Tap it: player 2 lands on Barn Lane **just outside player 1's gate**, facing in (never inside the barn), with "Welcome to …'s barn! Pat each horse for a stamp".
+- [ ] At each stall door, **Pat** works: hearts over the horse, "Comet nuzzles you! 1 more to pat for a stamp", then "Tour stamp! You toured …'s barn". Player 1's horses gain **no bond** from pats (My Horses). Patting again later never gives a second stamp; the Map's line reads "Tour stamps: 1 barn toured".
 - [ ] **Treat** once: "+1 bond". A second treat the same day says "You gave a treat here today. Come back tomorrow!". Player 2's own bag is unchanged.
-- [ ] At the post box, **Drop a carrot**: player 2 has one fewer carrot; player 1 gets "A friend left a carrot in your post box! (1 today)" (no name), one more carrot, and a little carrot pile appears on the post box. A second drop the same day is refused.
+- [ ] At the post box, **Drop a carrot**: player 2 has one fewer carrot; player 1 gets "A friend left you a carrot! (1 today)" (no name), one more carrot, and a little carrot pile appears on the post box. A second drop the same day is refused.
 - [ ] Player 2 can't feed, groom, muck out, plant or harvest at player 1's barn (no prompts, and the server says no).
 - [ ] While player 2 is in the yard, player 1 sees a big **🚪 Close gate** button over the dock (on the phone emulator: over the dock at the left, clear of Hop and Gallop). One tap: player 2 is walked out to Barn Lane with "…'s gate is closing. Bye for now!", a wooden bar crosses the gate, and the button turns into **🔓 Open gate**. Player 2's list now shows player 1 greyed with "🔒 Gate closed" and can't travel there. Tap **Open gate**: the bar goes, the list shows "Visit ▶" again.
 - [ ] Player 1 sets Settings → "Who can visit my stable?" to **Nobody**: player 2 (in the yard) is walked out, and player 1 disappears from player 2's list.
@@ -500,6 +500,17 @@ Use Play Solo (or 2 players), plus Device emulator → a phone in landscape. No 
 - [ ] Nothing anywhere says hurt, sore, injured, limping or sick, and the horse never looks unwell: tired means a yawn and a happy nap.
 - [ ] On the phone emulator the Spa's tap button, the chips and the Check-up / Spa Day buttons are fingertip-sized and every word is readable.
 - [ ] Studio check: the wash bay doesn't block the street or the Vet's door, and the "Spa Day" prompt and the Vet's "Check-up" prompt don't overlap.
+
+## Clarity pass (horse life stage 3, D-064)
+Use Play Solo plus Device emulator → a phone in landscape (iPhone SE or similar, 375 px high). No tools needed. The new icons (horseshoe, rosette, sprout, dotted league badges) are on their own uploaded sheet; until Roblox moderation approves it they show as emoji (∩, 🎀, 🌱, 🏅).
+- [ ] **One symbol each.** Ask a child "what does the star mean?" and "what does the horseshoe mean?": one answer each ("how well I rode", "how much energy my horse has"). Look for stars anywhere else: the dock, My Horses, the Stable Board, the picker, the market, the queue card, league badges and your stall plaque have none (🏇 marks the horse you ride, 📣 the horse you cheer for, ❤️ care, 🎀 monthly stamps, 🌱 a market horse's family line).
+- [ ] **One results row.** After a race the card has **one** row of stars, "You rode ★★☆", and only when your taps helped: "Your taps gained Comet 2 places!" (from race 4, with the ◀ ▶ buttons: "Your taps and steering gained …"). No "Good trip" row, no % or purse.
+- [ ] **The Next-thing pill.** Just above the dock a pill always shows **one** thing to do with a picture and a few words: "Feed Comet some hay", then "Brush Comet", then a job ("Ride in a race"), then "Race with Comet!". Tapping **GO ▶** takes you there (golden hoofprints to your barn, or straight into the race line for a race). A finished job shows "Get your job prize!" and GO opens the Stable Board. A napping horse with its Spa still open gets "Spa Day for Comet at the Vet"; after that, "Great day! Comet's dreaming of tomorrow." with no GO.
+- [ ] **Pip's hint.** Leave the pill up and stand still for 20 seconds: a bubble "🐴 Pip says: tap GO and follow me!" appears once and the pill bounces. Walking around resets the wait.
+- [ ] **Race cards.** Open RACE! → More choices: each course card is its league's colour with a dotted badge and one line ("Bronze · 🐇 Short · Dirt ☀️"), lane dots and a short status ("⏱ 12s", "👀 Watch"). Horse cards say "👍 Loves this race", "An okay day" or "Not its best" (no numbers). The Cup button says "🏆 Cup 🔒" until the Cup opens (no "pts").
+- [ ] **Jobs inline.** Stable Board: three tabs, 📋 Today, 📅 Week, 🎀 Month (with your stamp count). Week and Month show every job with its progress on the board itself: no toasts. With finished week jobs, "🎁 Get N prizes" collects them; the tab shows 🎁 while prizes wait.
+- [ ] **Words.** Every toast you see is short (10 words or fewer): try feeding with no hay ("No hay! Muck out a stall or visit Feed & Seed"), joining a race ("You're in line! You race when a course is free.").
+- [ ] **Phone sizes.** On the phone emulator: the dock buttons show a picture and a word (Horses, Map, Jobs, More); every button on the picker, Stable Board and My Horses is at least fingertip size and every word readable; a panel taller than the screen scrolls up and down instead of shrinking its words (My Horses gets shorter and its list scrolls). The pill sits left of Hop and Gallop.
 
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.

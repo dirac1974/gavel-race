@@ -24,28 +24,29 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(Trip.stars(0.0149, STEER) == 2 and Trip.stars(0, STEER) == 2 and Trip.stars(-0.005, STEER) == 2, "two stars from -0.005")
 	check(Trip.stars(-0.0051, STEER) == 1 and Trip.stars(-0.02, STEER) == 1 and Trip.stars(-1, STEER) == 1, "one star below that, never zero")
 
-	-- The results lines ---------------------------------------------------------------------------
+	-- The results lines: one row (D-064) -----------------------------------------------------------
 	check(ResultsText.rideLine(2) == "You rode ★★☆" and ResultsText.rideLine(0) == "You rode ☆☆☆"
 		and ResultsText.rideLine(NAN) == "You rode ☆☆☆", "You rode, in stars (a strange value shows none)")
-	check(ResultsText.tripLine(3) == "Good trip ★★★" and ResultsText.tripLine(2) == "Good trip ★★☆"
-		and ResultsText.tripLine(1) == "Good trip ★☆☆", "Good trip, in one to three stars")
+	check(ResultsText.oneRow(2) == "You rode ★★☆" and ResultsText.oneRow(2, 3, 1) == "You rode ★★★"
+		and ResultsText.oneRow(3, 1, 1) == "You rode ★★☆" and ResultsText.oneRow(1, 1, 1) == "You rode ★☆☆",
+		"the trip folds into the one row (average, halves up)")
 	local noTrip = true
 	for _, v in { nil, 0, 4, 2.5, -1, NAN, INF, -INF } do
-		if ResultsText.tripLine(v) ~= nil then noTrip = false end
+		if ResultsText.tripStars(v, 1) ~= nil or ResultsText.oneRow(2, v, 1) ~= "You rode ★★☆" then noTrip = false end
 	end
-	check(noTrip, "no trip line for nil, 0, 4, 2.5, a negative, NaN or infinity (never \"Good trip\" with no stars)")
-	check(ResultsText.tripLine(3, 0) == nil and ResultsText.tripLine(3, 1) == "Good trip ★★★",
-		"no trip line while steering is cosmetic (scale 0)")
-	check(ResultsText.gainLine("trip", 1) == "Your trip gained you 1 place!" and ResultsText.gainLine("trip", 2) == "Your trip gained you 2 places!"
-		and ResultsText.gainLine("riding", 3) == "Your riding gained you 3 places!", "gains, in words")
+	check(noTrip, "a trip value that isn't 1, 2 or 3 never changes the row")
+	check(ResultsText.oneRow(1, 3, 0) == "You rode ★☆☆" and ResultsText.tripStars(3, 0) == nil,
+		"no trip in the row while steering is cosmetic (scale 0)")
+	check(ResultsText.gainedLine("Comet", 1) == "Your taps gained Comet 1 place!" and ResultsText.gainedLine("Comet", 2) == "Your taps gained Comet 2 places!"
+		and ResultsText.gainedLine("Comet", 2, 1, 1) == "Your taps and steering gained Comet 2 places!"
+		and ResultsText.gainedLine("Comet", 0, 2, 1) == "Your steering gained Comet 2 places!"
+		and ResultsText.gainedLine("Comet", 2, 1, 0) == "Your taps gained Comet 2 places!", "gains, in words")
 	local onlyGains = true
 	for _, g in { nil, 0, 0.5, -1, -3, NAN, INF, -INF } do
-		for _, what in { "trip", "riding" } do
-			if ResultsText.gainLine(what, g) ~= "" then onlyGains = false end
-		end
+		if ResultsText.gainedLine("Comet", g) ~= "" or ResultsText.gainedLine("Comet", g, g, 1) ~= "" then onlyGains = false end
 	end
 	for g = -8, 8 do
-		local line = ResultsText.gainLine("trip", g)
+		local line = ResultsText.gainedLine("Comet", g, -2, 1)
 		if (g < 1) ~= (line == "") or string.find(line, "-", 1, true) or string.find(string.lower(line), "lost", 1, true) then
 			onlyGains = false
 		end
@@ -58,10 +59,10 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(#plainArgs == 4 and plainArgs[4] == "dirt" and #tripArgs == 6 and tripArgs[6] == "turf", "RideReport: four arguments, or six with a trip; the course last")
 	local plain = ResultsText.rideReport(table.unpack(plainArgs))
 	local steered = ResultsText.rideReport(table.unpack(tripArgs))
-	check(plain.stars == 2 and plain.gain == 1 and plain.place == 3 and plain.tripStars == nil and ResultsText.tripLine(plain.tripStars) == nil,
-		"without a trip the card shows no trip line")
-	check(steered.tripStars == 3 and steered.tripGain == -1 and ResultsText.tripLine(steered.tripStars, STEER.scale) == "Good trip ★★★"
-		and ResultsText.gainLine("trip", steered.tripGain) == "", "with a trip: the stars show, a trip that cost a place says nothing")
+	check(plain.stars == 2 and plain.gain == 1 and plain.place == 3 and plain.tripStars == nil and ResultsText.oneRow(plain.stars, plain.tripStars, STEER.scale) == "You rode ★★☆",
+		"without a trip the row is the ride's stars")
+	check(steered.tripStars == 3 and steered.tripGain == -1 and ResultsText.oneRow(steered.stars, steered.tripStars, STEER.scale) == "You rode ★★★"
+		and ResultsText.gainedLine("Comet", steered.gain, steered.tripGain, STEER.scale) == "", "with a trip: it folds into the row, a trip that cost a place says nothing")
 	local rs = fs.readFile("game/src/server/RaceService.server.luau")
 	check(string.find(rs, "local tripStars = if trip and steers[p] then Trip.stars(session.tau[i], GameConfig.steering) else nil", 1, true) ~= nil
 		and string.find(rs, "ResultsText.reportArgs(stars, session:ridingGain(i), placeOf[i], c.id, tripStars, tripGain)", 1, true) ~= nil,
@@ -139,7 +140,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		and string.find(rc, "ReplayTrip.saved(t, s.start, turn[1], turn[2], SPEED)", 1, true) ~= nil
 		and string.find(rc, "ReplayTrip.tuck(s.tuckFrom, t)", 1, true) ~= nil
 		and string.find(rc, "RaceState.recording.steer = true", 1, true) ~= nil
-		and string.find(rc, "ResultsText.tripLine(rideReport.tripStars, STEER.scale)", 1, true) ~= nil,
+		and string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)", 1, true) ~= nil,
 		"the race records lanes, the lock, saved turns, tucked spans and the buttons; the card asks ResultsText")
 	check(string.find(replay, "ReplayTrip.laneCurve(rec, k, f, i)", 1, true) ~= nil and string.find(replay, "lanes[subject] or subject", 1, true) ~= nil
 		and string.find(replay, "RaceState.finishFollowed()", 1, true) ~= nil and string.find(replay, "RaceState.restHorses(rec.course, rec.lanes)", 1, true) ~= nil,

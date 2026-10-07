@@ -4,7 +4,7 @@
 --   Market: a weekly stock seeded by the week (the same on every server), personal to each
 --   player (buying one never takes it from anyone else: no "only 2 left"). Coats are separate
 --   from stats, so collecting is never a chase for power; price follows Potential, shown as a
---   ★ bloodline hint until the vet reveals the numbers. Green Cash only, never Robux.
+--   🌱 family-line hint until the vet reveals the numbers. Green Cash only, never Robux.
 --   Taming: wild horses in the meadow carry natural rare coats. Offer a treat and win their
 --   trust in a gentle rhythm game; one new friend a day.
 --   Stalls: start with 2; Green Cash builds more, up to 6. Extra horses live in the free
@@ -43,12 +43,19 @@ local function lcg(seed: number)
 end
 Market.lcg = lcg
 
--- Bloodline stars 1..3 from average Potential.
+-- Bloodline level 1..3 from average Potential (shown as sprouts, not stars: D-064).
 function Market.stars(potential: { [string]: number }): number
 	local sum = 0
 	for _, k in Horse.STATS do sum += potential[k] end
 	local avg = sum / #Horse.STATS
 	return if avg >= 84 then 3 elseif avg >= 76 then 2 else 1
+end
+
+-- The family line on a market card (D-064: 🌱 = good family line): "Family 🌱🌱".
+Market.FAMILY_ICON, Market.FAMILY_EMOJI = "sprout", "🌱"
+function Market.familyLine(level: number): string
+	local n = math.clamp(math.floor(tonumber(level) or 1), 1, 3)
+	return "Family " .. string.rep(Market.FAMILY_EMOJI, n)
 end
 
 function Market.price(h: any): number
@@ -169,7 +176,7 @@ function Market.canTame(p: any, now: number): (boolean, string?)
 	for _, item in Market.TAME_TREATS do
 		if Profile.itemCount(p, item) > 0 then return true, nil end
 	end
-	return false, "Bring a treat (a carrot, apple or sugar cube) to make friends"
+	return false, "Bring a carrot, apple or sugar cube to make friends"
 end
 
 -- A successful taming: uses a treat; the new horse has a natural rare coat and surprise

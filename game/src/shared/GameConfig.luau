@@ -212,7 +212,16 @@ GameConfig.ui = {
 	labelPx = 16,
 	dockPhoneItems = 3,
 	phoneShortSide = 500, -- a screen whose shorter side is at most this many px is a phone
+	toastMaxWords = 10,   -- stage 3 (D-064): every toast at most this many words (Words.toastOk)
+	panelMinText = 16,    -- stage 3: the smallest text on the big panels (picker, Stable Board, My Horses), unscaled
+	panelButtonPx = 64,   -- stage 3: the smallest button on those panels, unscaled (PanelFit keeps both at the floors)
+	pickerLineWords = 5,  -- stage 3: a race card's one line, at most this many words
 }
+-- The results card (D-064): one row; tripRow = true brings back D-054's "Good trip ★★☆" row.
+GameConfig.results = { tripRow = false }
+-- The "Next thing" pill (D-064, stage 3): one suggestion above the dock from Advice.nextThing, with
+-- GO; Pip gives a hint when the same suggestion has been up this long and you haven't moved.
+GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6 }
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
 -- Visiting friends' barns (D-060, D-042): only Roblox friends in this server, never a count.

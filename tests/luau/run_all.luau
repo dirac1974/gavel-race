@@ -198,6 +198,8 @@ require("./queue_tests")(check, close)
 require("./race_button_tests")(check, close)
 require("./visit_tests")(check, close)
 require("./spa_tests")(check, close)
+require("./copy_tests")(check, close)
+require("./clarity_tests")(check, close)
 
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

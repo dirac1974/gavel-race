@@ -226,7 +226,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 				local path = dir .. "/" .. name
 				if fs.isDir(path) then
 					scan(path)
-				elseif string.sub(name, -5) == ".luau" and name ~= "GrownUps.client.luau" then -- (the parents' page says horses never get sick)
+				elseif string.sub(name, -5) == ".luau" and name ~= "GrownUps.client.luau" and name ~= "Words.luau" then -- (the parents' page says horses never get sick; Words.luau is the banned list itself)
 					for _, lit in literals(fs.readFile(path)) do
 						local w = banned(lit)
 						if w then table.insert(bad, name .. ": " .. lit) end

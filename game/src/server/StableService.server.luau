@@ -288,7 +288,7 @@ local function buildBarn(i: number, owner: Player, data)
 				bubble(hm, Spa.YAWN, "RestBubble")
 			end
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
-				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)
+				bay.LookVector, h.name, if h.id == data.activeHorse then "🏇" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)
 			nameLabel.Name = "HorseName"
 			rosettes(barn, bay, h)
 		end
@@ -756,7 +756,7 @@ VisitFriend.OnServerEvent:Connect(function(player: Player, userId: any)
 	lastTravel[player] = os.clock()
 	local x, z, lx, lz = WorldLayout.gateArrival(i)
 	arriveAt(player, x, z, lx, lz)
-	Profiles.notify(player, "Welcome to " .. owner.DisplayName .. "'s barn! Pat each horse for a Tour stamp", "heart")
+	Profiles.notify(player, "Welcome to " .. owner.DisplayName .. "'s barn! Pat each horse for a stamp", "heart")
 end)
 
 PostBox.OnServerEvent:Connect(function(player: Player, userId: any)
@@ -774,7 +774,7 @@ PostBox.OnServerEvent:Connect(function(player: Player, userId: any)
 		return
 	end
 	Profiles.notify(player, "Carrot dropped in the post box!", "carrot")
-	Profiles.notify(owner, "A friend left a carrot in your post box! (" .. res.today .. " today)", "carrot")
+	Profiles.notify(owner, "A friend left you a carrot! (" .. res.today .. " today)", "carrot")
 	Profiles.changed(player)
 	Profiles.changed(owner)
 end)

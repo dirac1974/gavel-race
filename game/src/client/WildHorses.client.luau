@@ -248,7 +248,7 @@ local function start(h)
 	if session or h.returnFrom then return end
 	local d = PlayerState.data
 	if d and d.market and not d.market.canTame then
-		Ui.toast("You made a new friend today, or need a treat (carrot, apple or sugar cube).", "heart", "🥕")
+		Ui.toast("One new friend a day. Bring a carrot or apple!", "heart", "🥕")
 		return
 	end
 	h.still = true

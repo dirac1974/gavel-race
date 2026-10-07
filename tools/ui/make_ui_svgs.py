@@ -1135,6 +1135,78 @@ def grownups() -> str:
     )
 
 
+# Clarity pass (D-064, horse-life stage 3): one symbol per meaning. Energy is a horseshoe, monthly stamps a
+# rosette, a good family line a sprout, and league badges count with dots (★ means only how you rode).
+def energy_shoe(full: bool) -> str:
+    """Energy pip: a horseshoe. Full: warm orange with nail holes. Spent: a thin hollow grey shoe (shape and colour change)."""
+    if full:
+        return horseshoe(64, 66, 1.65, ENERGY, w=22, outline=12, nails=True) + shine(36, 52, 4, 9, 20, 0.55)
+    return horseshoe(64, 66, 1.65, EMPTY, w=12, outline=10)
+
+
+ROSETTE = "#F27BB0"
+ROSETTE_DARK = "#C9508A"
+
+
+def rosette() -> str:
+    """Monthly stamp (🎀): a pleated rosette with two tails and a paper middle (no star)."""
+    return (
+        solid(ROSETTE_DARK, '<path d="M46 66 L30 118 L44 110 L52 122 L62 74 Z"/>', '<path d="M82 66 L98 118 L84 110 L76 122 L66 74 Z"/>', outline=10)
+        + solid(ROSETTE, f'<path d="{scallop_path(64, 54, 44, 16, 9)}"/>')
+        + f'<circle cx="64" cy="54" r="34" fill="none" stroke="{ROSETTE_DARK}" stroke-width="4" stroke-dasharray="6 5"/>'
+        + solid(PAPER, '<circle cx="64" cy="54" r="22"/>', outline=6)
+        + solid(GOLD, '<circle cx="64" cy="54" r="9"/>', outline=4)
+        + shine(46, 34, 7, 4, -35, 0.5)
+    )
+
+
+def sprout() -> str:
+    """Good family line in the market (🌱): two round leaves on a stem in a mound of soil."""
+    return (
+        solid(DIRT_DARK, '<ellipse cx="64" cy="106" rx="40" ry="14"/>', outline=10)
+        + band("M64 104 C64 86 64 72 66 58", 9, LEAF, 10)
+        + solid(GRASS, '<path d="M64 66 C46 70 22 60 18 36 C40 30 60 42 64 66 Z"/>')
+        + solid(GRASS, '<path d="M66 58 C74 36 98 22 114 30 C112 52 90 64 66 58 Z"/>')
+        + detail("M60 62 C48 56 36 48 28 40", 4, GRASS_DARK)
+        + detail("M70 54 C82 44 96 36 106 34", 4, GRASS_DARK)
+        + shine(36, 44, 6, 3, -30, 0.5)
+    )
+
+
+def badge(tier: str) -> str:
+    """League badges without stars: Rookie round + horseshoe; Bronze/Silver/Gold shields with 1/2/3 paper dots; Champion crown + dot."""
+    if tier == "rookie":  # no horseshoe here: the horseshoe means Energy
+        return (solid(GRASS, '<circle cx="64" cy="64" r="50"/>') + solid("#9EDB86", '<circle cx="64" cy="64" r="36"/>', outline=6)
+                + f'<circle cx="64" cy="64" r="16" fill="none" stroke="{INK}" stroke-width="12"/>'
+                + f'<circle cx="64" cy="64" r="16" fill="none" stroke="{PAPER}" stroke-width="6"/>' + shine(40, 34, 9, 5, -40, 0.45))
+    if tier == "champion":
+        return league("champion").replace(
+            f'<polygon points="{star_points(64, 82, 13, 6)}"/>', '<circle cx="64" cy="82" r="11"/>')
+    metal, dark = {"bronze": (BRONZE, BRONZE_DARK), "silver": (SILVER, SILVER_DARK), "gold": (GOLD, GOLD_DARK)}[tier]
+    spots = {"bronze": [(64, 62, 16)], "silver": [(48, 62, 12), (80, 62, 12)], "gold": [(42, 68, 10), (64, 50, 10), (86, 68, 10)]}[tier]
+    return (
+        solid(dark, f'<path d="{SHIELD}"/>')
+        + solid(metal, f'<path d="{SHIELD_IN}"/>', outline=6)
+        + solid(PAPER, *(f'<circle cx="{x}" cy="{y}" r="{r}"/>' for x, y, r in spots), outline=6)
+        + shine(48, 40, 7, 3.5, -20, 0.5)
+    )
+
+
+CLARITY_NAMES = ["energy_shoe", "energy_shoe_empty", "rosette", "sprout"] + [f"badge_{t}" for t in ("rookie", "bronze", "silver", "gold", "champion")]
+
+
+def clarity_assets() -> dict[str, tuple[int, int, str]]:
+    c: dict[str, tuple[int, int, str]] = {
+        "energy_shoe": (128, 128, energy_shoe(True)),
+        "energy_shoe_empty": (128, 128, energy_shoe(False)),
+        "rosette": (128, 128, rosette()),
+        "sprout": (128, 128, sprout()),
+    }
+    for tier in ("rookie", "bronze", "silver", "gold", "champion"):
+        c[f"badge_{tier}"] = (128, 128, badge(tier))
+    return c
+
+
 def world_assets() -> dict[str, tuple[int, int, str]]:
     w: dict[str, tuple[int, int, str]] = {
         "cash": (128, 128, cash()),
@@ -1196,6 +1268,7 @@ def world_assets() -> dict[str, tuple[int, int, str]]:
         w[f"stamp_{name}"] = (128, 128, stamp(name))
     for stat in ("speed", "accel", "stamina", "grit"):
         w[f"stat_{stat}"] = (128, 128, stat_icon(stat))
+    w.update(clarity_assets())
     return w
 
 
@@ -1211,6 +1284,7 @@ WORLD_SECTIONS: list[tuple[str, list[str]]] = [
     ("Health Passport stamps (one scalloped outline, distinct colour + picture) and the check-up tool", ["stamp_checkup", "stamp_teeth", "stamp_farrier", "stamp_vaccine", "stamp_potential", "stethoscope"]),
     ("Stable Board: jobs, rewards, progress ribbon, all done, welcome back", ["job_care", "job_ride", "job_explore", "job_cheer", "trophy", "ribbon_progress", "sleeping_horse", "welcome_sun"]),
     ("Training stats: Sprint Lane (Speed), Gate Break (Acceleration), Hill Climb (Stamina), Mud Splash (Grit)", ["stat_speed", "stat_accel", "stat_stamina", "stat_grit"]),
+    ("Clarity pass (D-064): Energy horseshoe full vs spent, monthly-stamp rosette, family-line sprout, league badges with dots (no stars)", CLARITY_NAMES),
 ]
 
 

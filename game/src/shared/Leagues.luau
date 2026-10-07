@@ -53,7 +53,7 @@ function Leagues.canEnter(h: any, card: any, bestRating: number): (boolean, stri
 		return false, string.format("%s needs %d more League Points for the Cup", h.name, Leagues.pointsToCup(h) or 0)
 	end
 	if Leagues.overCeiling(h, bestRating) then
-		return false, string.format("%s is too strong for %s races now. Win the Cup to move up!", h.name, h.league)
+		return false, string.format("%s is too good for %s now. Win the Cup!", h.name, h.league)
 	end
 	return true, nil
 end

@@ -9,10 +9,12 @@
 -- With no joinable card, Join puts you in your league's line for the next free course.
 -- One race button (D-061 stage 2): RACE! joins at once with the active horse, so this picker is
 -- "More choices" (another horse, Practice, the Cup, a course), opened from the queue card.
+-- Clarity pass (D-064, stage 3): each race card is its league's colour and badge with one short
+-- line (PickerText.cardLine) and a status chip; a horse card says how today's race suits it in
+-- words, never a number; every button is at least ui.panelButtonPx tall.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
@@ -21,16 +23,13 @@ local RaceRating = require(Shared:WaitForChild("RaceRating"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Guide = require(script.Parent:WaitForChild("Guide"))
+local PickerText = require(Shared:WaitForChild("PickerText"))
 local raceRemotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
 
-local DIST_ICON = { Sprint = "dist_short", Mile = "dist_short", Classic = "dist_long", Marathon = "dist_long" }
--- Sprint is 🐇 Short (D-064: ⚡ looked like Energy).
-local DIST_EMOJI = { Sprint = "🐇", Mile = "🏇", Classic = "🏆", Marathon = "🛤️" }
-local DIST_TEXT = { Sprint = "Short", Mile = "Mile", Classic = "Classic · long", Marathon = "Marathon · longest" }
-local SURF_EMOJI = { Dirt = "🟫", Turf = "🟩" }
-local WEATHER_EMOJI = { Sunny = "☀️", Rain = "🌧️", Wind = "🌬️" }
+local TEXT = GameConfig.ui.panelMinText -- the smallest text on this panel (16)
+local TAP = GameConfig.ui.panelButtonPx  -- the smallest button on this panel (64)
 
 local cards = {}
 local pickedCourse: string? = nil
@@ -46,28 +45,17 @@ dim.BackgroundColor3 = C.ink
 dim.BackgroundTransparency = 0.5
 dim.Parent = gui
 local W, H = 720, 470
-local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.paper)
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-local scale = Instance.new("UIScale")
-scale.Parent = panel
-local function rescale()
-	local cam = workspace.CurrentCamera
-	if cam then scale.Scale = math.min(1, (cam.ViewportSize.X - 20) / W, (cam.ViewportSize.Y - 20) / H) end
-end
-rescale()
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
+local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.new(), C.paper)
+local slideIn = Ui.fitPanel(panel, W, H) -- never shrinks text under 14 px: scrolls instead (D-064)
 local QCARD = GameConfig.queueCard or {}
 local moreChoices = QCARD.enabled ~= false and QCARD.oneTapRace ~= false
 Ui.text(panel, if moreChoices then "🔀 More choices" else "🏁 Pick a race", 32, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 38) })
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
+local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 10, 0, 6), C.white, 26)
 
 local cardRow = Instance.new("Frame")
 cardRow.BackgroundTransparency = 1
-cardRow.Size = UDim2.new(1, -32, 0, 170)
-cardRow.Position = UDim2.new(0, 16, 0, 58)
+cardRow.Size = UDim2.new(1, -32, 0, 150)
+cardRow.Position = UDim2.new(0, 16, 0, 74)
 cardRow.Parent = panel
 local cl = Instance.new("UIListLayout")
 cl.FillDirection = Enum.FillDirection.Horizontal
@@ -75,11 +63,11 @@ cl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 cl.Padding = UDim.new(0, 14)
 cl.Parent = cardRow
 
-Ui.text(panel, "Your horse", 20, { Position = UDim2.new(0, 18, 0, 236), Size = UDim2.new(0, 200, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
+Ui.text(panel, "Your horse", 20, { Position = UDim2.new(0, 18, 0, 228), Size = UDim2.new(0, 200, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 local horseRow = Instance.new("ScrollingFrame")
 horseRow.BackgroundTransparency = 1
-horseRow.Size = UDim2.new(1, -32, 0, 104)
-horseRow.Position = UDim2.new(0, 16, 0, 262)
+horseRow.Size = UDim2.new(1, -32, 0, 112)
+horseRow.Position = UDim2.new(0, 16, 0, 254)
 horseRow.ScrollingDirection = Enum.ScrollingDirection.X
 horseRow.AutomaticCanvasSize = Enum.AutomaticSize.X
 horseRow.CanvasSize = UDim2.new()
@@ -91,14 +79,14 @@ hl.Padding = UDim.new(0, 10)
 hl.Parent = horseRow
 
 local renderCards, renderHorses, renderKinds -- defined below; the buttons call them
-local joinBtn = Ui.button(panel, "Join!", UDim2.fromOffset(260, 62), UDim2.new(1, -276, 1, -78), C.orange, 30)
+local joinBtn = Ui.button(panel, "Join!", UDim2.fromOffset(250, TAP), UDim2.new(1, -266, 1, -TAP - 16), C.orange, 28)
 
 -- Race kind for an open card: a regular race, the Cup (when the horse has the points, or
 -- is too strong for its league), or Practice (free, no prizes, open to tired horses too).
 local kindRow = Instance.new("Frame")
 kindRow.BackgroundTransparency = 1
-kindRow.Size = UDim2.new(0, 420, 0, 50)
-kindRow.Position = UDim2.new(0, 16, 1, -72)
+kindRow.Size = UDim2.new(0, 430, 0, TAP)
+kindRow.Position = UDim2.new(0, 16, 1, -TAP - 16)
 kindRow.Parent = panel
 local kl = Instance.new("UIListLayout")
 kl.FillDirection = Enum.FillDirection.Horizontal
@@ -107,7 +95,7 @@ kl.Parent = kindRow
 local kindButtons = {}
 local kindAllowed: { [string]: boolean } = { race = true, cup = false, practice = true }
 for _, k in { { "race", "🏁 Race" }, { "cup", "🏆 Cup" }, { "practice", "🎈 Practice" } } do
-	local b = Ui.button(kindRow, k[2], UDim2.fromOffset(130, 46), UDim2.new(), C.white, 18)
+	local b = Ui.button(kindRow, k[2], UDim2.fromOffset(136, TAP), UDim2.new(), C.white, 20)
 	kindButtons[k[1]] = b
 	b.Activated:Connect(function()
 		if not kindAllowed[k[1]] then return end
@@ -183,11 +171,8 @@ renderKinds = function()
 	for kind, b in kindButtons do
 		b.BackgroundColor3 = if pickedKind == kind then C.gold elseif kindAllowed[kind] then C.white else C.shade
 	end
-	if h and h.pointsToCup and h.pointsToCup > 0 then
-		kindButtons.cup.Text = string.format("🏆 %d pts", h.pointsToCup)
-	else
-		kindButtons.cup.Text = "🏆 Cup"
-	end
+	-- No "pts" (D-064): the Cup button is grey with a 🔒 until the Cup is open.
+	kindButtons.cup.Text = if kindAllowed.cup then "🏆 Cup" else "🏆 Cup 🔒"
 end
 
 local function raceCard(c)
@@ -195,25 +180,23 @@ local function raceCard(c)
 	local full = c.riders >= c.lanes
 	local h = pickedHorse and PlayerState.horse(pickedHorse)
 	local watch = leagueQueues() and not c.open and h ~= nil and c.league ~= (h.league or "Rookie")
-	local card = Ui.card(cardRow, UDim2.fromOffset(330, 166), UDim2.new(), if selected then C.gold elseif full or watch then C.shade else C.cream)
+	-- The league is the card's colour and badge; one short line; lane dots; a status chip.
+	local league = c.league or (h and h.league) or "Rookie"
+	local face = if selected then C.gold elseif full or watch then C.shade else (Ui.leagueColors[league] or C.cream)
+	local card = Ui.card(cardRow, UDim2.fromOffset(330, 146), UDim2.new(), face)
 	local stroke = card:FindFirstChildOfClass("UIStroke")
 	if selected then
 		stroke.Thickness = 6
 		stroke.Color = C.orangeDark
 	end
-	Ui.icon(card, "league_" .. string.lower(c.league or "rookie"), "🎀", UDim2.fromOffset(44, 44), UDim2.new(0, 10, 0, 10))
-	local kindText = if c.open then "Open · your horse's league" elseif c.cup then "🏆 " .. (c.league or "") .. " Cup"
-		elseif c.practice then "🎈 Practice" else (c.league or "")
-	Ui.text(card, string.format("%s %s", kindText, if c.course == "dirt" then "· Dirt" else "· Turf"), 20,
-		{ Position = UDim2.new(0, 60, 0, 8), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.text(card, string.format("%s %s   %s %s   %s", DIST_EMOJI[c.distance] or "🏇", DIST_TEXT[c.distance] or (c.distance or ""),
-		SURF_EMOJI[c.surface] or "", c.surface or "", WEATHER_EMOJI[c.weather] or ""), 18,
-		{ Position = UDim2.new(0, 60, 0, 34), Size = UDim2.new(1, -66, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.icon(card, Ui.badge(league), "🏅", UDim2.fromOffset(48, 48), UDim2.new(0, 10, 0, 8))
+	Ui.text(card, PickerText.cardLine(c), 20,
+		{ Position = UDim2.new(0, 66, 0, 6), Size = UDim2.new(1, -74, 0, 52), TextXAlignment = Enum.TextXAlignment.Left })
 	-- Eight lane dots: filled = a rider is in line.
 	local dots = Instance.new("Frame")
 	dots.BackgroundTransparency = 1
-	dots.Size = UDim2.new(1, -20, 0, 26)
-	dots.Position = UDim2.new(0, 10, 0, 70)
+	dots.Size = UDim2.new(1, -20, 0, 24)
+	dots.Position = UDim2.new(0, 10, 0, 64)
 	dots.Parent = card
 	local dl = Instance.new("UIListLayout")
 	dl.FillDirection = Enum.FillDirection.Horizontal
@@ -227,15 +210,7 @@ local function raceCard(c)
 		Ui.stroke(d, 2)
 		d.Parent = dots
 	end
-	local status = if watch then string.format("👀 Watch · for %s horses", c.league or "")
-		elseif c.racing then "🏇 Racing now · next race after"
-		elseif c.seconds then string.format("⏱ Starts in %ds", c.seconds)
-		elseif c.riders > 0 then "Filling up…"
-		else "Open · be the first!"
-	Ui.text(card, status, 18, { Position = UDim2.new(0, 10, 0, 104), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.text(card, if c.cup then "🏆 Win to move up a league!" elseif c.practice then "🎈 Just for fun: no Energy, no prizes"
-		else "🎀 Ribbons and Green Cash", 14,
-		{ Position = UDim2.new(0, 10, 0, 130), Size = UDim2.new(1, -20, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+	Ui.text(card, PickerText.status(c, watch), 20, { Position = UDim2.new(0, 10, 0, 98), Size = UDim2.new(1, -20, 0, 30), TextXAlignment = Enum.TextXAlignment.Left })
 	local hit = Instance.new("TextButton")
 	hit.BackgroundTransparency = 1
 	hit.Text = ""
@@ -246,7 +221,7 @@ local function raceCard(c)
 		if watch then -- another league's race: watch it from the grandstand
 			local p = WorldLayout.places.raceBoard
 			Guide.to(p.x, p.z + 10)
-			Ui.toast(string.format("Follow the hoofprints to watch the %s race!", c.league or ""), "flag_ready", "👀")
+			Ui.toast("Follow the hoofprints to watch!", "flag_ready", "👀")
 			return
 		end
 		pickedCourse = c.course
@@ -260,7 +235,7 @@ local function horseCard(h, card)
 	local practice = pickedKind == "practice" or (card ~= nil and card.practice)
 	local tired = not practice and h.energy < GameConfig.energy.costPerCashRace
 		and not GameConfig.energy.freeLeagues[(card and card.league) or h.league or "Rookie"]
-	local b = Ui.button(horseRow, "", UDim2.fromOffset(200, 96), UDim2.new(), if selected then C.gold elseif tired then C.shade else C.white, 18)
+	local b = Ui.button(horseRow, "", UDim2.fromOffset(210, 104), UDim2.new(), if selected then C.gold elseif tired then C.shade else C.white, 18)
 	local dot = Instance.new("Frame")
 	dot.Size = UDim2.fromOffset(40, 40)
 	dot.Position = UDim2.new(0, 8, 0, 8)
@@ -268,20 +243,12 @@ local function horseCard(h, card)
 	Ui.corner(dot, 20)
 	Ui.stroke(dot, 2)
 	dot.Parent = b
-	local name = Ui.text(b, h.name, 18, { Position = UDim2.new(0, 54, 0, 6), Size = UDim2.new(1, -60, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	local name = Ui.text(b, h.name, 20, { Position = UDim2.new(0, 54, 0, 6), Size = UDim2.new(1, -60, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	Ui.energyPips(b, h.energy, GameConfig.energy.maxPerRacer, 18, UDim2.new(0, 54, 0, 31)) -- the one Energy icon (D-064)
 	local diff = suits(h, card)
-	local line
-	if tired then
-		line = "😴 Napping"
-	elseif diff then
-		local d = math.floor(diff + 0.5)
-		line = if d > 0 then string.format("Loves today's race (+%d)", d) elseif d < 0 then string.format("Not its best today (%d)", d) else "A normal day"
-	else
-		line = ""
-	end
-	local l = Ui.text(b, line, 15, { Position = UDim2.new(0, 8, 0, 60), Size = UDim2.new(1, -16, 0, 30), TextXAlignment = Enum.TextXAlignment.Left })
+	local line = PickerText.suits(diff, tired) -- words, never a number (D-064)
+	local l = Ui.text(b, line, TEXT, { Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 30), TextXAlignment = Enum.TextXAlignment.Left })
 	l.TextColor3 = if diff and diff > 0.5 then C.green elseif diff and diff < -0.5 then C.orangeDark else C.plum
 	b.Activated:Connect(function()
 		if tired then
@@ -352,8 +319,7 @@ local function open()
 		pickedCourse = best
 	end
 	gui.Enabled = true
-	panel.Position = UDim2.fromScale(0.5, 0.55)
-	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	slideIn()
 	renderCards(true)
 	renderHorses()
 end

@@ -506,7 +506,7 @@ local function chooseStat(h)
 end
 
 local function quickTrainMenu()
-	open(if GameConfig.training.mode == "rides" then "⚡ Quick train" else "⭐ Training Paddock", "Pick a horse to train")
+	open(if GameConfig.training.mode == "rides" then "⏩ Quick train" else "🎯 Training Paddock", "Pick a horse to train")
 	if #stalledHorses() == 0 then
 		Ui.text(body, "Pick your first horse to start training!", 22, { Size = UDim2.new(1, 0, 0, 40) })
 		return
@@ -544,7 +544,7 @@ local function layoutRibbons(parent: Instance, h, y: number)
 		Ui.corner(cell, 8)
 		Ui.stroke(cell, if key == week then 3 else 1.5, if key == week then C.orange else C.shade)
 		cell.Parent = row
-		local t = Ui.text(cell, got or "🎀", math.floor(size * 0.62), { Size = UDim2.fromScale(1, 1) })
+		local t = Ui.text(cell, got or "🏅", math.floor(size * 0.62), { Size = UDim2.fromScale(1, 1) })
 		if not got then t.TextTransparency = 0.4 end
 	end
 	return row
@@ -553,7 +553,7 @@ end
 local function coursePicker()
 	local h = PlayerState.activeHorse()
 	if not h or not h.stalled then
-		open("⭐ Training", "Ride your horse round a course!")
+		open("🎯 Training", "Ride your horse round a course!")
 		local msg = if h then h.name .. " is out in the pasture. Pick a horse from a stall in My Horses to train!"
 			else "Pick your first horse to start training!"
 		Ui.text(body, msg, 22, { Size = UDim2.new(1, 0, 0, 60) })
@@ -562,7 +562,7 @@ local function coursePicker()
 	local sub = if h.trainingReady == false then string.format("%s's training is full this week. Ride for stars!", h.name)
 		else string.format("Ride %s round a course · this week %.1f of %d points%s", h.name, h.trainedWeek or 0, Training.WEEKLY_CAP,
 			if h.rested then " · Rested ✨" else "")
-	open("⭐ Training", sub)
+	open("🎯 Training", sub)
 	local grid = Instance.new("Frame")
 	grid.BackgroundTransparency = 1
 	grid.Size = UDim2.new(1, 0, 0, 276)
@@ -603,7 +603,7 @@ local function coursePicker()
 		end)
 	end
 	if GameConfig.training.quickTrain then
-		local quick = Ui.button(body, "⚡ Quick train", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.04, 0, 0, 290), C.gold, 22)
+		local quick = Ui.button(body, "⏩ Quick train", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.04, 0, 0, 290), C.gold, 22)
 		quick.Activated:Connect(quickTrainMenu)
 	end
 	local together = Ui.button(body, "👫 Ride together", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.52, 0, 0, 290), C.sky, 22)

@@ -23,8 +23,8 @@ Jobs.DAILY = {
 	{ id = "d_pet", event = "pet", target = 2, text = "Pet your horses 2 times", icon = "heart", go = "stable", reward = { cash = 3, items = { carrot = 2 } } },
 	{ id = "d_race1", event = "race", target = 1, text = "Ride in a race", icon = "flag_ready", go = "raceBoard", reward = { cash = 6, items = { hay = 2 } } },
 	{ id = "d_race3", event = "race", target = 3, text = "Ride in 3 races", icon = "flag_ready", go = "raceBoard", reward = { cash = 10, items = { seed_carrot = 2 } } },
-	{ id = "d_great5", event = "great_tap", target = 5, text = "Land 5 Great or Perfect taps", icon = "care_star", go = "raceBoard", reward = { cash = 6, items = { treat = 1 } } },
-	{ id = "d_burst", event = "burst_great", target = 1, text = "Hit a Great Final Burst", icon = "care_star", go = "raceBoard", reward = { cash = 6, items = { grain = 1 } } },
+	{ id = "d_great5", event = "great_tap", target = 5, text = "Land 5 Great or Perfect taps", icon = "label_perfect", go = "raceBoard", reward = { cash = 6, items = { treat = 1 } } },
+	{ id = "d_burst", event = "burst_great", target = 1, text = "Hit a Great Final Burst", icon = "label_perfect", go = "raceBoard", reward = { cash = 6, items = { grain = 1 } } },
 	{ id = "d_plant", event = "plant", target = 1, text = "Plant a seed", icon = "seed_carrot", go = "stable", reward = { cash = 3, items = { seed_oats = 1 } } },
 	{ id = "d_chore", event = "chore", target = 1, text = "Muck out a stall", icon = "hay", go = "stable", reward = { cash = 3, items = { hay = 2 } } },
 	{ id = "d_treat", event = "treat", target = 2, text = "Give 2 treats", icon = "carrot", go = "stable", reward = { cash = 3, items = { apple = 1 } } },
@@ -38,12 +38,12 @@ Jobs.DAILY = {
 
 Jobs.WEEKLY = {
 	{ id = "w_race10", event = "race", target = 10, text = "Ride in 10 races", icon = "flag_ready", go = "raceBoard", reward = { cash = 30, items = { treat = 3 } } },
-	{ id = "w_great40", event = "great_tap", target = 40, text = "Land 40 Great or Perfect taps", icon = "care_star", go = "raceBoard", reward = { cash = 25, items = { grain = 3 } } },
+	{ id = "w_great40", event = "great_tap", target = 40, text = "Land 40 Great or Perfect taps", icon = "label_perfect", go = "raceBoard", reward = { cash = 25, items = { grain = 3 } } },
 	{ id = "w_care10", event = "feed", target = 7, text = "Feed horses 7 times", icon = "hay", go = "stable", reward = { cash = 20, items = { seed_apple = 2 } } },
 	{ id = "w_groom7", event = "groom", target = 7, text = "Brush horses 7 times", icon = "brush", go = "stable", reward = { cash = 20, items = { treat = 2 } } },
 	{ id = "w_harvest5", event = "harvest", target = 5, text = "Pick 5 crops", icon = "carrot", go = "stable", reward = { cash = 20, items = { seed_oats = 3 } } },
 	{ id = "w_chore6", event = "chore", target = 6, text = "Muck out 6 stalls", icon = "hay", go = "stable", reward = { cash = 15, items = { hay = 10 } } },
-	{ id = "w_burst3", event = "burst_great", target = 3, text = "Hit 3 Great Final Bursts", icon = "care_star", go = "raceBoard", reward = { cash = 25, items = { treat = 2 } } },
+	{ id = "w_burst3", event = "burst_great", target = 3, text = "Hit 3 Great Final Bursts", icon = "label_perfect", go = "raceBoard", reward = { cash = 25, items = { treat = 2 } } },
 	{ id = "w_days3", event = "day", target = 3, text = "Visit your stable on 3 days", icon = "map_stable", go = "stable", reward = { cash = 20, items = { apple = 3 } } },
 	{ id = "w_train4", event = "train", target = 4, text = "Do 4 training sessions", icon = "stat_stamina", go = "paddock", reward = { cash = 25, items = { grain = 3 } } },
 	{ id = "w_vet3", event = "checkup", target = 3, text = "Collect 3 vet check-ups", icon = "stethoscope", go = "vet", reward = { cash = 15, items = { treat = 2 } } },
@@ -51,7 +51,7 @@ Jobs.WEEKLY = {
 
 Jobs.MONTHLY = {
 	{ id = "m_race40", event = "race", target = 40, text = "Ride in 40 races", icon = "flag_ready", go = "raceBoard", reward = { stamps = 2, items = { treat = 5 } } },
-	{ id = "m_great150", event = "great_tap", target = 150, text = "Land 150 Great or Perfect taps", icon = "care_star", go = "raceBoard", reward = { stamps = 2, items = { grain = 5 } } },
+	{ id = "m_great150", event = "great_tap", target = 150, text = "Land 150 Great or Perfect taps", icon = "label_perfect", go = "raceBoard", reward = { stamps = 2, items = { grain = 5 } } },
 	{ id = "m_harvest20", event = "harvest", target = 20, text = "Pick 20 crops", icon = "carrot", go = "stable", reward = { stamps = 1, items = { seed_apple = 4 } } },
 	{ id = "m_bond", event = "pet", target = 20, text = "Pet your horses 20 times", icon = "heart", go = "stable", reward = { stamps = 1, items = { treat = 4 } } },
 	{ id = "m_days10", event = "day", target = 10, text = "Visit your stable on 10 days", icon = "map_stable", go = "stable", reward = { stamps = 2, items = { hay = 20 } } },

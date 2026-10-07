@@ -273,7 +273,7 @@ end)
 local panel = Ui.card(gui, UDim2.fromOffset(360, 260), UDim2.new(0, 16, 0.5, 0), C.paper)
 panel.AnchorPoint = Vector2.new(0, 0.5)
 panel.Visible = false
-local panelTitle = Ui.text(panel, "⭐ Top Fans", 26, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 30) })
+local panelTitle = Ui.text(panel, "📣 Top Fans", 26, { Position = UDim2.new(0, 0, 0, 8), Size = UDim2.new(1, 0, 0, 30) })
 local rows = {}
 for k = 1, 5 do
 	local r = Ui.text(panel, "", 18, { Position = UDim2.new(0, 16, 0, 42 + (k - 1) * 30), Size = UDim2.new(1, -32, 0, 26), TextXAlignment = Enum.TextXAlignment.Left })
@@ -296,7 +296,7 @@ remotes:WaitForChild("TopFans").OnClientEvent:Connect(function(courseId, board, 
 			r.Text = if e then string.format("%d. %s 📣 %s · %d", k, e.name, e.horse, e.score) else ""
 		end
 		mine.Text, xpLine.Text = "", ""
-		panelTitle.Text = "⭐ Top Fans"
+		panelTitle.Text = "📣 Top Fans"
 		panel.Visible = true
 		hideAt = os.clock() + 9
 	else

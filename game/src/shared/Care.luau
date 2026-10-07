@@ -55,7 +55,7 @@ function Care.feed(p: any, h: any, item: string, now: number, energyCfg: any): (
 	if not food then return false, "Horses eat hay or grain at mealtime" end
 	if h.care.day == today(now) and h.care.fed then return false, h.name .. " has had a meal today" end
 	if not Profile.takeItem(p, item, 1) then
-		return false, if item == "hay" then "Out of hay! Muck out a stall or visit Feed & Seed" else "No grain left"
+		return false, if item == "hay" then "No hay! Muck out a stall or visit Feed & Seed" else "No grain left"
 	end
 	local _, topUp = Horse.tend(h, "feed", now, energyCfg, energyCfg.careTopUps)
 	if food.bond > 0 then Horse.addBond(h, food.bond) end

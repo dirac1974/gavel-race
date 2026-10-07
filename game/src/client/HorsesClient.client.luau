@@ -4,22 +4,27 @@
 --   once the vet reveals it), Energy, bond and record, in a stall or the pasture. Ride this
 --   one (make it active), move between stall and pasture, rename with word chips, and build
 --   a new stall with Green Cash.
---   Market Corral: walk up to a horse in the corral to see its card (stats, ★ bloodline,
+--   Market Corral: walk up to a horse in the corral to see its card (stats, 🌱 family line,
 --   price) and bring it home. Never for Robux; buying never takes it from anyone else.
+-- Clarity pass (D-064, stage 3): 🏇 marks the horse you ride (★ is only how you rode), text is
+-- never under ui.panelMinText, buttons never under ui.panelButtonPx, and on a short screen the
+-- panel gets shorter and its list scrolls instead of shrinking.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local NameGen = require(Shared:WaitForChild("NameGen"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local Market = require(Shared:WaitForChild("Market"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
+local TEXT = GameConfig.ui.panelMinText -- the smallest text on these panels (16)
+local TAP = GameConfig.ui.panelButtonPx  -- the smallest button on these panels (64)
 local STAT_LABEL = { speed = "Speed", accel = "Accel", stamina = "Stamina", grit = "Grit" }
 local STYLE_LABEL = { FrontRunner = "Front-runner", Stalker = "Stalker", Closer = "Closer" }
 
@@ -32,33 +37,22 @@ dim.BackgroundColor3 = C.ink
 dim.BackgroundTransparency = 0.5
 dim.Parent = gui
 local W, H = 760, 500
-local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.paper)
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-local scale = Instance.new("UIScale")
-scale.Parent = panel
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	local function rescale()
-		local v = workspace.CurrentCamera.ViewportSize
-		scale.Scale = math.min(1, (v.X - 20) / W, (v.Y - 20) / H)
-	end
-	rescale()
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
-local title = Ui.text(panel, "🐴 My Horses", 30, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 36) })
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
-local stallBtn = Ui.button(panel, "", UDim2.fromOffset(220, 40), UDim2.new(0, 16, 0, 14), C.sky, 17)
-local hallBtn = Ui.button(panel, "🏅 Hall of Fame", UDim2.fromOffset(170, 40), UDim2.new(1, -236, 0, 14), C.cream, 16)
+local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.new(), C.paper)
+local slideIn = Ui.fitPanel(panel, W, H, 300) -- shorter on a short screen; the list scrolls (D-064)
+local title = Ui.text(panel, "🐴 My Horses", 28, { Position = UDim2.new(0, 250, 0, 20), Size = UDim2.new(1, -500, 0, 36) })
+local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 10, 0, 6), C.white, 26)
+local stallBtn = Ui.button(panel, "", UDim2.fromOffset(230, TAP), UDim2.new(0, 12, 0, 6), C.sky, 18)
+local hallBtn = Ui.button(panel, "🏅 Hall of Fame", UDim2.fromOffset(170, TAP), UDim2.new(1, -TAP - 186, 0, 6), C.cream, 18)
 local list = Instance.new("ScrollingFrame")
 list.BackgroundTransparency = 1
-list.Size = UDim2.new(1, -32, 1, -76)
-list.Position = UDim2.new(0, 16, 0, 62)
+list.Size = UDim2.new(1, -32, 1, -TAP - 22)
+list.Position = UDim2.new(0, 16, 0, TAP + 14)
 list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 list.CanvasSize = UDim2.new()
 list.ScrollBarThickness = 6
 list.Parent = panel
 local grid = Instance.new("UIGridLayout")
-grid.CellSize = UDim2.new(0.5, -8, 0, 210)
+grid.CellSize = UDim2.new(0.5, -8, 0, 260)
 grid.CellPadding = UDim2.fromOffset(12, 12)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = list
@@ -69,10 +63,10 @@ local renameState = nil       -- { id, first, second, picked } kept while renami
 local mode = "horses"       -- or "rename:<id>"
 
 local function statBar(parent: Instance, y: number, key: string, value: number, cap: number?)
-	Ui.text(parent, STAT_LABEL[key], 14, { Position = UDim2.new(0, 10, 0, y), Size = UDim2.new(0, 64, 0, 16), TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.text(parent, STAT_LABEL[key], TEXT, { Position = UDim2.new(0, 10, 0, y), Size = UDim2.new(0, 72, 0, 20), TextXAlignment = Enum.TextXAlignment.Left })
 	local bar = Instance.new("Frame")
-	bar.Size = UDim2.new(1, -140, 0, 12)
-	bar.Position = UDim2.new(0, 76, 0, y + 2)
+	bar.Size = UDim2.new(1, -156, 0, 14)
+	bar.Position = UDim2.new(0, 84, 0, y + 3)
 	bar.BackgroundColor3 = C.white
 	Ui.corner(bar, 6)
 	Ui.stroke(bar, 1.5)
@@ -89,8 +83,8 @@ local function statBar(parent: Instance, y: number, key: string, value: number, 
 	fillF.BackgroundColor3 = C.teal
 	Ui.corner(fillF, 6)
 	fillF.Parent = bar
-	Ui.text(parent, if cap then string.format("%.0f/%d", value, cap) else string.format("%.0f", value), 13,
-		{ Position = UDim2.new(1, -60, 0, y), Size = UDim2.new(0, 54, 0, 16), TextXAlignment = Enum.TextXAlignment.Right })
+	Ui.text(parent, if cap then string.format("%.0f/%d", value, cap) else string.format("%.0f", value), TEXT,
+		{ Position = UDim2.new(1, -68, 0, y), Size = UDim2.new(0, 62, 0, 20), TextXAlignment = Enum.TextXAlignment.Right })
 end
 
 local render
@@ -107,51 +101,53 @@ local function horseCard(h, order: number)
 	Ui.corner(dot, 20)
 	Ui.stroke(dot, 2)
 	dot.Parent = card
-	local name = Ui.text(card, (if active then "⭐ " else "") .. h.name, 20, { Position = UDim2.new(0, 58, 0, 6), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
+	local name = Ui.text(card, (if active then "🏇 " else "") .. h.name, 20, { Position = UDim2.new(0, 58, 0, 6), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	local leagueLine = (h.league or "Rookie") .. (if h.cupOpen then " · 🏆 Cup open!" elseif h.pointsToCup then string.format(" · %d pts to the Cup", h.pointsToCup) else "")
-	Ui.text(card, string.format("%s · %s · %s", if h.stalled then "Stall" else "Pasture", STYLE_LABEL[h.style] or "", leagueLine), 13,
-		{ Position = UDim2.new(0, 58, 0, 30), Size = UDim2.new(1, -66, 0, 16), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+	local leagueLine = (h.league or "Rookie") .. (if h.cupOpen then " · 🏆 Cup open!" else "")
+	local sub = Ui.text(card, string.format("%s · %s", if h.stalled then "Stall" else "Pasture", leagueLine), TEXT,
+		{ Position = UDim2.new(0, 58, 0, 30), Size = UDim2.new(1, -66, 0, 20), TextXAlignment = Enum.TextXAlignment.Left })
+	sub.TextColor3 = C.plum
+	sub.TextTruncate = Enum.TextTruncate.AtEnd
 	for k, key in { "speed", "accel", "stamina", "grit" } do
-		statBar(card, 54 + (k - 1) * 20, key, h.stats[key], h.potential and h.potential[key])
+		statBar(card, 56 + (k - 1) * 24, key, h.stats[key], h.potential and h.potential[key])
 	end
-	-- Energy as the one horseshoe row (D-064), then bond and the record.
-	local pips = Ui.energyPips(card, h.energy, GameConfig.energy.maxPerRacer, 16, UDim2.new(0, 10, 0, 137))
-	Ui.text(card, string.format("❤️%d  🏁 %d races · %d wins", math.floor(h.bond), h.record.races, h.record.wins), 14,
-		{ Position = UDim2.new(0, 16 + pips.Size.X.Offset, 0, 136), Size = UDim2.new(1, -26 - pips.Size.X.Offset, 0, 18), TextXAlignment = Enum.TextXAlignment.Left })
+	-- Energy as the one horseshoe row (D-064), then care (❤️ bond) and the record.
+	local pips = Ui.energyPips(card, h.energy, GameConfig.energy.maxPerRacer, 18, UDim2.new(0, 10, 0, 155))
+	Ui.text(card, string.format("❤️%d  🏁 %d · 🥇 %d", math.floor(h.bond), h.record.races, h.record.wins), TEXT,
+		{ Position = UDim2.new(0, 16 + pips.Size.X.Offset, 0, 153), Size = UDim2.new(1, -26 - pips.Size.X.Offset, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, -16, 0, 40)
-	row.Position = UDim2.new(0, 8, 1, -48)
+	row.Size = UDim2.new(1, -16, 0, TAP)
+	row.Position = UDim2.new(0, 8, 1, -TAP - 10)
 	row.Parent = card
 	local rl = Instance.new("UIListLayout")
 	rl.FillDirection = Enum.FillDirection.Horizontal
 	rl.Padding = UDim.new(0, 6)
 	rl.Parent = row
 	local function btn(text: string, color: Color3, fn)
-		local b = Ui.button(row, text, UDim2.fromOffset(82, 38), UDim2.new(), color, 13)
+		local b = Ui.button(row, text, UDim2.fromOffset(80, TAP), UDim2.new(), color, TEXT)
 		b.Activated:Connect(fn)
 	end
 	if h.stalled and not active then
-		btn("⭐ Ride this one", C.orange, function() gameRemotes:WaitForChild("SetActiveHorse"):FireServer(h.id) end)
+		btn("🏇 Ride", C.orange, function() gameRemotes:WaitForChild("SetActiveHorse"):FireServer(h.id) end)
 	end
 	if not h.stalled then
-		btn(if moving == h.id then "Pick a stall ↓" else "Move to stall", C.sky, function()
+		btn(if moving == h.id then "Pick one ↓" else "🏠 Stall", C.sky, function()
 			moving = if moving == h.id then nil else h.id
 			render()
 		end)
 	elseif moving then
-		btn("Swap here", C.green, function()
+		btn("🔁 Swap", C.green, function()
 			gameRemotes:WaitForChild("SwapStall"):FireServer(h.id, moving)
 			moving = nil
 		end)
 	end
-	btn("✏️ Rename", C.white, function()
+	btn("✏️ Name", C.white, function()
 		mode = "rename:" .. h.id
 		render()
 	end)
 	if #d.horses > 1 then
-		btn(if retiring == h.id then "Sure? Retire" else "🏅 Retire", if retiring == h.id then C.red else C.cream, function()
+		btn(if retiring == h.id then "Sure?" else "🏅 Retire", if retiring == h.id then C.red else C.cream, function()
 			if retiring == h.id then
 				gameRemotes:WaitForChild("RetireHorse"):FireServer(h.id)
 				retiring = nil
@@ -170,14 +166,14 @@ local function hallView()
 	if #plaques == 0 then
 		local empty = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
 		Ui.text(empty, "No legends yet. Retire a horse when you choose, and its record lives here.", 18,
-			{ Position = UDim2.new(0, 12, 0, 40), Size = UDim2.new(1, -24, 0, 80) })
+			{ Position = UDim2.new(0, 12, 0, 20), Size = UDim2.new(1, -24, 0, 80) })
 	end
 	for k, pl in plaques do
 		local c = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
 		c.LayoutOrder = k
 		Ui.text(c, "🏅 " .. pl.name, 22, { Position = UDim2.new(0, 12, 0, 12), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
-		Ui.text(c, string.format("%s · %s", pl.coat:gsub("_", " "), pl.league), 15, { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
-		Ui.text(c, string.format("🏁 %d races · 🥇 %d wins · 🎀 %d top three · 💵 %d", pl.races, pl.wins, pl.places, pl.cash), 16,
+		Ui.text(c, string.format("%s · %s", (pl.coat:gsub("_", " ")), pl.league), TEXT, { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+		Ui.text(c, string.format("🏁 %d races · 🥇 %d wins · 🏅 %d top three · 💵 %d", pl.races, pl.wins, pl.places, pl.cash), TEXT,
 			{ Position = UDim2.new(0, 12, 0, 74), Size = UDim2.new(1, -24, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	end
 end
@@ -196,7 +192,7 @@ local function renameView(id: string)
 	local first, second, picked = renameState.first, renameState.second, renameState.picked
 	local box = Instance.new("Frame")
 	box.BackgroundTransparency = 1
-	box.Size = UDim2.new(1, 0, 0, 300)
+	box.Size = UDim2.new(1, 0, 0, 52 + 3 * (TAP + 8))
 	box.LayoutOrder = 1
 	box.Parent = list
 	local preview = Ui.text(box, NameGen.build(picked[1], picked[2]) or h.name, 36, { Size = UDim2.new(1, 0, 0, 44) })
@@ -204,8 +200,8 @@ local function renameView(id: string)
 	for r, words in { first, second } do
 		local rowF = Instance.new("Frame")
 		rowF.BackgroundTransparency = 1
-		rowF.Size = UDim2.new(1, 0, 0, 50)
-		rowF.Position = UDim2.new(0, 0, 0, 54 + (r - 1) * 58)
+		rowF.Size = UDim2.new(1, 0, 0, TAP)
+		rowF.Position = UDim2.new(0, 0, 0, 52 + (r - 1) * (TAP + 8))
 		rowF.Parent = box
 		local l = Instance.new("UIListLayout")
 		l.FillDirection = Enum.FillDirection.Horizontal
@@ -213,7 +209,7 @@ local function renameView(id: string)
 		l.Padding = UDim.new(0, 6)
 		l.Parent = rowF
 		for _, w in words do
-			local b = Ui.button(rowF, w, UDim2.fromOffset(104, 44), UDim2.new(), C.white, 18)
+			local b = Ui.button(rowF, w, UDim2.fromOffset(104, TAP), UDim2.new(), C.white, 18)
 			b.Activated:Connect(function()
 				picked[r] = if picked[r] == w then nil else w
 				for _, o in rowF:GetChildren() do
@@ -224,8 +220,8 @@ local function renameView(id: string)
 			b.BackgroundColor3 = if picked[r] == w then C.gold else C.white
 		end
 	end
-	local save = Ui.button(box, "Save name", UDim2.fromOffset(200, 50), UDim2.new(0.5, -210, 0, 186), C.green, 22)
-	local back = Ui.button(box, "Back", UDim2.fromOffset(200, 50), UDim2.new(0.5, 10, 0, 186), C.white, 22)
+	local save = Ui.button(box, "Save name", UDim2.fromOffset(200, TAP), UDim2.new(0.5, -210, 0, 52 + 2 * (TAP + 8)), C.green, 22)
+	local back = Ui.button(box, "Back", UDim2.fromOffset(200, TAP), UDim2.new(0.5, 10, 0, 52 + 2 * (TAP + 8)), C.white, 22)
 	save.Activated:Connect(function()
 		if NameGen.build(picked[1], picked[2]) then
 			gameRemotes:WaitForChild("RenameHorse"):FireServer(id, picked[1], picked[2])
@@ -255,7 +251,7 @@ render = function()
 		stallBtn.Visible = false
 		return renameView(string.sub(mode, 8))
 	end
-	grid.CellSize = UDim2.new(0.5, -8, 0, 210)
+	grid.CellSize = UDim2.new(0.5, -8, 0, 260)
 	title.Text = string.format("🐴 My Horses (%d)", #d.horses)
 	local price = d.market and d.market.nextStallPrice
 	stallBtn.Visible = true
@@ -277,8 +273,7 @@ local function open()
 	if not PlayerState.data or #PlayerState.data.horses == 0 then return end
 	mode, moving, retiring, renameState = "horses", nil, nil, nil
 	gui.Enabled = true
-	panel.Position = UDim2.fromScale(0.5, 0.55)
-	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	slideIn()
 	render()
 end
 local function close() gui.Enabled = false end
@@ -297,20 +292,13 @@ ev.Event:Connect(function() if gui.Enabled then close() else open() end end)
 -- Market Corral --------------------------------------------------------------------------
 local mgui = Ui.screen("MarketCard", 11)
 mgui.Enabled = false
-local mcard = Ui.card(mgui, UDim2.fromOffset(420, 330), UDim2.fromScale(0.5, 0.5), C.paper)
-mcard.AnchorPoint = Vector2.new(0.5, 0.5)
-local mscale = Instance.new("UIScale")
-mscale.Parent = mcard
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	local v = workspace.CurrentCamera.ViewportSize
-	mscale.Scale = math.min(1, (v.X - 20) / 420, (v.Y - 20) / 330)
-end)
+local mcard = Ui.card(mgui, UDim2.fromOffset(420, 350), UDim2.new(), C.paper)
+local marketSlide = Ui.fitPanel(mcard, 420, 350)
 local mbody = Instance.new("Frame")
 mbody.BackgroundTransparency = 1
 mbody.Size = UDim2.fromScale(1, 1)
 mbody.Parent = mcard
-local mclose = Ui.button(mcard, "✕", UDim2.fromOffset(40, 40), UDim2.new(1, -50, 0, 10), C.white, 20)
+local mclose = Ui.button(mcard, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 8, 0, 6), C.white, 26)
 mclose.Activated:Connect(function() mgui.Enabled = false end)
 
 local function listingCard(id: string)
@@ -322,18 +310,22 @@ local function listingCard(id: string)
 	if not l then return end
 	mbody:ClearAllChildren()
 	Ui.text(mbody, l.name, 28, { Position = UDim2.new(0, 0, 0, 14), Size = UDim2.new(1, 0, 0, 32) })
-	Ui.text(mbody, string.format("%s · %s · Bloodline %s", l.coat:gsub("_", " "), STYLE_LABEL[l.style] or "", string.rep("★", l.stars) .. string.rep("☆", 3 - l.stars)), 16,
-		{ Position = UDim2.new(0, 0, 0, 48), Size = UDim2.new(1, 0, 0, 20) }).TextColor3 = C.plum
-	for k, key in { "speed", "accel", "stamina", "grit" } do statBar(mbody, 80 + (k - 1) * 22, key, l.stats[key], nil) end
-	Ui.text(mbody, "More ★ = more room to grow with training", 14, { Position = UDim2.new(0, 0, 0, 172), Size = UDim2.new(1, 0, 0, 18) }).TextColor3 = C.plum
-	local buy = Ui.button(mbody, if l.bought then "Lives with you ✓" else string.format("Bring home · 💵 %d", l.price), UDim2.fromOffset(280, 58),
-		UDim2.new(0.5, -140, 1, -78), if l.bought then C.shade else C.orange, 22)
+	-- 🌱 = a good family line (D-064; ★ is only how you rode).
+	Ui.text(mbody, string.format("%s · %s", (l.coat:gsub("_", " ")), Market.familyLine(l.stars)), TEXT,
+		{ Position = UDim2.new(0, 0, 0, 50), Size = UDim2.new(1, 0, 0, 22) }).TextColor3 = C.plum
+	for k, key in { "speed", "accel", "stamina", "grit" } do statBar(mbody, 82 + (k - 1) * 24, key, l.stats[key], nil) end
+	Ui.text(mbody, "More 🌱 = more room to grow", TEXT, { Position = UDim2.new(0, 0, 0, 182), Size = UDim2.new(1, 0, 0, 22) }).TextColor3 = C.plum
+	local buy = Ui.button(mbody, if l.bought then "Lives with you ✓" else string.format("Bring home · 💵 %d", l.price), UDim2.fromOffset(280, TAP),
+		UDim2.new(0.5, -140, 1, -TAP - 16), if l.bought then C.shade else C.orange, 22)
 	buy.Activated:Connect(function()
 		if l.bought then return end
 		gameRemotes:WaitForChild("MarketBuy"):FireServer(l.id)
 		mgui.Enabled = false
 	end)
-	mgui.Enabled = true
+	if not mgui.Enabled then
+		mgui.Enabled = true
+		marketSlide()
+	end
 end
 
 local function attachListing(m: Instance)

@@ -55,7 +55,10 @@ WORLD_NAMES = (
     + [f"stat_{k}" for k in ("speed", "accel", "stamina", "grit")]
 )
 
-SETS = ((NAMES, "ui_atlas_"), (WORLD_NAMES, "ui_atlas_world_"))
+# Clarity pass (D-064, horse-life stage 3): its own sheet, so the uploaded race and world sheets never move.
+CLARITY_NAMES = ["energy_shoe", "energy_shoe_empty", "rosette", "sprout"] + [f"badge_{t}" for t in ("rookie", "bronze", "silver", "gold", "champion")]
+
+SETS = ((NAMES, "ui_atlas_"), (WORLD_NAMES, "ui_atlas_world_"), (CLARITY_NAMES, "ui_atlas_clarity_"))
 
 
 def pack(images: dict[str, Image.Image]) -> list[dict[str, tuple[int, int, int, int]]]:
@@ -115,7 +118,7 @@ def main() -> None:
     written = []
     for names, prefix in SETS:
         written += build(names, prefix, entries)
-    for stale in OUT.glob("ui_atlas_world_*.png"):
+    for stale in [*OUT.glob("ui_atlas_world_*.png"), *OUT.glob("ui_atlas_clarity_*.png")]:
         if stale.stem not in written:
             stale.unlink()
             print(f"removed stale {stale.name}")

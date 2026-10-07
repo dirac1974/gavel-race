@@ -6,7 +6,11 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local PanelFit = require(Shared:WaitForChild("PanelFit"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 
@@ -35,6 +39,16 @@ Ui.coatColors = {
 	appaloosa = Color3.fromHex("EDE6DA"), buckskin = Color3.fromHex("C9A26B"), dun = Color3.fromHex("C8A97E"),
 	roan = Color3.fromHex("A8695A"), white = Color3.fromHex("F4F0E8"), chestnut_blaze = Color3.fromHex("B5562B"),
 }
+
+-- League colours (D-064, stage 3): a race card is its league's colour, the badge on it too.
+Ui.leagueColors = {
+	Rookie = Color3.fromHex("9EDB86"), Bronze = Color3.fromHex("E8B48A"), Silver = Color3.fromHex("D5DCE6"),
+	Gold = Color3.fromHex("FFE08A"), Champion = Color3.fromHex("B9B9F0"),
+}
+-- League badges count with dots, not stars (★ means only how you rode, D-064).
+function Ui.badge(league: string?): string
+	return "badge_" .. string.lower(league or "Rookie")
+end
 
 local player = Players.LocalPlayer
 
@@ -195,7 +209,7 @@ end
 
 -- Energy (D-064): one horseshoe icon everywhere, a row of `max` pips with the spent ones faded.
 -- "∩" stands in for the horseshoe until the atlas loads (⚡ meant Sprint too, so it's gone).
-Ui.ENERGY_ICON, Ui.ENERGY_EMOJI = "energy_hoof", "∩"
+Ui.ENERGY_ICON, Ui.ENERGY_EMOJI = "energy_shoe", "∩"
 function Ui.energyPips(parent: Instance, energy: number, max: number, px: number, pos: UDim2?): Frame
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
@@ -213,6 +227,69 @@ function Ui.energyPips(parent: Instance, energy: number, max: number, px: number
 	end
 	row.Parent = parent
 	return row
+end
+
+-- An icon plus one word (D-064): the icon on top, the word (ui.labelPx) under it.
+function Ui.iconButton(parent: Instance, icon: string, emoji: string, word: string, size: UDim2, pos: UDim2, color: Color3?): TextButton
+	local b = Ui.button(parent, "", size, pos, color)
+	local px = GameConfig.ui.labelPx
+	Ui.icon(b, icon, emoji, UDim2.fromOffset(36, 36), UDim2.new(0.5, -18, 0, 6))
+	local l = Ui.text(b, word, px, { Size = UDim2.new(1, -4, 0, px + 2), Position = UDim2.new(0, 2, 1, -(px + 6)), TextWrapped = false })
+	l.Name = "Word"
+	return b
+end
+
+-- Big panels on small screens (D-064, stage 3): the panel shrinks to fit, but never below the
+-- text and touch floors (PanelFit); what still doesn't fit scrolls in a column, or, for a panel
+-- with its own list (minHeight), the panel gets shorter and its list scrolls. Returns a function
+-- that plays the open slide.
+function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?): () -> ()
+	local cfg = GameConfig.ui
+	local scale = panel:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Parent = panel
+	local column = Instance.new("ScrollingFrame")
+	column.Name = "PanelColumn"
+	column.BackgroundTransparency = 1
+	column.BorderSizePixel = 0
+	column.AnchorPoint = Vector2.new(0.5, 0)
+	column.Position = UDim2.fromScale(0.5, 0)
+	column.ScrollingDirection = Enum.ScrollingDirection.XY
+	column.ScrollBarThickness = 8
+	column.ZIndex = 2
+	-- The column is only as wide as the panel (+20 px), so on a wide screen taps beside it still
+	-- reach the dim, which closes the panel; on a phone the panel's ✕ does.
+	column.Parent = panel.Parent
+	panel.AnchorPoint = Vector2.new(0.5, 0)
+	panel.Parent = column
+	local top = 0
+	local centre = UDim.new(0.5, 0)
+	local function apply()
+		local cam = workspace.CurrentCamera
+		if not cam then return end
+		local v = cam.ViewportSize
+		local f = PanelFit.layout(v.X, v.Y, w, h, cfg.panelMinText, cfg.panelButtonPx, cfg, minHeight)
+		scale.Scale = f.scale
+		panel.Size = UDim2.fromOffset(w, f.height)
+		local colW = math.min(v.X, math.ceil(w * f.scale) + 20)
+		column.Size = UDim2.new(0, colW, 1, 0)
+		column.CanvasSize = UDim2.fromOffset(if f.scrollX then f.canvasX else 0, f.canvas)
+		column.ScrollingEnabled = f.scroll or f.scrollX
+		top = math.floor((f.canvas - f.height * f.scale) / 2)
+		centre = if f.scrollX then UDim.new(0, math.floor(f.canvasX / 2)) else UDim.new(0.5, 0)
+		panel.Position = UDim2.new(centre, UDim.new(0, top))
+	end
+	apply()
+	task.spawn(function()
+		while not workspace.CurrentCamera do task.wait(0.1) end
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(apply)
+		apply()
+	end)
+	return function()
+		apply()
+		column.CanvasPosition = Vector2.zero
+		panel.Position = UDim2.new(centre, UDim.new(0, top + 30))
+		TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.new(centre, UDim.new(0, top)) }):Play()
+	end
 end
 
 -- Fade an icon (a spent Energy pip) or bring it back.
@@ -264,7 +341,7 @@ function Ui.toast(text: string, icon: string?, emoji: string?)
 	layout.Parent = t
 	local p = Ui.pad(t, 8)
 	p.PaddingLeft, p.PaddingRight = UDim.new(0, 14), UDim.new(0, 18)
-	if icon or emoji then Ui.icon(t, icon or "", emoji or "⭐", UDim2.fromOffset(32, 32)) end
+	if icon or emoji then Ui.icon(t, icon or "", emoji or "💬", UDim2.fromOffset(32, 32)) end
 	local label = Ui.text(t, text, 22, { Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, TextWrapped = false })
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	t.Parent = toastList
