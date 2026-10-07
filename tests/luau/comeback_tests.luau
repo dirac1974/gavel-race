@@ -65,7 +65,8 @@ end
 
 return function(check: (boolean, string) -> (), _close: (number, number, number) -> boolean)
 	local CB = GameConfig.comeback
-	check(CB ~= nil and CB.welcome.enabled and CB.welcome.awayDays == 3 and CB.studioAwayDays == 0, "comeback config: 3+ days away, Studio pretend off")
+	check(CB ~= nil and CB.welcome.enabled and CB.welcome.awayDays == 3 and CB.studioAwayDays == 0 and CB.studioMonthStamps == 0,
+		"comeback config: 3+ days away, Studio pretend values off")
 
 	-- Monthly stamp cloths ---------------------------------------------------------------
 	do

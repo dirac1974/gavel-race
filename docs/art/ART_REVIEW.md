@@ -108,3 +108,15 @@ Plan `docs/plans/horse-life-and-retention.md` stage 4 (≈ 90 credits asked). Th
 | `horse_lie_palomino`, `horse_lie_grey` | 2 × 10 | PASS | Retextures of the bay (the starter coats). Golden with a cream mane and black hooves; steel grey with dapples, silver mane, dark hooves. The other nine coats sink a standing horse into a straw bed instead (90 credits saved). |
 | `towel_rack` | 30 | PASS (note) | Honey-wood stand with a red-and-white striped towel over the top; the brush caddy is small and odd-shaped. |
 | **Total** | **110** | | 3 text-to-3D (90) + 2 retextures (20). Balance 360 → 250. |
+
+## Horse life stage 6: reasons to come back (2026-10-07)
+
+Plan `docs/plans/horse-life-and-retention.md` stage 6 (≈ 60 credits asked); this stage had a hard cap of 50 and a floor of 150 (stage 7 needs the rest). The balance was checked before each job: 250 before, 240 after the retexture, 210 at the end. Checked on the Meshy thumbnails. Uploaded to the LlamaWorks group with `tools/roblox/upload_assets.py` (moderation pending; the game keeps part-built stand-ins until Roblox approves them).
+
+| Slot | Credits | Verdict | Notes |
+| --- | --- | --- | --- |
+| `welcome_hay_bale` | 10 | PASS (note) | Retexture of `hay_bale` (a new model would have cost 30): golden straw with one wide shiny red ribbon band round the middle. A retexture can't add a bow, carrots or a gift tag, so the client adds a part-built red bow, two carrots and an apple on top. Asset 115478221440793. |
+| `photo_frame_stand` | 30 | PASS (note) | Sky-blue and cream gabled frame with red, yellow, blue and orange bunting along the top and a gold rosette with a blue tail in the corner. Asked for an open centre on legs; it has a painted hills-and-pine backdrop in the frame and a flat base, which works as a backdrop to pose a horse in front of. No text. Asset 138175926810022. |
+| **Total** | **40** | | 1 text-to-3D (30) + 1 retexture (10), no re-rolls. Balance 250 → 210. |
+
+Guardrail check: no text, numbers or logos; nothing that reads as a counter, score, ranking or offer; no wagering shapes.

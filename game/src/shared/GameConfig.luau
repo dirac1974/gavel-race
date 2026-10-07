@@ -351,14 +351,15 @@ GameConfig.spa = {
 -- Reasons to come back (D-063, stage 6). The Welcome Back Hay Bale: after awayDays or more whole
 -- days away, one flat gift (never bigger for a longer absence, never on two days in a row, no
 -- streak). The Horse Book, personal bests ("New best!") and the Photo Finish camera can each be
--- switched off. studioAwayDays (Studio only): pretend the last visit was this many days ago, for
--- the parent check without editing a save.
+-- switched off. Studio only, for the parent checks without editing a save: studioAwayDays pretends
+-- the last visit was this many days ago; studioMonthStamps starts this month's stamps at that count.
 GameConfig.comeback = {
 	welcome = { enabled = true, awayDays = 3, gift = { hay = 5, seed_carrot = 2, treat = 1 } },
 	horseBook = true,
 	bests = true,
 	photo = true,
 	studioAwayDays = 0,
+	studioMonthStamps = 0,
 }
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and

@@ -14,6 +14,7 @@ local Training = require(Shared:WaitForChild("Training"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Style = require(Shared:WaitForChild("Style"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 
 -- Every monthly job claimed: a milestone gift of Diamonds, once per month (D-050).
 local function monthlyGift(player: Player, data)
@@ -76,6 +77,11 @@ Profiles.Loaded.Event:Connect(function(player: Player)
 	if not data then return end
 	local now = os.time()
 	local auto = Jobs.refresh(data, player.UserId, now)
+	-- Studio only (the parent check): start this month's stamps at comeback.studioMonthStamps.
+	local pretend = (GameConfig.comeback or {}).studioMonthStamps or 0
+	if pretend > 0 and game:GetService("RunService"):IsStudio() then
+		data.jobs.monthStamps = math.max(tonumber(data.jobs.monthStamps) or 0, pretend)
+	end
 	monthlyGift(player, data)
 	if auto > 0 then
 		Profiles.notify(player, string.format("Welcome back! %d finished job%s added to your stable", auto, if auto == 1 then " was" else "s were"), "gift")
