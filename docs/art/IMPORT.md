@@ -125,6 +125,9 @@ Coats: bay, chestnut, grey, black, palomino, pinto, appaloosa, buckskin, dun, ro
 | `log_jump` | `log_jump.glb` | 2,863 | 7.1 × 3.0 × 1.8 | no |
 | `wooden_bridge` | `wooden_bridge.glb` | 3,614 | 16.0 × 7.8 × 12.2 | no |
 | `hay_cart` | `hay_cart.glb` | 1,348 | 8.9 × 6.0 × 5.3 | yes |
+| `post_box_carrots` | `post_box_carrots.glb` | 2,926 | 2.6 × 4.5 × 2.2 | yes |
+| `visitor_bell` | `visitor_bell.glb` | 2,903 | 1.2 × 5.5 × 1.5 | yes |
+| `rosette_wall` | `rosette_wall.glb` | 2,568 | 5.6 × 7.5 × 1.2 | yes |
 
 **Notes for the world code:**
 
