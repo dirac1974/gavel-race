@@ -83,3 +83,16 @@ Models for the world in `docs/WORLD_DESIGN.md`: standing horses, more coats, foa
 | **Total** | **1,280** | | 32 text-to-3D slots (960), 22 retextures (220), 6 re-rolls (100). Balance 1,740 → 460, above the 450 floor. |
 
 Guardrail check, every model: no text, logos, numbers or prices; no red cross; no whip, crop or rider; no casino or wagering shapes; horses calm with small side eyes, ears forward, mouths closed, natural coats and dark hooves (every coat run through `darken_hooves.py`, which now ignores a tail that hangs low on a standing horse).
+
+## Horse life stage 5 verdicts (2026-10-07, D-060)
+
+Balance checked before each batch: 460 → 360 (floor 150). The plan asked for about 60 credits; the bell's re-roll took it to 100.
+
+| Slot | Credits | Verdict | Notes |
+| --- | --- | --- | --- |
+| `rosette_wall` | 30 | PASS (note) | Red frame, little shingle roof, two short legs, cream backboard with hooks and two shelves, empty and ready to fill (stage 8 hangs the rosettes). A pale cross-brace shape is painted on the back board. Stands in the yard, visible from the gate. |
+| `post_box_carrots` | 10 (retexture of `post_box`) | PASS (note) | Same mailbox with both flags carrot orange. No carrots show on the door (a retexture keeps the mesh and didn't paint them), so on carrot days the game also puts a small part-built carrot pile on the lid. |
+| `visitor_bell` | 30 + 30 | PASS on re-roll (notes) | First try FAIL: no post, just a bell on a floating arm above a separate flower pot. The re-roll is one tall post with the brass bell at the top and a red flower box at the foot (asked for halfway up), on a small grey stone base. |
+| **Total** | **100** | | 2 text-to-3D, 1 retexture, 1 re-roll. Uploaded to the LlamaWorks group; moderation pending. |
+
+Guardrail check: no text, numbers or logos; nothing that reads as a counter, score or ranking; no wagering shapes.

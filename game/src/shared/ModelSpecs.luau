@@ -33,6 +33,10 @@ local ModelSpecs: { [string]: Spec } = {
 	pitchfork = { axis = "Y", studs = 5.5, yaw = 0, collide = false },
 	noticeboard = { axis = "Y", studs = 8.0, yaw = 0, collide = true },
 	post_box = { axis = "Y", studs = 4.5, yaw = 0, collide = true },
+	-- Visits (D-060): the post box on carrot days, the bell by the gate, the Rosette Wall (filled in stage 8, D-062).
+	post_box_carrots = { axis = "Y", studs = 4.5, yaw = 0, collide = true },
+	visitor_bell = { axis = "Y", studs = 5.5, yaw = 0, collide = true },
+	rosette_wall = { axis = "Y", studs = 7.5, yaw = 0, collide = true },
 	saddle_rack = { axis = "Y", studs = 3.5, yaw = 0, collide = true },
 
 	-- Garden. Crops are sized to sit two to a garden_bed (6 x 2.6 studs).

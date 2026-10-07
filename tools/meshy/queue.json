@@ -15,6 +15,15 @@
       "spent_credits": 1280,
       "end_balance": 460,
       "note": "David allowed up to 75% of the day's credits; the balance was checked before every batch and never went below 450. Spent per Meshy consumed_credits: 32 text-to-3D slots x 30 = 960, 22 retextures x 10 = 220, re-rolls 2 x 30 (pitchfork, water_trough) + 4 x 10 (pinto and roan, both poses) = 100. flower_planter (30) failed and was dropped. Verdicts: docs/art/ART_REVIEW.md."
+    },
+    "horse_life_stage5": {
+      "date": "2026-10-07",
+      "start_balance": 460,
+      "floor_balance": 150,
+      "allowed_credits": 60,
+      "spent_credits": 100,
+      "end_balance": 360,
+      "note": "Stage 5 (D-060), plan asked about 60: rosette_wall 30, post_box_carrots retexture 10, visitor_bell 30 + re-roll 30 (the first had no post). Balance checked before each batch (460, then 390); never near the 150 floor. Verdicts: docs/art/ART_REVIEW.md."
     }
   },
   "defaults": {
@@ -753,6 +762,45 @@
       "texture_prompt": "honey brown wood cart, golden hay, dark brown wheels, soft hand-painted shading, bright daylight colors",
       "negative": "no horse, no text, no thin spokes",
       "notes": "GENERATED (30 cr). PASS (note): thin spoked wheels."
+    },
+    {
+      "slot_id": "rosette_wall",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a painted wooden display board for a barn wall, red barn colour frame with a little shingle roof, rows of small hooks and shelves for ribbons, rosettes and small trophies, empty and ready to fill, standing on two short sturdy wooden legs, cheerful and toy-like chunky proportions",
+      "texture_prompt": "barn red painted wood frame, cream backboard, honey brown shelves and hooks, dark red shingle roof, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no ribbons, no rosettes, no trophies, no pictures, no medals",
+      "notes": "GENERATED 2026-10-07 (30 cr). PASS (note): red frame and shingle roof on two legs, cream backboard with hooks and two small shelves, empty; a pale cross-brace shape painted on the back board. Uploaded asset 129697307017044."
+    },
+    {
+      "slot_id": "post_box_carrots",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "retexture_of": "post_box",
+      "text_style_prompt": "the same rustic farm post box on a wooden post, keep the exact shape, soft sky blue painted mailbox, honey wood post, the little flag painted bright carrot orange with a green leafy tip like a carrot, a few orange carrots with green tops painted peeking out of the front door, soft hand-painted shading, bright daylight colors, cheerful and toy-like",
+      "negative": "no text, no numbers, no logos",
+      "notes": "GENERATED 2026-10-07 (10 cr, retexture of post_box). PASS (note): both flags orange, but no carrots visible on the door (a retexture can't add them), so the game adds a small part-built carrot pile on the lid on carrot days. Uploaded asset 76953039543816."
+    },
+    {
+      "slot_id": "visitor_bell",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "one single tall square wooden post standing straight up from the ground, at the very top of the post a short wooden arm sticks out sideways with a shiny brass bell hanging under it, a small painted flower box with red and yellow flowers fixed to the front of the same post halfway up, everything joined into one object, county fair style, toy-like chunky proportions",
+      "texture_prompt": "honey brown wood post, warm polished brass bell, red flower box, red and yellow flowers with green leaves, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no rope, no gate, no fence, no sign, no separate pieces, no floating parts",
+      "notes": "GENERATED 2026-10-07 (30 + 30 cr). PASS on re-roll (notes): one tall post, brass bell on a short arm at the top, red flower box at the foot (asked halfway up), a small grey stone base. First try FAIL (no post: a bell on a floating arm over a separate flower pot). Uploaded asset 71560735604593.",
+      "first_attempt": {
+        "date": "2026-10-07",
+        "credits": 30,
+        "prompt": "a small chunky wooden gate post with a shiny brass bell hanging from a little wooden arm at the top and a painted flower box with red and yellow flowers on the front, county fair style, toy-like chunky proportions",
+        "verdict": "FAIL: no post; a bell on a floating arm above a separate flower pot"
+      }
     }
   ]
 }

@@ -2,6 +2,8 @@
 -- CareService (D-038): the server side of care, the garden, chores and the Feed & Seed.
 -- Checks every request (your own horse, near your own barn or the shop, sane arguments,
 -- not too fast), applies the rule in Care.luau, saves, and answers with a friendly toast.
+-- Visitors (D-060): on a friend's plot only VisitCare's pat and treat are allowed (Visits.luau);
+-- every other care action still needs your own horse at your own barn.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -14,12 +16,15 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
+local Visits = require(Shared:WaitForChild("Visits"))
+local VisitAccess = require(script.Parent:WaitForChild("VisitAccess"))
 
 local CareAction = Profiles.remote("CareAction")   -- client -> server: horseId, "feed"|"groom"|"treat"|"pet", item?
 local Garden = Profiles.remote("Garden")           -- client -> server: bed, "plant"|"harvest", seed?
 local Chore = Profiles.remote("Chore")             -- client -> server: stall
 local Shop = Profiles.remote("Shop")               -- client -> server: "buy"|"sell", item, qty
 local CareFx = Profiles.remote("CareFx")           -- server -> all: plot, horseId, kind (hearts, sparkles)
+local VisitCare = Profiles.remote("VisitCare")     -- client -> server: ownerUserId, horseId, "pat"|"treat" (D-060)
 
 local NEAR_PLOT = 30   -- studs outside your plot's rectangle that still count as "at your barn"
 local NEAR_SHOP = 40
@@ -131,6 +136,49 @@ Shop.OnServerEvent:Connect(function(player: Player, action: any, item: any, qty:
 		return
 	end
 	reply(player, ok, msg, "cash")
+end)
+
+-- Visiting a friend's barn (D-060): pat (no bond; pat them all for a Tour stamp) and one free
+-- treat a day (bond, inside the visitors' daily cap). Nothing else on someone else's plot.
+VisitCare.OnServerEvent:Connect(function(player: Player, ownerId: any, horseId: any, action: any)
+	if busy(player) or typeof(horseId) ~= "string" or not Visits.visitorMay(action) or action == "post" then return end
+	local owner = VisitAccess.owner(ownerId)
+	local ok, why = VisitAccess.check(player, owner)
+	if not ok then
+		if why == "closed" then Profiles.notify(player, "The gate is closed right now", "heart") end
+		return
+	end
+	if not VisitAccess.near(player, owner) then return end
+	local vdata, odata = Profiles.get(player), Profiles.get(owner)
+	if not vdata or not odata then return end
+	local ids = VisitAccess.barnHorses(owner, odata)
+	local h = table.find(ids, horseId) and Profile.horse(odata, horseId)
+	if not h then return end
+	local now = os.time()
+	local cfg = GameConfig.visit
+	if action == "pat" then
+		local done, res = Visits.pat(vdata, owner.UserId, horseId, ids, now)
+		if not done then return end
+		if res.stamp then
+			Profiles.notify(player, "Tour stamp! You toured " .. owner.DisplayName .. "'s barn", "heart")
+		elseif res.left > 0 and not res.already then
+			Profiles.notify(player, h.name .. " nuzzles you! Pat " .. res.left .. " more for a Tour stamp", "heart")
+		else
+			Profiles.notify(player, h.name .. " nuzzles you!", "heart")
+		end
+		Profiles.changed(player)
+		CareFx:FireAllClients(owner:GetAttribute("PlotIndex"), horseId, "pet")
+	else
+		local done, res = Visits.treat(vdata, owner.UserId, h, now, cfg)
+		if not done then
+			Profiles.notify(player, "You gave a treat here today. Come back tomorrow!", "heart")
+			return
+		end
+		Profiles.notify(player, h.name .. " loved your treat!" .. (if res.bond > 0 then " +" .. res.bond .. " bond" else ""), "heart")
+		Profiles.changed(player)
+		if res.bond > 0 then Profiles.changed(owner) end
+		CareFx:FireAllClients(owner:GetAttribute("PlotIndex"), horseId, "treat")
+	end
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player) last[player] = nil end)
