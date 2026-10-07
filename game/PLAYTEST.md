@@ -468,6 +468,25 @@ Use Play Solo, or Test → Clients and Servers with 2 players, plus Device emula
 - [ ] **Training shows.** A fresh Rookie horse wins roughly 1 race in 4 against bots on your own; after a few days of training (Rating near 58) it wins noticeably more, about 1 in 3. (The sim's numbers: `python sims/economy.py --solo`.)
 - [ ] On the phone emulator the card fits across the top without covering the dock, every word on it is readable, and ✕ and More are fingertip-sized.
 
+## Visiting friends' barns (horse life stage 5: D-060, D-042)
+Use Test → Clients and Servers with 2 players, plus Device emulator → a phone in landscape. Studio's test players are **not** Roblox friends, so the first block needs no tools; the second needs two accounts that are friends on a published test server.
+
+**Two players who aren't friends (Studio):**
+- [ ] Player 2 opens the Map: a sixth big button, **👫 Friends' barns**. Tapping it shows "No friends' barns here yet" and the Tour stamp line. **Player 1's barn is not on the list.**
+- [ ] Player 2 walks Barn Lane to player 1's gate: the gate stays closed (can't walk in). Standing at the post box from the lane shows no "Drop a carrot" prompt.
+- [ ] Nothing anywhere shows how many people visited, liked or toured a barn.
+
+**Two friend accounts (published test server):**
+- [ ] Player 2: Map → 👫 Friends' barns shows player 1's **face and name** with "🏡 Visit ▶". Tap it: player 2 lands on Barn Lane **just outside player 1's gate**, facing in (never inside the barn), with "Welcome to …'s barn! Pat each horse for a Tour stamp".
+- [ ] At each stall door, **Pat** works: hearts over the horse, "Comet nuzzles you! Pat 1 more for a Tour stamp", then "Tour stamp! You toured …'s barn". Player 1's horses gain **no bond** from pats (My Horses). Patting again later never gives a second stamp; the Map's line reads "Tour stamps: 1 barn toured".
+- [ ] **Treat** once: "+1 bond". A second treat the same day says "You gave a treat here today. Come back tomorrow!". Player 2's own bag is unchanged.
+- [ ] At the post box, **Drop a carrot**: player 2 has one fewer carrot; player 1 gets "A friend left a carrot in your post box! (1 today)" (no name), one more carrot, and a little carrot pile appears on the post box. A second drop the same day is refused.
+- [ ] Player 2 can't feed, groom, muck out, plant or harvest at player 1's barn (no prompts, and the server says no).
+- [ ] While player 2 is in the yard, player 1 sees a big **🚪 Close gate** button over the dock (on the phone emulator: over the dock at the left, clear of Hop and Gallop). One tap: player 2 is walked out to Barn Lane with "…'s gate is closing. Bye for now!", a wooden bar crosses the gate, and the button turns into **🔓 Open gate**. Player 2's list now shows player 1 greyed with "🔒 Gate closed" and can't travel there. Tap **Open gate**: the bar goes, the list shows "Visit ▶" again.
+- [ ] Player 1 sets Settings → "Who can visit my stable?" to **Nobody**: player 2 (in the yard) is walked out, and player 1 disappears from player 2's list.
+- [ ] A horse out riding or at the races has an empty stall: no Pat or Treat prompt on that door.
+- [ ] For grown-ups page: the 🏡 Visiting friends' barns paragraph reads clearly.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

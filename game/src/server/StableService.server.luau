@@ -6,6 +6,10 @@
 -- players who aren't allowed in (WorldClient). Visitors never change anything. Each stall shows
 -- a gold rosette for every training course its horse has a gold ribbon on (D-053); Mud Splash
 -- has one rosette for a gold on any of its four layouts (T5, Profile.rosettes).
+-- Visiting friends' barns (D-060): the Map's Friends' barns list (FriendBarns), the trip to a
+-- friend's gate (VisitFriend), the owner's one-tap gate (GateToggle, GateState to the owner
+-- only) and the post box (PostBox). Once a second, anyone standing in a plot who isn't let in
+-- (not a friend, "Nobody", or the gate closed) is walked out to Barn Lane.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -20,8 +24,15 @@ local GameConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Sh
 local Rides = require(script.Parent:WaitForChild("Rides"))
 local Care = require(Shared:WaitForChild("Care"))
 local Style = require(Shared:WaitForChild("Style"))
+local Visits = require(Shared:WaitForChild("Visits"))
+local VisitAccess = require(script.Parent:WaitForChild("VisitAccess"))
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
+local FriendBarns = Profiles.remote("FriendBarns")  -- client -> server: ask; server -> client: { {userId, name, closed} }
+local VisitFriend = Profiles.remote("VisitFriend")  -- client -> server: friend's userId
+local GateToggle = Profiles.remote("GateToggle")    -- client -> server: owner opens or closes their gate
+local GateState = Profiles.remote("GateState")      -- server -> owner only: visitorsIn, closed
+local PostBox = Profiles.remote("PostBox")          -- client -> server: owner's userId (drop a carrot)
 local GROUND_Y = WorldScene.GROUND_Y
 local C = WorldScene.colors
 local part, wedge = WorldScene.part, WorldScene.wedge
@@ -204,6 +215,8 @@ local function buildBarn(i: number, owner: Player, data)
 		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = wallC,
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
 		local h = data.horses[k]
+		local door = barn:FindFirstChild("Stall" .. k)
+		if door and h then door:SetAttribute("HorseId", h.id) door:SetAttribute("HorseName", h.name) end
 		if h then
 			local hm = horseModel(h.coat)
 			hm.Name = "Horse_" .. h.id
@@ -267,7 +280,36 @@ local function buildBarn(i: number, owner: Player, data)
 	WorldScene.placeModel(barn, "grooming_brush", plotCF(i, front - 3, -width / 2 + 9, GROUND_Y))
 	WorldScene.placeModel(barn, "wheelbarrow", plotCF(i, front - 14, propA - 6, GROUND_Y))
 	WorldScene.placeModel(barn, "pitchfork", plotCF(i, front - 14, propA - 11, GROUND_Y))
-	WorldScene.placeModel(barn, "post_box", plotCF(i, 3, GATE_W / 2 + 3, GROUND_Y))
+	-- The post box shows carrots on the days friends dropped some (D-060), and a box part holds
+	-- the visitors' "Drop a carrot" prompt (VisitClient) whether or not the art has loaded.
+	local boxCF = plotCF(i, 3, GATE_W / 2 + 3, GROUND_Y)
+	local carrots = data.postBox and data.postBox.day == os.time() // 86400 and data.postBox.today > 0
+	if not (carrots and WorldScene.placeModel(barn, "post_box_carrots", boxCF)) then
+		if not WorldScene.placeModel(barn, "post_box", boxCF) then
+			part({ Name = "PostBoxPost", Size = Vector3.new(0.6, 3.4, 0.6), Color = C.wood, CFrame = boxCF * CFrame.new(0, 1.7, 0) }, barn)
+			part({ Name = "PostBoxBox", Size = Vector3.new(1.8, 1.4, 2.4), Color = Color3.fromHex("7EC8E3"), CFrame = boxCF * CFrame.new(0, 3.9, 0) }, barn)
+		end
+	end
+	if carrots then -- a little pile of carrots on the lid, so a kid sees the gift from the lane
+		for k = -1, 1 do
+			local c = part({ Name = "PostCarrot", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.4, 0.45, 0.45),
+				Color = Color3.fromHex("FF8A1F"), CanCollide = false, CFrame = boxCF * CFrame.new(k * 0.45, 4.95, 0) * CFrame.Angles(0, math.pi / 2 + k * 0.3, 0) }, barn)
+			part({ Name = "PostCarrotTop", Size = Vector3.new(0.3, 0.5, 0.3), Color = Color3.fromHex("4CAF50"), CanCollide = false,
+				CFrame = c.CFrame * CFrame.new(0.8, 0, 0) * CFrame.Angles(0, 0, math.pi / 2) }, barn)
+		end
+	end
+	local spot = part({ Name = "PostBox", Size = Vector3.new(3, 5, 3), Transparency = 1, CanCollide = false, CanQuery = false,
+		CanTouch = false, CFrame = boxCF * CFrame.new(0, 2.5, 0) }, barn)
+	spot:SetAttribute("Owner", owner.UserId)
+	-- The visitor bell on the other gate post (rung when the owner opens or closes the gate).
+	local bellCF = plotCF(i, 3, -(GATE_W / 2 + 3), GROUND_Y)
+	if not WorldScene.placeModel(barn, "visitor_bell", bellCF) then
+		part({ Name = "BellPost", Size = Vector3.new(0.8, 5, 0.8), Color = C.wood, CFrame = bellCF * CFrame.new(0, 2.5, 0) }, barn)
+		part({ Name = "Bell", Shape = Enum.PartType.Ball, Size = Vector3.new(1.2, 1.2, 1.2), Color = Color3.fromHex("D4A537"),
+			Material = Enum.Material.Metal, CanCollide = false, CFrame = bellCF * CFrame.new(0, 4.6, -0.8) }, barn)
+	end
+	-- The Rosette Wall (D-060, D-062): what visitors see; stage 8 hangs the rosettes on it.
+	WorldScene.placeModel(barn, "rosette_wall", plotCF(i, 52, 12, GROUND_Y))
 	-- The Stable Board noticeboard by the gate (D-043).
 	local nbCF = plotCF(i, 9, -GATE_W / 2 - 9, GROUND_Y)
 	local nb = WorldScene.placeModel(barn, "noticeboard", nbCF)
@@ -466,6 +508,7 @@ local function signature(data): string
 		table.insert(parts, it and it.id or "")
 	end
 	table.insert(parts, tostring(Style.hasSet(data, "star")))
+	table.insert(parts, tostring(data.postBox and data.postBox.day == os.time() // 86400 and data.postBox.today > 0)) -- D-060
 	for _, it in Style.yard(data) do table.insert(parts, it.id) end
 	for _, h in data.horses do
 		local golds = table.concat(Profile.rosettes(h), ",")
@@ -481,6 +524,7 @@ local function refresh(player: Player)
 	local shell = plotModels[i]
 	shell:SetAttribute("OwnerId", player.UserId)
 	shell:SetAttribute("Visits", data.settings.visits)
+	shell:SetAttribute("GateClosed", VisitAccess.gateClosed(player))
 	local label = shell:FindFirstChild("OwnerLabel", true)
 	if label then label.Text = "🏡 " .. player.DisplayName .. "'s Stable" end
 	local sig = signature(data)
@@ -507,6 +551,9 @@ local function clearPlot(i: number)
 	gardenSigs[i] = nil
 	shell:SetAttribute("OwnerId", nil)
 	shell:SetAttribute("Visits", nil)
+	shell:SetAttribute("GateClosed", nil)
+	local bar = shell:FindFirstChild("GateBar")
+	if bar then bar:Destroy() end
 	local label = shell:FindFirstChild("OwnerLabel", true)
 	if label then label.Text = "🏡 Free stable" end
 	signatures[i] = nil
@@ -525,17 +572,21 @@ local function assign(player: Player): number?
 	return nil
 end
 
-local function arrive(player: Player, dest: string)
+local function arriveAt(player: Player, x: number, z: number, lx: number, lz: number)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
-	local x, z, lx, lz = WorldLayout.arrival(dest, plotOf[player])
 	local ground = Vector3.new(x, GROUND_Y, z)
 	local facing = CFrame.lookAt(ground, Vector3.new(lx, GROUND_Y, lz))
 	if Rides.travel(player, facing) then return end -- riding: you and your horse travel together
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.SeatPart then return end -- sitting on something else (e.g. a race horse)
 	character:PivotTo(facing + Vector3.new(0, 3.5, 0))
+end
+
+local function arrive(player: Player, dest: string)
+	local x, z, lx, lz = WorldLayout.arrival(dest, plotOf[player])
+	arriveAt(player, x, z, lx, lz)
 end
 
 local function onCharacter(player: Player)
@@ -575,19 +626,175 @@ end)
 
 -- Map fast-travel (D-035): only between races, never while riding in one.
 local lastTravel: { [Player]: number } = {}
-Travel.OnServerEvent:Connect(function(player: Player, dest: any)
-	if typeof(dest) ~= "string" or not table.find(WorldLayout.MAP, dest) then return end
-	if (lastTravel[player] or 0) > os.clock() - 1.5 then return end
-	lastTravel[player] = os.clock()
-	if player:GetAttribute("Racing") then return end
+local function canTravel(player: Player): boolean
+	if player:GetAttribute("Racing") then return false end
 	-- Still on a race horse after your race: its results card's Done gets you off (D-056).
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	local seat = humanoid and humanoid.SeatPart
 	if seat and seat.Name == "Saddle" and not seat:IsDescendantOf(workspace:FindFirstChild("RideHorses") or game) then
 		Profiles.notify(player, "Tap Done first", "map_fair")
+		return false
+	end
+	return true
+end
+Travel.OnServerEvent:Connect(function(player: Player, dest: any)
+	if typeof(dest) ~= "string" or not table.find(WorldLayout.MAP, dest) then return end
+	if (lastTravel[player] or 0) > os.clock() - 1.5 then return end
+	lastTravel[player] = os.clock()
+	if not canTravel(player) then return end
+	arrive(player, dest)
+end)
+
+-- Visiting friends' barns (D-060) ------------------------------------------------------
+local CFG = GameConfig.visit
+local lastVisitAsk: { [Player]: number } = {}
+local lastPost: { [Player]: number } = {}
+local lastGate: { [Player]: number } = {}
+local walkedAt: { [Player]: number } = {}
+
+local function barnOwners(): { Visits.Owner }
+	local out = {}
+	for player in plotOf do
+		local data = Profiles.get(player)
+		if data then
+			table.insert(out, { userId = player.UserId, name = player.DisplayName, visits = data.settings.visits,
+				gateClosed = VisitAccess.gateClosed(player), hasBarn = #data.horses > 0 })
+		end
+	end
+	return out
+end
+
+local function isFriend(a: number, b: number): boolean
+	local pa, pb = Players:GetPlayerByUserId(a), Players:GetPlayerByUserId(b)
+	return pa ~= nil and pb ~= nil and VisitAccess.friends(pa, pb)
+end
+
+FriendBarns.OnServerEvent:Connect(function(player: Player)
+	if (lastVisitAsk[player] or 0) > os.clock() - 0.5 then return end
+	lastVisitAsk[player] = os.clock()
+	FriendBarns:FireClient(player, Visits.list(player.UserId, barnOwners(), isFriend, CFG))
+end)
+
+VisitFriend.OnServerEvent:Connect(function(player: Player, userId: any)
+	if not CFG.mapList then return end
+	local owner = VisitAccess.owner(userId)
+	local ok, why = VisitAccess.check(player, owner)
+	if not ok then
+		if why == "closed" then Profiles.notify(player, "That gate is closed right now. Try again later!", "heart") end
 		return
 	end
-	arrive(player, dest)
+	if (lastTravel[player] or 0) > os.clock() - CFG.travelGapSeconds then return end
+	if not canTravel(player) then return end
+	local odata = Profiles.get(owner)
+	local i = plotOf[owner]
+	if not i or not odata or #odata.horses == 0 then return end -- the same barns Visits.list shows
+	lastTravel[player] = os.clock()
+	local x, z, lx, lz = WorldLayout.gateArrival(i)
+	arriveAt(player, x, z, lx, lz)
+	Profiles.notify(player, "Welcome to " .. owner.DisplayName .. "'s barn! Pat each horse for a Tour stamp", "heart")
+end)
+
+PostBox.OnServerEvent:Connect(function(player: Player, userId: any)
+	if (lastPost[player] or 0) > os.clock() - 0.5 then return end
+	lastPost[player] = os.clock()
+	local owner = VisitAccess.owner(userId)
+	if not VisitAccess.check(player, owner) or not VisitAccess.near(player, owner) then return end
+	local vdata, odata = Profiles.get(player), Profiles.get(owner)
+	if not vdata or not odata then return end
+	local ok, res = Visits.post(vdata, odata, owner.UserId, os.time(), CFG)
+	if not ok then
+		local msg = ({ used = "You dropped a carrot here today. Come back tomorrow!", full = "The post box is full today",
+			none = "You need a carrot first. Grow some in your garden!" })[res.reason] or "Not now"
+		Profiles.notify(player, msg, "carrot")
+		return
+	end
+	Profiles.notify(player, "Carrot dropped in the post box!", "carrot")
+	Profiles.notify(owner, "A friend left a carrot in your post box! (" .. res.today .. " today)", "carrot")
+	Profiles.changed(player)
+	Profiles.changed(owner)
+end)
+
+-- The gate (D-060): the owner's button shows while anyone is visiting or the gate is closed.
+local gateSent: { [Player]: string } = {}
+local function sendGate(owner: Player, visitorsIn: boolean)
+	local closedNow = VisitAccess.gateClosed(owner)
+	local k = tostring(visitorsIn) .. tostring(closedNow)
+	if gateSent[owner] == k then return end
+	gateSent[owner] = k
+	GateState:FireClient(owner, visitorsIn, closedNow)
+end
+
+local function applyGate(owner: Player)
+	local i = plotOf[owner]
+	if not i then return end
+	local shell = plotModels[i]
+	local isClosed = VisitAccess.gateClosed(owner)
+	shell:SetAttribute("GateClosed", isClosed)
+	local bar = shell:FindFirstChild("GateBar")
+	if isClosed and not bar then
+		local x0, z0 = WorldLayout.plotPoint(i, 1, -GATE_W / 2)
+		local x1, z1 = WorldLayout.plotPoint(i, 1, GATE_W / 2)
+		local a, b = Vector3.new(x0, GROUND_Y + 2.6, z0), Vector3.new(x1, GROUND_Y + 2.6, z1)
+		part({ Name = "GateBar", Size = Vector3.new(0.6, 0.6, (b - a).Magnitude), Color = C.woodLight or C.wood,
+			CanCollide = false, CFrame = CFrame.lookAt((a + b) / 2, b) }, shell)
+	elseif not isClosed and bar then
+		bar:Destroy()
+	end
+end
+
+-- Walk out (to Barn Lane, just outside the gate) everyone standing in a plot who isn't let in.
+local function sweep()
+	for owner, i in plotOf do
+		local rect = WorldLayout.plotRect(i)
+		local people = {}
+		for _, p in Players:GetPlayers() do
+			local pos = VisitAccess.position(p)
+			if pos and p ~= owner then table.insert(people, { userId = p.UserId, x = pos.X, z = pos.Z }) end
+		end
+		local inside = Visits.toWalkOut(rect, owner.UserId, people)
+		local visitorsIn = false
+		for _, uid in inside do
+			local visitor = Players:GetPlayerByUserId(uid)
+			if visitor and not visitor:GetAttribute("Racing") then
+				local ok, why = VisitAccess.check(visitor, owner)
+				if ok then
+					visitorsIn = true
+				elseif why == "friends" or why == "private" or why == "closed" then
+					-- ("off", visits switched off in GameConfig, leaves friends where they are, as before D-060)
+					local x, z, lx, lz = WorldLayout.gateArrival(i)
+					arriveAt(visitor, x, z, x + (x - lx), z + (z - lz)) -- facing the lane, back to the gate
+					if why == "closed" and (walkedAt[visitor] or 0) < os.clock() - 10 then
+						walkedAt[visitor] = os.clock()
+						Profiles.notify(visitor, owner.DisplayName .. "'s gate is closing. Bye for now!", "heart")
+					end
+				end
+			end
+		end
+		sendGate(owner, visitorsIn)
+	end
+end
+
+GateToggle.OnServerEvent:Connect(function(player: Player)
+	if not plotOf[player] then return end
+	if (lastGate[player] or 0) > os.clock() - 0.5 then return end
+	lastGate[player] = os.clock()
+	VisitAccess.setGate(player, not VisitAccess.gateClosed(player))
+	applyGate(player)
+	Profiles.notify(player, if VisitAccess.gateClosed(player) then "Gate closed. Visitors head home." else "Gate open. Friends can visit.", "map_stable")
+	gateSent[player] = nil
+	sweep()
+end)
+
+Players.PlayerRemoving:Connect(function(player: Player)
+	lastVisitAsk[player], lastPost[player], lastGate[player], walkedAt[player], gateSent[player] = nil, nil, nil, nil, nil
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		local ok, err = pcall(sweep)
+		if not ok then warn("[StableService] visit sweep: " .. tostring(err)) end
+	end
 end)
 
 for i = 1, WorldLayout.PLOT_COUNT do plotModels[i] = buildShell(i) end

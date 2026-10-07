@@ -412,6 +412,13 @@
   "sha256": "d818dd1e7ef91cf6f418663c9818298d7affb3c09d305ea43533a18413350c57",
   "uploadedAt": "2026-10-05T06:49:54Z"
  },
+ "post_box_carrots": {
+  "assetId": 76953039543816,
+  "file": "Models/generated/post_box_carrots/post_box_carrots.glb",
+  "kind": "Model",
+  "sha256": "6b2134d3ae2307d35b9d3be1ed03da5da111112092de46a789f64bd1f2180605",
+  "uploadedAt": "2026-10-07T17:20:03Z"
+ },
  "race_board_frame": {
   "assetId": 72220661450105,
   "file": "Models/generated/race_board_frame/race_board_frame_trimmed.glb",
@@ -425,6 +432,13 @@
   "kind": "Model",
   "sha256": "33e4a95d1b0b2797dd15b485cf42b7a27dd5785242c0a122bafbb347b9c05244",
   "uploadedAt": "2026-10-05T06:56:17Z"
+ },
+ "rosette_wall": {
+  "assetId": 129697307017044,
+  "file": "Models/generated/rosette_wall/rosette_wall.glb",
+  "kind": "Model",
+  "sha256": "017e1cbd1d833f74602b8824ebbd396540db9f0ca579988e24c14d413ab6582a",
+  "uploadedAt": "2026-10-07T17:20:22Z"
  },
  "saddle_rack": {
   "assetId": 82900481997584,
@@ -495,6 +509,13 @@
   "kind": "Model",
   "sha256": "4cf888a5b759dd6444dcf7c76dd8d35e3f30cbfc2e546f2d526259ec0ad7d58e",
   "uploadedAt": "2026-10-05T06:51:45Z"
+ },
+ "visitor_bell": {
+  "assetId": 71560735604593,
+  "file": "Models/generated/visitor_bell/visitor_bell.glb",
+  "kind": "Model",
+  "sha256": "1f950a7518a86a44ebf77220b085c6725610e2d599ef1e815329b5cb784cd3ff",
+  "uploadedAt": "2026-10-07T17:23:23Z"
  },
  "vo_burst": {
   "assetId": 97283117250795,
