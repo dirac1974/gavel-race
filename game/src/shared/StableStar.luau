@@ -170,10 +170,6 @@ function StableStar.cards(p: any): { { [string]: any } }
 	return out
 end
 
-local function isLegend(h: any): boolean
-	return typeof(h) == "table" and (h.legend == true or (typeof(h.career) == "table" and h.career.legend == true))
-end
-
 -- What hangs on the wall, in order: Cups, Legend plaques, first-win rosettes, goal rosettes
 -- (in the goals' order). At most MAX_WALL items. Each: { kind, id, hex, label }.
 function StableStar.wall(p: any): { { kind: string, id: string, hex: string, label: string } }
@@ -186,14 +182,9 @@ function StableStar.wall(p: any): { { kind: string, id: string, hex: string, lab
 	for _, lg in StableStar.LEAGUES do
 		if typeof(cups) == "table" and cups[lg] == true then add("cup", lg, StableStar.LEAGUE_HEX[lg], lg .. " Cup") end
 	end
-	-- Legend plaques (D-059): Legend horses, then Hall of Fame plaques, newest first.
+	-- Legend plaques (D-059): the Hall of Fame plaques, newest first (Leagues.retire adds one for
+	-- every Legend, `legend = true`, and kept older retirements).
 	local plaques = 0
-	for _, h in (if typeof(p.horses) == "table" then p.horses else {}) do
-		if plaques < StableStar.MAX_PLAQUES and isLegend(h) and typeof(h.name) == "string" then
-			plaques += 1
-			add("plaque", tostring(h.id or h.name), "FFD23F", h.name)
-		end
-	end
 	for _, e in (if typeof(p.hallOfFame) == "table" then p.hallOfFame else {}) do
 		if plaques < StableStar.MAX_PLAQUES and typeof(e) == "table" and typeof(e.name) == "string" then
 			plaques += 1
