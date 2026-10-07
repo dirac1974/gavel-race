@@ -120,3 +120,15 @@ Plan `docs/plans/horse-life-and-retention.md` stage 6 (≈ 60 credits asked); th
 | **Total** | **40** | | 1 text-to-3D (30) + 1 retexture (10), no re-rolls. Balance 250 → 210. |
 
 Guardrail check: no text, numbers or logos; nothing that reads as a counter, score, ranking or offer; no wagering shapes.
+## Horse life stage 7: Careers, Legend Retirement and Rehoming (2026-10-07, D-059)
+
+The plan asked for about 90 credits; this stage was capped at 50 with a 150 floor (another builder was spending at the same time), so all three are retextures of reviewed meshes (10 each) instead of text-to-3D. Balance checked before each job: 210 → 200 → 190 → 180. Checked on the Meshy thumbnails. Uploaded to the LlamaWorks group with `tools/roblox/upload_assets.py`; all three Approved by Roblox moderation.
+
+| Slot | Credits | Verdict | Notes |
+| --- | --- | --- | --- |
+| `legend_paddock_arch` | 10 (retexture of `trail_gate_arch`) | PASS (note) | White-painted posts and beam, a gold disc in the middle of the beam, the hanging board cream with a gold border, laurel garlands in green and gold, gold and white flowers at the feet. It keeps the log-arch mesh, so no star finials, bunting or horseshoe shape, and the board is blank (no horseshoe painted). Sized 14 studs wide (about 10 tall). |
+| `riding_school_sign` | 10 (retexture of `noticeboard`) | PASS | Sky-blue roof, cream posts and frame, a big yellow sun over green meadow hills with tiny flowers, plain sky in the upper middle for the game's "Sunny Meadow Riding School" overlay. The noticeboard's fold line on the face reads as a hill edge. Replaces the plan's `riding_school_trailer`. Sized 8 studs tall (about 7 wide). |
+| `legend_plaque_post` | 10 (retexture of `noticeboard`) | PASS (notes) | Royal-blue roof, honey-wood posts, a plain cream face in a pale gold frame (less shiny than asked); no rosette was painted, and the noticeboard's dark fold line shows on the lower face. The game's name overlay should cover the face; add a part rosette if one is wanted. Sized 4.5 studs tall. |
+| **Total** | **30** | | 3 retextures. Balance 210 → 180. |
+
+Guardrail check: no text, numbers or logos; nothing that reads as a score, ranking or wagering shape.

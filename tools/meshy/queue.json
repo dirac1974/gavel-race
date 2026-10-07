@@ -43,6 +43,16 @@
       "spent_credits": 40,
       "end_balance": 210,
       "note": "Horse life stage 6 (D-063). Hard cap 50, never below 150 (stage 7 needs the rest); balance checked before each job (250, 240). welcome_hay_bale retexture of hay_bale 10, photo_frame_stand text-to-3D 30, no re-rolls. Verdicts: docs/art/ART_REVIEW.md."
+    },
+    "stage7": {
+      "date": "2026-10-07",
+      "plan_credits": 90,
+      "cap_credits": 50,
+      "floor_balance": 150,
+      "start_balance": 210,
+      "spent_credits": 30,
+      "end_balance": 180,
+      "note": "Horse life stage 7 (D-059). Cap 50 with a 150 floor (another builder was spending at the same time), so all three are retextures (10 each) instead of text-to-3D: legend_paddock_arch from trail_gate_arch, riding_school_sign and legend_plaque_post from noticeboard. Balance checked before each job: 210, 200, 190. riding_school_sign replaces the plan's riding_school_trailer. Verdicts: docs/art/ART_REVIEW.md."
     }
   },
   "defaults": {
@@ -897,6 +907,75 @@
       "texture_prompt": "sky blue and cream painted wood frame, red yellow and blue bunting flags, shiny gold rosette with a blue ribbon tail, honey brown wooden legs, soft hand-painted shading, bright daylight colors",
       "negative": "no text, no letters, no picture inside the frame, no glass, no people, no horse, no camera",
       "notes": "Stage 6 Photo Finish (D-063), 2026-10-07. GENERATED (30 cr), one try. PASS (note): blue gabled frame, bunting, gold rosette; a painted backdrop instead of an open centre and a flat base instead of legs (fine as a photo backdrop). Uploaded asset 138175926810022."
+    },
+    {
+      "slot_id": "legend_paddock_arch",
+      "kind": "building",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 6000,
+      "retexture_of": "trail_gate_arch",
+      "plan_prompt": "[CFT] A small paddock entrance arch of white-painted wooden posts with a curved top board, gold star finials and laurel garlands, bunting along the top, a little gold horseshoe in the middle, no text, cheerful toy-like.",
+      "text_style_prompt": "the same entrance arch, keep the exact shape, a Hall of Fame paddock gate for champion horses: the two posts and the top beam painted clean glossy white like painted wood, the round disc in the middle of the beam painted shiny gold with a small gold horseshoe on it, the hanging board painted cream with a gold border and a small gold horseshoe in the middle and nothing else on it, the climbing leaves painted as green laurel garlands with little gold ribbons, the small flowers at the feet gold and white, soft hand-painted shading, bright daylight colors, cheerful and toy-like",
+      "negative": "no text, no letters, no numbers, no logos",
+      "notes": "Stage 7 (D-059), 2026-10-07. Retexture of trail_gate_arch (10 cr) instead of text-to-3D (30): the budget was 50 for the stage with a 150 floor. Keeps the log-arch mesh, so no star finials or bunting geometry. GENERATED (10 cr). PASS (note): white-painted posts and beam, a gold disc where the log end was, the hanging board cream with a gold border, gold-green laurel garlands, gold and white flowers at the feet. The mesh is the log arch, so no star finials, bunting or horseshoe shape (the board face is blank, no horseshoe painted). Uploaded asset 129962389179647 (moderation Approved).",
+      "generation": {
+        "date": "2026-10-07",
+        "mode": "retexture",
+        "credits": 10,
+        "task_ids": [
+          "01a11797-3758-75df-a91f-50d34fd5fdd0"
+        ],
+        "input_task_id": "01a10ac7-a4bd-7374-ac74-5a91ba9c7a3f",
+        "balance_before": 210,
+        "balance_after": 200
+      }
+    },
+    {
+      "slot_id": "riding_school_sign",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "retexture_of": "noticeboard",
+      "plan_prompt": "[CFT] A friendly sign board for Sunny Meadow Riding School in cream and sky blue on two posts, a painted sun and meadow, no text, toy-like. (The plan listed riding_school_trailer; the stage 7 brief asked for this sign at the Market Corral instead.)",
+      "text_style_prompt": "the same rustic sign board on two posts, keep the exact shape, the roof painted soft sky blue, the posts and frame painted warm cream, the board face painted as a cheerful little landscape picture: a big round yellow sun with short rays in the top corner, light blue sky, rolling green meadow hills along the bottom with tiny white and yellow flowers, the upper middle of the board left as plain light sky, soft hand-painted shading, bright daylight colors, friendly and toy-like",
+      "negative": "no text, no letters, no numbers, no logos, no faces",
+      "notes": "Stage 7 (D-059), 2026-10-07. Retexture of noticeboard (10 cr). The game overlays the words Sunny Meadow Riding School itself. GENERATED (10 cr). PASS: sky-blue roof, cream posts and frame, a big yellow sun over green meadow hills with tiny flowers; plain sky in the upper middle for the game's Sunny Meadow Riding School overlay. The noticeboard's fold line on the face reads as a hill edge. Uploaded asset 96463453328758 (moderation Approved).",
+      "generation": {
+        "date": "2026-10-07",
+        "mode": "retexture",
+        "credits": 10,
+        "task_ids": [
+          "01a11797-f39f-7246-af87-5ec860f16804"
+        ],
+        "input_task_id": "01a10ac0-74c3-7085-9971-d93bd6873c56",
+        "balance_before": 200,
+        "balance_after": 190
+      }
+    },
+    {
+      "slot_id": "legend_plaque_post",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "retexture_of": "noticeboard",
+      "plan_prompt": "[CFT] A short wooden post holding a gold-framed plaque with a blank face and a small rosette, painted wood, toy-like.",
+      "text_style_prompt": "the same small board on two posts, keep the exact shape, a Hall of Fame plaque for a champion horse: the frame around the board painted shiny polished gold, the board face plain smooth cream with nothing on it except one small blue and gold rosette ribbon painted in the top corner, the roof painted deep royal blue with a gold edge, the posts painted honey brown wood, soft hand-painted shading, bright daylight colors, toy-like",
+      "negative": "no text, no letters, no numbers, no logos",
+      "notes": "Stage 7 (D-059), 2026-10-07. Retexture of noticeboard (10 cr), scaled down to a short plaque stand. The game puts the horse's name on the plaque face. GENERATED (10 cr). PASS (notes): royal blue roof, honey posts, plain cream face in a pale gold frame (less shiny than asked), no rosette painted; the noticeboard's dark fold line shows on the lower face, so the game's name overlay should cover the face (or add a part rosette). Uploaded asset 125330987786071 (moderation Approved).",
+      "generation": {
+        "date": "2026-10-07",
+        "mode": "retexture",
+        "credits": 10,
+        "task_ids": [
+          "01a11798-b3e6-77ea-9066-45c7d7b6f2b7"
+        ],
+        "input_task_id": "01a10ac0-74c3-7085-9971-d93bd6873c56",
+        "balance_before": 190,
+        "balance_after": 180
+      }
     }
   ]
 }

@@ -331,7 +331,8 @@ end
 
 local function attachBarn(barn: Instance)
 	if barn:GetAttribute("Owner") ~= player.UserId then return end
-	-- Stall k holds the k-th horse (StableService); both prompts hang on its half door, which
+	-- Stall k's door carries its horse's id (HorseId, StableService; stalls stored per horse, D-059);
+	-- both prompts hang on its half door, which
 	-- is where a kid stands (the horse itself is too far into the barn to reach).
 	local d = PlayerState.data
 	for _, m in barn:GetChildren() do
@@ -342,8 +343,8 @@ local function attachBarn(barn: Instance)
 				end)
 			end
 		elseif m:IsA("BasePart") and string.sub(m.Name, 1, 5) == "Stall" then
-			local stall = tonumber(string.sub(m.Name, 6))
-			local h = stall and d and d.horses[stall]
+			local hid = m:GetAttribute("HorseId")
+			local h = hid and d and PlayerState.horse(hid)
 			if h and not m:FindFirstChild("CarePrompt") then
 				local id = h.id
 				local p = prompt(m, "Care", h.name)

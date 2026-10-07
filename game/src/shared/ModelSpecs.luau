@@ -47,6 +47,11 @@ local ModelSpecs: { [string]: Spec } = {
 	-- with a part-built bow on top) and the photo board in every yard.
 	welcome_hay_bale = { axis = "Y", studs = 3.4, yaw = 0, collide = false },
 	photo_frame_stand = { axis = "Y", studs = 9.0, yaw = 0, collide = true },
+	-- Careers, Legend Retirement and Rehoming (D-059). The arch is the trail arch's mesh (27.6 x 20 x 6.6 raw),
+	-- sized by width to 14 studs (about 10 tall); the sign and plaque are the noticeboard's mesh (7 x 8 x 3.9 raw).
+	legend_paddock_arch = { axis = "Z", studs = 14.0, yaw = 0, collide = false },
+	legend_plaque_post = { axis = "Y", studs = 4.5, yaw = 0, collide = true },
+	riding_school_sign = { axis = "Y", studs = 8.0, yaw = 0, collide = true },
 
 	-- Garden. Crops are sized to sit two to a garden_bed (6 x 2.6 studs).
 	carrot_crop = { axis = "Z", studs = 2.4, yaw = 0, collide = false },

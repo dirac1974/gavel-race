@@ -362,6 +362,34 @@ GameConfig.comeback = {
 	studioMonthStamps = 0,
 }
 
+-- Careers (D-059, stage 7): no ageing and no decline. A career badge every badgeEvery races; a
+-- Veteran at veteranAt races may take an opt-in Legend Retirement (two taps; suggested once per
+-- horse): it moves to the Hall of Fame paddock beside the barn, keeps its stats, can still be
+-- ridden, and frees its stall. legacyMax is the most Potential a Legend passes to one foal once
+-- breeding exists (D-047); unused until then. retireNeedsVeteran = false brings back retiring
+-- any horse at any time (as before stage 7).
+GameConfig.career = {
+	enabled = true,
+	badgeEvery = 25,
+	veteranAt = 100,
+	legacyMax = 2,
+	retireNeedsVeteran = true,
+	paddockShown = 4,                -- Legends standing in the paddock (the Hall of Fame list keeps them all)
+	sparkle = true,                  -- the gold sparkle on a Legend (off on screens with Reduced Motion)
+}
+
+-- Rehoming (D-059, stage 7): at the Market Corral a horse joins Sunny Meadow Riding School. The
+-- school pays share of what you paid for it, never more (tamed and gifted horses: 0 and a goodbye
+-- rosette); undo for undoHours at the same price. The starter, your last racing horse, a Legend
+-- and a horse that's busy can't go. No trading between players.
+GameConfig.rehome = {
+	enabled = true,
+	share = 0.5,
+	undoHours = 72,
+	maxWaiting = 10,                 -- horses waiting at the school for an undo (then it's full until one settles in or comes back)
+	school = "Sunny Meadow Riding School",
+}
+
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
 -- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in
 -- TrainingCourses.luau; scoring in TrainingRide.luau.

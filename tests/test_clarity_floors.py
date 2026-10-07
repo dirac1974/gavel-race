@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT = ROOT / "game" / "src" / "client"
 SHARED = ROOT / "game" / "src" / "shared"
-PANELS = ["RacePicker.client.luau", "StableBoard.client.luau", "HorsesClient.client.luau"]
+PANELS = ["RacePicker.client.luau", "StableBoard.client.luau", "HorsesClient.client.luau", "RehomeClient.client.luau"]
 CLARITY_ICONS = ["energy_shoe", "energy_shoe_empty", "rosette", "sprout",
                  "badge_rookie", "badge_bronze", "badge_silver", "badge_gold", "badge_champion"]
 

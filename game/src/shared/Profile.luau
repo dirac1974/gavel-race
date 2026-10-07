@@ -9,6 +9,7 @@
 -- Roblox requires by instance; Lune (tests) by path.
 local Horse = if script then require(script.Parent.Horse) :: any else require("./Horse")
 local HorseBook = if script then require(script.Parent.HorseBook) :: any else require("./HorseBook")
+local Career = if script then require(script.Parent.Career) :: any else require("./Career")
 
 local Profile = {}
 
@@ -89,6 +90,9 @@ function Profile.new(now: number): Profile
 		receipts = {},
 		tour = Profile.emptyTour(now // 86400),
 		postBox = { day = now // 86400, today = 0, total = 0 },
+		stallMap = 1,  -- stalls stored per horse (D-059)
+		rehomed = {},  -- horses at Sunny Meadow Riding School that can still come back (D-059)
+		hallOfFame = {},
 	}
 end
 
@@ -210,9 +214,11 @@ function Profile.migrate(data: any, now: number): Profile
 		end
 	end
 	p.horses = horses
-	if p.activeHorse and not Profile.horse(p, p.activeHorse) then p.activeHorse = nil end
-	if not p.activeHorse and horses[1] then p.activeHorse = horses[1].id end
 	p.stalls = math.clamp(math.floor(tonumber(p.stalls) or Profile.START_STALLS), Profile.START_STALLS, Profile.MAX_STALLS)
+	Profile.repairStalls(p)
+	Profile.fillStalls(p) -- a stall a load cleared takes the first pasture horse
+	if p.activeHorse and not Profile.horse(p, p.activeHorse) then p.activeHorse = nil end
+	Profile.fixActive(p)
 	p.nextHorseId = math.max(math.floor(tonumber(p.nextHorseId) or 1), #horses + 1)
 	p.days = if typeof(p.days) == "table" then p.days else {}
 	p.days.played = tonumber(p.days.played) or 0
@@ -250,7 +256,51 @@ function Profile.migrate(data: any, now: number): Profile
 	p.receipts = if typeof(p.receipts) == "table" then p.receipts else {}
 	Profile.repairVisits(p, now)
 	HorseBook.repair(p) -- the Horse Book and personal bests (D-063)
+	Profile.repairCareers(p, now)
 	return p :: Profile
+end
+
+-- Careers and rehoming (D-059): the starter is marked (older saves: the first horse, h1, when the
+-- starter was picked); the Hall of Fame list and the horses waiting at the riding school are
+-- repaired, and horses whose undo window has closed leave for good.
+Profile.MAX_PLAQUES = 50
+function Profile.repairCareers(p: any, now: number)
+	local hasStarter = false
+	for _, h in p.horses do
+		if h.origin == "starter" then hasStarter = true end
+	end
+	if not hasStarter and p.flags and p.flags.starterPicked then
+		local h1 = Profile.horse(p, "h1")
+		if h1 and h1.origin == nil then h1.origin = "starter" end
+	end
+	local plaques = {}
+	if typeof(p.hallOfFame) == "table" then
+		for _, pl in p.hallOfFame do
+			if typeof(pl) == "table" and typeof(pl.name) == "string" and #plaques < Profile.MAX_PLAQUES then
+				for _, k in { "races", "wins", "places", "cash", "retired" } do pl[k] = tonumber(pl[k]) or 0 end
+				pl.coat = if typeof(pl.coat) == "string" then pl.coat else "bay"
+				pl.league = if typeof(pl.league) == "string" then pl.league else "Rookie"
+				table.insert(plaques, pl)
+			end
+		end
+	end
+	p.hallOfFame = plaques
+	local waiting = {}
+	if typeof(p.rehomed) == "table" then
+		for _, e in p.rehomed do
+			local expires = typeof(e) == "table" and tonumber(e.expires)
+			if expires and now < expires and typeof(e.horse) == "table" and typeof(e.horse.id) == "string"
+				and not Profile.horse(p, e.horse.id) and #waiting < Career.cfgRehomeMax() then
+				e.horse = Horse.repair(e.horse, now)
+				e.horse.stall = nil
+				e.cash = math.max(0, math.floor(tonumber(e.cash) or 0))
+				e.at = tonumber(e.at) or now
+				table.insert(waiting, e)
+			end
+		end
+	end
+	p.rehomed = waiting
+	p.goodbyeRosettes = math.max(0, math.floor(tonumber(p.goodbyeRosettes) or 0))
 end
 
 local function userKey(k: any): boolean
@@ -367,23 +417,111 @@ function Profile.activeHorse(p: Profile): Horse.Horse?
 	return Profile.horse(p, p.activeHorse)
 end
 
+-- The horse a ride brings (D-059): a Legend when one is asked for by id (Legends are still
+-- ridden for fun from the Hall of Fame paddock), otherwise the active horse.
+function Profile.rideHorse(p: Profile, legendId: string?): Horse.Horse?
+	local h = if legendId then Profile.horse(p, legendId) else nil
+	if h and h.legend ~= nil then return h end
+	return Profile.activeHorse(p)
+end
+
 function Profile.newHorseId(p: Profile): string
 	local id = "h" .. p.nextHorseId
 	p.nextHorseId += 1
 	return id
 end
 
--- The first `stalls` horses in the list are stalled (can race); the rest are in the pasture.
-function Profile.isStalled(p: Profile, id: string): boolean
-	for i, h in p.horses do
-		if h.id == id then return i <= p.stalls end
+-- Stalls (D-059, stage 7): each horse stores its own stall (h.stall, 1..stalls), so a horse that
+-- leaves (a Legend, or rehomed) never shifts the others. A stall that comes free takes the first
+-- pasture horse; a horse with no stall lives in the pasture (it can't race until stalled).
+function Profile.stallHorse(p: Profile, k: number): Horse.Horse?
+	for _, h in p.horses do
+		if h.stall == k then return h end
 	end
-	return false
+	return nil
+end
+
+function Profile.freeStall(p: Profile): number?
+	for k = 1, p.stalls do
+		if not Profile.stallHorse(p, k) then return k end
+	end
+	return nil
+end
+
+-- Horses in the pasture (not stalled, not Legends), in the order they came home.
+function Profile.pasture(p: Profile): { Horse.Horse }
+	local out = {}
+	for _, h in p.horses do
+		if h.stall == nil and h.legend == nil then table.insert(out, h) end
+	end
+	return out
+end
+
+function Profile.legends(p: Profile): { Horse.Horse }
+	local out = {}
+	for _, h in p.horses do
+		if h.legend ~= nil then table.insert(out, h) end
+	end
+	return out
+end
+
+-- Horses that can race (not Legends).
+function Profile.racers(p: Profile): number
+	local n = 0
+	for _, h in p.horses do
+		if h.legend == nil then n += 1 end
+	end
+	return n
+end
+
+function Profile.isStalled(p: Profile, id: string): boolean
+	local h = Profile.horse(p, id)
+	return h ~= nil and h.stall ~= nil
+end
+
+-- Fill every free stall from the pasture (oldest first). Returns the horses moved in.
+function Profile.fillStalls(p: Profile): { Horse.Horse }
+	local moved = {}
+	for _, h in Profile.pasture(p) do
+		local k = Profile.freeStall(p)
+		if not k then break end
+		h.stall = k
+		table.insert(moved, h)
+	end
+	return moved
+end
+
+-- The active horse is always a stalled one (or nil when none is).
+function Profile.fixActive(p: Profile)
+	if p.activeHorse and Profile.isStalled(p, p.activeHorse) then return end
+	p.activeHorse = nil
+	for k = 1, p.stalls do
+		local h = Profile.stallHorse(p, k)
+		if h then
+			p.activeHorse = h.id
+			return
+		end
+	end
 end
 
 function Profile.addHorse(p: Profile, h: Horse.Horse)
 	table.insert(p.horses, h)
-	if not p.activeHorse then p.activeHorse = h.id end
+	h.stall = if h.legend == nil then Profile.freeStall(p) else nil
+	if not p.activeHorse and h.stall then p.activeHorse = h.id end
+end
+
+-- Take a horse out of the stable list (rehoming): its stall fills from the pasture.
+function Profile.removeHorse(p: Profile, id: string): Horse.Horse?
+	for i, h in p.horses do
+		if h.id == id then
+			table.remove(p.horses, i)
+			h.stall = nil
+			Profile.fillStalls(p)
+			Profile.fixActive(p)
+			return h
+		end
+	end
+	return nil
 end
 
 function Profile.setActive(p: Profile, id: string): boolean
@@ -392,35 +530,77 @@ function Profile.setActive(p: Profile, id: string): boolean
 	return true
 end
 
--- Swap a pasture horse into a stall slot (the stalled horse goes to the pasture).
-function Profile.swapStall(p: Profile, stalledId: string, pastureId: string): boolean
-	local a, b
-	for i, h in p.horses do
-		if h.id == stalledId then a = i end
-		if h.id == pastureId then b = i end
+-- Swap a pasture horse into a stall (the stalled horse goes to the pasture). With stalledId nil
+-- (or naming no stalled horse) a pasture horse moves into a free stall, if there is one.
+function Profile.swapStall(p: Profile, stalledId: string?, pastureId: string): boolean
+	local b = Profile.horse(p, pastureId)
+	if not b or b.stall ~= nil or b.legend ~= nil then return false end
+	local a = stalledId and Profile.horse(p, stalledId)
+	if not a or a.stall == nil then
+		local k = Profile.freeStall(p)
+		if stalledId ~= nil or not k then return false end
+		b.stall = k
+		Profile.fixActive(p)
+		return true
 	end
-	if not a or not b or a > p.stalls or b <= p.stalls then return false end
-	p.horses[a], p.horses[b] = p.horses[b], p.horses[a]
+	b.stall, a.stall = a.stall, nil
 	if p.activeHorse == stalledId then p.activeHorse = pastureId end
 	return true
 end
 
+-- Load-time repair of the stalls: an older save had no h.stall (the first `stalls` horses in the
+-- list were stalled), so those take stalls in list order once (p.stallMap = 1 after). After that,
+-- stalls out of range, shared or on a Legend are cleared; free stalls stay free.
+function Profile.repairStalls(p: Profile)
+	local pa = p :: any
+	if pa.stallMap ~= 1 then
+		local k = 0
+		for _, h in p.horses do
+			h.stall = nil
+			if h.legend == nil and k < p.stalls then
+				k += 1
+				h.stall = k
+			end
+		end
+		pa.stallMap = 1
+		return
+	end
+	local taken = {}
+	for _, h in p.horses do
+		if h.stall and (h.legend ~= nil or h.stall > p.stalls or taken[h.stall]) then h.stall = nil end
+		if h.stall then taken[h.stall] = true end
+	end
+end
+
 -- Races -------------------------------------------------------------------------
-function Profile.recordRace(p: Profile, horseId: string, place: number, cash: number, points: number, now: number)
+-- Returns the horse's races before and after (career badges, D-059), or nil with no horse.
+function Profile.recordRace(p: Profile, horseId: string, place: number, cash: number, points: number, now: number): (number?, number?)
 	local h = Profile.horse(p, horseId)
 	if cash > 0 then Profile.addCash(p, cash) end
 	p.totals.races += 1
 	if place == 1 then p.totals.wins += 1 end
-	if h then Horse.recordRace(h, place, cash, points, now) end
+	if not h then return nil, nil end
+	local before = h.record.races
+	Horse.recordRace(h, place, cash, points, now)
+	return before, h.record.races
 end
 
 -- What the owner's client sees (no Potential unless revealed, nothing internal).
 function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): { [string]: any }
 	local horses = {}
-	for i, h in p.horses do
+	for _, h in p.horses do
 		local v = Horse.view(h, now, energyCfg)
-		v.stalled = i <= p.stalls
+		v.stalled = h.stall ~= nil
+		v.career = Career.view(h)
 		table.insert(horses, v)
+	end
+	-- Horses at Sunny Meadow Riding School that can still come back (D-059): no clock, just "days".
+	local rehomed = {}
+	for _, e in (p :: any).rehomed or {} do
+		if now < e.expires then
+			table.insert(rehomed, { id = e.horse.id, name = e.horse.name, coat = e.horse.coat, cash = e.cash,
+				daysLeft = math.max(1, math.ceil((e.expires - now) / 86400)) })
+		end
 	end
 	return {
 		cash = p.cash,
@@ -445,6 +625,8 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 			total = if p.postBox then p.postBox.total else 0,
 		},
 		style = { owned = table.clone((p.style and p.style.owned) or {}), equipped = table.clone((p.style and p.style.equipped) or {}) },
+		rehomed = rehomed,
+		goodbyeRosettes = tonumber((p :: any).goodbyeRosettes) or 0,
 	}
 end
 

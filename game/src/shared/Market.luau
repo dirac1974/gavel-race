@@ -132,6 +132,7 @@ function Market.buy(p: any, id: string, now: number): (boolean, string, any)
 	if not Profile.spendCash(p, listing.price) then return false, "Not enough Green Cash yet. Races, chores and jobs earn more!", nil end
 	local h = Horse.new(Profile.newHorseId(p), listing.name, listing.coat, listing.stats, listing.potential, now)
 	h.style = listing.style
+	h.origin, h.paid = "market", listing.price -- what rehoming pays half of (D-059)
 	Profile.addHorse(p, h)
 	p.market.bought[id] = true
 	-- keep the record small: forget purchases from old weeks
@@ -197,6 +198,7 @@ function Market.tame(p: any, coat: string, rng: any, now: number): (boolean, str
 	local name = NameGen.build(NameGen.FIRST[rng:NextInteger(1, #NameGen.FIRST)], NameGen.SECOND[rng:NextInteger(1, #NameGen.SECOND)]) or "Wildflower"
 	local h = Horse.new(Profile.newHorseId(p), name, coat, stats, potential, now)
 	h.style = Market.STYLES[rng:NextInteger(1, #Market.STYLES)]
+	h.origin, h.paid = "tamed", 0
 	Profile.addHorse(p, h)
 	p.market.tameDay = now // 86400
 	return true, string.format("%s trusts you now and is coming home!", h.name), h
@@ -212,7 +214,90 @@ function Market.buyStall(p: any): (boolean, string)
 	if not price then return false, "Your barn is as big as it gets!" end
 	if not Profile.spendCash(p, price) then return false, string.format("A new stall costs %d Green Cash", price) end
 	p.stalls += 1
+	Profile.fillStalls(p) -- the first pasture horse moves in
+	Profile.fixActive(p)
 	return true, string.format("New stall built! You have %d stalls now", p.stalls)
+end
+
+-- Rehoming (D-059, stage 7) ------------------------------------------------------------
+-- At the Market Corral a horse can join Sunny Meadow Riding School. The school pays rehome.share
+-- of what you paid for it (h.paid), never more and never the market price, so buying and rehoming
+-- always costs Green Cash; tamed and gifted horses pay 0 and give a goodbye rosette (once per
+-- horse). For rehome.undoHours it can come back at the same price, with its name and stats.
+local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
+
+function Market.rehomeValue(h: any): number
+	local paid = math.max(0, math.floor(tonumber(h.paid) or 0))
+	return math.min(paid, math.floor(paid * GameConfig.rehome.share))
+end
+
+-- Why this horse can't be rehomed, or nil. `busy` as Leagues.retireBlock.
+function Market.rehomeBlock(p: any, id: string, busy: any?, now: number?): string?
+	local Leagues = if script then require(script.Parent.Leagues) :: any else require("./Leagues")
+	if not GameConfig.rehome.enabled then return "The riding school is closed today" end
+	local h = Profile.horse(p, id)
+	if not h then return "No such horse" end
+	if h.origin == "starter" then return h.name .. " was your first horse. Friends forever!" end
+	if h.legend ~= nil then return h.name .. " is a Legend and lives with you!" end
+	if Profile.racers(p) <= 1 then return "Keep one horse racing with you!" end
+	local waiting = 0
+	for _, e in (if typeof(p.rehomed) == "table" then p.rehomed else {}) do
+		if now == nil or now < e.expires then waiting += 1 end
+	end
+	if waiting >= GameConfig.rehome.maxWaiting then return "The riding school is full. Try again soon!" end
+	return Leagues.retireBlock(h.name, id, busy or {}, "Rehome")
+end
+
+-- Horses whose undo window has closed leave for good.
+function Market.pruneRehomed(p: any, now: number)
+	if typeof(p.rehomed) ~= "table" then p.rehomed = {} end
+	for i = #p.rehomed, 1, -1 do
+		if now >= p.rehomed[i].expires then table.remove(p.rehomed, i) end
+	end
+end
+
+-- Rehome a horse. Returns (ok, message, entry): entry = { horse, cash, rosette, at, expires }.
+-- The cash is not counted as earned (totals.cashEarned), so it never moves a job along.
+function Market.rehome(p: any, id: string, now: number, busy: any?): (boolean, string, any)
+	Market.pruneRehomed(p, now)
+	local why = Market.rehomeBlock(p, id, busy, now)
+	if why then return false, why, nil end
+	local h = Profile.removeHorse(p, id)
+	if not h then return false, "No such horse", nil end
+	local cash = Market.rehomeValue(h)
+	p.cash += cash
+	local rosette = false
+	if cash == 0 and not h.goodbyeRosette then
+		h.goodbyeRosette, rosette = true, true
+		p.goodbyeRosettes = (tonumber(p.goodbyeRosettes) or 0) + 1
+	end
+	local entry = { horse = h, cash = cash, at = now, expires = now + GameConfig.rehome.undoHours * 3600 }
+	table.insert(p.rehomed, entry)
+	return true, string.format("%s is joining %s!", h.name, GameConfig.rehome.school),
+		{ name = h.name, coat = h.coat, id = h.id, cash = cash, rosette = rosette, days = GameConfig.rehome.undoHours // 24 }
+end
+
+-- Bring a rehomed horse back within the undo window, at the same price the school paid.
+function Market.undoRehome(p: any, id: string, now: number): (boolean, string, any)
+	Market.pruneRehomed(p, now)
+	local index = nil
+	for i, e in p.rehomed do
+		if e.horse.id == id then index = i end
+	end
+	if not index then return false, "That horse has settled in at the school", nil end
+	local e = p.rehomed[index]
+	if Profile.horse(p, id) then
+		table.remove(p.rehomed, index)
+		return false, e.horse.name .. " already lives with you!", nil
+	end
+	if not Market.canAddHorse(p) then return false, "Your stable is full of friends!", nil end
+	if p.cash < e.cash then return false, string.format("Bringing %s home needs 💵 %d", e.horse.name, e.cash), nil end
+	p.cash -= e.cash
+	table.remove(p.rehomed, index)
+	local h = e.horse
+	h.stall = nil
+	Profile.addHorse(p, h)
+	return true, string.format("Welcome back, %s!", h.name), h
 end
 
 -- Rename with word chips (NameGen), same rules as the starter.

@@ -1867,7 +1867,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(p.cash == 30 + 24 and p.totals.wins == 1 and h3.record.wins == 1, "race pays into the profile")
 
 	local view = Profile.view(p, T0, E)
-	check(#view.horses == 3 and view.horses[3].stalled == false and view.horses[1].potential == nil, "profile view")
+	check(#view.horses == 3 and view.horses[1].stalled == false and view.horses[3].stalled == true and view.horses[1].potential == nil, "profile view (stalls stored per horse, D-059)")
 
 	-- Migration: nil, junk, and an old record ------------------------------------------
 	check(Profile.migrate(nil, T0).cash == Profile.START_CASH, "new player")
@@ -2299,9 +2299,11 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Profile.addHorse(rp, r1)
 	Profile.addHorse(rp, r2)
 	r1.record.races, r1.record.wins = 40, 9
+	check(Leagues.retire(rp, r1.id, T0) == nil, "Legend Retirement waits for a Veteran (D-059)")
+	r1.record.races = 100
 	local plaque = Leagues.retire(rp, r1.id, T0)
-	check(plaque and plaque.wins == 9 and #rp.horses == 1 and rp.activeHorse == r2.id and rp.hallOfFame[1].name == "Old Timer",
-		"retiring keeps a Hall of Fame plaque")
+	check(plaque and plaque.wins == 9 and #rp.horses == 2 and r1.legend == T0 and rp.activeHorse == r2.id and rp.hallOfFame[1].name == "Old Timer",
+		"retiring keeps a Hall of Fame plaque, and the Legend stays (D-059)")
 	check(Leagues.retire(rp, "nope", T0) == nil, "only your horses retire")
 
 	-- First ten minutes (Stage 10) -------------------------------------------------------

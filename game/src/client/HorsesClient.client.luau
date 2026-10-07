@@ -9,6 +9,11 @@
 -- Clarity pass (D-064, stage 3): 🏇 marks the horse you ride (★ is only how you rode), text is
 -- never under ui.panelMinText, buttons never under ui.panelButtonPx, and on a short screen the
 -- panel gets shorter and its list scrolls instead of shrinking.
+-- Careers (D-059, stage 7): each card has its career row (🎖️ badges, 🏆 Cups, Veteran / 👑
+-- Legend); a Veteran's "👑 Legend" button (two taps) retires it to the Hall of Fame paddock; a
+-- Legend's "🐴 Ride" brings it for a ride. Stalls are stored per horse: cards go stall order,
+-- pasture, then Legends, and a pasture horse moves straight into a free stall. The Hall of Fame
+-- page lists the plaques and the horses at Sunny Meadow Riding School with "↩️ Undo".
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -52,7 +57,7 @@ list.CanvasSize = UDim2.new()
 list.ScrollBarThickness = 6
 list.Parent = panel
 local grid = Instance.new("UIGridLayout")
-grid.CellSize = UDim2.new(0.5, -8, 0, 260)
+grid.CellSize = UDim2.new(0.5, -8, 0, 290)
 grid.CellPadding = UDim2.fromOffset(12, 12)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = list
@@ -92,7 +97,8 @@ local render
 local function horseCard(h, order: number)
 	local d = PlayerState.data
 	local active = h.id == d.activeHorse
-	local card = Ui.card(list, UDim2.new(), UDim2.new(), if active then C.gold elseif h.stalled then C.cream else Color3.fromHex("E3F2D9"))
+	local card = Ui.card(list, UDim2.new(), UDim2.new(), if active then C.gold elseif h.legend then Color3.fromHex("FFF4C7")
+		elseif h.stalled then C.cream else Color3.fromHex("E3F2D9"))
 	card.LayoutOrder = order
 	local dot = Instance.new("Frame")
 	dot.Size = UDim2.fromOffset(40, 40)
@@ -104,7 +110,8 @@ local function horseCard(h, order: number)
 	local name = Ui.text(card, (if active then "🏇 " else "") .. h.name, 20, { Position = UDim2.new(0, 58, 0, 6), Size = UDim2.new(1, -66, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	local leagueLine = (h.league or "Rookie") .. (if h.cupOpen then " · 🏆 Cup open!" else "")
-	local sub = Ui.text(card, string.format("%s · %s", if h.stalled then "Stall" else "Pasture", leagueLine), TEXT,
+	local place = if h.legend then "👑 Hall of Fame paddock" elseif h.stalled then "Stall " .. tostring(h.stall or "") else "Pasture"
+	local sub = Ui.text(card, if h.legend then place else string.format("%s · %s", place, leagueLine), TEXT,
 		{ Position = UDim2.new(0, 58, 0, 30), Size = UDim2.new(1, -66, 0, 20), TextXAlignment = Enum.TextXAlignment.Left })
 	sub.TextColor3 = C.plum
 	sub.TextTruncate = Enum.TextTruncate.AtEnd
@@ -115,6 +122,13 @@ local function horseCard(h, order: number)
 	local pips = Ui.energyPips(card, h.energy, GameConfig.energy.maxPerRacer, 18, UDim2.new(0, 10, 0, 155))
 	Ui.text(card, string.format("❤️%d  🏁 %d · 🥇 %d", math.floor(h.bond), h.record.races, h.record.wins), TEXT,
 		{ Position = UDim2.new(0, 16 + pips.Size.X.Offset, 0, 153), Size = UDim2.new(1, -26 - pips.Size.X.Offset, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	-- Career row (D-059): 🎖️ a badge every 25 races, 🏆 Cups, Veteran or 👑 Legend; races to the next badge.
+	local career = h.career or {}
+	local careerText = career.line or ""
+	if not h.legend and career.toNextBadge then careerText ..= string.format(" · 🎖️ in %d races", career.toNextBadge) end
+	local cl = Ui.text(card, careerText, TEXT, { Position = UDim2.new(0, 10, 0, 180), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	cl.TextColor3 = C.plum
+	cl.TextTruncate = Enum.TextTruncate.AtEnd
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
 	row.Size = UDim2.new(1, -16, 0, TAP)
@@ -128,15 +142,31 @@ local function horseCard(h, order: number)
 		local b = Ui.button(row, text, UDim2.fromOffset(80, TAP), UDim2.new(), color, TEXT)
 		b.Activated:Connect(fn)
 	end
+	if h.legend then
+		btn("🐴 Ride", C.orange, function()
+			gameRemotes:WaitForChild("CallHorse"):FireServer(h.id) -- a Legend ride (D-059)
+			gui.Enabled = false
+		end)
+	end
 	if h.stalled and not active then
 		btn("🏇 Ride", C.orange, function() gameRemotes:WaitForChild("SetActiveHorse"):FireServer(h.id) end)
 	end
-	if not h.stalled then
+	local freeStall = false
+	do
+		local used = 0
+		for _, x in d.horses do if x.stalled then used += 1 end end
+		freeStall = used < d.stalls
+	end
+	if not h.stalled and not h.legend then
 		btn(if moving == h.id then "Pick one ↓" else "🏠 Stall", C.sky, function()
+			if freeStall then -- an empty stall: straight in (stalls stored per horse, D-059)
+				gameRemotes:WaitForChild("SwapStall"):FireServer("", h.id)
+				return
+			end
 			moving = if moving == h.id then nil else h.id
 			render()
 		end)
-	elseif moving then
+	elseif moving and h.stalled then
 		btn("🔁 Swap", C.green, function()
 			gameRemotes:WaitForChild("SwapStall"):FireServer(h.id, moving)
 			moving = nil
@@ -146,8 +176,8 @@ local function horseCard(h, order: number)
 		mode = "rename:" .. h.id
 		render()
 	end)
-	if #d.horses > 1 then
-		btn(if retiring == h.id then "Sure?" else "🏅 Retire", if retiring == h.id then C.red else C.cream, function()
+	if career.canBeLegend and not h.legend then -- Legend Retirement (D-059): two taps, a Veteran only
+		btn(if retiring == h.id then "Sure? 👑" else "👑 Legend", if retiring == h.id then C.red else C.gold, function()
 			if retiring == h.id then
 				gameRemotes:WaitForChild("RetireHorse"):FireServer(h.id)
 				retiring = nil
@@ -163,15 +193,35 @@ local function hallView()
 	local d = PlayerState.data
 	title.Text = "🏅 Hall of Fame"
 	local plaques = d.hallOfFame or {}
+	-- Horses at Sunny Meadow Riding School that can still come back (D-059): undo, no clock.
+	for k, r in d.rehomed or {} do
+		local c = Ui.card(list, UDim2.new(), UDim2.new(), C.sky)
+		c.LayoutOrder = k
+		local t = Ui.text(c, "🏫 " .. r.name .. " at Sunny Meadow", 20, { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -24, 0, 26), TextXAlignment = Enum.TextXAlignment.Left })
+		t.TextTruncate = Enum.TextTruncate.AtEnd
+		Ui.text(c, string.format("%d %s to change your mind", r.daysLeft, if r.daysLeft == 1 then "day" else "days"), TEXT,
+			{ Position = UDim2.new(0, 12, 0, 36), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+		local undo = Ui.button(c, if r.cash > 0 then string.format("↩️ Undo · 💵 %d", r.cash) else "↩️ Undo", UDim2.fromOffset(200, TAP), UDim2.new(0, 12, 1, -TAP - 6), C.white, 18)
+		undo.Activated:Connect(function() gameRemotes:WaitForChild("UndoRehome"):FireServer(r.id) end)
+	end
+	if (d.goodbyeRosettes or 0) > 0 then
+		local c = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
+		c.LayoutOrder = 50
+		Ui.text(c, string.format("🏵️ %d goodbye %s", d.goodbyeRosettes, if d.goodbyeRosettes == 1 then "rosette" else "rosettes"), 22,
+			{ Position = UDim2.new(0, 12, 0, 12), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
+		Ui.text(c, "From horses you shared with the riding school", TEXT,
+			{ Position = UDim2.new(0, 12, 0, 48), Size = UDim2.new(1, -24, 0, 44), TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true }).TextColor3 = C.plum
+	end
 	if #plaques == 0 then
 		local empty = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
-		Ui.text(empty, "No legends yet. Retire a horse when you choose, and its record lives here.", 18,
-			{ Position = UDim2.new(0, 12, 0, 20), Size = UDim2.new(1, -24, 0, 80) })
+		empty.LayoutOrder = 100
+		Ui.text(empty, string.format("No Legends yet. A horse with %d races can become one!", GameConfig.career.veteranAt), 18,
+			{ Position = UDim2.new(0, 12, 0, 20), Size = UDim2.new(1, -24, 0, 80), TextWrapped = true })
 	end
 	for k, pl in plaques do
 		local c = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
-		c.LayoutOrder = k
-		Ui.text(c, "🏅 " .. pl.name, 22, { Position = UDim2.new(0, 12, 0, 12), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
+		c.LayoutOrder = 100 + k
+		Ui.text(c, (if pl.legend then "👑 " else "🏅 ") .. pl.name, 22, { Position = UDim2.new(0, 12, 0, 12), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
 		Ui.text(c, string.format("%s · %s", (pl.coat:gsub("_", " ")), pl.league), TEXT, { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
 		Ui.text(c, string.format("🏁 %d races · 🥇 %d wins · 🏅 %d top three · 💵 %d", pl.races, pl.wins, pl.places, pl.cash), TEXT,
 			{ Position = UDim2.new(0, 12, 0, 74), Size = UDim2.new(1, -24, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
@@ -240,7 +290,7 @@ render = function()
 	local d = PlayerState.data
 	if not d then return end
 	if mode == "hall" then
-		grid.CellSize = UDim2.new(0.5, -8, 0, 120)
+		grid.CellSize = UDim2.new(0.5, -8, 0, 140)
 		stallBtn.Visible = false
 		hallBtn.Text = "◀ My Horses"
 		return hallView()
@@ -251,12 +301,16 @@ render = function()
 		stallBtn.Visible = false
 		return renameView(string.sub(mode, 8))
 	end
-	grid.CellSize = UDim2.new(0.5, -8, 0, 260)
+	grid.CellSize = UDim2.new(0.5, -8, 0, 290)
 	title.Text = string.format("🐴 My Horses (%d)", #d.horses)
 	local price = d.market and d.market.nextStallPrice
 	stallBtn.Visible = true
 	stallBtn.Text = if price then string.format("🔨 Build a stall · 💵 %d", price) else string.format("🏠 %d stalls (full barn)", d.stalls)
-	for i, h in d.horses do horseCard(h, i) end
+	-- stall order, then the pasture, then Legends (D-059)
+	for i, h in d.horses do
+		local order = if h.legend then 200 + i elseif h.stalled then (h.stall or 0) else 100 + i
+		horseCard(h, order)
+	end
 end
 
 hallBtn.Activated:Connect(function()
@@ -288,6 +342,38 @@ if not ev then
 	ev.Parent = HudEvents
 end
 ev.Event:Connect(function() if gui.Enabled then close() else open() end end)
+
+-- Legends in your Hall of Fame paddock (D-059): a Ride prompt on your own Legends.
+local function attachLegend(m: Instance)
+	if not m:IsA("Model") or not m:GetAttribute("LegendId") or m:GetAttribute("Owner") ~= Players.LocalPlayer.UserId then return end
+	local anchor = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true)
+	if not anchor or anchor:FindFirstChild("LegendPrompt") then return end
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "LegendPrompt"
+	p.ActionText = "Ride"
+	p.ObjectText = "👑 " .. tostring(m:GetAttribute("HorseName") or "Legend")
+	p.MaxActivationDistance = 14
+	p.RequiresLineOfSight = false
+	p.Parent = anchor
+	p.Triggered:Connect(function() gameRemotes:WaitForChild("CallHorse"):FireServer(m:GetAttribute("LegendId")) end)
+end
+
+-- Reduced Motion: no sparkle on Legends (the soft gold sheen stays).
+local function calm(): boolean
+	local ok, on = pcall(function() return game:GetService("GuiService").ReducedMotionEnabled end)
+	return ok and on == true
+end
+local function onPaddockPart(d: Instance)
+	if d:IsA("Model") then task.defer(attachLegend, d) end
+	if d:IsA("ParticleEmitter") and d.Name == "LegendSparkle" and calm() then d.Enabled = false end
+end
+task.spawn(function()
+	local plots = workspace:WaitForChild("World", 60)
+	plots = plots and plots:WaitForChild("Plots", 60)
+	if not plots then return end
+	for _, d in plots:GetDescendants() do onPaddockPart(d) end
+	plots.DescendantAdded:Connect(onPaddockPart)
+end)
 
 -- Market Corral --------------------------------------------------------------------------
 local mgui = Ui.screen("MarketCard", 11)
