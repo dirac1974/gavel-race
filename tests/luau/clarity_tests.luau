@@ -81,10 +81,11 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	ok(Advice.nextThing(profile(horse({ trainingReady = true, stats = { speed = 40, accel = 50, stamina = 50, grit = 50 },
 		potential = { speed = 80, accel = 60, stamina = 60, grit = 60 } })), T0), "train:h1", "paddock", "training ready")
 	ok(Advice.nextThing(profile(horse({})), T0), "race:h1", "race", "ready to race")
-	local nap = Advice.nextThing(profile(horse({ resting = true })), T0)
+	ok(Advice.nextThing(profile(horse({ resting = true })), T0), "spa:h1", "vet", "napping with the Spa open (D-058)")
+	local nap = Advice.nextThing(profile(horse({ resting = true, spaToday = 1 })), T0)
 	ok(nap, "nap", nil, "napping")
 	check(string.find(nap.text, "dreaming of tomorrow", 1, true) ~= nil, "napping: D-058's words, no GO")
-	local garden = profile(horse({ resting = true }))
+	local garden = profile(horse({ resting = true, spaToday = 1 }))
 	garden.garden = { { seed = "carrot", ready = true } }
 	ok(Advice.nextThing(garden, T0), "crops", "stable", "crops ready")
 	-- the active horse, not the first one

@@ -6,7 +6,7 @@ Last updated: 2026-10-07
 
 - **Race model v2**: Python reference and Luau module agree exactly (300 fixture races, purses and finish orders included).
 - **Roblox prototype (Phase 1)**: Rojo project in `game/` with three Giddy-up stretches and a Final Burst (D-022). Pure modules (GameConfig, ThemePack, Stride, BurstMeter, TapTime, Integrity, RaceRating, RaceSession) are tested under Lune; stride scoring has a Python mirror with parity tests. Server loop and client UI are written and compile, but **have not been run in Roblox Studio** (see `game/PLAYTEST.md`).
-- **Tests**: 1,683 Python tests; 81,339 Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
+- **Tests**: 1,683 Python tests; 81,409 Luau checks; policy guard; syntax check for every Luau file; GitHub Actions runs all of it.
 - **Art**: playtest art (D-023) is uploaded and wired in; the place must be published to the LlamaWorks group to load it.
 - **Race shape (D-033)**: secret luck at the gate gives the same Harville odds as an exponential race; luck shows from the far turn, so comebacks happen on screen while taps still count. Replays of the finish or the whole race (D-034).
 - **Design**: debate 007 replaced the gavel meter with Giddy-up stretches and the Final Burst (D-022). Provisional decisions listed in REVIEW_QUEUE.md.

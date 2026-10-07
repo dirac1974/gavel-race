@@ -117,6 +117,9 @@ function Advice.nextThing(profile: any, now: number): Next
 	if not h.resting then
 		return { key = "race:" .. tostring(h.id), emoji = "🏁", icon = "flag_ready", text = "Race with " .. name .. "!", go = "race" }
 	end
+	if GameConfig.spa.enabled and (h.spaToday or 0) < GameConfig.spa.perDay then -- D-058: napping, Spa open today
+		return { key = "spa:" .. tostring(h.id), emoji = "🛁", icon = "stethoscope", text = "Spa Day for " .. name .. " at the Vet", go = "vet" }
+	end
 	for _, b in profile.garden or {} do
 		if b.seed ~= "" and (b.ready or Care.cropProgress(b, now) >= 1) then
 			return { key = "crops", emoji = "🥕", icon = "carrot", text = "Pick your crops", go = "stable" }
