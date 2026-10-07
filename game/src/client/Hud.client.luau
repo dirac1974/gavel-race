@@ -207,6 +207,7 @@ local KIND_WORD = { race = "🏁 RACE!", cup = "🏆 CUP!", practice = "🎈 PRA
 local inLine = false
 local function setRaceButton(state: string, detail: string?)
 	raceBtn.TextYAlignment = Enum.TextYAlignment.Center
+	raceBtn.TextSize = 30
 	raceSub.Visible = false
 	if state == "nohorse" then
 		raceBtn.Text, raceBtn.BackgroundColor3 = "🐴 Pick a horse", C.gold
@@ -220,6 +221,7 @@ local function setRaceButton(state: string, detail: string?)
 		if oneTap and h then
 			local kind = oneTapKind(h)
 			raceBtn.Text = KIND_WORD[kind]
+			raceBtn.TextSize = if kind == "practice" then 24 else 30 -- one line above "with Comet ▶"
 			raceBtn.BackgroundColor3 = if kind == "practice" then C.sky else C.orange
 			raceBtn.TextYAlignment = Enum.TextYAlignment.Top
 			raceSub.Text = "with " .. h.name .. " ▶"

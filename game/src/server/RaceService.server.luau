@@ -260,6 +260,7 @@ local function leaveLine(player: Player)
 	end
 	local c = inLine[player]
 	if not c then return end
+	RaceTime:FireClient(player, c.id, true) -- cancels a "Race time!" already shown (D-061 stage 2)
 	inLine[player] = nil
 	player:SetAttribute("InLine", nil)
 	local i = table.find(c.queue, player)
@@ -410,6 +411,14 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	local pick = data and ((id and Profile.isStalled(data, id) and Profile.horse(data, id)) or Profile.activeHorse(data))
 	local wanted = { league = if pick then pick.league else DEFAULT_LEAGUE, cup = kind == "cup", practice = kind == "practice" }
 	local h, why = rideable(player, id, wanted)
+	if not h and kind == "race" then -- (D-061 stage 2) a tired or outgrown horse still gets a race: Practice
+		local practice = { league = wanted.league, cup = false, practice = true }
+		local hp = rideable(player, id, practice)
+		if hp then
+			h, kind = hp, "practice"
+			Profiles.notify(player, hp.name .. " is resting, so this one is a Practice race!", "zzz_resting")
+		end
+	end
 	if not h then
 		Profiles.notify(player, why, "zzz_resting")
 		if not inLine[player] and not RaceQueues.isWaiting(waits, player) then QueueStatus:FireClient(player, false, 0, nil, nil) end
@@ -1081,6 +1090,8 @@ local function courseLoop(c)
 			task.wait(if left > callAt + 0.05 then math.clamp(left - callAt, 0.05, 1) else math.clamp(left, 0.05, 1))
 		end
 		callBack()
+		-- A gate that filled early: the riders just heard "Race time!"; give them its seconds.
+		if #c.queue >= GameConfig.lanes and os.clock() < (c.fillDeadline or 0) - callAt then task.wait(callAt) end
 		-- The first race after a server start waits (up to 10 s more) for the horse models to
 		-- load, so no horse runs without its running legs (D-055). Riders stay in line meanwhile.
 		local models = ReplicatedStorage:FindFirstChild("RaceModels")

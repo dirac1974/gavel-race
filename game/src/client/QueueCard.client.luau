@@ -34,10 +34,10 @@ local function reducedMotion(): boolean
 end
 
 -- Layout (unscaled px). Never scaled below minTextPx / 14 so the smallest text (14 px) stays 14.
-local W, H = 600, 156
+local W, H = 660, 156
 local RING, DOTS = 104, 20
-local SLOT_W, SLOT_H, GAP = 96, 38, 6
-local MIN_SCALE = GameConfig.ui.minTextPx / 14
+local SLOT_W, SLOT_H, GAP = 110, 38, 6
+local MIN_SCALE = GameConfig.ui.minTextPx / 16 -- the smallest text on the card is 16 px
 
 local gui = Ui.screen("QueueCard", 12) -- above the care card and the picker (11): visible while grooming
 gui.Enabled = false
@@ -130,7 +130,7 @@ for k = 1, GameConfig.lanes do
 	Ui.corner(dot, 10)
 	Ui.stroke(dot, 2)
 	dot.Parent = f
-	local name = Ui.text(f, "", 15, { Position = UDim2.fromOffset(30, 0), Size = UDim2.new(1, -33, 1, 0),
+	local name = Ui.text(f, "", 16, { Position = UDim2.fromOffset(30, 0), Size = UDim2.new(1, -33, 1, 0),
 		TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 	f.Parent = gate
 	slotUi[k] = { frame = f, dot = dot, name = name, stroke = stroke }
@@ -140,7 +140,7 @@ end
 local leaveBtn = Ui.button(card, "✕", UDim2.fromOffset(56, 56), UDim2.new(1, -66, 0, 8), C.white, 26)
 local moreBtn = Ui.button(card, "", UDim2.fromOffset(56, 64), UDim2.new(1, -66, 0, 76), C.sky, 14)
 Ui.text(moreBtn, "🔀", 24, { Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 4) })
-Ui.text(moreBtn, "More", 14, { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, -24) })
+Ui.text(moreBtn, "More", 16, { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, -24) })
 leaveBtn.Activated:Connect(function()
 	raceRemotes:WaitForChild("JoinRace"):FireServer(false)
 end)
@@ -159,7 +159,11 @@ raceRemotes:WaitForChild("QueueGate").OnClientEvent:Connect(function(courseId, r
 	QueueView.gate(state, courseId, riders, lanes, seconds, racing, os.clock())
 end)
 local raceTimeAt = 0
-raceRemotes:WaitForChild("RaceTime").OnClientEvent:Connect(function(courseId)
+raceRemotes:WaitForChild("RaceTime").OnClientEvent:Connect(function(courseId, cancel)
+	if cancel then -- you left the line
+		QueueView.clear(state)
+		return
+	end
 	QueueView.raceTime(state, courseId, CFG.raceTimeSeconds or 3, os.clock())
 	raceTimeAt = os.clock()
 	if Sound then Sound.play("horse_nicker") end
