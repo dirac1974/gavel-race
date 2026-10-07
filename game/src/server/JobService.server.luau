@@ -15,6 +15,7 @@ local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Style = require(Shared:WaitForChild("Style"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local StableStar = require(Shared:WaitForChild("StableStar")) -- Stable Star goal cards (D-062)
 
 -- Every monthly job claimed: a milestone gift of Diamonds, once per month (D-050).
 local function monthlyGift(player: Player, data)
@@ -72,11 +73,17 @@ Profiles.addDecorator(function(data, view)
 	end
 end, "jobs")
 
+-- Stable Star goal cards and the wall count (D-062): private, the owner's view only.
+Profiles.addDecorator(function(data, view)
+	view.stableStar = StableStar.view(data)
+end, "stableStar")
+
 Profiles.Loaded.Event:Connect(function(player: Player)
 	local data = Profiles.get(player)
 	if not data then return end
 	local now = os.time()
 	local auto = Jobs.refresh(data, player.UserId, now)
+	StableStar.check(data) -- goals met while away (Horse Book pages) hang their rosettes
 	-- Studio only (the parent check): start this month's stamps at comeback.studioMonthStamps.
 	local pretend = (GameConfig.comeback or {}).studioMonthStamps or 0
 	if pretend > 0 and game:GetService("RunService"):IsStudio() then

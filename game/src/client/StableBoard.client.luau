@@ -7,6 +7,8 @@
 --   with a picture, a few words, progress and GO, or Claim when done; "All done today!" when all
 --   three are claimed), This week and This month (every job inline with its progress, and one
 --   "Get prizes" button). One free swap a day.
+-- 🏵️ Goals (D-062): Stable Star goal cards (care, collection, skill), one of each, private; each
+-- finished goal hangs a rosette on the stable's Rosette Wall.
 -- The "Next thing" pill (D-064): one thing to do above the dock, from Advice.nextThing, with GO;
 -- Pip gives a hint when you seem stuck.
 -- No bell, no red badge, no timers. Words state facts about the horse, never guilt.
@@ -83,12 +85,13 @@ tl.FillDirection = Enum.FillDirection.Horizontal
 tl.Padding = UDim.new(0, 8)
 tl.SortOrder = Enum.SortOrder.LayoutOrder
 tl.Parent = tabRow
-local TABS = { { "daily", "📋 Today" }, { "weekly", "📅 Week" }, { "monthly", "🎀 Month" } }
+-- 🏵️ Goals (D-062): the Stable Star goal cards, private; each one done hangs a rosette on the wall.
+local TABS = { { "daily", "📋 Today" }, { "weekly", "📅 Week" }, { "monthly", "🎀 Month" }, { "goals", "🏵️ Goals" } }
 local tabButtons = {}
 local tab = "daily"
 local render
 for k, t in TABS do
-	local b = Ui.button(tabRow, t[2], UDim2.fromOffset(160, TAP), UDim2.new(), C.white, 20)
+	local b = Ui.button(tabRow, t[2], UDim2.fromOffset(132, TAP), UDim2.new(), C.white, 18)
 	b.LayoutOrder = k
 	tabButtons[t[1]] = b
 	b.Activated:Connect(function()
@@ -97,7 +100,7 @@ for k, t in TABS do
 	end)
 end
 -- Swap a job (Today) or Get prizes (a week or month set with finished jobs), on the tab row's right.
-local actionBtn = Ui.button(board, "🔀 Swap a job", UDim2.fromOffset(210, TAP), UDim2.new(1, -226, 0, 244), C.white, 18)
+local actionBtn = Ui.button(board, "🔀 Swap a job", UDim2.fromOffset(190, TAP), UDim2.new(1, -206, 0, 244), C.white, 18)
 local jobsArea = Instance.new("Frame")
 jobsArea.BackgroundTransparency = 1
 jobsArea.Size = UDim2.new(1, -32, 0, 190)
@@ -222,6 +225,45 @@ local function jobChip(parent: Instance, job, order: number)
 	end
 end
 
+-- A Stable Star goal card (D-062): its kind in its rosette colour, the goal, progress. Never a race
+-- result: care, things found and how you ride.
+local function goalCard(parent: Instance, g, order: number)
+	local done = g.progress >= g.target
+	local card = Ui.card(parent, UDim2.new(), UDim2.new(), C.paper)
+	card.LayoutOrder = order
+	local strip = Instance.new("Frame")
+	strip.Size = UDim2.new(1, 0, 0, 10)
+	strip.BackgroundColor3 = Color3.fromHex(g.color or "FFD23F")
+	Ui.corner(strip, 8)
+	strip.Parent = card
+	Ui.icon(card, g.icon, g.emoji or "🏵️", UDim2.fromOffset(46, 46), UDim2.new(0, 10, 0, 18))
+	Ui.text(card, "🏵️ " .. (g.kindWord or ""), TEXT, { Position = UDim2.new(0, 62, 0, 14), Size = UDim2.new(1, -70, 0, 22), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+	local text = Ui.text(card, g.text, 18, { Position = UDim2.new(0, 62, 0, 36), Size = UDim2.new(1, -70, 0, 48), TextXAlignment = Enum.TextXAlignment.Left })
+	text.TextTruncate = Enum.TextTruncate.AtEnd
+	bar(card, g.progress / g.target, done, UDim2.new(0, 10, 0, 100), UDim2.new(1, -86, 0, 16))
+	Ui.text(card, string.format("%d/%d", g.progress, g.target), TEXT, { Position = UDim2.new(1, -72, 0, 97), Size = UDim2.new(0, 64, 0, 22) })
+end
+
+local function goalsTab(ss)
+	local row = Instance.new("Frame")
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, 140)
+	row.Parent = jobsArea
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(1 / 3, -8, 0, 136)
+	grid.CellPadding = UDim2.fromOffset(12, 0)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = row
+	local cards = ss.cards or {}
+	for k, g in cards do goalCard(row, g, k) end
+	local foot = if #cards == 0 then "Every goal done! What a stable!"
+		else string.format("🏵️ %d on your Rosette Wall", ss.wall or 0)
+	Ui.text(jobsArea, foot, 20, { Position = UDim2.new(0, 0, 0, 148), Size = UDim2.new(1, 0, 0, 30) })
+	actionBtn.Visible = true
+	actionBtn.Text = "🏵️ See my wall"
+	actionBtn.BackgroundColor3 = C.sky
+end
+
 local function claimable(list): number
 	local n = 0
 	for _, j in list do
@@ -243,7 +285,7 @@ render = function()
 	-- Tabs: the picked one gold; a 🎁 on a tab with prizes waiting.
 	for _, t in TABS do
 		local b = tabButtons[t[1]]
-		local n = claimable(jobs[t[1]] or {})
+		local n = if t[1] == "goals" then 0 else claimable(jobs[t[1]] or {})
 		b.BackgroundColor3 = if tab == t[1] then C.gold else C.white
 		-- This month's stamps toward its cloth (D-063): "🎀 Month 6/8"
 		local label = if t[1] == "monthly"
@@ -252,7 +294,9 @@ render = function()
 		b.Text = if n > 0 and tab ~= t[1] then label .. " 🎁" else label
 	end
 	local list = jobs[tab] or {}
-	if tab == "daily" then
+	if tab == "goals" then
+		goalsTab(d.stableStar or {})
+	elseif tab == "daily" then
 		local row = Instance.new("Frame")
 		row.BackgroundTransparency = 1
 		row.Size = UDim2.fromScale(1, 1)
@@ -292,7 +336,9 @@ render = function()
 end
 
 actionBtn.Activated:Connect(function()
-	if tab == "daily" then
+	if tab == "goals" then
+		goTo("stable") -- walk to your barn's Rosette Wall
+	elseif tab == "daily" then
 		swapping = not swapping
 		render()
 	else
