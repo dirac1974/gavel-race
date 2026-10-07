@@ -47,7 +47,7 @@ welcomeScale.Parent = welcomeCard
 local welcomeTitle = Ui.text(welcomeCard, "", 26, { Position = UDim2.new(0, 12, 0, 14), Size = UDim2.new(1, -24, 0, 64) })
 local welcomeGift = Ui.text(welcomeCard, "", 20, { Position = UDim2.new(0, 12, 0, 84), Size = UDim2.new(1, -24, 0, 70) })
 welcomeGift.TextColor3 = C.cash
-local thanksBtn = Ui.button(welcomeCard, "💛 Thanks!", UDim2.fromOffset(200, MIN_TOUCH + 4), UDim2.new(0.5, -100, 1, -MIN_TOUCH - 20), C.orange, 24)
+local thanksBtn = Ui.button(welcomeCard, "💛 Thanks!", UDim2.fromOffset(200, MIN_TOUCH + 8), UDim2.new(0.5, -100, 1, -MIN_TOUCH - 24), C.orange, 24)
 
 local scene: Model? = nil
 local shownFor = false -- shown this session (the server clears pending on Thanks)
@@ -176,8 +176,11 @@ local function showWelcome()
 	local name = (h and h.name) or "Your horse"
 	welcomeTitle.Text = string.format("🐴 Welcome back! %s has a gift for you!", name)
 	welcomeGift.Text = giftText(w.gift or {})
+	-- Narrow screens get a narrower card, never smaller text or buttons (D-064 floors).
 	local cam = workspace.CurrentCamera
-	welcomeScale.Scale = if cam then math.min(1, (cam.ViewportSize.X - 24) / 400) else 1
+	local w = if cam then math.clamp(cam.ViewportSize.X - 24, 280, 400) else 400
+	welcomeCard.Size = UDim2.fromOffset(w, 250)
+	welcomeScale.Scale = 1
 	welcomeCard.Visible = true
 	Ui.pop(welcomeCard)
 	pcall(playWelcome, (h and h.coat) or "bay")
@@ -256,10 +259,13 @@ local function takePhoto()
 	if snapping or CB.photo == false then return end
 	snapping = true
 	-- Hide the game's screens for a clean picture, then bring back exactly what was showing.
+	-- Each screen we hide is tagged; one that another script changed meanwhile (turned back on, or
+	-- tag cleared) is left as that script set it.
 	local hidden = {}
 	for _, g in player.PlayerGui:GetChildren() do
 		if g:IsA("ScreenGui") and g.Enabled then
 			g.Enabled = false
+			g:SetAttribute("PhotoHidden", true)
 			table.insert(hidden, g)
 		end
 	end
@@ -267,9 +273,22 @@ local function takePhoto()
 	local function restore()
 		if done then return end
 		done = true
-		for _, g in hidden do g.Enabled = true end
+		for _, g in hidden do
+			if g.Parent and g:GetAttribute("PhotoHidden") and not g.Enabled then g.Enabled = true end
+			g:SetAttribute("PhotoHidden", nil)
+		end
 		snapping = false
 	end
+	for _, g in hidden do -- a screen another script turns on or off meanwhile keeps its new state
+		local c
+		c = g:GetPropertyChangedSignal("Enabled"):Connect(function()
+			c:Disconnect()
+			if not done then g:SetAttribute("PhotoHidden", nil) end
+		end)
+		task.delay(4, function() if c.Connected then c:Disconnect() end end)
+	end
+	RunService.RenderStepped:Wait() -- let the hidden screens leave the frame first
+	RunService.RenderStepped:Wait()
 	local ok = pcall(function()
 		CaptureService:CaptureScreenshot(function(contentId)
 			restore()
@@ -292,9 +311,26 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, who)
 	if who == player and prompt.Name == "PhotoPrompt" then takePhoto() end
 end)
 
+local open = false -- your results card is up (see the Heartbeat below)
+local function showBest()
+	if not pendingBest then return end
+	bestSub.Text = string.format("%s  %d", tostring(pendingBest.distance), tonumber(pendingBest.score) or 0)
+	bestPill.Visible = true
+	Ui.pop(bestPill)
+end
+
 raceRemotes:WaitForChild("PersonalBest").OnClientEvent:Connect(function(distance, score, _prev, _courseId)
 	if CB.bests == false then return end
 	pendingBest = { distance = distance, score = score }
+	if open then showBest() end -- the card beat the message here
+end)
+
+-- A new race of yours starts clean (nothing carried over from the last card).
+player:GetAttributeChangedSignal("Racing"):Connect(function()
+	if player:GetAttribute("Racing") then
+		pendingBest, wonRace = nil, false
+		bestPill.Visible, photoBtn.Visible = false, false
+	end
 end)
 
 raceRemotes:WaitForChild("RaceFinished").OnClientEvent:Connect(function(summary, _courseId)
@@ -307,16 +343,11 @@ raceRemotes:WaitForChild("RaceFinished").OnClientEvent:Connect(function(summary,
 end)
 
 -- Show the column while your own results card is up; clear it when it closes.
-local open = false
 RunService.Heartbeat:Connect(function()
 	local up = RaceState.resultsOpen and RaceState.holdFocus
 	if up and not open then
 		open = true
-		if pendingBest then
-			bestSub.Text = string.format("%s  %d", pendingBest.distance, pendingBest.score)
-			bestPill.Visible = true
-			Ui.pop(bestPill)
-		end
+		showBest()
 		photoBtn.Visible = wonRace and CB.photo ~= false
 	elseif not up and open then
 		open = false

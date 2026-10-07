@@ -1074,7 +1074,7 @@ local function runRace(c, players: { Player })
 			if data and not (GameConfig.comeback and GameConfig.comeback.bests == false) then
 				local isNew, prev = HorseBook.recordBest(data, cond.distance, S[i])
 				if isNew then PersonalBest:FireClient(p, cond.distance, data.bests[cond.distance], prev, c.id) end
-				Profiles.changed(p)
+				if isNew or prev == nil then Profiles.changed(p) end -- the best moved (or the first one was set)
 			end
 		end
 	end

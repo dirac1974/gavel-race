@@ -181,7 +181,10 @@ function Jobs.refresh(p: any, userId: number, now: number): number
 	local J = p.jobs
 	J.stamps = tonumber(J.stamps) or 0
 	J.rerollDay = tonumber(J.rerollDay) or -1
-	if tonumber(J.monthStamps) == nil then J.monthStamps = claimedStamps(J.monthly) end
+	if tonumber(J.monthStamps) == nil then
+		J.monthStamps = claimedStamps(J.monthly) -- an older save: this month's claimed jobs
+		payCloth(p) -- already 8 or more: the cloth now, since no later claim would pay it
+	end
 	local auto = 0
 	for kind in POOLS do
 		local key = kind .. "Period"

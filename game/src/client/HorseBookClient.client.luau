@@ -15,6 +15,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local C = Ui.colors
 local player = Players.LocalPlayer
 
@@ -38,12 +39,11 @@ do
 	local slot = Instance.new("Frame")
 	slot.Name = "BookSlot"
 	slot.BackgroundTransparency = 1
-	slot.Size = UDim2.new(0, 90, 1, 0)
+	slot.Size = UDim2.new(0, 70, 1, 0)
 	slot.LayoutOrder = 4
 	slot.Parent = dock
-	local b = Ui.button(slot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream, TEXT)
-	Ui.text(b, "📖", 30, { Size = UDim2.new(1, 0, 0, 36), Position = UDim2.new(0, 0, 0, 4), TextScaled = false })
-	Ui.text(b, "Book", TEXT, { Size = UDim2.new(1, 0, 0, 22), Position = UDim2.new(0, 0, 1, -28), TextWrapped = false })
+	-- icon + one word, like the other dock buttons (D-064)
+	local b = Ui.iconButton(slot, "", "📖", "Book", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream)
 	b.Activated:Connect(function() openEvent:Fire() end)
 end
 
@@ -127,7 +127,7 @@ local TABS = {
 	{ id = "cups", icon = "🏆", word = "Cups" },
 	{ id = "passport", icon = "🩺", word = "Passport" },
 	{ id = "tour", icon = "👫", word = "Friends" },
-	{ id = "bests", icon = "★", word = "Bests" },
+	{ id = "bests", icon = "🏅", word = "Bests" },
 	{ id = "cloths", icon = "🎀", word = "Cloths" },
 }
 local page = "coats"
@@ -249,7 +249,7 @@ render = function()
 	if page == "bests" then
 		note("Your best ride at each distance. Only you see these.", 0)
 		for k, b in book.bests or {} do
-			local stars = if b.stars then string.rep("★", b.stars) .. string.rep("☆", 3 - b.stars) else nil
+			local stars = if b.stars then ResultsText.stars(b.stars) else nil -- how you rode (D-064)
 			entryCard({ earned = b.score ~= nil, emoji = b.emoji, label = b.distance }, k, nil,
 				if b.score then string.format("%s  %d", stars, b.score) else "Race one!")
 		end

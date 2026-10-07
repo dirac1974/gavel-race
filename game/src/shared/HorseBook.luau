@@ -70,25 +70,47 @@ local function courseStat(course: string): string?
 	return nil
 end
 
--- Bring p.book and p.bests to a clean shape (anything unknown is dropped).
+HorseBook.MAX_KEY_LEN = 32
+HorseBook.MAX_PER_SECTION = 64
+
+-- Bring p.book and p.bests to a clean shape. Ids this version doesn't know (a newer build's,
+-- during a rolling update) pass through if they look sane, so an older server never erases a
+-- page; view() shows only the ones it knows. Junk values are dropped.
+local function saneKey(k: any): boolean
+	return typeof(k) == "string" and #k >= 1 and #k <= HorseBook.MAX_KEY_LEN
+end
+
 function HorseBook.repair(p: any)
 	local src = if typeof(p.book) == "table" then p.book else {}
 	local book = {}
 	for section, ids in KNOWN do
-		local set = {}
+		local set, n = {}, 0
 		if typeof(src[section]) == "table" then
+			local keys = {}
 			for id, v in src[section] do
-				if v == true and typeof(id) == "string" and ids[id] then set[id] = true end
+				if v == true and saneKey(id) then table.insert(keys, id) end
+			end
+			table.sort(keys, function(a, b) -- known ids first, so the cap never drops one
+				if (ids[a] == true) ~= (ids[b] == true) then return ids[a] == true end
+				return a < b
+			end)
+			for _, id in keys do
+				if n >= HorseBook.MAX_PER_SECTION then break end
+				set[id] = true
+				n += 1
 			end
 		end
 		book[section] = set
 	end
 	p.book = book
-	local bests = {}
+	local bests, n = {}, 0
 	if typeof(p.bests) == "table" then
 		for d, v in p.bests do
-			local n = tonumber(v)
-			if typeof(d) == "string" and DIST_KNOWN[d] and n and n == n then bests[d] = math.clamp(math.floor(n), 0, 100) end
+			local s = tonumber(v)
+			if saneKey(d) and s and s == s and n < HorseBook.MAX_PER_SECTION then
+				bests[d] = math.clamp(math.floor(s), 0, 100)
+				n += 1
+			end
 		end
 	end
 	p.bests = bests

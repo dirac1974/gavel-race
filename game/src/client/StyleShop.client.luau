@@ -87,7 +87,7 @@ list.CanvasSize = UDim2.new()
 list.ScrollBarThickness = 6
 list.Parent = panel
 local grid = Instance.new("UIGridLayout")
-grid.CellSize = UDim2.new(0.5, -8, 0, 132)
+grid.CellSize = UDim2.new(0.5, -8, 0, 148)
 grid.CellPadding = UDim2.fromOffset(12, 12)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = list
@@ -167,15 +167,15 @@ local function itemCard(it, order: number)
 	subL.TextColor3 = if own then C.green else C.plum
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, -20, 0, 40)
-	row.Position = UDim2.new(0, 10, 1, -48)
+	row.Size = UDim2.new(1, -20, 0, 56)
+	row.Position = UDim2.new(0, 10, 1, -64)
 	row.Parent = card
 	local rl = Instance.new("UIListLayout")
 	rl.FillDirection = Enum.FillDirection.Horizontal
 	rl.Padding = UDim.new(0, 6)
 	rl.Parent = row
 	local function btn(text: string, color: Color3, fn)
-		local b = Ui.button(row, text, UDim2.fromOffset(124, 44), UDim2.new(), color, 16)
+		local b = Ui.button(row, text, UDim2.fromOffset(124, 56), UDim2.new(), color, 16) -- 56 px floor (D-064)
 		b.Activated:Connect(fn)
 	end
 	if own then
@@ -252,7 +252,7 @@ render = function()
 	balance.Text = "💎 " .. diamonds()
 	for _, ch in tabs:GetChildren() do if ch:IsA("TextButton") then ch:Destroy() end end
 	for _, ch in list:GetChildren() do if not ch:IsA("UIGridLayout") then ch:Destroy() end end
-	grid.CellSize = if compact then UDim2.new(1, -8, 0, 132) else UDim2.new(0.5, -8, 0, 132)
+	grid.CellSize = if compact then UDim2.new(1, -8, 0, 148) else UDim2.new(0.5, -8, 0, 148)
 	for _, cat in Style.CATEGORIES do
 		local b = Ui.button(tabs, cat.label, UDim2.fromOffset(112, 44), UDim2.new(), if tab == cat.id then C.gold else C.white, 15)
 		b.Activated:Connect(function()

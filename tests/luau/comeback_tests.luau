@@ -143,6 +143,14 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		p.jobs.monthStamps = nil
 		Jobs.refresh(p, USER, T0)
 		check(p.jobs.monthStamps == 4, "older saves: this month's claimed stamps count")
+		local full = Profile.new(T0)
+		Jobs.refresh(full, USER, T0)
+		finishMonthly(full, 4)
+		for k = 1, 4 do Jobs.claim(full, USER, "monthly", k, T0) end
+		full.style.owned["cloth_m10"] = nil
+		full.jobs.monthStamps, full.jobs.clothDue = nil, nil
+		Jobs.refresh(full, USER, T0)
+		check(Style.owns(full, "cloth_m10") and #(full.jobs.clothDue or {}) == 1, "an older save already at 8 stamps gets the cloth on load")
 	end
 
 	-- Welcome Back Hay Bale -----------------------------------------------------------------
@@ -281,8 +289,25 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		junk.book = { coats = { bay = true, unicorn = true, grey = "yes" }, cups = "x" }
 		junk.bests = { Mile = "64.9", Moon = 3, Sprint = -5 }
 		HorseBook.repair(junk)
-		check(junk.book.coats.bay and junk.book.coats.unicorn == nil and junk.book.coats.grey == nil, "a bad book is repaired")
-		check(typeof(junk.book.cups) == "table" and junk.bests.Mile == 64 and junk.bests.Moon == nil and junk.bests.Sprint == 0, "bad bests are repaired")
+		check(junk.book.coats.bay and junk.book.coats.grey == nil, "a bad book is repaired")
+		check(junk.book.coats.unicorn == true, "a newer build's page survives an older server's load (rolling updates)")
+		local shown = false
+		for _, page in HorseBook.view(junk).pages do
+			for _, e in page.entries do
+				if e.id == "unicorn" then shown = true end
+			end
+		end
+		check(not shown, "but only known pages are shown")
+		check(typeof(junk.book.cups) == "table" and junk.bests.Mile == 64 and junk.bests.Sprint == 0, "bad bests are repaired")
+		local many = Profile.new(T0)
+		many.book = { coats = {} }
+		for k = 1, 500 do many.book.coats["a" .. k] = true end
+		many.book.coats.white = true
+		many.book.coats[string.rep("y", 200)] = true
+		HorseBook.repair(many)
+		local count = 0
+		for _ in many.book.coats do count += 1 end
+		check(count == HorseBook.MAX_PER_SECTION and many.book.coats.white == true, "a section keeps at most MAX_PER_SECTION ids, known ones first")
 		local migrated = Profile.migrate({ book = { coats = { dun = true } }, bests = { Sprint = 50 } }, T0)
 		check(migrated.book.coats.dun and migrated.bests.Sprint == 50, "a save's book survives a load")
 	end
