@@ -3,7 +3,10 @@
 -- distance, surface, weather, riders in line, starts in…) and your stalled horses with their
 -- Energy and how well each suits today's race (shown as Rating, never win chance, because
 -- chance depends on the field). Pick a card and a horse, then Join. Tired horses nap on
--- their card ("Resting"), with no countdown and no buy button.
+-- their card ("Napping", only at 0 Energy, D-058), with no countdown and no buy button.
+-- Per-league queues (D-061 core, stage 1): only a card your horse can join is ever preselected or
+-- joinable; another league's card shows its badge and "Watch" (hoofprints to the grandstand).
+-- With no joinable card, Join puts you in your league's line for the next free course.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,13 +17,16 @@ local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local RaceRating = require(Shared:WaitForChild("RaceRating"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
+local Guide = require(script.Parent:WaitForChild("Guide"))
 local raceRemotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
 
 local DIST_ICON = { Sprint = "dist_short", Mile = "dist_short", Classic = "dist_long", Marathon = "dist_long" }
-local DIST_EMOJI = { Sprint = "⚡", Mile = "🏇", Classic = "🏆", Marathon = "🛤️" }
-local DIST_TEXT = { Sprint = "Sprint · short", Mile = "Mile", Classic = "Classic · long", Marathon = "Marathon · longest" }
+-- Sprint is 🐇 Short (D-064: ⚡ looked like Energy).
+local DIST_EMOJI = { Sprint = "🐇", Mile = "🏇", Classic = "🏆", Marathon = "🛤️" }
+local DIST_TEXT = { Sprint = "Short", Mile = "Mile", Classic = "Classic · long", Marathon = "Marathon · longest" }
 local SURF_EMOJI = { Dirt = "🟫", Turf = "🟩" }
 local WEATHER_EMOJI = { Sunny = "☀️", Rain = "🌧️", Wind = "🌬️" }
 
@@ -140,6 +146,17 @@ local function cardFor(course: string)
 	return nil
 end
 
+local function leagueQueues(): boolean
+	return GameConfig.queue == nil or GameConfig.queue.mode ~= "cards"
+end
+
+-- Can this horse join this card? An open card takes any league; a claimed one only its own.
+local function joinable(c, h): boolean
+	if not c or c.riders >= c.lanes then return false end
+	if not leagueQueues() then return true end
+	return c.open or (h ~= nil and c.league == (h.league or "Rookie"))
+end
+
 renderKinds = function()
 	local card = pickedCourse and cardFor(pickedCourse)
 	local h = pickedHorse and PlayerState.horse(pickedHorse)
@@ -172,7 +189,9 @@ end
 local function raceCard(c)
 	local selected = c.course == pickedCourse
 	local full = c.riders >= c.lanes
-	local card = Ui.card(cardRow, UDim2.fromOffset(330, 166), UDim2.new(), if selected then C.gold elseif full then C.shade else C.cream)
+	local h = pickedHorse and PlayerState.horse(pickedHorse)
+	local watch = leagueQueues() and not c.open and h ~= nil and c.league ~= (h.league or "Rookie")
+	local card = Ui.card(cardRow, UDim2.fromOffset(330, 166), UDim2.new(), if selected then C.gold elseif full or watch then C.shade else C.cream)
 	local stroke = card:FindFirstChildOfClass("UIStroke")
 	if selected then
 		stroke.Thickness = 6
@@ -204,7 +223,8 @@ local function raceCard(c)
 		Ui.stroke(d, 2)
 		d.Parent = dots
 	end
-	local status = if c.racing then "🏇 Racing now · next race after"
+	local status = if watch then string.format("👀 Watch · for %s horses", c.league or "")
+		elseif c.racing then "🏇 Racing now · next race after"
 		elseif c.seconds then string.format("⏱ Starts in %ds", c.seconds)
 		elseif c.riders > 0 then "Filling up…"
 		else "Open · be the first!"
@@ -219,6 +239,12 @@ local function raceCard(c)
 	hit.ZIndex = 5
 	hit.Parent = card
 	hit.Activated:Connect(function()
+		if watch then -- another league's race: watch it from the grandstand
+			local p = WorldLayout.places.raceBoard
+			Guide.to(p.x, p.z + 10)
+			Ui.toast(string.format("Follow the hoofprints to watch the %s race!", c.league or ""), "flag_ready", "👀")
+			return
+		end
 		pickedCourse = c.course
 		renderCards()
 		renderHorses()
@@ -228,7 +254,7 @@ end
 local function horseCard(h, card)
 	local selected = h.id == pickedHorse
 	local practice = pickedKind == "practice" or (card ~= nil and card.practice)
-	local tired = not practice and h.resting and h.energy < GameConfig.energy.costPerCashRace
+	local tired = not practice and h.energy < GameConfig.energy.costPerCashRace
 		and not GameConfig.energy.freeLeagues[(card and card.league) or h.league or "Rookie"]
 	local b = Ui.button(horseRow, "", UDim2.fromOffset(200, 96), UDim2.new(), if selected then C.gold elseif tired then C.shade else C.white, 18)
 	local dot = Instance.new("Frame")
@@ -240,12 +266,11 @@ local function horseCard(h, card)
 	dot.Parent = b
 	local name = Ui.text(b, h.name, 18, { Position = UDim2.new(0, 54, 0, 6), Size = UDim2.new(1, -60, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	Ui.text(b, string.rep("⚡", h.energy) .. string.rep("·", GameConfig.energy.maxPerRacer - h.energy), 16,
-		{ Position = UDim2.new(0, 54, 0, 30), Size = UDim2.new(1, -60, 0, 20), TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.energyPips(b, h.energy, GameConfig.energy.maxPerRacer, 18, UDim2.new(0, 54, 0, 31)) -- the one Energy icon (D-064)
 	local diff = suits(h, card)
 	local line
 	if tired then
-		line = "😴 Resting"
+		line = "😴 Napping"
 	elseif diff then
 		local d = math.floor(diff + 0.5)
 		line = if d > 0 then string.format("Loves today's race (+%d)", d) elseif d < 0 then string.format("Not its best today (%d)", d) else "A normal day"
@@ -256,10 +281,11 @@ local function horseCard(h, card)
 	l.TextColor3 = if diff and diff > 0.5 then C.green elseif diff and diff < -0.5 then C.orangeDark else C.plum
 	b.Activated:Connect(function()
 		if tired then
-			Ui.toast(h.name .. " is resting. Try another horse!", "zzz_resting", "😴")
+			Ui.toast(h.name .. " is napping. Try another horse!", "zzz_resting", "😴")
 			return
 		end
 		pickedHorse = h.id
+		renderCards(true) -- (lets go of a picked card that's for another league)
 		renderHorses()
 	end)
 end
@@ -269,9 +295,15 @@ end
 local lastCardsKey = ""
 renderCards = function(force: boolean?)
 	if not gui.Enabled then return end
-	local parts = { tostring(pickedCourse) }
+	-- A picked card that a league has since claimed for others is let go.
+	local h = pickedHorse and PlayerState.horse(pickedHorse)
+	if pickedCourse and not joinable(cardFor(pickedCourse), h) then pickedCourse = nil end
+	-- The key has everything a card shows, league, kind and Cup included (D-065), so a card
+	-- claimed by a league never keeps its "Open" look.
+	local parts = { tostring(pickedCourse), tostring(pickedHorse) }
 	for _, c in cards do
-		table.insert(parts, table.concat({ c.course, c.distance or "", c.weather or "", c.riders, tostring(c.seconds), tostring(c.racing) }, ":"))
+		table.insert(parts, table.concat({ c.course, c.distance or "", c.weather or "", c.riders, tostring(c.seconds), tostring(c.racing),
+			tostring(c.league), tostring(c.open), tostring(c.cup), tostring(c.practice) }, ":"))
 	end
 	local key = table.concat(parts, "|")
 	if key == lastCardsKey and not force then return end
@@ -279,8 +311,9 @@ renderCards = function(force: boolean?)
 	for _, ch in cardRow:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
 	for _, c in cards do raceCard(c) end
 	renderKinds()
-	joinBtn.Text = if pickedCourse then "Join!" else "Pick a race"
-	joinBtn.BackgroundColor3 = if pickedCourse then C.orange else C.shade
+	local canWait = leagueQueues() and h ~= nil -- no card for us: wait in our league's line
+	joinBtn.Text = if pickedCourse then "Join!" elseif canWait then "Join the line!" else "Pick a race"
+	joinBtn.BackgroundColor3 = if pickedCourse or canWait then C.orange else C.shade
 end
 renderHorses = function()
 	if not gui.Enabled then return end
@@ -303,12 +336,14 @@ local function open()
 		return
 	end
 	pickedHorse = pickedHorse or d.activeHorse
-	-- Preselect the course with riders waiting, else the one that isn't racing.
-	if not pickedCourse or not cardFor(pickedCourse) then
+	-- Preselect only a card this horse can join (D-061): one with riders of its league waiting,
+	-- else an open one that isn't racing. None: Join puts it in its league's line.
+	local h = pickedHorse and PlayerState.horse(pickedHorse)
+	if not pickedCourse or not joinable(cardFor(pickedCourse), h) then
 		local best, score = nil, -math.huge
 		for _, c in cards do
 			local s = c.riders * 10 + (if c.racing then -50 else 0)
-			if c.riders < c.lanes and s > score then best, score = c.course, s end
+			if joinable(c, h) and s > score then best, score = c.course, s end
 		end
 		pickedCourse = best
 	end
@@ -322,7 +357,13 @@ local function close() gui.Enabled = false end
 closeBtn.Activated:Connect(close)
 dim.Activated:Connect(close)
 joinBtn.Activated:Connect(function()
-	if not pickedCourse then return end
+	if not pickedCourse then
+		if leagueQueues() and pickedHorse then -- wait in this league's line for the next free course
+			raceRemotes:WaitForChild("JoinRace"):FireServer(true, nil, pickedHorse, pickedKind)
+			close()
+		end
+		return
+	end
 	local card = cardFor(pickedCourse)
 	local kind = if card and not card.open then (if card.cup then "cup" elseif card.practice then "practice" else "race") else pickedKind
 	raceRemotes:WaitForChild("JoinRace"):FireServer(true, pickedCourse, pickedHorse, kind)

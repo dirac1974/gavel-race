@@ -15,7 +15,7 @@ The agents can't open Roblox Studio, so the server and client scripts have only 
 - [ ] Eight horses stand in the starting gate, each with a lane badge 1–8; your horse has a YOU marker. The gate's position changes with the distance (Sprint: backstretch; Mile: just past the finish; Classic: top of the stretch).
 
 ## Lobby
-- [ ] "Next race in N" counts down from 20 (or starts at once with 8 players).
+- [ ] "Next race in N" counts down from 15 (D-061; or starts at once with 8 players).
 - [ ] The board lists 8 lanes: you (highlighted) plus bots, each with lane badge, Win chance % and Win purse.
 - [ ] Win chances add up to about 100%.
 - [ ] The status line shows the race conditions (for example "Rookie race: Sprint · Dirt · Sunny").
@@ -442,6 +442,19 @@ Plan section D, from your 4th race on (the buttons are shown):
 - [ ] **The finish:** two horses close together in one lane at the line finish staggered (one edges half a lane over in the last moment), never through each other.
 - [ ] **No jerks:** after the lock, no horse ever snaps backwards. Watch horses swinging out to pass, two horses moving into the same lane, and the last second before the line.
 - [ ] **Understanding** (plan section D): after 5 races, ask "What do the arrows do?" and "What does Tucked in mean?". Do kids who never touch the arrows end with "Good trip ★★☆"?
+
+## Playtest-safe fixes (horse life stage 1: D-065, D-061 core, D-058 label, D-064 basics)
+Use Play Solo, or Test → Clients and Servers with 2 players, plus Device emulator → a phone in landscape. No tools needed.
+- [ ] **No league lockout.** Two players: player 1 (a Bronze save, or the Studio cheat) taps RACE on dirt; player 2 (new, Rookie) taps RACE. Player 2 never sees "That race is for Bronze horses"; they get the turf course, or wait ("In line! next race") and race next.
+- [ ] In the picker, a card another league has claimed is grey, shows that league's badge and "👀 Watch · for Bronze horses", and is never preselected; tapping it lays hoofprints to the grandstand. With no card for your horse, the button says **Join the line!**
+- [ ] Tap ✕ while waiting in the line: the RACE! button comes back and the card stays as it was.
+- [ ] **Ready / Napping.** After one Bronze race the dock still says **Ready** and shows 4 horseshoes; after 5 it says **Napping**. The Stable Board says "napping" only then.
+- [ ] Energy is the same horseshoe in the dock, the race picker's horse cards and My Horses; no ⚡ next to Energy. The picker's shortest race reads **🐇 Short**.
+- [ ] **Phone dock.** On the phone emulator the dock is just your horse card, 🏁 RACE! and ☰; every dock button is at least the size of a fingertip (about 1 cm on a laptop screen) and the words are readable. ☰ opens Green Cash, My Horses, the Stable Board, the Map and Ride; any of them closes it. On a laptop the dock is unchanged.
+- [ ] The player list shows no Green Cash or Wins column.
+- [ ] **Sync can't stall.** In the command bar, `require(game.ServerScriptService.Server.Profiles).decorators[1] = function() error("x") end`, then do anything (feed, ride, race): the client still updates (no "loading" forever). Output shows one `[Profiles] decorator ... failed (skipped)` warning, not one per update.
+- [ ] **Retire.** Ride your horse, open My Horses, tap Retire on it: it says you can't while riding. The same while in line for a race or on a training ride. Another horse at home still retires.
+- [ ] **Locked save (needs API access and a published place).** Join, then leave and rejoin within a few seconds from another server: you see "🐴 Opening your stable…" with **Try again**, never a kick; the stable opens within about 5 minutes at most (as soon as the old server lets go). Leaving while it waits is fine.
 
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.

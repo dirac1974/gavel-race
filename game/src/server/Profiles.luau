@@ -23,7 +23,8 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 
 local STORE_NAME = "GiddyUp_Profiles_v1"
 local LOCK_STALE = 5 * 60
-local LOAD_ATTEMPTS = 6
+local LOAD_ATTEMPTS = 6   -- DataStore errors before the "Opening your stable…" card shows
+local LOCK_RETRY = 10     -- seconds between tries while another session holds the save
 local AUTOSAVE_SECONDS = 60
 local SYNC_MIN_GAP = 0.2
 local REQUEST_GAP = 0.5
@@ -32,9 +33,12 @@ local Profiles = {}
 Profiles.Loaded = Instance.new("BindableEvent")   -- (player)
 Profiles.Changed = Instance.new("BindableEvent")  -- (player)
 Profiles.decorators = {} :: { (any, any) -> () }  -- add fields to the owner's view (JobService, MarketService)
+Profiles.decoratorNames = {} :: { [number]: string } -- for the one warning a failing decorator gets
+local warnedDecorators: { [string]: boolean } = {}
 
-function Profiles.addDecorator(fn: (any, any) -> ())
+function Profiles.addDecorator(fn: (any, any) -> (), name: string?)
 	table.insert(Profiles.decorators, fn)
+	Profiles.decoratorNames[#Profiles.decorators] = name or ("#" .. #Profiles.decorators)
 end
 
 local remotes = ReplicatedStorage:FindFirstChild("GameRemotes")
@@ -58,6 +62,7 @@ end
 local ProfileSync = Profiles.remote("ProfileSync")   -- server -> owner: profile view
 local RequestSync = Profiles.remote("RequestSync")   -- client -> server: send my view now
 local Notice = Profiles.remote("Notice")             -- server -> one: short friendly message (toast)
+local ProfileWaiting = Profiles.remote("ProfileWaiting") -- server -> one: true while a locked save keeps them waiting (D-065)
 
 local store = nil
 do
@@ -82,8 +87,14 @@ local function sendSync(player: Player)
 	if not e or not player.Parent then return end
 	e.syncQueued = false
 	e.lastSync = os.clock()
-	local view = Profile.view(e.data, now(), GameConfig.energy)
-	for _, decorate in Profiles.decorators do decorate(e.data, view) end -- jobs, garden, market (other services)
+	-- Jobs, garden, market, Cup status (other services). One that throws is skipped and warned
+	-- about once per name, so ProfileSync always reaches the client (D-065).
+	local view = Profile.decoratedView(e.data, now(), GameConfig.energy, Profiles.decorators, function(i, err)
+		local name = Profiles.decoratorNames[i] or ("#" .. i)
+		if warnedDecorators[name] then return end
+		warnedDecorators[name] = true
+		warn(string.format("[Profiles] decorator %s failed (skipped): %s", name, tostring(err)))
+	end)
 	ProfileSync:FireClient(player, view)
 end
 
@@ -139,16 +150,27 @@ local function lockIsLive(lock: any, session: string?): boolean
 	return lock ~= nil and lock.session ~= session and now() - (tonumber(lock.at) or 0) < LOCK_STALE
 end
 
--- Load and lock. Returns (data, session, temporary), or nil if a live session holds the save.
-local function load(userId: number): (any, string?, boolean)
+-- Load and lock. Returns (data, session, temporary), or nil if the player left first.
+-- A save another live session holds is never a kick (D-065): the player sees "Opening your
+-- stable…" (ProfileWaiting) with a Try again button, and this retries every LOCK_RETRY seconds
+-- until that lock is released or goes stale (LOCK_STALE), when UpdateAsync takes it over.
+-- DataStore errors retry with backoff and show the same card after LOAD_ATTEMPTS tries.
+local function load(player: Player): (any, string?, boolean)
 	if not store then return Profile.new(now()), nil, true end
+	local userId = player.UserId
 	local session = HttpService:GenerateGUID(false)
-	for attempt = 1, LOAD_ATTEMPTS do
-		local mine, data = false, nil
+	local attempt, told = 0, false
+	while player.Parent do
+		attempt += 1
+		local mine, data, locked = false, nil, false
 		local ok, err = pcall(function()
 			local value = store:UpdateAsync(key(userId), function(old)
-				mine, data = false, nil -- the transform can run more than once; the last run counts
-				if old and lockIsLive(old.lock, session) then
+				mine, data, locked = false, nil, false -- the transform can run more than once; the last run counts
+				-- (In Studio, a lock left by an earlier Studio session, job "", is taken over: a
+				-- stopped test can't release it and Try again can't teleport there.)
+				local studioLeftover = RunService:IsStudio() and old and old.lock and old.lock.job == ""
+				if old and lockIsLive(old.lock, session) and not studioLeftover then
+					locked = true
 					return nil -- another live session has it; try again shortly
 				end
 				mine, data = true, Profile.migrate(old and old.data, now())
@@ -164,7 +186,13 @@ local function load(userId: number): (any, string?, boolean)
 		elseif not ok then
 			warn(string.format("[Profiles] load attempt %d for %d failed: %s", attempt, userId, tostring(err)))
 		end
-		task.wait(math.min(2 ^ attempt, 20))
+		if not told and (locked or attempt >= LOAD_ATTEMPTS) and player.Parent then
+			told = true
+			ProfileWaiting:FireClient(player, true)
+		end
+		local pause = if locked then LOCK_RETRY else math.min(2 ^ attempt, 20)
+		local deadline = os.clock() + pause
+		while player.Parent and os.clock() < deadline do task.wait(0.5) end -- leaving cancels the wait
 	end
 	return nil, nil, false
 end
@@ -200,8 +228,8 @@ local function save(player: Player, e: any, release: boolean): boolean
 end
 
 local function onPlayerAdded(player: Player)
-	local data, session, temporary = load(player.UserId)
-	if not player.Parent then
+	local data, session, temporary = load(player)
+	if not player.Parent or not data then
 		-- Left while loading: release the lock we took.
 		if data and session and store then
 			pcall(function()
@@ -214,10 +242,6 @@ local function onPlayerAdded(player: Player)
 				end)
 			end)
 		end
-		return
-	end
-	if not data then
-		player:Kick("Your stable is still open in another server. Please rejoin in a minute!")
 		return
 	end
 	Profile.touchDay(data, now())

@@ -67,6 +67,18 @@ function Leagues.promote(h: any): string?
 	return nxt
 end
 
+-- Why a horse can't retire right now, or nil (D-065): never one that's racing, queued, ridden or
+-- on a training ride. `busy` is the owner's state: racing, inLine (any horse), racingHorse,
+-- ridingHorse (the horse ids from the player's attributes) and trainingRide.
+function Leagues.retireBlock(name: string, id: string, busy: any): string?
+	if busy.racing or busy.inLine or busy.racingHorse == id then return "Retire after your race!" end
+	if busy.trainingRide and (busy.ridingHorse == nil or busy.ridingHorse == id) then
+		return string.format("%s is on a training ride. Retire after it!", name)
+	end
+	if busy.ridingHorse == id then return string.format("You can't retire %s while riding. Hop off first!", name) end
+	return nil
+end
+
 -- Retire a horse into the Hall of Fame (player's choice). Returns the plaque.
 function Leagues.retire(p: any, id: string, now: number): any
 	local index = nil

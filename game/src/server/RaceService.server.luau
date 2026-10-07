@@ -38,6 +38,7 @@ local Rides = require(script.Parent:WaitForChild("Rides"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Leagues = require(Shared:WaitForChild("Leagues"))
 local Style = require(Shared:WaitForChild("Style"))
+local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -217,7 +218,21 @@ local function queueStatus(c)
 	for _, p in c.queue do QueueStatus:FireClient(p, true, #c.queue, seconds, c.id) end
 end
 
+-- Per-league queues (D-061 core, stage 1): riders wait in their league-and-kind queue until a
+-- course can take them (RaceQueues.pump). GameConfig.queue.mode = "cards" is the D-036 claiming.
+local LEAGUE_QUEUES = GameConfig.queue == nil or GameConfig.queue.mode ~= "cards"
+local waits = RaceQueues.new()
+
+-- A rider waiting in a league queue (no course yet): in line, how many wait with them, no course.
+local function waitStatus(player: Player)
+	QueueStatus:FireClient(player, true, RaceQueues.waitingWith(waits, player), nil, nil)
+end
+
 local function leaveLine(player: Player)
+	if RaceQueues.leave(waits, player) then
+		player:SetAttribute("InLine", nil)
+		QueueStatus:FireClient(player, false, 0, nil, nil)
+	end
 	local c = inLine[player]
 	if not c then return end
 	inLine[player] = nil
@@ -325,10 +340,11 @@ Profiles.addDecorator(function(data, view)
 		end
 	end
 	view.hallOfFame = data.hallOfFame or {}
-end)
+end, "races")
 
--- With no course picked: join riders already waiting, else a free course, else the shorter line.
-local function bestCourse()
+-- Cards mode (D-036): with no course picked, join riders already waiting, else a free course,
+-- else the shorter line, whatever its league.
+local function bestCourseCards()
 	local best, bestScore = nil, -math.huge
 	for _, id in COURSE_ORDER do
 		local c = courses[id]
@@ -340,22 +356,88 @@ local function bestCourse()
 	return best
 end
 
+-- Move waiting riders onto courses that can take them: a card already theirs, or an open course
+-- for the longest-waiting queue, which claims its card (RaceQueues.pump).
+local function pumpQueues()
+	if not LEAGUE_QUEUES then return end
+	local touched = {}
+	local moved = RaceQueues.pump(waits, courses, COURSE_ORDER, GameConfig.lanes, function(c, league, kind)
+		if not c.card then newCard(c) end
+		claimCard(c, league, kind)
+	end, function(p, c)
+		inLine[p] = c
+		touched[c] = true
+	end)
+	if moved == 0 then return end
+	for c in touched do
+		if not c.fillDeadline and not c.current then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
+		queueStatus(c)
+	end
+	publishCards()
+end
+
+-- League queues: check the horse for its own league's card, then wait in that league-and-kind
+-- queue; pumpQueues puts the rider on a course when one can take them. A picked course is only a
+-- wish: a card for another league never takes them.
+local function joinQueue(player: Player, courseId: any, horseId: any, kind: string)
+	local data = Profiles.get(player)
+	local id = if typeof(horseId) == "string" then horseId else nil
+	local pick = data and ((id and Profile.isStalled(data, id) and Profile.horse(data, id)) or Profile.activeHorse(data))
+	local wanted = { league = if pick then pick.league else DEFAULT_LEAGUE, cup = kind == "cup", practice = kind == "practice" }
+	local h, why = rideable(player, id, wanted)
+	if not h then
+		Profiles.notify(player, why, "zzz_resting")
+		if not inLine[player] and not RaceQueues.isWaiting(waits, player) then QueueStatus:FireClient(player, false, 0, nil, nil) end
+		return
+	end
+	local key = RaceQueues.key(h.league, kind)
+	local c = inLine[player]
+	if c then
+		if RaceQueues.cardKey(c.card) == key then -- same race, maybe another horse of the league
+			chosen[player] = h.id
+			return
+		end
+		if #c.queue == 1 and c.queue[1] == player then -- alone in line: the card follows the new pick
+			chosen[player] = h.id
+			claimCard(c, h.league, kind)
+			publishCards()
+			return
+		end
+		leaveLine(player)
+	end
+	chosen[player] = h.id
+	local want = if typeof(courseId) == "string" and courses[courseId] then courseId else nil
+	RaceQueues.join(waits, player, h.league, kind, os.clock(), want)
+	player:SetAttribute("InLine", true)
+	pumpQueues()
+	if RaceQueues.isWaiting(waits, player) then
+		waitStatus(player)
+		Profiles.notify(player, "You're in line! You race as soon as a course is free.", "flag_ready")
+	end
+	publishCards()
+end
+
 local lastJoin: { [Player]: number } = {}
 JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any, horseId: any, kind: any)
 	if os.clock() - (lastJoin[player] or 0) < 0.5 then return end
 	lastJoin[player] = os.clock()
 	if want == false then
 		leaveLine(player)
+		pumpQueues()
 		publishCards()
 		return
 	end
 	if riding[player] then return end
-	local c = if typeof(courseId) == "string" and courses[courseId] then courses[courseId] else bestCourse()
+	kind = if kind == "cup" or kind == "practice" then kind else "race"
+	if LEAGUE_QUEUES then
+		joinQueue(player, courseId, horseId, kind)
+		return
+	end
+	local c = if typeof(courseId) == "string" and courses[courseId] then courses[courseId] else bestCourseCards()
 	if not c then
 		Profiles.notify(player, "Both races are full. Try again after these races!", "flag_ready")
 		return
 	end
-	kind = if kind == "cup" or kind == "practice" then kind else "race"
 	-- An open card takes this rider's league and kind; a claimed card must match.
 	local wanted = c.card
 	local alone = #c.queue == 0 or (#c.queue == 1 and c.queue[1] == player)
@@ -413,6 +495,7 @@ Players.PlayerRemoving:Connect(function(player: Player)
 		if i then Trip.setSmart(trip, i, true) end
 	end
 	leaveLine(player)
+	task.defer(pumpQueues) -- a card they held may be open now
 	riding[player], chosen[player], lastJoin[player] = nil, nil, nil
 	task.defer(function()
 		trackers[player.UserId] = nil -- session-only until saved trackers (STATUS backlog)
@@ -1001,7 +1084,7 @@ local function courseLoop(c)
 		end
 		publishCards()
 		task.wait(5) -- results screen
-		if #c.queue > 0 then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
+		if #c.queue > 0 then c.fillDeadline = c.fillDeadline or (os.clock() + GameConfig.lobbyFillSeconds) end
 		queueStatus(c)
 	end
 end
@@ -1014,10 +1097,17 @@ task.delay(3, function()
 	end
 end)
 
--- Cards tick down once a second for the board and the picker.
+-- Cards tick down once a second for the board and the picker. Waiting riders go to any course
+-- that has opened (a race started and its next card is open, or a line emptied), and those still
+-- waiting hear how many wait with them.
 task.spawn(function()
 	while true do
 		task.wait(1)
+		local ok, err = pcall(pumpQueues)
+		if not ok then warn("[RaceService] queue pump failed: " .. tostring(err)) end
+		for p in waits.of do
+			if p.Parent then waitStatus(p) end
+		end
 		publishCards()
 	end
 end)

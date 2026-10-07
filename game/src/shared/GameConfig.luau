@@ -202,6 +202,17 @@ GameConfig.touchLayout = {
 	gemPlacement = "topRight",
 	movementColumn = 176, -- px kept free at the right edge for Hop (up to 170 px in) and Gallop
 }
+-- Phones first (D-064, stage 1): rendered floors for the dock, whatever the screen. fitDock never
+-- scales a button below minTouchPx or a label below minTextPx; on a phone the dock is the horse
+-- card, RACE! and ☰ More (dockPhoneItems = 3), and everything else moves into More.
+-- dockPhoneItems = 5 keeps today's touch dock (with the floors).
+GameConfig.ui = {
+	minTouchPx = 56,
+	minTextPx = 14,
+	labelPx = 16,
+	dockPhoneItems = 3,
+	phoneShortSide = 500, -- a screen whose shorter side is at most this many px is a phone
+}
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
 -- Riding your own horse (D-056).
@@ -233,7 +244,12 @@ GameConfig.strideLabels = {
 	{ min = 0.15, label = "Good" },     -- within 68 ms
 	{ min = 0, label = "Okay" },
 }
-GameConfig.lobbyFillSeconds = 20     -- bots fill remaining lanes after this
+GameConfig.lobbyFillSeconds = 15     -- bots fill remaining lanes after this (D-061: was 20)
+-- Race queues (D-061 core, stage 1): one queue per league and kind (Race, Cup, Practice); a
+-- course whose card is open goes to the longest-waiting queue, and a card claimed by one league
+-- never takes a rider of another. mode = "cards" restores the D-036 claiming (first rider's
+-- league claims a card; RACE! picks the busiest course).
+GameConfig.queue = { mode = "leagues" }
 GameConfig.kappa = 1.0
 GameConfig.qFloor = 0.025
 GameConfig.rFloor = -0.5
@@ -280,6 +296,7 @@ GameConfig.energy = {
 	careTopUps = { feed = 1, groom = 1 },
 	careCooldownSeconds = 2 * 60 * 60,
 	freeLeagues = { Rookie = true }, -- Rookie races cost no Energy
+	restingLabelAt = 0,              -- D-058: "Napping" only at this Energy or less; "Ready" above it
 }
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and

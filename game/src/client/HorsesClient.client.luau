@@ -16,6 +16,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local NameGen = require(Shared:WaitForChild("NameGen"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
@@ -114,8 +115,10 @@ local function horseCard(h, order: number)
 	for k, key in { "speed", "accel", "stamina", "grit" } do
 		statBar(card, 54 + (k - 1) * 20, key, h.stats[key], h.potential and h.potential[key])
 	end
-	Ui.text(card, string.format("⚡%d  ❤️%d  🏁 %d races · %d wins", h.energy, math.floor(h.bond), h.record.races, h.record.wins), 14,
-		{ Position = UDim2.new(0, 10, 0, 136), Size = UDim2.new(1, -20, 0, 18), TextXAlignment = Enum.TextXAlignment.Left })
+	-- Energy as the one horseshoe row (D-064), then bond and the record.
+	local pips = Ui.energyPips(card, h.energy, GameConfig.energy.maxPerRacer, 16, UDim2.new(0, 10, 0, 137))
+	Ui.text(card, string.format("❤️%d  🏁 %d races · %d wins", math.floor(h.bond), h.record.races, h.record.wins), 14,
+		{ Position = UDim2.new(0, 16 + pips.Size.X.Offset, 0, 136), Size = UDim2.new(1, -26 - pips.Size.X.Offset, 0, 18), TextXAlignment = Enum.TextXAlignment.Left })
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
 	row.Size = UDim2.new(1, -16, 0, 40)

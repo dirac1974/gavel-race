@@ -257,3 +257,30 @@ RunService.Heartbeat:Connect(function()
 		Ui.toast("You've been riding for a while. Time for a stretch and a drink of water? 🌤️", "welcome_sun", "🌤️")
 	end
 end)
+
+-- Opening your stable (D-065) ---------------------------------------------------------
+-- While another server still holds this player's save (a fast rejoin after a crash), the
+-- server keeps trying instead of kicking (Profiles.load) and says so here. "Try again" rejoins
+-- the game; the card goes away by itself when the profile arrives.
+local waitGui = Ui.screen("OpeningStable", 20)
+waitGui.Enabled = false
+local waitCard = Ui.card(waitGui, UDim2.fromOffset(420, 220), UDim2.fromScale(0.5, 0.5), C.paper)
+waitCard.AnchorPoint = Vector2.new(0.5, 0.5)
+Ui.text(waitCard, "🐴 Opening your stable…", 28, { Position = UDim2.new(0, 12, 0, 18), Size = UDim2.new(1, -24, 0, 36) })
+Ui.text(waitCard, "Your horses are on their way. This can take a minute.", 18,
+	{ Position = UDim2.new(0, 20, 0, 62), Size = UDim2.new(1, -40, 0, 50), TextWrapped = true }).TextColor3 = C.plum
+local retryBtn = Ui.button(waitCard, "Try again", UDim2.fromOffset(200, 60), UDim2.new(0.5, -100, 1, -78), C.orange, 24)
+retryBtn.Activated:Connect(function()
+	retryBtn.Text = "Rejoining…"
+	local ok = pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+	if not ok then
+		retryBtn.Text = "Try again"
+		Ui.toast("Couldn't rejoin just now. Your stable is still opening!", "hay", "🐴")
+	end
+end)
+gameRemotes:WaitForChild("ProfileWaiting").OnClientEvent:Connect(function(waiting)
+	waitGui.Enabled = waiting == true and PlayerState.data == nil
+end)
+gameRemotes:WaitForChild("ProfileSync").OnClientEvent:Connect(function()
+	waitGui.Enabled = false
+end)
