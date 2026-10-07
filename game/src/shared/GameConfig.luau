@@ -272,7 +272,18 @@ GameConfig.botStrideMean = 40        -- Giddy-up stretches (D-022), kept for Cla
 GameConfig.botStrideSd = 15
 GameConfig.botBurstMean = 55
 GameConfig.botBurstSd = 15
-GameConfig.botRatingSpread = 6                   -- bots rated within ± this of the human median
+-- Bots by league (D-061 stage 2): every bot is rated anchor ± botRatingSpread (uniform), whoever
+-- is in the race. The debate's anchors (Rookie 50, Bronze 63, Silver 73, Gold 83, Champion 90)
+-- failed the gate: a fresh starter ridden by an average kid won 12% of solo Rookie races. These
+-- are tuned by `python sims/economy.py --solo` so a horse entering any league with an average kid
+-- wins about 24% solo (20-35% for new to skilled kids) and about 35% at the league's ceiling.
+-- botRatingAnchor = nil restores bots rated around the human median (before D-061).
+GameConfig.botRatingAnchor = { Rookie = 32, Bronze = 46, Silver = 56, Gold = 69, Champion = 80 }
+GameConfig.botRatingSpread = 6                   -- bots rated within ± this of the anchor (or the human median)
+-- The one race button and the queue card (D-061 stage 2). oneTapRace: RACE! joins the line for
+-- your active horse at once ("More choices" on the queue card opens the picker); false = RACE!
+-- opens the picker (stage 1). raceTimeSeconds: how long "Race time!" shows as the gate fills.
+GameConfig.queueCard = { enabled = true, oneTapRace = true, raceTimeSeconds = 3 }
 
 -- Macro detection (D-022). Log only until a month of real data sets the threshold.
 GameConfig.integrity = {

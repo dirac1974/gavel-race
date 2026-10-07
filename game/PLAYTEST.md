@@ -456,6 +456,18 @@ Use Play Solo, or Test → Clients and Servers with 2 players, plus Device emula
 - [ ] **Retire.** Ride your horse, open My Horses, tap Retire on it: it says you can't while riding. The same while in line for a race or on a training ride. Another horse at home still retires.
 - [ ] **Locked save (needs API access and a published place).** Join, then leave and rejoin within a few seconds from another server: you see "🐴 Opening your stable…" with **Try again**, never a kick; the stable opens within about 5 minutes at most (as soon as the old server lets go). Leaving while it waits is fine.
 
+## One race button and the queue card (horse life stage 2, D-061)
+Use Play Solo, or Test → Clients and Servers with 2 players, plus Device emulator → a phone in landscape. No tools needed.
+- [ ] **One tap.** A new player picks a starter, then taps the big **🏁 RACE!** button ("with Comet ▶" under it) once: no picker opens, and they are in a gate within 20 seconds (15 s countdown plus the 3, 2, 1).
+- [ ] **The queue card.** While in line a card sits at the top: a ring of dots that empties as the big number counts down from 15, the gate's 8 slots with your horse's name and coat dot in gold (★), and "🤖 Bots join at 0". With 2 players, the second player's horse name and coat dot appear in the next slot on both screens.
+- [ ] **Wait away from the track.** After tapping RACE!, walk to your barn and brush your horse (Care → Groom): it works, and the card stays on top. About 3 seconds before the gate, the card turns gold and says **Race time!** with hoofprints stepping to **GO!**; the care card closes and you are in the gate for the 3, 2, 1. The same while riding your own horse or walking on Fair Street.
+- [ ] Waiting while the other course's race runs: the card says "You race next!" (🏇); with no course free, "Finding a race…". The ring's dots chase each other while you wait (still under Reduced Motion).
+- [ ] ✕ on the card leaves the line (the RACE! button comes back). 🔀 **More** opens "More choices" (another horse, Practice, the Cup, a course); joining there moves you.
+- [ ] A horse at 0 Energy outside Rookie shows **🎈 PRACTICE** "with Comet ▶" on the button and joins a Practice race; a horse past its league's ceiling shows **🏆 CUP!**.
+- [ ] Bots have horse names made of the name-chip words ("Lucky Star", "Pepper Socks"), never anything like "Player123".
+- [ ] **Training shows.** A fresh Rookie horse wins roughly 1 race in 4 against bots on your own; after a few days of training (Rating near 58) it wins noticeably more, about 1 in 3. (The sim's numbers: `python sims/economy.py --solo`.)
+- [ ] On the phone emulator the card fits across the top without covering the dock, every word on it is readable, and ✕ and More are fingertip-sized.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

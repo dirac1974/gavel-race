@@ -39,6 +39,7 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 local Leagues = require(Shared:WaitForChild("Leagues"))
 local Style = require(Shared:WaitForChild("Style"))
 local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
+local NameGen = require(Shared:WaitForChild("NameGen"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -83,6 +84,8 @@ RaceOffsets.Parent = remotes
 local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst, course
 local JoinRace = makeRemote("JoinRace")           -- client -> server: want (bool), course id?, horse id?
 local QueueStatus = makeRemote("QueueStatus")     -- server -> one: in line?, riders in line, seconds (or nil), course
+local QueueGate = makeRemote("QueueGate")         -- server -> one in line: course (nil = league line), riders {name, coat, user}, lanes, seconds (or nil), racing (D-061 stage 2)
+local RaceTime = makeRemote("RaceTime")           -- server -> racers: the gate filled, "Race time!" (D-061 stage 2), course
 local RaceAborted = makeRemote("RaceAborted")     -- server -> all: the race stopped with an error, course
 local RaceCards = makeRemote("RaceCards")         -- server -> all: the next race on each course (Race Board)
 local PaceTap = makeRemote("PaceTap")             -- client -> server: claimed server time
@@ -213,9 +216,26 @@ local function publishCards()
 	updateBoard(view)
 end
 
+-- The queue card's gate (D-061 stage 2): each rider's horse name and coat, in line order.
+local function gateRiders(list: { Player }): { any }
+	local out = {}
+	for _, p in list do
+		local data = Profiles.get(p)
+		local h = data and ((chosen[p] and Profile.horse(data, chosen[p])) or Profile.activeHorse(data))
+		if h and #out < GameConfig.lanes then
+			table.insert(out, { name = h.name, coat = h.coat, user = p.UserId })
+		end
+	end
+	return out
+end
+
 local function queueStatus(c)
 	local seconds = if c.fillDeadline then math.max(0, math.ceil(c.fillDeadline - os.clock())) else nil
-	for _, p in c.queue do QueueStatus:FireClient(p, true, #c.queue, seconds, c.id) end
+	local riders = gateRiders(c.queue)
+	for _, p in c.queue do
+		QueueStatus:FireClient(p, true, #c.queue, seconds, c.id)
+		QueueGate:FireClient(p, c.id, riders, GameConfig.lanes, seconds, c.current ~= nil)
+	end
 end
 
 -- Per-league queues (D-061 core, stage 1): riders wait in their league-and-kind queue until a
@@ -226,6 +246,11 @@ local waits = RaceQueues.new()
 -- A rider waiting in a league queue (no course yet): in line, how many wait with them, no course.
 local function waitStatus(player: Player)
 	QueueStatus:FireClient(player, true, RaceQueues.waitingWith(waits, player), nil, nil)
+	local key = waits.of[player]
+	local q = key and waits.queues[key]
+	local list = {}
+	for _, w in (q and q.riders) or {} do table.insert(list, w.rider) end
+	QueueGate:FireClient(player, nil, gateRiders(list), GameConfig.lanes, nil, false)
 end
 
 local function leaveLine(player: Player)
@@ -235,6 +260,7 @@ local function leaveLine(player: Player)
 	end
 	local c = inLine[player]
 	if not c then return end
+	RaceTime:FireClient(player, c.id, true) -- cancels a "Race time!" already shown (D-061 stage 2)
 	inLine[player] = nil
 	player:SetAttribute("InLine", nil)
 	local i = table.find(c.queue, player)
@@ -385,6 +411,14 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	local pick = data and ((id and Profile.isStalled(data, id) and Profile.horse(data, id)) or Profile.activeHorse(data))
 	local wanted = { league = if pick then pick.league else DEFAULT_LEAGUE, cup = kind == "cup", practice = kind == "practice" }
 	local h, why = rideable(player, id, wanted)
+	if not h and kind == "race" then -- (D-061 stage 2) a tired or outgrown horse still gets a race: Practice
+		local practice = { league = wanted.league, cup = false, practice = true }
+		local hp = rideable(player, id, practice)
+		if hp then
+			h, kind = hp, "practice"
+			Profiles.notify(player, hp.name .. " is resting, so this one is a Practice race!", "zzz_resting")
+		end
+	end
 	if not h then
 		Profiles.notify(player, why, "zzz_resting")
 		if not inLine[player] and not RaceQueues.isWaiting(waits, player) then QueueStatus:FireClient(player, false, 0, nil, nil) end
@@ -589,7 +623,8 @@ local function runRace(c, players: { Player })
 		return
 	end
 	newCard(c) -- the board shows the next race on this course while this one runs
-	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng)
+	-- Bots rated by league (D-061 stage 2), named from the horse-name chips.
+	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng, { league = leagueName, nameParts = NameGen })
 	local coats = {}
 	for i, lane in lanes do coats[i] = coatOf[lane.id] end -- bots keep the default coats
 	local session = RaceSession.new({
@@ -1035,11 +1070,28 @@ local function courseLoop(c)
 		-- Wait for someone to join this course's line, then give others the fill time to join too.
 		while #c.queue == 0 do task.wait(0.5) end
 		c.fillDeadline = c.fillDeadline or (os.clock() + GameConfig.lobbyFillSeconds)
+		-- "Race time!" (D-061 stage 2): riders hear it raceTimeSeconds before the gate, or when it
+		-- fills, wherever they are (grooming, riding, visiting); the race then seats them.
+		local called: { [Player]: boolean } = {}
+		local callAt = (GameConfig.queueCard and GameConfig.queueCard.raceTimeSeconds) or 3
+		local function callBack()
+			for _, p in c.queue do
+				if not called[p] then
+					called[p] = true
+					RaceTime:FireClient(p, c.id)
+				end
+			end
+		end
 		while #c.queue > 0 and os.clock() < (c.fillDeadline or 0) and #c.queue < GameConfig.lanes do
 			for _, p in c.queue do LobbyStatus:FireClient(p, math.ceil((c.fillDeadline or 0) - os.clock()), c.id) end
 			queueStatus(c)
-			task.wait(1)
+			if (c.fillDeadline or 0) - os.clock() <= callAt + 0.05 then callBack() end
+			local left = (c.fillDeadline or 0) - os.clock()
+			task.wait(if left > callAt + 0.05 then math.clamp(left - callAt, 0.05, 1) else math.clamp(left, 0.05, 1))
 		end
+		callBack()
+		-- A gate that filled early: the riders just heard "Race time!"; give them its seconds.
+		if #c.queue >= GameConfig.lanes and os.clock() < (c.fillDeadline or 0) - callAt then task.wait(callAt) end
 		-- The first race after a server start waits (up to 10 s more) for the horse models to
 		-- load, so no horse runs without its running legs (D-055). Riders stay in line meanwhile.
 		local models = ReplicatedStorage:FindFirstChild("RaceModels")

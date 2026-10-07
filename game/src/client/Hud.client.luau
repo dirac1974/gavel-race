@@ -180,16 +180,35 @@ local boardBtn = Ui.button(boardSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0
 Ui.icon(boardBtn, "clipboard", "📋", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
 boardBtn.Activated:Connect(function() OpenBoard:Fire() end)
 
--- Race button
-local raceSlot = slot(170, 5) -- the Ride button (RideClient) comes after it, at 6
+-- Race button: "🏁 RACE!" big, "with Comet ▶" under it (D-061 stage 2): one tap joins the line
+-- for your active horse; the queue card's "More choices" opens the picker.
+local QCARD = GameConfig.queueCard or {}
+local oneTap = QCARD.enabled ~= false and QCARD.oneTapRace ~= false
+local raceSlot = slot(if oneTap then 200 else 170, 5) -- the Ride button (RideClient) comes after it, at 6
 local raceBtn = Ui.button(raceSlot, "🏁 RACE!", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.orange, 30)
+Ui.pad(raceBtn, 5)
+local raceSub = Ui.text(raceBtn, "", DockLayout.LABEL_PX, { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 1, -20),
+	TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+raceSub.Visible = false
 -- The ✕ that leaves the line: big enough for a fingertip at the dock's smallest scale (D-064).
 local leaveBtn = Ui.button(raceSlot, "✕", UDim2.fromOffset(DockLayout.LEAVE_PX, DockLayout.LEAVE_PX), UDim2.new(1, -44, 1, -118), C.white, 26)
 leaveBtn.Visible = false
 leaveBtn.ZIndex = 3
 
+-- What one tap on RACE! joins for the active horse (D-061): a Race; the Cup when the horse has
+-- outgrown its league's races; Practice while it naps (no Energy) outside the free leagues.
+local function oneTapKind(h): string
+	if h.overCeiling then return if h.cupOpen then "cup" else "practice" end
+	local tired = (h.energy or 0) < GameConfig.energy.costPerCashRace and not GameConfig.energy.freeLeagues[h.league or "Rookie"]
+	return if tired then "practice" else "race"
+end
+local KIND_WORD = { race = "🏁 RACE!", cup = "🏆 CUP!", practice = "🎈 PRACTICE" }
+
 local inLine = false
 local function setRaceButton(state: string, detail: string?)
+	raceBtn.TextYAlignment = Enum.TextYAlignment.Center
+	raceBtn.TextSize = 30
+	raceSub.Visible = false
 	if state == "nohorse" then
 		raceBtn.Text, raceBtn.BackgroundColor3 = "🐴 Pick a horse", C.gold
 		leaveBtn.Visible = false
@@ -197,7 +216,17 @@ local function setRaceButton(state: string, detail: string?)
 		raceBtn.Text, raceBtn.BackgroundColor3 = "In line! " .. (detail or ""), C.teal
 		leaveBtn.Visible = true
 	else
+		local h = PlayerState.activeHorse()
 		raceBtn.Text, raceBtn.BackgroundColor3 = "🏁 RACE!", C.orange
+		if oneTap and h then
+			local kind = oneTapKind(h)
+			raceBtn.Text = KIND_WORD[kind]
+			raceBtn.TextSize = if kind == "practice" then 24 else 30 -- one line above "with Comet ▶"
+			raceBtn.BackgroundColor3 = if kind == "practice" then C.sky else C.orange
+			raceBtn.TextYAlignment = Enum.TextYAlignment.Top
+			raceSub.Text = "with " .. h.name .. " ▶"
+			raceSub.Visible = true
+		end
 		leaveBtn.Visible = false
 	end
 end
@@ -255,6 +284,12 @@ raceBtn.Activated:Connect(function()
 		return
 	end
 	if inLine then return end
+	if oneTap then -- one tap, one race (D-061): the active horse joins its league's line
+		local h = PlayerState.activeHorse()
+		raceRemotes:WaitForChild("JoinRace"):FireServer(true, nil, h.id, oneTapKind(h))
+		if Sound then Sound.play("horse_nicker") end
+		return
+	end
 	OpenRacePicker:Fire() -- pick a course and a horse (D-036)
 end)
 leaveBtn.Activated:Connect(function()

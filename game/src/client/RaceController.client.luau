@@ -1235,6 +1235,7 @@ end)
 
 -- Server events -------------------------------------------------------------
 remotes.LobbyStatus.OnClientEvent:Connect(function(seconds)
+	if GameConfig.queueCard and GameConfig.queueCard.enabled ~= false then return end -- the queue card shows the wait (D-061)
 	status.Text = string.format("%s  Next race in %d", ThemePack.gameTitle, seconds)
 	hint.Text = ThemePack.tagline
 end)
