@@ -360,6 +360,8 @@ GameConfig.comeback = {
 	photo = true,
 	studioAwayDays = 0,
 	studioMonthStamps = 0,
+}
+
 -- Careers (D-059, stage 7): no ageing and no decline. A career badge every badgeEvery races; a
 -- Veteran at veteranAt races may take an opt-in Legend Retirement (two taps; suggested once per
 -- horse): it moves to the Hall of Fame paddock beside the barn, keeps its stats, can still be
@@ -384,7 +386,7 @@ GameConfig.rehome = {
 	enabled = true,
 	share = 0.5,
 	undoHours = 72,
-	maxWaiting = 10,                 -- horses waiting at the school for an undo (the oldest leaves first)
+	maxWaiting = 10,                 -- horses waiting at the school for an undo (then it's full until one settles in or comes back)
 	school = "Sunny Meadow Riding School",
 }
 
