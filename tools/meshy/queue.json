@@ -24,6 +24,15 @@
       "spent_credits": 100,
       "end_balance": 360,
       "note": "Stage 5 (D-060), plan asked about 60: rosette_wall 30, post_box_carrots retexture 10, visitor_bell 30 + re-roll 30 (the first had no post). Balance checked before each batch (460, then 390); never near the 150 floor. Verdicts: docs/art/ART_REVIEW.md."
+    },
+    "stage4": {
+      "date": "2026-10-07",
+      "plan_credits": 90,
+      "floor_balance": 150,
+      "start_balance": 360,
+      "spent_credits": 110,
+      "end_balance": 250,
+      "note": "Horse life stage 4 (D-058, docs/plans/horse-life-and-retention.md). Balance checked before every job (stage 5 was also using Meshy). spa_wash_stall 30, horse_lie_bay 30, towel_rack 30, retextures horse_lie_palomino 10 and horse_lie_grey 10 (the starter coats; other coats sink a standing horse into straw). Verdicts: docs/art/ART_REVIEW.md."
     }
   },
   "defaults": {
@@ -811,7 +820,7 @@
       "prompt": "a small open-sided horse wash bay for a county-fair vet clinic, painted pale blue wooden frame posts with a white scalloped roof trim, a dark green rubber mat floor, a coiled green garden hose on a round wall reel, a wooden bucket full of white soapy bubbles and a big yellow sponge, cheerful and clean, toy-like chunky proportions, empty bay with no horse",
       "texture_prompt": "pale blue painted wood frame, white scalloped trim, dark green rubber mat, green hose, white soap bubbles, yellow sponge, soft hand-painted shading, bright daylight colors",
       "negative": "no horse, no people, no text, no logos, no red cross, no medical symbols, no needles",
-      "notes": "Stage 4 Spa Day (D-058), 2026-10-07."
+      "notes": "Stage 4 Spa Day (D-058), 2026-10-07. GENERATED (30 cr). PASS: pale-blue bay, scalloped roof, hose reel, soapy bucket, sponge."
     },
     {
       "slot_id": "horse_lie_bay",
@@ -822,7 +831,7 @@
       "prompt": "full body stylized thoroughbred horse lying down resting in a little patch of straw, all four legs folded neatly under the body, head up and relaxed, neck gently arched, small calm dark eyes open on the sides of the head, ears soft and forward, mouth closed, glossy healthy bay coat: reddish brown body, black lower legs, short neat black mane, black tail, glossy dark hooves, chunky toy-like proportions, simple brown leather bridle, bare back with no saddle, riderless",
       "texture_prompt": "glossy healthy bay horse coat, warm reddish brown body, black mane, tail and lower legs, dark hooves, small dark eyes, simple brown leather bridle, golden straw, soft hand-painted shading, bright daylight colors",
       "negative": "no rider, no saddle, no bandages, no wounds, no lying flat on the side, no closed eyes, no eyelashes, no open mouth, no flank symbols",
-      "notes": "Stage 4 Spa Day (D-058) napping pose, 2026-10-07. Coat retextures only if this reads well and the balance allows."
+      "notes": "Stage 4 Spa Day (D-058) napping pose, 2026-10-07. GENERATED (30 cr). PASS (note): sphinx pose, front legs forward, head up, calm, healthy. Uploaded raw (darken_hooves.py finds standing legs only)."
     },
     {
       "slot_id": "towel_rack",
@@ -833,7 +842,7 @@
       "prompt": "a small standing wooden towel rack with two folded striped towels hanging over the top rail and a little wooden brush caddy holding two grooming brushes on the base, painted wood, bright colours, toy-like chunky proportions",
       "texture_prompt": "honey wood rack, red-and-white and blue-and-white striped towels, wooden caddy with tan-bristle brushes, soft hand-painted shading, bright daylight colors",
       "negative": "no text, no logos, no metal spikes",
-      "notes": "Stage 4 Spa Day (D-058), 2026-10-07."
+      "notes": "Stage 4 Spa Day (D-058), 2026-10-07. GENERATED (30 cr). PASS (note): striped towel over a wooden stand, small odd caddy."
     },
     {
       "slot_id": "horse_lie_palomino",
@@ -844,7 +853,7 @@
       "target_polycount": 8000,
       "text_style_prompt": "same stylized horse lying down resting in straw, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, palomino coat: rich golden body, creamy white mane and tail, a white stripe down the face, golden lower legs, glossy jet-black hooves on every leg, golden straw, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
       "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no text, no logos",
-      "notes": "Stage 4 (D-058) napping pose, starter coat, 2026-10-07."
+      "notes": "Stage 4 (D-058) napping pose, starter coat, 2026-10-07. GENERATED (10 cr). PASS: golden, cream mane, black hooves."
     },
     {
       "slot_id": "horse_lie_grey",
@@ -855,7 +864,7 @@
       "target_polycount": 8000,
       "text_style_prompt": "same stylized horse lying down resting in straw, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dapple grey coat: medium steel-grey body covered in clearly visible round charcoal-grey dapples on the shoulders, barrel and hindquarters, dark charcoal lower legs, light silver mane and tail, dark grey muzzle, glossy jet-black hooves on every leg, golden straw, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
       "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no text, no logos",
-      "notes": "Stage 4 (D-058) napping pose, starter coat, 2026-10-07."
+      "notes": "Stage 4 (D-058) napping pose, starter coat, 2026-10-07. GENERATED (10 cr). PASS: dapple grey, silver mane, dark hooves."
     }
   ]
 }
