@@ -113,6 +113,7 @@ end
 local lastTrain: { [Player]: number } = {}
 local lastVet: { [Player]: number } = {}
 local spaStarted: { [Player]: { id: string, at: number } } = {}
+local lastSpa: { [Player]: number } = {}
 local sessions: { [Player]: any } = {}
 local history: { [Player]: { number } } = {}
 local pending: { [Player]: boolean } = {}
@@ -791,15 +792,24 @@ local function spaCheck(player: Player, horseId: any)
 end
 
 SpaStart.OnServerEvent:Connect(function(player: Player, horseId: any)
-	if os.clock() - (lastVet[player] or 0) < 1 then return end
-	lastVet[player] = os.clock()
+	if os.clock() - (lastSpa[player] or 0) < 1 then return end
+	lastSpa[player] = os.clock()
 	if spaCheck(player, horseId) then spaStarted[player] = { id = horseId, at = os.clock() } end
 end)
 
+-- The client waits minSeconds from before it sent SpaStart; the server's clock starts when
+-- SpaStart arrives, so a lag allowance keeps a real Spa on a slow phone from being lost.
 SpaDone.OnServerEvent:Connect(function(player: Player, horseId: any)
 	local started = spaStarted[player]
-	if not started or started.id ~= horseId then return end
-	if os.clock() - started.at < GameConfig.spa.minSeconds then return end
+	if not started or started.id ~= horseId
+		or os.clock() - started.at < GameConfig.spa.minSeconds - GameConfig.spa.lagAllowance then
+		local h = horseFor(player, horseId)
+		if h and Spa.open(h, os.time(), GameConfig.spa) then
+			Profiles.notify(player, Spa.AGAIN, "map_vet") -- never a silent no (a closed Spa already said so)
+		end
+		spaStarted[player] = nil
+		return
+	end
 	spaStarted[player] = nil
 	local h = spaCheck(player, horseId)
 	if not h then return end
@@ -813,7 +823,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	lastTrain[player], lastVet[player] = nil, nil
-	spaStarted[player] = nil
+	spaStarted[player], lastSpa[player] = nil, nil
 	if sessions[player] then restGroup(player, sessions[player]) end
 	sessions[player], history[player], pending[player], cards[player] = nil, nil, nil, nil
 	quick[player], lastAsk[player] = nil, nil

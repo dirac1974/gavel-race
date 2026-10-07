@@ -108,13 +108,14 @@ local function today(): number
 end
 
 -- Courses -------------------------------------------------------------------------
--- course = { id, cfg, scene, surface, queue, fillDeadline, current, card, charged, nextDistance }
+-- course = { id, cfg, scene, surface, queue, fillDeadline, current, card, charged, shined, nextDistance }
+-- (shined: player -> horse id whose Spa shine this race took, D-058; given back if the race aborts)
 local courses: { [string]: any } = {}
 for _, id in COURSE_ORDER do
 	local cfg = TrackLayout.courses[id]
 	courses[id] = {
 		id = id, cfg = cfg, scene = TrackScene.course(id, cfg), surface = SURFACE[id],
-		queue = {}, fillDeadline = nil, current = nil, card = nil, charged = {}, nextDistance = if id == "dirt" then 1 else 2,
+		queue = {}, fillDeadline = nil, current = nil, card = nil, charged = {}, shined = {}, nextDistance = if id == "dirt" then 1 else 2,
 	}
 end
 
@@ -612,7 +613,11 @@ local function runRace(c, players: { Player })
 			table.insert(humans, { id = tostring(p.UserId), name = h.name, rating = rating, isBot = false })
 			horseOf[p.UserId] = h.id
 			coatOf[tostring(p.UserId)] = h.coat
-			if GameConfig.spa.shine and Spa.takeShine(h) then shineOf[tostring(p.UserId)] = true end
+			if GameConfig.spa.shine and Spa.takeShine(h) then
+				shineOf[tostring(p.UserId)] = true
+				c.shined[p] = h.id
+				Profiles.changed(p)
+			end
 			table.insert(riders, p)
 			if cost > 0 then
 				c.charged[p] = h.id
@@ -1045,6 +1050,7 @@ local function runRace(c, players: { Player })
 		end
 	end
 	table.clear(c.charged) -- the race counted
+	table.clear(c.shined)
 	-- Your ride: stars from your score, and places your riding gained versus riding at the race
 	-- average (same luck, everything else the same). Only gains are shown to the rider.
 	local S = session:scoresSoFar()
@@ -1144,6 +1150,15 @@ local function courseLoop(c)
 					end
 				end
 				table.clear(c.charged)
+				for p, horseId in c.shined do -- and the Spa shine (D-058)
+					local data = Profiles.get(p)
+					local h = data and Profile.horse(data, horseId)
+					if h then
+						h.shine = true
+						Profiles.changed(p)
+					end
+				end
+				table.clear(c.shined)
 				if #c.queue == 0 then openCard(c) end
 				for _, p in racers do
 					p:SetAttribute("Racing", nil)

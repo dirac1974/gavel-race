@@ -332,6 +332,7 @@ GameConfig.spa = {
 	perDay = 1,
 	energy = 1,
 	minSeconds = 8,                  -- the server takes a Spa only this long after it started (a real wash)
+	lagAllowance = 1.5,              -- seconds off minSeconds for the trip SpaStart takes to the server
 	taps = { hose = 6, brush = 6, towel = 4 }, -- taps per step (about 30 s in all)
 	shine = true,                    -- sparkle on the horse in its next race
 	muddyLook = false,               -- D-058 minority view ("Muddy & happy"), off

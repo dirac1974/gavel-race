@@ -67,6 +67,11 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(S ~= nil and S.enabled == true and S.perDay == 1 and S.energy == 1, "spa config: on, once a day, +1 Energy")
 	check(S.muddyLook == false, "the muddy look stays off (D-058 minority view)")
 	check(S.minSeconds > 0 and S.minSeconds < 30, "a Spa takes a few seconds, under a minute")
+	check(S.lagAllowance >= 0 and S.lagAllowance < S.minSeconds, "the lag allowance leaves a real wait")
+	-- the client's three steps can't finish before the server would take them: at 8 taps a second
+	local taps = 0
+	for _, step in Spa.STEPS do taps += S.taps[step] end
+	check(taps >= 9 and taps / 8 < 30, "the Spa's taps fit in under 30 s")
 	check(E.yawnAt == 1 and E.restingLabelAt == 0, "yawn at 1 Energy, nap at 0")
 
 	-- +1 Energy once per horse per day ---------------------------------------------------
@@ -175,6 +180,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		check(not Spa.allNapping({}, T0, E), "no horses: not napping")
 		check(not Spa.allNapping({ a }, T0 + E.regenSeconds, E), "a nap ends as Energy comes back")
 		check(Spa.dreamLine("Comet") == "Great day! Comet's dreaming of tomorrow.", "the dream line")
+		check(Spa.YAWN == "🥱 Yawn!" and Spa.NAP == "💤 Napping", "one word each for yawning and napping")
 	end
 
 	-- Stable Board job and the next step --------------------------------------------------------
@@ -200,7 +206,10 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	do
 		local x, z = WorldLayout.placePoint("vet", WorldLayout.SPA.across, WorldLayout.SPA.out)
 		local r = WorldLayout.placeRect("vet") :: { number }
-		check(x >= r[1] - 30 and x <= r[3] + 30 and z >= r[2] - 30 and z <= r[4] + 30, "the wash bay is within the Vet's reach")
+		-- TrainingService takes a Spa within 30 studs of the Vet's rectangle: keep 8 to spare
+		check(x >= r[1] - 22 and x <= r[3] + 22 and z >= r[2] - 22 and z <= r[4] + 22, "the wash bay is well within the Vet's reach")
+		local sr = WorldLayout.spaRect()
+		check(x > sr[1] and x < sr[3] and z > sr[2] and z < sr[4], "the wash bay is in the tree-free rectangle")
 		check(x < r[1] - 6 or x > r[3] + 6, "the wash bay stands beside the Vet, not in it")
 		local px, pz = WorldLayout.placePoint("vet", 0, 0)
 		check(px == WorldLayout.places.vet.x and pz == WorldLayout.places.vet.z, "placePoint(0, 0) is the place's front centre")

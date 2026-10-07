@@ -404,7 +404,7 @@ local function horseRow(onPick: (any) -> ())
 	l.Parent = row
 	for _, h in stalledHorses() do
 		-- D-058: how it's resting, icon and word
-		local rest = if h.resting then "\n💤 Napping" elseif h.yawning then "\n🥱 Sleepy" else ""
+		local rest = if h.resting then "\n" .. Spa.NAP elseif h.yawning then "\n" .. Spa.YAWN else ""
 		local b = Ui.button(row, h.name .. rest, UDim2.fromOffset(170, 80), UDim2.new(), Ui.coatColors[h.coat] or C.cream, 20)
 		b.TextColor3 = if h.coat == "black" or h.coat == "bay" or h.coat == "chestnut" then C.white else C.ink
 		b.Activated:Connect(function() onPick(h) end)
@@ -758,8 +758,10 @@ local function spaGame(h)
 end
 
 local function spaPick(h)
-	open("🛁 Spa Day for " .. h.name, "Hose, brush and dry. +1 Energy!")
-	if not GameConfig.spa.enabled or (h.spaToday or 0) >= GameConfig.spa.perDay then
+	local closed = not GameConfig.spa.enabled or (h.spaToday or 0) >= GameConfig.spa.perDay
+	local full = (h.energy or 0) >= GameConfig.energy.maxPerRacer
+	open("🛁 Spa Day for " .. h.name, if closed then "" elseif full then "Hose, brush and dry!" else "Hose, brush and dry. +1 Energy!")
+	if closed then
 		Ui.text(body, "🌙 " .. Spa.CLOSED, 26, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 40) })
 		local ok = Ui.button(body, "OK", UDim2.new(0.3, 0, 0, 56), UDim2.new(0.35, 0, 0, 120), C.green, 24)
 		ok.Activated:Connect(close)

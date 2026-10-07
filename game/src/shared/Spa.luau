@@ -21,8 +21,11 @@ Spa.STEP_TEXT = {
 Spa.STAMP = "spa"
 Spa.STAMP_LABEL = "Spa Day"
 Spa.CLOSED = "Spa opens again tomorrow"
+Spa.AGAIN = "Let's try the Spa again!"
+Spa.YAWN = "🥱 Yawn!"
+Spa.NAP = "💤 Napping"
 
-export type SpaConfig = { enabled: boolean, perDay: number, energy: number, minSeconds: number, shine: boolean }
+export type SpaConfig = { enabled: boolean, perDay: number, energy: number, minSeconds: number, shine: boolean, lagAllowance: number? }
 
 local function today(now: number): number
 	return now // 86400
@@ -98,11 +101,11 @@ end
 
 -- Every line a kid can read from the Spa and the rest cues (the copy test reads these).
 function Spa.copy(): { string }
-	local out = { Spa.CLOSED, Spa.STAMP_LABEL, Spa.dreamLine("Comet"), "💤 Napping", "🥱 Yawn!",
-		"🛁 Spa Day", "Hose, brush and dry. +1 Energy!", "Spa Day for Comet", "The Spa is closed today",
+	local out = { Spa.CLOSED, Spa.AGAIN, Spa.YAWN, Spa.NAP, Spa.STAMP_LABEL, Spa.dreamLine("Comet"),
+		"🛁 Spa Day", "Hose, brush and dry. +1 Energy!", "Hose, brush and dry!", "Spa Day for Comet", "The Spa is closed today",
 		"✨ Comet is squeaky clean! +1 Energy", "✨ Comet is squeaky clean and full of Energy!",
 		"Spa Days happen at the Vet on Fair Street", "Give a horse a Spa Day", "Next: a Spa Day at the Vet",
-		"All clean! Time to go", "✨ Shiny from the Spa" }
+		"All clean! Time to go" }
 	for _, s in Spa.STEPS do
 		table.insert(out, Spa.STEP_TEXT[s].verb)
 		table.insert(out, Spa.STEP_TEXT[s].tap)

@@ -143,12 +143,13 @@ end
 local function bubble(hm: Model, text: string, name: string)
 	local anchor = hm.PrimaryPart or hm:FindFirstChildWhichIsA("BasePart", true)
 	if not anchor then return end
-	local _, size = hm:GetBoundingBox()
+	local box, size = hm:GetBoundingBox()
 	local bb = Instance.new("BillboardGui")
 	bb.Name = name
 	bb.Size = UDim2.fromOffset(150, 48)
-	bb.StudsOffsetWorldSpace = hm:GetPivot().Position + Vector3.new(0, size.Y + 1.5, 0) - anchor.Position
+	bb.StudsOffsetWorldSpace = box.Position + Vector3.new(0, size.Y / 2 + 1.5, 0) - anchor.Position
 	bb.MaxDistance = 70
+	bb.AlwaysOnTop = true -- over the half door and the stall walls
 	bb.LightInfluence = 0
 	local t = Instance.new("TextLabel")
 	t.Size = UDim2.fromScale(1, 1)
@@ -282,9 +283,9 @@ local function buildBarn(i: number, owner: Player, data)
 			hm:SetAttribute("Rest", pose or "")
 			hm.Parent = barn
 			if pose == "nap" then
-				bubble(hm, "💤 Napping", "RestBubble")
+				bubble(hm, Spa.NAP, "RestBubble")
 			elseif pose == "yawn" then
-				bubble(hm, "🥱 Yawn!", "RestBubble")
+				bubble(hm, Spa.YAWN, "RestBubble")
 			end
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
 				bay.LookVector, h.name, if h.id == data.activeHorse then "⭐" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)

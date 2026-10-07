@@ -876,6 +876,7 @@ local function clear(x: number, z: number, margin: number): boolean
 	local m = WorldLayout.meadow
 	if (x - m.x) ^ 2 + (z - m.z) ^ 2 < (m.radius + margin) ^ 2 then return false end
 	if WorldLayout.overlaps(r, WorldLayout.trainingLink) then return false end -- the path to the Training Ground
+	if WorldLayout.overlaps(r, WorldLayout.spaRect()) then return false end -- the Spa Day wash bay (D-058)
 	return true
 end
 
