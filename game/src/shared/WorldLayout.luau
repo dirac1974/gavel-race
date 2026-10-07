@@ -129,6 +129,15 @@ function WorldLayout.arrival(dest: string, plotIndex: number?): (number, number,
 	return x, z, p.x, p.z
 end
 
+-- Visiting a friend (D-060): on Barn Lane just outside their gate, facing in (never inside the
+-- barn). Visitors walked out when the gate closes land here too.
+WorldLayout.GATE_OUTSIDE = 8
+function WorldLayout.gateArrival(plotIndex: number): (number, number, number, number)
+	local x, z = WorldLayout.plotPoint(plotIndex, -WorldLayout.GATE_OUTSIDE, 0)
+	local lx, lz = WorldLayout.plotPoint(plotIndex, 20, 0)
+	return x, z, lx, lz
+end
+
 function WorldLayout.overlaps(a: { number }, b: { number }): boolean
 	return a[1] < b[3] and b[1] < a[3] and a[2] < b[4] and b[2] < a[4]
 end

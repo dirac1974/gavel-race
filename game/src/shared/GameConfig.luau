@@ -215,6 +215,19 @@ GameConfig.ui = {
 }
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
+-- Visiting friends' barns (D-060, D-042): only Roblox friends in this server, never a count.
+GameConfig.visit = {
+	enabled = true,
+	mapList = true,           -- the Map's Friends' barns list and its trip to the gate (false: walk Barn Lane only)
+	bondPerHorsePerDay = 1,   -- bond a horse can get from all visitors together in a day
+	treatsPerFriendPerDay = 1, -- free treats a visitor can give at one friend's barn a day
+	treatBond = 1,            -- bond a visitor's treat gives (inside the cap above)
+	carrotsPerFriendPerDay = 1, -- carrots a visitor can drop in one friend's post box a day
+	postBoxPerDay = 5,        -- carrots a post box takes a day from all visitors together
+	nearStuds = 30,           -- how far outside a friend's plot still counts as "at their barn"
+	travelGapSeconds = 3,     -- between two visits by the Friends' barns list
+	listMax = 12,             -- faces on the Friends' barns list
+}
 -- Riding your own horse (D-056).
 GameConfig.riding = {
 	hopButton = true,   -- touch: a Hop button at Roblox's own jump spot while you ride

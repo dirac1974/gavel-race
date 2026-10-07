@@ -4,7 +4,7 @@
 --   Settings: who can visit your stable (Friends or Nobody), break reminder on or off, sound on or off,
 --   Easy Rein (steering help on training courses, D-053) on or off, Smart Steer in races (D-054, on
 --   by default), and whether friends may see your training ghosts (off by default). "Nobody"
---   visits also turns off Ride together invites.
+--   visits also turns off Ride together invites and keeps your barn off friends' lists (D-060).
 --   For grown-ups: how races work (no gambling, nothing buys speed), what's saved, chat and
 --   safety, this week's play time, and where Roblox's parental controls live.
 --   Tour: one friendly step at a time with a GO button (golden hoofprints) and Skip.
@@ -133,7 +133,7 @@ local function settingsTab()
 		panelGui.Enabled = false
 		gameRemotes:WaitForChild("SetSetting"):FireServer("tour", "restart")
 	end)
-	para("Visitors who aren't allowed in see a closed gate. Nobody can take, move or buy anything in your stable. \"Nobody\" also means no Ride together invites.", 15, 8).TextColor3 = C.plum
+	para("Only Roblox friends can visit, and only from the Map's Friends' barns list. Visitors can pat your horses, give one treat a day and drop a carrot in your post box; nobody can take, move or buy anything in your stable. Tap 🚪 Close gate any time to send visitors home. \"Nobody\" also means no Ride together invites.", 15, 8).TextColor3 = C.plum
 end
 
 local function grownUpsTab()
@@ -154,6 +154,7 @@ local function grownUpsTab()
 	para("💬 Chat uses Roblox's own filtered chat and age settings. Horse names are built from a word list, so nothing can be typed.", 16, 60)
 	para("👫 Ride together: only Roblox friends can invite each other to a training ride, and only if the invite is accepted (it can always be declined, lapses by itself and is limited to a few). Riders see each other's stars and ribbons, never times or who was first. Setting stable visits to Nobody turns invites off.", 16, 61)
 	para("👻 Ghosts: a see-through horse shows your child's own best training ride. Friends see it only if \"Share my ghost with friends\" is turned on in Settings (it's off at first).", 16, 62)
+	para("🏡 Visiting friends' barns: the Map lists only Roblox friends who are in the same game server, and only if their stable visits are set to Friends. A visit is patting horses (no stats), one free treat a day and a carrot in the post box. Owners see how many carrots arrived, never who sent them, and nobody sees visitor counts, likes or rankings. The owner can close the gate in one tap, which walks visitors back to the lane.", 16, 63)
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 70)
 end
 

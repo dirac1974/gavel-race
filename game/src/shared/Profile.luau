@@ -35,9 +35,28 @@ export type Profile = {
 	flags: { [string]: boolean },
 	garden: { { seed: string, at: number } },
 	chores: { [string]: number },
+	tour: Tour,
+	postBox: { day: number, today: number, total: number },
+}
+
+-- Visiting friends' barns (D-060), on the visitor's profile: a Tour stamp per friend whose
+-- horses you've all patted (kept, at most MAX_TOUR_STAMPS), and today's pats, treats and
+-- carrots per friend (only today's are kept). Keys are friends' user ids as strings.
+export type Tour = {
+	stamps: { [string]: number },              -- friend -> day the stamp was earned
+	day: number,                               -- the day the three maps below belong to
+	patted: { [string]: { [string]: boolean } }, -- friend -> horse ids patted today
+	treats: { [string]: number },              -- friend -> treats given today
+	carrots: { [string]: number },             -- friend -> carrots dropped today
 }
 
 Profile.BEDS = 3
+Profile.MAX_TOUR_STAMPS = 200
+Profile.MAX_TOUR_FRIENDS = 50 -- friends a day in the patted, treats and carrots maps
+
+function Profile.emptyTour(day: number): Tour
+	return { stamps = {}, day = day, patted = {}, treats = {}, carrots = {} }
+end
 
 function Profile.emptyGarden(): { { seed: string, at: number } }
 	local g = {}
@@ -67,6 +86,8 @@ function Profile.new(now: number): Profile
 		diamonds = 0,
 		style = { owned = {}, equipped = {} },
 		receipts = {},
+		tour = Profile.emptyTour(now // 86400),
+		postBox = { day = now // 86400, today = 0, total = 0 },
 	}
 end
 
@@ -226,7 +247,68 @@ function Profile.migrate(data: any, now: number): Profile
 	p.style.owned = if typeof(p.style.owned) == "table" then p.style.owned else {}
 	p.style.equipped = if typeof(p.style.equipped) == "table" then p.style.equipped else {}
 	p.receipts = if typeof(p.receipts) == "table" then p.receipts else {}
+	Profile.repairVisits(p, now)
 	return p :: Profile
+end
+
+local function userKey(k: any): boolean
+	return typeof(k) == "string" and #k >= 1 and #k <= 20 and string.match(k, "^%d+$") ~= nil
+end
+
+local function countMap(src: any, limit: number): { [string]: number }
+	local out, n = {}, 0
+	if typeof(src) ~= "table" then return out end
+	local keys = {}
+	for k, v in src do
+		if userKey(k) and tonumber(v) and (tonumber(v) :: number) >= 0 then table.insert(keys, k) end
+	end
+	table.sort(keys)
+	for _, k in keys do
+		if n >= limit then break end
+		out[k] = math.floor(tonumber(src[k]) :: number)
+		n += 1
+	end
+	return out
+end
+
+-- Visits (D-060): the visitor's Tour and the owner's post box, repaired; a new day clears
+-- today's pats, treats and carrots (stamps stay).
+function Profile.repairVisits(p: any, now: number)
+	local today = now // 86400
+	local t = if typeof(p.tour) == "table" then p.tour else {}
+	local tour = Profile.emptyTour(today)
+	tour.stamps = countMap(t.stamps, Profile.MAX_TOUR_STAMPS)
+	if tonumber(t.day) == today then
+		tour.treats = countMap(t.treats, Profile.MAX_TOUR_FRIENDS)
+		tour.carrots = countMap(t.carrots, Profile.MAX_TOUR_FRIENDS)
+		local n = 0
+		if typeof(t.patted) == "table" then
+			for k, ids in t.patted do
+				if n >= Profile.MAX_TOUR_FRIENDS then break end
+				if userKey(k) and typeof(ids) == "table" then
+					local set = {}
+					for id, v in ids do
+						if typeof(id) == "string" and #id <= Profile.MAX_KEY_LEN and v == true then set[id] = true end
+					end
+					tour.patted[k] = set
+					n += 1
+				end
+			end
+		end
+	end
+	p.tour = tour
+	local b = if typeof(p.postBox) == "table" then p.postBox else {}
+	local total = math.max(0, math.floor(tonumber(b.total) or 0))
+	local todayCount = if tonumber(b.day) == today then math.max(0, math.floor(tonumber(b.today) or 0)) else 0
+	p.postBox = { day = today, today = todayCount, total = total }
+end
+
+function Profile.tourStampCount(p: any): number
+	local n = 0
+	if typeof(p.tour) == "table" and typeof(p.tour.stamps) == "table" then
+		for _ in p.tour.stamps do n += 1 end
+	end
+	return n
 end
 
 -- Calendar (D-043): counts days played; missing days never resets anything.
@@ -355,6 +437,11 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 		end)(),
 		chores = table.clone(p.chores),
 		diamonds = p.diamonds or 0,
+		tourStamps = Profile.tourStampCount(p),
+		postBox = {
+			today = if p.postBox and p.postBox.day == now // 86400 then p.postBox.today else 0,
+			total = if p.postBox then p.postBox.total else 0,
+		},
 		style = { owned = table.clone((p.style and p.style.owned) or {}), equipped = table.clone((p.style and p.style.equipped) or {}) },
 	}
 end
