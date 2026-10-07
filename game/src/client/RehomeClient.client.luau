@@ -98,6 +98,7 @@ local function renderRehome()
 			nm.TextTruncate = Enum.TextTruncate.AtEnd
 			local worth = if h.rehomeBlock then h.rehomeBlock
 				elseif (h.rehomeValue or 0) > 0 then string.format("School pays 💵 %d", h.rehomeValue)
+				elseif h.goodbyeRosette then "❤️ Free to a happy home"
 				else "🏵️ Goodbye rosette"
 			local sub = Ui.text(row, worth, TEXT, { Position = UDim2.new(0, 60, 0, 36), Size = UDim2.new(1, -250, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true })
 			sub.TextColor3 = C.plum
@@ -174,15 +175,16 @@ local function showLegend(h)
 	dot(lbody, h.coat, 64, UDim2.new(0.5, -32, 0, 18))
 	Ui.text(lbody, string.format("🎖️ %s is a Veteran!", h.name), 26, { Position = UDim2.new(0, 20, 0, 90), Size = UDim2.new(1, -40, 0, 34) })
 	Ui.text(lbody, string.format("%d races! %s can retire as a 👑 Legend.", h.record.races, h.name), TEXT + 2,
-		{ Position = UDim2.new(0, 20, 0, 130), Size = UDim2.new(1, -40, 0, 26) })
+		{ Position = UDim2.new(0, 20, 0, 128), Size = UDim2.new(1, -40, 0, 48), TextWrapped = true })
 	Ui.text(lbody, "Legends live in your Hall of Fame paddock. You can still ride them!", TEXT,
-		{ Position = UDim2.new(0, 20, 0, 162), Size = UDim2.new(1, -40, 0, 48), TextWrapped = true }).TextColor3 = C.plum
+		{ Position = UDim2.new(0, 20, 0, 180), Size = UDim2.new(1, -40, 0, 48), TextWrapped = true }).TextColor3 = C.plum
 	local show = Ui.button(lbody, "👑 Show me", UDim2.fromOffset(190, TAP), UDim2.new(0.5, -200, 1, -TAP - 18), C.gold, 22)
 	local later = Ui.button(lbody, "Not now", UDim2.fromOffset(190, TAP), UDim2.new(0.5, 10, 1, -TAP - 18), C.white, 22)
 	show.Activated:Connect(function()
 		lgui.Enabled = false
+		local horses = player:WaitForChild("PlayerGui"):FindFirstChild("MyHorses")
 		local ev = HudEvents:FindFirstChild("OpenHorses")
-		if ev then ev:Fire() end
+		if ev and not (horses and horses:IsA("ScreenGui") and horses.Enabled) then ev:Fire() end -- the event toggles
 	end)
 	later.Activated:Connect(function() lgui.Enabled = false end)
 	lgui.Enabled = true

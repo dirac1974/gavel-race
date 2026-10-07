@@ -215,6 +215,7 @@ function Market.buyStall(p: any): (boolean, string)
 	if not Profile.spendCash(p, price) then return false, string.format("A new stall costs %d Green Cash", price) end
 	p.stalls += 1
 	Profile.fillStalls(p) -- the first pasture horse moves in
+	Profile.fixActive(p)
 	return true, string.format("New stall built! You have %d stalls now", p.stalls)
 end
 
@@ -231,7 +232,7 @@ function Market.rehomeValue(h: any): number
 end
 
 -- Why this horse can't be rehomed, or nil. `busy` as Leagues.retireBlock.
-function Market.rehomeBlock(p: any, id: string, busy: any?): string?
+function Market.rehomeBlock(p: any, id: string, busy: any?, now: number?): string?
 	local Leagues = if script then require(script.Parent.Leagues) :: any else require("./Leagues")
 	if not GameConfig.rehome.enabled then return "The riding school is closed today" end
 	local h = Profile.horse(p, id)
@@ -239,6 +240,11 @@ function Market.rehomeBlock(p: any, id: string, busy: any?): string?
 	if h.origin == "starter" then return h.name .. " was your first horse. Friends forever!" end
 	if h.legend ~= nil then return h.name .. " is a Legend and lives with you!" end
 	if Profile.racers(p) <= 1 then return "Keep one horse racing with you!" end
+	local waiting = 0
+	for _, e in (if typeof(p.rehomed) == "table" then p.rehomed else {}) do
+		if now == nil or now < e.expires then waiting += 1 end
+	end
+	if waiting >= GameConfig.rehome.maxWaiting then return "The riding school is full. Try again soon!" end
 	return Leagues.retireBlock(h.name, id, busy or {}, "Rehome")
 end
 
@@ -253,9 +259,9 @@ end
 -- Rehome a horse. Returns (ok, message, entry): entry = { horse, cash, rosette, at, expires }.
 -- The cash is not counted as earned (totals.cashEarned), so it never moves a job along.
 function Market.rehome(p: any, id: string, now: number, busy: any?): (boolean, string, any)
-	local why = Market.rehomeBlock(p, id, busy)
-	if why then return false, why, nil end
 	Market.pruneRehomed(p, now)
+	local why = Market.rehomeBlock(p, id, busy, now)
+	if why then return false, why, nil end
 	local h = Profile.removeHorse(p, id)
 	if not h then return false, "No such horse", nil end
 	local cash = Market.rehomeValue(h)
@@ -267,7 +273,6 @@ function Market.rehome(p: any, id: string, now: number, busy: any?): (boolean, s
 	end
 	local entry = { horse = h, cash = cash, at = now, expires = now + GameConfig.rehome.undoHours * 3600 }
 	table.insert(p.rehomed, entry)
-	while #p.rehomed > GameConfig.rehome.maxWaiting do table.remove(p.rehomed, 1) end
 	return true, string.format("%s is joining %s!", h.name, GameConfig.rehome.school),
 		{ name = h.name, coat = h.coat, id = h.id, cash = cash, rosette = rosette, days = GameConfig.rehome.undoHours // 24 }
 end

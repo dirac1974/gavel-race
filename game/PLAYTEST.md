@@ -524,6 +524,20 @@ Use Play Solo (or 2 players), plus Device emulator → a phone in landscape. Mon
 - [ ] On the phone emulator every Book tab, card, the Thanks!, Photo, Save and Share buttons are fingertip-sized and every word is readable; the Book fills the screen rather than shrinking.
 - [ ] Studio check: the photo board doesn't overlap the Rosette Wall, the garden beds or the hay cart (if placed), and its prompt doesn't fight the Stable Board's.
 
+## Careers, Legends and rehoming (horse life stage 7, D-059)
+Use Play Solo (or 2 players), plus Device emulator → a phone in landscape. No tools needed beyond Studio's command bar for the race count. To skip the 100 races: in Studio's command bar during Play, set a horse's races, e.g. `require(game.ServerScriptService.Server.Profiles).get(game.Players:GetPlayers()[1]).horses[2].record.races = 99`, then run one race.
+- [ ] **Career row.** Open 🐴 My Horses: each card has a line like "🎖️ 0 badges · next in 25". Race once with a horse at 24 races: after the results a toast says "🎖️ Comet earned a 25-race badge!" and the card shows "🎖️ 1 badge". Nothing ever gets slower or older.
+- [ ] **Veteran and the Legend card.** Set a horse's races to 99 and race once: a toast says it's a Veteran, and back in the world (never in the race or the line) a card says "🎖️ Comet is a Veteran!" with **👑 Show me** and **Not now**. Tap either; the card never comes back for that horse (rejoin to check).
+- [ ] **Legend Retirement.** On that horse's card tap **👑 Legend**, then **Sure? 👑**: a toast "👑 Comet is a Legend! See the Hall of Fame paddock." Walk to your barn: beside it, on the garden side, a white-fenced paddock with an arch ("👑 Hall of Fame"), the horse with a soft gold glow and a few sparkles, and a plaque post with its name and races. Its old stall now holds your pasture horse (if you had one); no other horse changed stall.
+- [ ] **Still rideable.** Walk up to the Legend in the paddock: a **Ride** prompt brings it and you ride it around; it leaves the paddock while you ride and is back when you hop off. It doesn't appear on the race picker and can't race. With Reduced Motion on (Roblox settings), no sparkles, only the glow.
+- [ ] Your only racing horse has no 👑 Legend button working ("Keep one horse racing with you!").
+- [ ] **Rehome a bought horse.** Buy a horse at the Market Corral, then walk to the cream-and-blue **Sunny Meadow Riding School** sign by the corral gate: its prompt "Rehome a horse" opens a list. The bought horse says "School pays 💵 N" (half its price). Tap **🏫 Rehome**, then **Sure? ✓**: the goodbye card says "Comet is joining Sunny Meadow Riding School!" with "+💵 N Green Cash" and "Changed your mind? Undo for 3 days." Nothing says farm or sold.
+- [ ] **Undo at once.** Tap **↩️ Undo**: the horse is back with the same name and stats, and the Green Cash goes back. Rehome it again and open My Horses → 🏅 Hall of Fame: it's listed "at Sunny Meadow" with "3 days to change your mind" and **↩️ Undo · 💵 N**; that works too.
+- [ ] **Who stays.** The starter horse's row says it stays ("was your first horse. Friends forever!") with no Rehome button; so does your last racing horse and any Legend. While you're in a race line or riding a horse, rehoming that horse says to do it after.
+- [ ] A tamed horse's row says "🏵️ Goodbye rosette"; rehoming it pays nothing and the Hall of Fame page counts the rosette.
+- [ ] On the phone emulator the rehome list, the goodbye card and the Legend card have fingertip-sized buttons and readable words; the For grown-ups page explains careers and rehoming.
+- [ ] Studio check: the paddock doesn't overlap the garden beds, the trough or the pasture horses; the riding school sign doesn't block the corral gate or the market horses.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

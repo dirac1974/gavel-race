@@ -216,6 +216,7 @@ function Profile.migrate(data: any, now: number): Profile
 	p.horses = horses
 	p.stalls = math.clamp(math.floor(tonumber(p.stalls) or Profile.START_STALLS), Profile.START_STALLS, Profile.MAX_STALLS)
 	Profile.repairStalls(p)
+	Profile.fillStalls(p) -- a stall a load cleared takes the first pasture horse
 	if p.activeHorse and not Profile.horse(p, p.activeHorse) then p.activeHorse = nil end
 	Profile.fixActive(p)
 	p.nextHorseId = math.max(math.floor(tonumber(p.nextHorseId) or 1), #horses + 1)
@@ -263,7 +264,6 @@ end
 -- starter was picked); the Hall of Fame list and the horses waiting at the riding school are
 -- repaired, and horses whose undo window has closed leave for good.
 Profile.MAX_PLAQUES = 50
-Profile.MAX_REHOMED = 10
 function Profile.repairCareers(p: any, now: number)
 	local hasStarter = false
 	for _, h in p.horses do
@@ -290,7 +290,7 @@ function Profile.repairCareers(p: any, now: number)
 		for _, e in p.rehomed do
 			local expires = typeof(e) == "table" and tonumber(e.expires)
 			if expires and now < expires and typeof(e.horse) == "table" and typeof(e.horse.id) == "string"
-				and not Profile.horse(p, e.horse.id) and #waiting < Profile.MAX_REHOMED then
+				and not Profile.horse(p, e.horse.id) and #waiting < Career.cfgRehomeMax() then
 				e.horse = Horse.repair(e.horse, now)
 				e.horse.stall = nil
 				e.cash = math.max(0, math.floor(tonumber(e.cash) or 0))

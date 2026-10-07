@@ -118,7 +118,7 @@ Profiles.addDecorator(function(data, view)
 		local h = data.horses[i]
 		if h and h.id == hv.id then
 			hv.rehomeValue = Market.rehomeValue(h)
-			hv.rehomeBlock = Market.rehomeBlock(data, h.id, {})
+			hv.rehomeBlock = Market.rehomeBlock(data, h.id, {}, now)
 		end
 	end
 end, "market")
@@ -232,7 +232,7 @@ Retire.OnServerEvent:Connect(function(player: Player, id: any)
 	end
 	local plaque, no = Leagues.retire(data, id, os.time())
 	if plaque then
-		Profiles.notify(player, string.format("👑 %s is a Legend! See the Hall of Fame paddock.", plaque.name), "trophy")
+		Profiles.notify(player, string.format("👑 %s is a Legend now!", plaque.name), "trophy")
 		Profiles.changed(player)
 	elseif no then
 		Profiles.notify(player, no, "heart")
@@ -264,7 +264,7 @@ Rehome.OnServerEvent:Connect(function(player: Player, id: any)
 end)
 
 UndoRehome.OnServerEvent:Connect(function(player: Player, id: any)
-	if busy(player, 1, "rehome") or typeof(id) ~= "string" then return end
+	if busy(player, 1, "undo") or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
 	local ok, msg = Market.undoRehome(data, id, os.time())
@@ -276,7 +276,7 @@ UndoRehome.OnServerEvent:Connect(function(player: Player, id: any)
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
-	for _, k in { "market", "tame", "rename", "retire", "asked", "rehome" } do last[k .. ":" .. player.UserId] = nil end
+	for _, k in { "market", "tame", "rename", "retire", "asked", "rehome", "undo" } do last[k .. ":" .. player.UserId] = nil end
 end)
 
 -- Build the corral now, rebuild when models load and when the week turns.

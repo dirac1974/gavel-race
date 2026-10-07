@@ -386,7 +386,7 @@ end
 -- active horse.
 function Rides.call(player: Player, legendId: string?): (boolean, string?)
 	if player:GetAttribute("Racing") then return false, "You're in a race!" end
-	if active[player] then return false, nil end
+	if active[player] then return false, if legendId then "Hop off first, then ride your Legend!" else nil end
 	local data = Profiles.get(player)
 	local h = data and Profile.rideHorse(data, legendId)
 	if not h then return false, "Pick your first horse to ride" end

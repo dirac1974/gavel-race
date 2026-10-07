@@ -77,6 +77,11 @@ function Career.view(h: any): { [string]: any }
 	}
 end
 
+-- Horses that can wait at the riding school (rehome.maxWaiting), for Profile's load repair.
+function Career.cfgRehomeMax(): number
+	return GameConfig.rehome.maxWaiting
+end
+
 -- Toasts (each at most ui.toastMaxWords words).
 function Career.badgeToast(name: string, badgeRaces: number): string
 	return string.format("%s %s earned a %d-race badge!", Career.BADGE, name, badgeRaces)

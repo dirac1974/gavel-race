@@ -125,7 +125,7 @@ local function horseCard(h, order: number)
 	-- Career row (D-059): 🎖️ a badge every 25 races, 🏆 Cups, Veteran or 👑 Legend; races to the next badge.
 	local career = h.career or {}
 	local careerText = career.line or ""
-	if not h.legend and career.toNextBadge then careerText ..= string.format(" · next in %d", career.toNextBadge) end
+	if not h.legend and career.toNextBadge then careerText ..= string.format(" · 🎖️ in %d races", career.toNextBadge) end
 	local cl = Ui.text(card, careerText, TEXT, { Position = UDim2.new(0, 10, 0, 180), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	cl.TextColor3 = C.plum
 	cl.TextTruncate = Enum.TextTruncate.AtEnd
@@ -215,7 +215,7 @@ local function hallView()
 	if #plaques == 0 then
 		local empty = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
 		empty.LayoutOrder = 100
-		Ui.text(empty, "No Legends yet. A horse with 100 races can become one!", 18,
+		Ui.text(empty, string.format("No Legends yet. A horse with %d races can become one!", GameConfig.career.veteranAt), 18,
 			{ Position = UDim2.new(0, 12, 0, 20), Size = UDim2.new(1, -24, 0, 80), TextWrapped = true })
 	end
 	for k, pl in plaques do

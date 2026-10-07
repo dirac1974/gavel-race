@@ -221,6 +221,7 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		-- careers and rehoming (D-059): the client never decides with these, the server does
 		origin = h.origin,
 		paid = h.paid or 0,
+		goodbyeRosette = h.goodbyeRosette == true,
 		stall = h.stall,
 		legend = h.legend ~= nil,
 		-- training rides (D-053): best ribbon and best run per course

@@ -159,7 +159,7 @@ local function grownUpsTab()
 	local career, rehome = GameConfig.career, GameConfig.rehome
 	para(string.format("🎖️ Careers: horses never get old or slower. Every %d races a horse earns a career badge, and at %d races it's a Veteran. A Veteran may retire as a 👑 Legend, only if your child chooses (we suggest it once): it moves to the Hall of Fame paddock beside the barn, keeps its stats and can still be ridden; its stall goes to another horse.",
 		career.badgeEvery, career.veteranAt), 16, 64)
-	para(string.format("🏫 Rehoming: at the Market Corral a horse can go to %s, a riding school where other children ride it. The school pays half of what your child paid for it (never more, and nothing for a tamed or gifted horse, which earns a goodbye rosette instead). It takes two taps, and for %d days the horse can come back for the same Green Cash, with its name and stats. The first horse and the last racing horse always stay. Horses are never traded between players.",
+	para(string.format("🏫 Rehoming: at the Market Corral a horse can go to %s, a riding school where other children ride it. The school pays half of what your child paid for it (never more, and nothing for a tamed or gifted horse, or one bought before this feature, which earns a goodbye rosette instead). It takes two taps, and for %d days the horse can come back for the same Green Cash, with its name and stats. The first horse and the last racing horse always stay. Horses are never traded between players.",
 		rehome.school, rehome.undoHours // 24), 16, 65)
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 70)
 end

@@ -45,10 +45,20 @@ local function stable(n: number, price: number?)
 	return p
 end
 
-local function ids(list: { any }): string
+-- A real save and load: through JSON, like the DataStore.
+local serde = require("@lune/serde")
+local function reload(p: any, now: number)
+	return Profile.migrate(serde.decode("json", serde.encode("json", p)), now)
+end
+
+-- What the barn puts on each stall door (StableService: door StallK gets stallHorse(p, K).id).
+local function doors(p: any): { [number]: string }
 	local out = {}
-	for _, h in list do table.insert(out, h.id) end
-	return table.concat(out, ",")
+	for k = 1, p.stalls do
+		local h = Profile.stallHorse(p, k)
+		if h then out[k] = h.id end
+	end
+	return out
 end
 
 return function(check: (boolean, string) -> (), _close: any)
@@ -129,7 +139,7 @@ return function(check: (boolean, string) -> (), _close: any)
 		check(Leagues.markAsked(r, r.horses[2].id) and not Career.suggestLegend(r.horses[2]), "never suggested twice")
 		check(Career.canBeLegend(r.horses[2]), "still a Legend later, from its card")
 		-- a Legend survives a save and load
-		local saved = Profile.migrate(p, T0 + DAY)
+		local saved = reload(p, T0 + DAY)
 		local la = Profile.horse(saved, a.id)
 		check(la ~= nil and la.legend == T0 and la.stall == nil and la.stats.speed == 77, "a Legend loads as a Legend")
 		-- busy horses don't retire
@@ -173,6 +183,23 @@ return function(check: (boolean, string) -> (), _close: any)
 		check(Profile.swapStall(r, nil, r.horses[2].id) and r.horses[2].stall == 2, "a pasture horse moves into a free stall")
 		check(not Profile.swapStall(r, nil, r.horses[3].id), "no free stall: pick one to swap")
 		check(Profile.swapStall(r, r.horses[2].id, r.horses[3].id) and r.horses[3].stall == 2 and r.horses[2].stall == nil, "swap keeps the stall number")
+		-- the stall doors follow the horses, not the list order (CareClient reads the door's HorseId)
+		local dd = doors(r)
+		check(dd[1] == r.horses[1].id and dd[2] == r.horses[3].id, "doors after a swap: stall 2 is the swapped-in horse")
+		r.horses[3].record.races = 100
+		Leagues.retire(r, r.horses[3].id, T0)
+		dd = doors(r)
+		check(dd[1] == r.horses[1].id and dd[2] == r.horses[2].id, "doors after a Legend: its stall takes the pasture horse")
+		-- a load that clears a junk stall fills it again and keeps an active horse
+		local j = stable(2)
+		j.horses[1].stall, j.horses[2].stall = 7, 2
+		local jl = reload(j, T0)
+		check(Profile.stallHorse(jl, 1) ~= nil and Profile.isStalled(jl, jl.activeHorse :: string), "a cleared stall refills on load; an active horse remains")
+		-- buying a stall fills it and keeps an active horse
+		local b = stable(2)
+		b.cash = 1000
+		b.activeHorse = nil
+		check(Market.buyStall(b) and b.horses[3].stall == 3 and b.activeHorse ~= nil, "a new stall takes the pasture horse")
 	end
 
 	-- Rehoming: price paid, never market, never more ------------------------------------------
@@ -202,11 +229,13 @@ return function(check: (boolean, string) -> (), _close: any)
 		local tamed = t.horses[2]
 		tamed.origin, tamed.paid = "tamed", 0
 		local cash0 = t.cash
+		check(Horse.view(tamed, T0, E).goodbyeRosette == false, "the card can tell a rosette is still to come")
 		local okT, _, infoT = Market.rehome(t, tamed.id, T0, {})
 		check(okT and t.cash == cash0 and infoT.rosette and t.goodbyeRosettes == 1, "a tamed horse: 0 and a goodbye rosette")
 		Market.undoRehome(t, tamed.id, T0 + HOUR)
 		local _, _, infoT2 = Market.rehome(t, tamed.id, T0 + 2 * HOUR, {})
 		check(not infoT2.rosette and t.goodbyeRosettes == 1, "one goodbye rosette per horse, whatever the undos")
+		check(Horse.view(t.rehomed[#t.rehomed].horse, T0, E).goodbyeRosette == true, "and the card knows it was given")
 	end
 
 	-- Undo for 72 h at the same price ------------------------------------------------------------
@@ -230,11 +259,11 @@ return function(check: (boolean, string) -> (), _close: any)
 		check(not okLate and Profile.horse(p, id) == nil and #p.rehomed == 0, "after 72 h the horse has settled in for good")
 		-- a load drops expired entries too
 		Market.rehome(p, p.horses[2].id, T0, {})
-		local loaded = Profile.migrate(p, T0 + 73 * HOUR)
+		local loaded = reload(p, T0 + 73 * HOUR)
 		check(#loaded.rehomed == 0, "a load after 72 h keeps nothing")
 		local q = stable(2, 600)
 		Market.rehome(q, q.horses[2].id, T0, {})
-		local loadedQ = Profile.migrate(q, T0 + HOUR)
+		local loadedQ = reload(q, T0 + HOUR)
 		check(#loadedQ.rehomed == 1 and loadedQ.rehomed[1].horse.name == "Horse1", "a load inside 72 h keeps it")
 		-- undo needs the cash and room
 		local r = stable(2, 600)
@@ -245,10 +274,13 @@ return function(check: (boolean, string) -> (), _close: any)
 		r.cash = 300
 		while #r.horses < Market.MAX_HORSES do Profile.addHorse(r, Horse.new(Profile.newHorseId(r), "F", "bay", STATS, POT, T0)) end
 		check(not Market.undoRehome(r, rid, T0 + HOUR), "undo needs room in the stable")
-		-- at most maxWaiting wait at the school
+		-- at most maxWaiting wait at the school; then it's full and nobody leaves early
 		local m = stable(GameConfig.rehome.maxWaiting + 3, 100)
-		for k = 2, #m.horses - 1 do Market.rehome(m, m.horses[2].id, T0 + k, {}) end
-		check(#m.rehomed == GameConfig.rehome.maxWaiting, "at most maxWaiting can come back")
+		for k = 1, GameConfig.rehome.maxWaiting do Market.rehome(m, m.horses[2].id, T0 + k, {}) end
+		local full, fullWhy = Market.rehome(m, m.horses[2].id, T0 + 100, {})
+		check(#m.rehomed == GameConfig.rehome.maxWaiting and not full and string.find(fullWhy, "full") ~= nil, "a full school says so")
+		check(Market.undoRehome(m, m.rehomed[1].horse.id, T0 + 200), "the first one can still come back")
+		check(#reload(m, T0 + HOUR).rehomed == GameConfig.rehome.maxWaiting - 1, "a load keeps every waiting horse")
 	end
 
 	-- Who can't be rehomed ------------------------------------------------------------------------
@@ -316,12 +348,16 @@ return function(check: (boolean, string) -> (), _close: any)
 		-- taming every day and rehoming: nothing
 		local tp = stable(1)
 		tp.cash = 0
+		local tamed = 0
 		for d = 0, 9 do
 			Profile.addItem(tp, "carrot", 1)
 			local okT, _, th = Market.tame(tp, "pinto", rngOf(d + 1), T0 + d * DAY)
-			if okT then Market.rehome(tp, th.id, T0 + d * DAY, {}) end
+			if okT then
+				tamed += 1
+				Market.rehome(tp, th.id, T0 + d * DAY, {})
+			end
 		end
-		check(tp.cash == 0, "tamed horses rehome for 0")
+		check(tamed == 10 and tp.cash == 0, "ten tamed horses rehome for 0")
 	end
 
 	-- Copy: the riding school, never a farm or "sold" (D-059) -----------------------------------
