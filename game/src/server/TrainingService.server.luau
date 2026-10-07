@@ -1,6 +1,10 @@
 --!nonstrict
 -- TrainingService (D-039, D-040, D-053): training rides at the Training Ground and the paddock
--- gymkhana, the Quick train games, and check-ups at the Vet.
+-- gymkhana, the Quick train games, and check-ups and Spa Days at the Vet.
+--   Spa Day (D-058, stage 4): SpaStart(horseId) when the hose step begins, SpaDone(horseId) after
+--   the towel. The server takes it only for your stalled horse, at the Vet, not racing, after
+--   spa.minSeconds, while the Spa is open for that horse today (Spa.give: +1 Energy never above the
+--   cap, the Spa stamp, the shine for its next race; no bond, Rating or win chance).
 --   Training rides (D-053):
 --     TrainStart(horseId, course)   client -> server: ride this course on my active horse
 --     TrainBegin(course, seed, n)   server -> client: you're at the start; GO in n seconds
@@ -64,6 +68,7 @@ local QuickTrain = require(Shared:WaitForChild("QuickTrain"))
 local Ghost = require(Shared:WaitForChild("Ghost"))
 local RideTogether = require(Shared:WaitForChild("RideTogether"))
 local TapTime = require(Shared:WaitForChild("TapTime"))
+local Spa = require(Shared:WaitForChild("Spa"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Ghosts = require(script.Parent:WaitForChild("Ghosts"))
 local TrainingFriends = require(script.Parent:WaitForChild("TrainingFriends"))
@@ -86,6 +91,8 @@ local TrainInviteReply = Profiles.remote("TrainInviteReply") -- friend -> server
 local TrainInviteGone = Profiles.remote("TrainInviteGone")   -- server -> friend: invite id (lapsed or withdrawn)
 local TrainTogether = Profiles.remote("TrainTogether")       -- server -> riders: stars and ribbons of the group
 local VetVisit = Profiles.remote("VetVisit")       -- client -> server: horseId, score
+local SpaStart = Profiles.remote("SpaStart")       -- client -> server: horseId (the Spa Day begins)
+local SpaDone = Profiles.remote("SpaDone")         -- client -> server: horseId (hose, brush and towel done)
 local TrainStart = Profiles.remote("TrainStart")   -- client -> server: horseId, course
 local TrainBegin = Profiles.remote("TrainBegin")   -- server -> client: course, seed, countdown seconds
 local TrainEnd = Profiles.remote("TrainEnd")       -- server -> client: result
@@ -105,6 +112,7 @@ end
 
 local lastTrain: { [Player]: number } = {}
 local lastVet: { [Player]: number } = {}
+local spaStarted: { [Player]: { id: string, at: number } } = {}
 local sessions: { [Player]: any } = {}
 local history: { [Player]: { number } } = {}
 local pending: { [Player]: boolean } = {}
@@ -766,8 +774,46 @@ VetVisit.OnServerEvent:Connect(function(player: Player, horseId: any, score: any
 	end
 end)
 
+-- Spa Day (D-058) ------------------------------------------------------------------------
+local function spaCheck(player: Player, horseId: any)
+	local h = horseFor(player, horseId)
+	if not h or not GameConfig.spa.enabled then return nil end
+	if racing(player) then return nil end
+	if not near(player, "vet", 30) then
+		Profiles.notify(player, "Spa Days happen at the Vet on Fair Street", "map_vet")
+		return nil
+	end
+	if not Spa.open(h, os.time(), GameConfig.spa) then
+		Profiles.notify(player, Spa.CLOSED, "map_vet")
+		return nil
+	end
+	return h
+end
+
+SpaStart.OnServerEvent:Connect(function(player: Player, horseId: any)
+	if os.clock() - (lastVet[player] or 0) < 1 then return end
+	lastVet[player] = os.clock()
+	if spaCheck(player, horseId) then spaStarted[player] = { id = horseId, at = os.clock() } end
+end)
+
+SpaDone.OnServerEvent:Connect(function(player: Player, horseId: any)
+	local started = spaStarted[player]
+	if not started or started.id ~= horseId then return end
+	if os.clock() - started.at < GameConfig.spa.minSeconds then return end
+	spaStarted[player] = nil
+	local h = spaCheck(player, horseId)
+	if not h then return end
+	local ok, msg = Spa.give(h, os.time(), GameConfig.energy, GameConfig.spa)
+	Profiles.notify(player, msg, if ok then "brush" else "map_vet")
+	if ok then
+		Progress.record(player, "spa", 1) -- (saves and syncs)
+		Profiles.changed(player)
+	end
+end)
+
 Players.PlayerRemoving:Connect(function(player: Player)
 	lastTrain[player], lastVet[player] = nil, nil
+	spaStarted[player] = nil
 	if sessions[player] then restGroup(player, sessions[player]) end
 	sessions[player], history[player], pending[player], cards[player] = nil, nil, nil, nil
 	quick[player], lastAsk[player] = nil, nil

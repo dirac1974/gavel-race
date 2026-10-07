@@ -33,6 +33,7 @@ Jobs.DAILY = {
 	{ id = "d_cheer", event = "cheer", target = 1, text = "Cheer for a horse in a race", icon = "job_cheer", go = "track", reward = { cash = 3, items = { carrot = 2 } } },
 	{ id = "d_train", event = "train", target = 1, text = "Do a training session", icon = "stat_speed", go = "paddock", reward = { cash = 4, items = { grain = 1 } } },
 	{ id = "d_vet", event = "checkup", target = 1, text = "Take a horse for a check-up", icon = "stethoscope", go = "vet", reward = { cash = 3, items = { treat = 1 } } },
+	{ id = "d_spa", event = "spa", target = 1, text = "Give a horse a Spa Day", icon = "brush", go = "vet", reward = { cash = 3, items = { carrot = 1 } } }, -- D-058
 } :: { Def }
 
 Jobs.WEEKLY = {

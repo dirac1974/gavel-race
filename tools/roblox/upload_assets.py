@@ -65,12 +65,16 @@ STAND_COATS = ("bay", "chestnut", "grey", "black", "palomino", "pinto", "appaloo
                "chestnut_blaze")
 NEW_GALLOP_COATS = ("pinto", "appaloosa", "buckskin", "dun", "roan", "white", "chestnut_blaze")
 FOAL_COATS = ("bay", "chestnut", "grey")
+# Napping horses (D-058): the starter coats lying in the straw. Raw Meshy files: darken_hooves.py finds the
+# legs of a standing horse, not folded ones (its hooves are already dark). Other coats sink a standing horse.
+LIE_COATS = ("bay", "palomino", "grey")
 PROPS = (
     "stable_barn", "hay_bale", "water_trough", "feed_bucket", "grooming_brush", "wheelbarrow", "pitchfork", "noticeboard",
     "post_box", "saddle_rack", "carrot_crop", "apple_tree_small", "oat_crop", "garden_bed",
     "feed_store", "vet_clinic", "market_corral_booth", "training_shed", "race_board_frame", "trail_gate_arch",
     "lantern_post", "bench", "picnic_table", "trophy_cup", "rosette_ribbon", "horseshoe_decor", "log_jump",
     "wooden_bridge", "hay_cart", "post_box_carrots", "visitor_bell", "rosette_wall",
+    "spa_wash_stall", "towel_rack",
 )
 MODELS = {
     # The playtest gallop coats keep their original slot names (horse_<coat>); the race code uses them.
@@ -78,6 +82,7 @@ MODELS = {
     **{f"horse_gallop_{c}": f"horse_gallop_{c}/horse_gallop_{c}_hoofed.glb" for c in NEW_GALLOP_COATS},
     **{f"horse_stand_{c}": f"horse_stand_{c}/horse_stand_{c}_hoofed.glb" for c in STAND_COATS},
     **{f"foal_stand_{c}": f"foal_stand_{c}/foal_stand_{c}_hoofed.glb" for c in FOAL_COATS},
+    **{f"horse_lie_{c}": f"horse_lie_{c}/horse_lie_{c}.glb" for c in LIE_COATS},
     # Standing horses cut into Body + four legs by tools/meshy/split_legs.py, for animated legs.
     **{f"horse_anim_{c}": f"horse_anim_{c}/horse_anim_{c}.glb" for c in STAND_COATS},
     "finish_post": "finish_post/finish_post.glb",

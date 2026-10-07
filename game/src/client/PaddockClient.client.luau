@@ -19,6 +19,10 @@
 --     Hill Climb (Stamina): hold to keep the marker in the moving green band.
 --     Mud Splash (Grit): tap as each puddle reaches the hoof.
 --   Vet: tap with each heartbeat; collect Health Passport stamps (one a day).
+--   Spa Day (D-058, stage 4): at the Vet (or the wash bay's "Spa Day" prompt) pick a horse, then
+--     rinse with the hose, brush and dry with a towel, tapping only (about 30 s). +1 Energy, a
+--     Spa stamp and a shine on the next race, once per horse per day; after that the button says
+--     "Spa opens again tomorrow" (no clock anywhere).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -38,6 +42,7 @@ local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
 local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
+local Spa = require(Shared:WaitForChild("Spa"))
 
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local C = Ui.colors
@@ -398,7 +403,9 @@ local function horseRow(onPick: (any) -> ())
 	l.Padding = UDim.new(0, 10)
 	l.Parent = row
 	for _, h in stalledHorses() do
-		local b = Ui.button(row, h.name, UDim2.fromOffset(170, 80), UDim2.new(), Ui.coatColors[h.coat] or C.cream, 20)
+		-- D-058: how it's resting, icon and word
+		local rest = if h.resting then "\n💤 Napping" elseif h.yawning then "\n🥱 Sleepy" else ""
+		local b = Ui.button(row, h.name .. rest, UDim2.fromOffset(170, 80), UDim2.new(), Ui.coatColors[h.coat] or C.cream, 20)
 		b.TextColor3 = if h.coat == "black" or h.coat == "bay" or h.coat == "chestnut" then C.white else C.ink
 		b.Activated:Connect(function() onPick(h) end)
 	end
@@ -678,31 +685,122 @@ local function passport(h)
 	l.Parent = row
 	for _, s in Training.STAMPS do
 		local got = h.stamps and h.stamps[s]
-		local cell = Ui.card(row, UDim2.fromOffset(104, 86), UDim2.new(), if got then C.cream else C.white)
+		local cell = Ui.card(row, UDim2.fromOffset(88, 86), UDim2.new(), if got then C.cream else C.white)
 		Ui.icon(cell, "stamp_" .. s, if got then "✅" else "⬜", UDim2.fromOffset(40, 40), UDim2.new(0.5, -20, 0, 6))
-		local t = Ui.text(cell, Training.STAMP_LABELS[s], 13, { Position = UDim2.new(0, 2, 0, 48), Size = UDim2.new(1, -4, 0, 34) })
+		local t = Ui.text(cell, Training.STAMP_LABELS[s], 14, { Position = UDim2.new(0, 2, 0, 48), Size = UDim2.new(1, -4, 0, 34) })
 		t.TextColor3 = if got then C.ink else C.shade
 	end
+	-- The Spa Day stamp (D-058), with how many Spa Days this horse has had.
+	local spa = (h.spaDays or 0) > 0
+	local cell = Ui.card(row, UDim2.fromOffset(88, 86), UDim2.new(), if spa then C.cream else C.white)
+	Ui.text(cell, if spa then "🛁" else "⬜", 30, { Position = UDim2.new(0.5, -20, 0, 6), Size = UDim2.fromOffset(40, 40) })
+	local t = Ui.text(cell, Spa.STAMP_LABEL .. (if (h.spaDays or 0) > 1 then " ×" .. h.spaDays else ""), 14,
+		{ Position = UDim2.new(0, 2, 0, 48), Size = UDim2.new(1, -4, 0, 34) })
+	t.TextColor3 = if spa then C.ink else C.shade
 end
 
-local function vetMenu()
-	open("💚 Vet check-up", "Listen to the heartbeat. Collect Health Passport stamps!")
+-- Spa Day (D-058): hose, brush, towel. Each step is a row of taps on one big button, with the
+-- step's chip lit along the top. The server takes it only spa.minSeconds after it started, so a
+-- fast tapper sees "All clean!" a moment longer before it's sent.
+local function spaGame(h)
+	local spaCfg = GameConfig.spa
+	local gen = generation
+	local started = now()
+	gameRemotes:WaitForChild("SpaStart"):FireServer(h.id)
+	local a = area(200)
+	local horse = Ui.text(a, "🐴", 90, { Size = UDim2.fromOffset(130, 130), AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.58), TextScaled = true })
+	local scale = Instance.new("UIScale")
+	scale.Parent = horse
+	local fx = Ui.text(a, "", 40, { Size = UDim2.fromOffset(60, 60), AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.74, 0.45), TextScaled = true })
+	local chips = {}
+	for k, step in Spa.STEPS do
+		local info = Spa.STEP_TEXT[step]
+		local chip = Ui.text(a, info.emoji .. " " .. info.verb, 22, { Size = UDim2.new(1 / 3, -8, 0, 32),
+			Position = UDim2.new((k - 1) / 3, 4, 0, 6) })
+		chip.TextColor3 = C.shade
+		chips[k] = chip
+	end
+	local stepIdx, taps = 1, 0
+	local button: TextButton? = nil
+	local function finish()
+		for _, chip in chips do chip.TextColor3 = C.green end
+		fx.Text = "✨"
+		if button then button.Text, button.AutoButtonColor = "All clean! Time to go", false end
+		local wait = math.max(0, spaCfg.minSeconds + 0.5 - (now() - started))
+		task.delay(wait, function()
+			if not alive(gen) then return end
+			gameRemotes:WaitForChild("SpaDone"):FireServer(h.id)
+			task.delay(0.8, function() if gui.Enabled and generation == gen then close() end end)
+		end)
+	end
+	local function showStep()
+		local step = Spa.STEPS[stepIdx]
+		for k, chip in chips do chip.TextColor3 = if k < stepIdx then C.green elseif k == stepIdx then C.ink else C.shade end
+		fx.Text = Spa.STEP_TEXT[step].emoji
+		if button then button.Text = Spa.STEP_TEXT[step].tap end
+	end
+	button = tapper(function()
+		if stepIdx > #Spa.STEPS or not alive(gen) then return end
+		local step = Spa.STEPS[stepIdx]
+		taps += 1
+		if Sound then Sound.play("brush") end
+		scale.Scale = 1.12
+		TweenService:Create(scale, TweenInfo.new(0.2), { Scale = 1 }):Play()
+		if taps >= (spaCfg.taps[step] or 5) then
+			stepIdx += 1
+			taps = 0
+			if stepIdx > #Spa.STEPS then finish() else showStep() end
+		end
+	end, Spa.STEP_TEXT.hose.tap)
+	showStep()
+end
+
+local function spaPick(h)
+	open("🛁 Spa Day for " .. h.name, "Hose, brush and dry. +1 Energy!")
+	if not GameConfig.spa.enabled or (h.spaToday or 0) >= GameConfig.spa.perDay then
+		Ui.text(body, "🌙 " .. Spa.CLOSED, 26, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 40) })
+		local ok = Ui.button(body, "OK", UDim2.new(0.3, 0, 0, 56), UDim2.new(0.35, 0, 0, 120), C.green, 24)
+		ok.Activated:Connect(close)
+		return
+	end
+	spaGame(h)
+end
+
+local function vetMenu(spaOnly: boolean)
+	if spaOnly then
+		open("🛁 Spa Day", "Pick a horse for a wash and a shine!")
+	else
+		open("💚 Vet", "Pick a horse: check-up or Spa Day")
+	end
 	if #stalledHorses() == 0 then
 		Ui.text(body, "Pick your first horse first!", 22, { Size = UDim2.new(1, 0, 0, 40) })
 		return
 	end
 	horseRow(function(h)
-		open("💚 Check-up for " .. h.name, "Tap with each heartbeat")
+		if spaOnly then
+			spaPick(h)
+			return
+		end
+		open("💚 " .. h.name .. " at the Vet", "Health Passport")
 		passport(h)
-		local go = Ui.button(body, "🩺 Start", UDim2.new(0.4, 0, 0, 60), UDim2.new(0.3, 0, 0, 220), C.green, 26)
-		go.Activated:Connect(function()
-			clear()
+		local check = Ui.button(body, "🩺 Check-up", UDim2.new(0.44, 0, 0, 60), UDim2.new(0.04, 0, 0, 220), C.green, 26)
+		check.Activated:Connect(function()
+			open("💚 Check-up for " .. h.name, "Tap with each heartbeat")
 			local gen = generation
 			heartGame(function(score)
 				if not alive(gen) then return end
 				gameRemotes:WaitForChild("VetVisit"):FireServer(h.id, score)
 				task.delay(0.6, function() if gui.Enabled then close() end end)
 			end)
+		end)
+		local spaOpen = GameConfig.spa.enabled and (h.spaToday or 0) < GameConfig.spa.perDay
+		local spa = Ui.button(body, if spaOpen then "🛁 Spa Day" else "🌙 " .. Spa.CLOSED, UDim2.new(0.44, 0, 0, 60),
+			UDim2.new(0.52, 0, 0, 220), if spaOpen then C.sky else C.shade, if spaOpen then 26 else 18)
+		spa.TextWrapped = true
+		spa.Activated:Connect(function()
+			if spaOpen then spaPick(h) end
 		end)
 	end)
 end
@@ -741,7 +839,11 @@ if GameConfig.training.mode == "rides" then
 	end
 end
 local vet = WorldLayout.places.vet
-promptAt("VetPrompt", vet.x, vet.z + 6, "Check-up", "Vet", vetMenu)
+promptAt("VetPrompt", vet.x, vet.z + 6, "Check-up", "Vet", function() vetMenu(false) end)
+if GameConfig.spa.enabled then -- the wash bay beside the Vet (D-058)
+	local sx, sz = WorldLayout.placePoint("vet", WorldLayout.SPA.across, WorldLayout.SPA.out)
+	promptAt("SpaPrompt", sx, sz, "Spa Day", "Wash bay", function() vetMenu(true) end)
+end
 
 -- Your queued race starting closes the paddock card (the race HUD needs the screen and keys).
 game:GetService("Players").LocalPlayer:GetAttributeChangedSignal("Racing"):Connect(function()

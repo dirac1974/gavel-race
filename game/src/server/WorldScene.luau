@@ -359,6 +359,22 @@ local function buildPlaces(root: Instance)
 		else
 			WorldScene.shop(f, cf, p.w, p.d, 16, C.white, Color3.fromHex("3E8E7E"), { C.white, C.mint }, "Vet", "💚")
 		end
+		-- Spa Day wash bay and towel rack beside the Vet (D-058), facing the street like the Vet.
+		local S = WorldLayout.SPA
+		local spaCF = cf * CFrame.new(S.across, GROUND_Y, -S.out)
+		local bay = placeModel(f, "spa_wash_stall", spaCF)
+		if not bay then
+			local blue = Color3.fromHex("A9D6F5")
+			for _, xz in { { -5, -4 }, { 5, -4 }, { -5, 4 }, { 5, 4 } } do
+				part({ Name = "SpaPost", Size = Vector3.new(0.8, 9, 0.8), Color = blue, CFrame = spaCF * CFrame.new(xz[1], 4.5, xz[2]) }, f)
+			end
+			part({ Name = "SpaRoof", Size = Vector3.new(12, 0.8, 10), Color = C.white, CFrame = spaCF * CFrame.new(0, 9.4, 0) }, f)
+			part({ Name = "SpaMat", Size = Vector3.new(10, 0.2, 8), Color = Color3.fromHex("2F6B4F"), CFrame = spaCF * CFrame.new(0, 0.1, 0) }, f)
+			part({ Name = "SpaHose", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 2.4, 2.4), Color = Color3.fromHex("3FA34D"),
+				CFrame = spaCF * CFrame.new(-5.6, 4, 0) }, f)
+		end
+		WorldScene.sign(f, (spaCF * CFrame.new(0, 11.5, -5)).Position, cf.LookVector, "Spa Day", "🛁", 12, 3)
+		placeModel(f, "towel_rack", cf * CFrame.new(S.rackAcross, GROUND_Y, -S.rackOut))
 	end
 	-- Tack & Paint (D-050): the Diamond shop for looks; opens only when you walk in and tap.
 	do

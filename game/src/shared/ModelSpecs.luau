@@ -39,6 +39,10 @@ local ModelSpecs: { [string]: Spec } = {
 	rosette_wall = { axis = "Y", studs = 7.5, yaw = 0, collide = true },
 	saddle_rack = { axis = "Y", studs = 3.5, yaw = 0, collide = true },
 
+	-- Spa Day at the Vet (D-058). The napping horse horse_lie_<coat> takes the horse_ prefix (8 studs nose to tail).
+	spa_wash_stall = { axis = "Y", studs = 11.0, yaw = 0, collide = false },
+	towel_rack = { axis = "Y", studs = 4.5, yaw = 0, collide = true },
+
 	-- Garden. Crops are sized to sit two to a garden_bed (6 x 2.6 studs).
 	carrot_crop = { axis = "Z", studs = 2.4, yaw = 0, collide = false },
 	apple_tree_small = { axis = "Y", studs = 12.0, yaw = 0, collide = true },

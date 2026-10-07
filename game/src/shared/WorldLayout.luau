@@ -92,6 +92,16 @@ WorldLayout.trainingLink = { 715, -150, 805, -70 } -- x0, z0, x1, z1
 WorldLayout.TRAINING_PATH_WIDTH = 18
 
 -- Rectangle covered by a building (for overlap checks).
+-- The Spa Day wash bay (D-058) beside the Vet, in the Vet's frame: `across` studs to its right
+-- (looking out of its front), `out` studs toward the street (negative: back from its front).
+WorldLayout.SPA = { across = 44, out = -12, rackAcross = 35, rackOut = -6 }
+
+-- A point in a place's frame -> world x, z.
+function WorldLayout.placePoint(key: string, across: number, out: number): (number, number)
+	local p = WorldLayout.places[key]
+	return p.x - p.fz * across + p.fx * out, p.z + p.fx * across + p.fz * out
+end
+
 function WorldLayout.placeRect(key: string): { number }?
 	local p = WorldLayout.places[key]
 	if not p or not p.w or not p.d then return nil end

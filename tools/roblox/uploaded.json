@@ -258,6 +258,27 @@
   "sha256": "63096080384b97bb748215b50f7e7e8206bc4d90c667d4d06dc353aadfd08534",
   "uploadedAt": "2026-10-05T03:44:18Z"
  },
+ "horse_lie_bay": {
+  "assetId": 122995162819428,
+  "file": "Models/generated/horse_lie_bay/horse_lie_bay.glb",
+  "kind": "Model",
+  "sha256": "fcbf8ce9c546ec755daffee94bcc5491f7680bb8ff766ee4e3214ca276e7f825",
+  "uploadedAt": "2026-10-07T17:44:33Z"
+ },
+ "horse_lie_grey": {
+  "assetId": 104887651843860,
+  "file": "Models/generated/horse_lie_grey/horse_lie_grey.glb",
+  "kind": "Model",
+  "sha256": "bec3c0509310c1d0262f3319d1965d3d0631b944fad9d105ec5c796724133a1c",
+  "uploadedAt": "2026-10-07T17:44:57Z"
+ },
+ "horse_lie_palomino": {
+  "assetId": 139973145019505,
+  "file": "Models/generated/horse_lie_palomino/horse_lie_palomino.glb",
+  "kind": "Model",
+  "sha256": "4f99a841a327683fdd993c7ddebffc8b6eb66c27f64e9b65a1a4a866a39ec827",
+  "uploadedAt": "2026-10-07T17:44:45Z"
+ },
  "horse_palomino": {
   "assetId": 87460359921029,
   "file": "Models/generated/horse_gallop_palomino/horse_gallop_palomino_hoofed.glb",
@@ -447,12 +468,26 @@
   "sha256": "a4c42d4f2fe2e294c5199a0deb88ea10842a2bac666fb0cf716c9fb633995b63",
   "uploadedAt": "2026-10-05T06:50:08Z"
  },
+ "spa_wash_stall": {
+  "assetId": 78029461963265,
+  "file": "Models/generated/spa_wash_stall/spa_wash_stall.glb",
+  "kind": "Model",
+  "sha256": "2cdaae62c2ef5f2625e13aec237197f2d2e2e2295952c7f70fe93f2b6f3a935f",
+  "uploadedAt": "2026-10-07T17:45:04Z"
+ },
  "stable_barn": {
   "assetId": 77273775992946,
   "file": "Models/generated/stable_barn/stable_barn.glb",
   "kind": "Model",
   "sha256": "ad6eabd48d18271547f12e0a73dfac17f8be60cdfa6a98220588b53d5741b71c",
   "uploadedAt": "2026-10-05T06:48:10Z"
+ },
+ "towel_rack": {
+  "assetId": 127770490330430,
+  "file": "Models/generated/towel_rack/towel_rack.glb",
+  "kind": "Model",
+  "sha256": "329f3dfa2c5242fad1b4951df6e61476e8120c0917058ee7e0e9ac65537b73e2",
+  "uploadedAt": "2026-10-07T17:45:11Z"
  },
  "trail_gate_arch": {
   "assetId": 74918735399703,
