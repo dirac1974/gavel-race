@@ -255,7 +255,7 @@ RunService.Heartbeat:Connect(function()
 	local elapsed = os.clock() - sessionStart
 	if elapsed >= nextReminder then
 		nextReminder = (math.floor(elapsed / 3600) + 1) * 3600 -- one note, even if it was just turned on
-		Ui.toast("You've been riding for a while. Time for a stretch and a drink of water? 🌤️", "welcome_sun", "🌤️")
+		Ui.toast("Time for a stretch and a drink of water! 🌤️", "welcome_sun", "🌤️")
 	end
 end)
 

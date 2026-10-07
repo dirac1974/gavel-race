@@ -350,7 +350,7 @@ local function rideable(player: Player, horseId: string?, card)
 		if not ok then return nil, why end
 		local cost = costOf(card, h)
 		if cost > 0 and Horse.syncEnergy(h, os.time(), GameConfig.energy) < cost then
-			return nil, h.name .. " is resting. Try a Practice race, or care for your horse while it naps!"
+			return nil, h.name .. " is napping. Try a Practice race!"
 		end
 	end
 	return h, nil
@@ -448,7 +448,7 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	pumpQueues()
 	if RaceQueues.isWaiting(waits, player) then
 		waitStatus(player)
-		Profiles.notify(player, "You're in line! You race as soon as a course is free.", "flag_ready")
+		Profiles.notify(player, "You're in line! You race when a course is free.", "flag_ready")
 	end
 	publishCards()
 end
@@ -566,8 +566,7 @@ local function recordIntegrity(players: { Player }, errors: { [number]: { number
 				print(string.format("[Integrity] %s (%d): strike %d, timing spread %.1f ms, action %s",
 					p.Name, p.UserId, strikes, spread * 1000, action))
 				if action == "warn" then
-					IntegrityNote:FireClient(p, "Your taps looked automatic, so they count as practice for now. "
-						.. "Auto-clickers and scripts aren't allowed in cash races. If that wasn't you, tap Ask for a check.")
+					IntegrityNote:FireClient(p, "Your taps looked automatic, so this race is practice.")
 				end
 			end
 		end

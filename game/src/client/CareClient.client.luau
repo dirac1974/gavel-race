@@ -220,7 +220,7 @@ local function horseCard(id: string)
 		local horse = PlayerState.horse(id)
 		if not horse or not gui.Enabled or openHorseId ~= id then return end
 		local care = math.floor(horse.care * 2 + 0.5)
-		status.Text = string.format("Care today: %s   ⚡ %d   🌾 %d hay", string.rep("⭐", care) .. string.rep("☆", 2 - care), horse.energy, count("hay"))
+		status.Text = string.format("Care today: %s   🌾 %d hay", string.rep("❤️", care) .. string.rep("🤍", 2 - care), count("hay")) -- ❤️ = care (D-064)
 		bondFill.Size = UDim2.fromScale(math.clamp(horse.bond / 100, 0.02, 1), 1)
 		feedBtn.Text = if horse.fed then "🌾 Fed ✓" else "🌾 Feed"
 		groomBtn.Text = if horse.groomed then "🪮 Shiny ✓" else "🪮 Groom"

@@ -428,20 +428,14 @@ local function watchViewport()
 end
 watchViewport()
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchViewport)
--- Above the card: "You rode ★★☆", and under it "Good trip ★★☆" (steering, D-054). In the card's
--- foot: places your riding gained, and places your trip gained, each only when it's a gain.
-local rideLine = label(results, UDim2.new(1, -24, 0, 30), UDim2.new(0, 12, 0, -70), "", 26)
+-- One row above the card (D-064): "You rode ★★☆", the trip folded into the same stars. In the
+-- card's foot: "Your taps gained Comet 2 places!", only when it's a gain.
+local rideLine = label(results, UDim2.new(1, -24, 0, 34), UDim2.new(0, 12, 0, -42), "", 28)
 rideLine.ZIndex = 7
 rideLine.Font = Enum.Font.GothamBlack
 rideLine.TextColor3 = Color3.fromHex("FFD34D")
-local tripLine = label(results, UDim2.new(1, -24, 0, 26), UDim2.new(0, 12, 0, -38), "", 22)
-tripLine.ZIndex = 7
-tripLine.Font = Enum.Font.GothamBlack
-tripLine.TextColor3 = Color3.fromHex("9FE07A")
 local gainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, CARD_HEIGHT - 4), "", 20)
 gainLine.ZIndex = 7
-local tripGainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, CARD_HEIGHT - 4 + GAIN_ROW), "", 20)
-tripGainLine.ZIndex = 7
 
 local function button(parent, text: string, size: UDim2, pos: UDim2, colour: Color3): TextButton
 	local b = Instance.new("TextButton")
@@ -492,7 +486,7 @@ local paceState = nil
 local burstState = nil
 
 -- The running-order board (D-030, D-055). During a race the rows follow the running order;
--- before it they're in lane order. Rows show place, lane badge and name, with a ★ (and an up or
+-- before it they're in lane order. Rows show place, lane badge and name, with a 📣 (and an up or
 -- down arrow after cheers lock) on the rider you cheered. No win % or purse unless
 -- GameConfig.hud.boardShowsChance. Spectators on a phone get the top 3 plus their rider.
 local cheerArrow = nil -- { up, untilT } for the rider you cheered
@@ -523,7 +517,7 @@ local function renderBoard()
 			local you = lane.id == myId and "  ◀ YOU" or ""
 			local star = ""
 			if i == RaceState.myCheer() then
-				star = " ★"
+				star = " 📣" -- the horse you cheer for (📣 = fans, D-064; ★ is how you rode)
 				if cheerArrow and cheerArrow.untilT > t then star ..= if cheerArrow.up then " ▲" else " ▼" end
 			end
 			local sparkle = (sparkleUntil[lane.id] or 0) > t and " ✦" or ""
@@ -1638,21 +1632,19 @@ local function showResults(summary, raceId: number)
 			r.icon.Visible = false
 		end
 	end
-	-- Your ride first (stars need no reading), your trip under it (riders with the steering
-	-- buttons), then places your riding and your trip gained, each only if it's a gain.
+	-- One row (D-064): your ride in stars (the trip folded in for riders with the steering
+	-- buttons), then "Your taps gained Comet N places!" only if it's a gain.
 	if rideReport then
-		rideLine.Text = ResultsText.rideLine(rideReport.stars)
-		tripLine.Text = ResultsText.tripLine(rideReport.tripStars, STEER.scale) or "" -- none while steering is cosmetic
-		gainLine.Text = ResultsText.gainLine("riding", rideReport.gain)
-		tripGainLine.Text = ResultsText.gainLine("trip", rideReport.tripGain)
+		local horse = ""
+		for _, row in summary do
+			if row.id == myId then horse = row.name end
+		end
+		rideLine.Text = ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale)
+		gainLine.Text = ResultsText.gainedLine(horse, rideReport.gain, rideReport.tripGain, STEER.scale)
 	else
-		rideLine.Text, tripLine.Text, gainLine.Text, tripGainLine.Text = "", "", "", ""
+		rideLine.Text, gainLine.Text = "", ""
 	end
-	if gainLine.Text == "" then -- the trip's gain moves up into the first row
-		gainLine.Text, tripGainLine.Text = tripGainLine.Text, ""
-	end
-	local gainRows = (if gainLine.Text ~= "" then 1 else 0) + (if tripGainLine.Text ~= "" then 1 else 0)
-	results.Size = UDim2.fromOffset(360, CARD_HEIGHT + gainRows * GAIN_ROW)
+	results.Size = UDim2.fromOffset(360, CARD_HEIGHT + (if gainLine.Text ~= "" then GAIN_ROW else 0))
 	local hasRecording = RaceState.recording ~= nil and #RaceState.recording.frames > 10
 	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
 	doneBtn.Visible = true

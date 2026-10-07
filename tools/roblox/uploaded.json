@@ -524,6 +524,13 @@
   "sha256": "009513b2d9daf1bdf193dd29bffd05f2b9ccfb40d6e4e08ecd6080c204e42240",
   "uploadedAt": "2026-10-05T03:45:37Z"
  },
+ "ui_atlas_clarity_1": {
+  "assetId": 134193368841769,
+  "file": "assets/ui/atlas/ui_atlas_clarity_1.png",
+  "kind": "Decal",
+  "sha256": "cef2630fe3dfca95f9e1c253813d475d451dcb7a3a397d952e222df2b18a39f2",
+  "uploadedAt": "2026-10-07T17:44:01Z"
+ },
  "ui_atlas_world_1": {
   "assetId": 70883920012717,
   "file": "assets/ui/atlas/ui_atlas_world_1.png",

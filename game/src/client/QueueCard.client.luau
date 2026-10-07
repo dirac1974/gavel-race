@@ -227,7 +227,7 @@ RunService.Heartbeat:Connect(function()
 			ui.frame.BackgroundColor3 = if s.you then C.gold else C.white
 			ui.dot.Visible = true
 			ui.dot.BackgroundColor3 = Ui.coatColors[s.coat or "bay"] or Ui.coatColors.bay
-			ui.name.Text = if s.you then "★ " .. (s.name or "") else (s.name or "")
+			ui.name.Text = if s.you then "▶ " .. (s.name or "") else (s.name or "")
 			ui.name.TextTransparency = 0
 			ui.stroke.Transparency = 0
 		else

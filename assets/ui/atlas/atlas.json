@@ -6,6 +6,41 @@
   "x": 258,
   "y": 0
  },
+ "badge_bronze": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 0,
+  "y": 0
+ },
+ "badge_champion": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 130,
+  "y": 0
+ },
+ "badge_gold": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 260,
+  "y": 0
+ },
+ "badge_rookie": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 390,
+  "y": 0
+ },
+ "badge_silver": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 520,
+  "y": 0
+ },
  "brush": {
   "h": 128,
   "sheet": "ui_atlas_world_1",
@@ -124,6 +159,20 @@
   "w": 128,
   "x": 780,
   "y": 178
+ },
+ "energy_shoe": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 650,
+  "y": 0
+ },
+ "energy_shoe_empty": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 780,
+  "y": 0
  },
  "finish_checker": {
   "h": 128,
@@ -559,6 +608,13 @@
   "x": 0,
   "y": 614
  },
+ "rosette": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 0,
+  "y": 130
+ },
  "seed_apple": {
   "h": 128,
   "sheet": "ui_atlas_world_1",
@@ -593,6 +649,13 @@
   "w": 256,
   "x": 0,
   "y": 0
+ },
+ "sprout": {
+  "h": 128,
+  "sheet": "ui_atlas_clarity_1",
+  "w": 128,
+  "x": 130,
+  "y": 130
  },
  "stamp_checkup": {
   "h": 128,

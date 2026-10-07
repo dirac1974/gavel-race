@@ -403,7 +403,7 @@ local function buildPlaces(root: Instance)
 		part({ Name = "Arena", Size = Vector3.new(p.w - 2, 0.2, p.d - 2), Color = Color3.fromHex("D9B98A"), Material = Enum.Material.Sand,
 			CFrame = CFrame.new(p.x, GROUND_Y + 0.06, (z0 + z1) / 2) }, f)
 		-- The arena holds the Mud Splash gymkhana (built with the Training Ground).
-		WorldScene.sign(f, Vector3.new(p.x + gate / 2 + 8, GROUND_Y + 7, z0 - 0.8), Vector3.new(0, 0, -1), "Training Paddock", "⭐", 18, 4)
+		WorldScene.sign(f, Vector3.new(p.x + gate / 2 + 8, GROUND_Y + 7, z0 - 0.8), Vector3.new(0, 0, -1), "Training Paddock", "🎯", 18, 4)
 	end
 	-- Market Corral (Stage 8).
 	do
@@ -833,7 +833,7 @@ local function buildTrainingGround(root: Instance)
 			part({ Name = "ArchPost", Size = Vector3.new(1.2, 14, 1.2), Color = C.woodLight, Material = Enum.Material.Wood,
 				CFrame = CFrame.new(gateX + s * half, GROUND_Y + 7, z) }, f)
 		end
-		WorldScene.sign(f, Vector3.new(gateX, GROUND_Y + 12.5, z), Vector3.new(0, 0, -1), "Training Ground", "⭐", half * 2 + 2, 3.5, C.woodLight)
+		WorldScene.sign(f, Vector3.new(gateX, GROUND_Y + 12.5, z), Vector3.new(0, 0, -1), "Training Ground", "🎯", half * 2 + 2, 3.5, C.woodLight)
 	end
 	buildOval(f)
 	buildGymkhanas()

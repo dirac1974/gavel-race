@@ -40,7 +40,7 @@ local function near(player: Player, x: number, z: number, radius: number): boole
 	return hrp ~= nil and (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(x, 0, z)).Magnitude <= radius
 end
 
--- The corral: this week's horses standing in a row with signs (name, ★ bloodline, price).
+-- The corral: this week's horses standing in a row with signs (name, 🌱 family line, price).
 local corral: Folder? = nil
 local shownWeek = -1
 local function buildCorral()
@@ -71,7 +71,7 @@ local function buildCorral()
 			marker:SetAttribute("ListingId", l.id)
 		end
 		WorldScene.sign(corral, (cf * CFrame.new(0, WorldScene.GROUND_Y + 9, -3)).Position, cf.LookVector,
-			string.format("%s %s · %d", l.name, string.rep("★", l.stars), l.price), "💵", 16, 2.6)
+			string.format("%s %s · %d", l.name, string.rep(Market.FAMILY_EMOJI, l.stars), l.price), "💵", 16, 2.6)
 	end
 	corral.Parent = world
 end
@@ -126,7 +126,7 @@ Tame.OnServerEvent:Connect(function(player: Player, index: any, score: any, star
 	local at = if typeof(startedAt) == "number" and startedAt == startedAt then math.clamp(startedAt, now - 30, now) else now
 	local x, z = Market.wildPosition(WorldLayout.meadow, index, at)
 	if not near(player, x, z, 30) then
-		Profiles.notify(player, "Get a little closer to the wild horse, then try again", "heart")
+		Profiles.notify(player, "Get closer to the wild horse, then try again", "heart")
 		TameResult:FireClient(player, false)
 		return
 	end
@@ -194,7 +194,7 @@ Retire.OnServerEvent:Connect(function(player: Player, id: any)
 	end
 	local plaque = Leagues.retire(data, id, os.time())
 	if plaque then
-		Profiles.notify(player, string.format("%s retires a legend: %d races, %d wins. See the Hall of Fame!", plaque.name, plaque.races, plaque.wins), "trophy")
+		Profiles.notify(player, string.format("Legend %s: %d races, %d wins. See Hall of Fame!", plaque.name, plaque.races, plaque.wins), "trophy")
 		Profiles.changed(player)
 	end
 end)

@@ -163,21 +163,19 @@ local restLabel = Ui.text(hoofRow, "", DockLayout.LABEL_PX, { Size = UDim2.new(0
 	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false })
 restLabel.TextColor3 = C.plum
 
-local horsesSlot = slot(70, 2)
-local horsesBtn = Ui.button(horsesSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.gold, 20)
-Ui.icon(horsesBtn, "horse", "🐴", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
+-- Icon + one word on every dock button (D-064, stage 3).
+local horsesSlot = slot(DockLayout.BUTTON_PX, 2)
+local horsesBtn = Ui.iconButton(horsesSlot, "job_ride", "🐴", "Horses", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.gold)
 horsesBtn.Activated:Connect(openHorses)
 
 -- Map (D-035)
-local mapSlot = slot(70, 4)
-local mapBtn = Ui.button(mapSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.sky, 20)
-Ui.icon(mapBtn, "map", "🗺️", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
+local mapSlot = slot(DockLayout.BUTTON_PX, 4)
+local mapBtn = Ui.iconButton(mapSlot, "map", "🗺️", "Map", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.sky)
 mapBtn.Activated:Connect(function() OpenMap:Fire() end)
 
 -- Stable Board (D-043): no badge, no bell.
-local boardSlot = slot(70, 3)
-local boardBtn = Ui.button(boardSlot, "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream, 20)
-Ui.icon(boardBtn, "clipboard", "📋", UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0.5, -22))
+local boardSlot = slot(DockLayout.BUTTON_PX, 3)
+local boardBtn = Ui.iconButton(boardSlot, "clipboard", "📋", "Jobs", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream)
 boardBtn.Activated:Connect(function() OpenBoard:Fire() end)
 
 -- Race button: "🏁 RACE!" big, "with Comet ▶" under it (D-061 stage 2): one tap joins the line
@@ -274,7 +272,7 @@ RaceState.ResultsShown.Event:Connect(function(shown: boolean)
 	coinOwed = false
 end)
 
-raceBtn.Activated:Connect(function()
+local function pressRace()
 	if not PlayerState.data then
 		Ui.toast("Your stable is loading…", "hay", "🐴")
 		return
@@ -291,7 +289,10 @@ raceBtn.Activated:Connect(function()
 		return
 	end
 	OpenRacePicker:Fire() -- pick a course and a horse (D-036)
-end)
+end
+raceBtn.Activated:Connect(pressRace)
+-- The Next-thing pill's GO for "Race with Comet!" presses RACE! (D-064, stage 3).
+localEvent("PressRace").Event:Connect(pressRace)
 leaveBtn.Activated:Connect(function()
 	raceRemotes:WaitForChild("JoinRace"):FireServer(false)
 end)
@@ -318,7 +319,7 @@ end)
 -- Horses, the Stable Board, the Map and Ride move into the More panel (the slots themselves move,
 -- so every button works as before). Any button there closes the panel.
 local moreSlot = slot(DockLayout.BUTTON_PX, 7)
-local moreBtn = Ui.button(moreSlot, "☰", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.white, 34)
+local moreBtn = Ui.iconButton(moreSlot, "", "☰", "More", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.white)
 moreSlot.Visible = false
 local moreGui = Ui.screen("DockMore", 6)
 moreGui.Enabled = false

@@ -85,7 +85,7 @@ CareAction.OnServerEvent:Connect(function(player: Player, horseId: any, action: 
 	else
 		return
 	end
-	reply(player, ok, msg, if action == "groom" then "care_star" else "heart")
+	reply(player, ok, msg, if action == "groom" then "brush" else "heart")
 	if ok then
 		CareFx:FireAllClients(player:GetAttribute("PlotIndex"), horseId, action)
 		if counted then Progress.record(player, action, 1) end
@@ -162,7 +162,7 @@ VisitCare.OnServerEvent:Connect(function(player: Player, ownerId: any, horseId: 
 		if res.stamp then
 			Profiles.notify(player, "Tour stamp! You toured " .. owner.DisplayName .. "'s barn", "heart")
 		elseif res.left > 0 and not res.already then
-			Profiles.notify(player, h.name .. " nuzzles you! Pat " .. res.left .. " more for a Tour stamp", "heart")
+			Profiles.notify(player, h.name .. " nuzzles you! " .. res.left .. " more pats for a stamp", "heart")
 		else
 			Profiles.notify(player, h.name .. " nuzzles you!", "heart")
 		end

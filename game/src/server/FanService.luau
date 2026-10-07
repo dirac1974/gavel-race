@@ -157,7 +157,7 @@ function FanService.finish(courseId: string, winnerLane: number)
 				table.insert(f.strikes, t)
 				local n = activeStrikes(f, t)
 				if n == 2 then
-					Profiles.notify(e.player, "Your claps looked automatic, so they didn't count. Auto-clickers or scripts can turn off fan play.", "heart")
+					Profiles.notify(e.player, "Those claps looked automatic, so they didn't count.", "heart")
 				elseif n >= 3 then
 					f.banUntil = t + BAN_SECONDS
 				end

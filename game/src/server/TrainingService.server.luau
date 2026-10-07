@@ -195,7 +195,7 @@ QuickStart.OnServerEvent:Connect(function(player: Player, horseId: any, stat: an
 		return
 	end
 	if os.clock() - (lastTrain[player] or 0) < SESSION_GAP then
-		Profiles.notify(player, "Your horse is catching its breath. Try again in a moment!", "heart")
+		Profiles.notify(player, "Your horse is catching its breath. Try again soon!", "heart")
 		return
 	end
 	local h = horseFor(player, horseId)
@@ -210,7 +210,7 @@ QuickStart.OnServerEvent:Connect(function(player: Player, horseId: any, stat: an
 	history[player] = history[player] or {}
 	local ok = TrainingRide.rateCheck(history[player], os.clock(), CFG)
 	if not ok then
-		Profiles.notify(player, "What a lot of training! Give your horse a rest, or try a race.", "heart")
+		Profiles.notify(player, "That's lots of training for today. Try a race!", "heart")
 		return
 	end
 	local prevTrain = lastTrain[player]
@@ -452,15 +452,15 @@ local function startCourse(player: Player, horseId: any, requested: any, opts: a
 	history[player] = history[player] or {}
 	local ok, why = TrainingRide.rateCheck(history[player], os.clock(), CFG)
 	if not ok then
-		Profiles.notify(player, if why == "gap" then "Your horse is catching its breath. Try again in a moment!"
-			else "What a lot of riding! Give your horse a rest, or try a race.", "heart")
+		Profiles.notify(player, if why == "gap" then "Your horse is catching its breath. Try again soon!"
+			else "That's lots of riding for today. Try a race!", "heart")
 		return
 	end
 	local data = Profiles.get(player)
 	local h = horseFor(player, horseId)
 	if not data or not h then return end
 	if data.activeHorse ~= horseId then
-		Profiles.notify(player, "Pick " .. h.name .. " as your horse in My Horses to ride the courses", "heart")
+		Profiles.notify(player, "Pick " .. h.name .. " in My Horses to ride the courses", "heart")
 		return
 	end
 	local function where(): Vector3?
