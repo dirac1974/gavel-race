@@ -17,7 +17,20 @@ Regenerate with `--write` after any change to `src/trip.py`, `trip.CONFIG` (the 
 ```bash
 python sims/economy.py                       # current thresholds (D-013)
 python sims/economy.py --thresholds 100,100,100,100 --days 40
+python sims/economy.py --solo                # solo win rate vs league-anchored bots (D-061 stage 2)
 ```
+
+`--solo`: one rider against seven bots rated `BOT_RATING_ANCHOR` ± 6 (mirrors `GameConfig.botRatingAnchor`; `tests/test_sims.py` checks they agree), bots scoring as in `GameConfig`, kids at slider 60 / 70 / 80 and Final Burst 50 / 60 / 70 (new / average / skilled). The D-061 gate is a fresh starter (Rating 46.1) with an average kid winning 20–35% of solo Rookie races. The debate's anchors (50 / 63 / 73 / 83 / 90) gave 12.2%; the tuned ones (32 / 46 / 56 / 69 / 80) give, with 20,000 races a cell:
+
+| League | Horse | New | Average | Skilled |
+| --- | --- | --- | --- | --- |
+| Rookie | fresh 46.1 | 20.5% | 23.9% | 27.6% |
+| Rookie | ceiling 58 | 30.6% | 35.0% | 39.5% |
+| Bronze | entry 58 | 20.8% | 24.3% | 28.0% |
+| Bronze | ceiling 68 | 31.4% | 35.8% | 40.3% |
+| Silver | entry 68 | 20.8% | 24.3% | 28.0% |
+| Gold | entry 78 | 20.0% | 23.4% | 27.0% |
+| Champion | entry 88 | 20.6% | 24.0% | 27.7% |
 
 Results with D-013 thresholds (100, 110, 1,400, 3,000 League Points; 100 players per cohort, 90 days, seed 1). "Hours" = hours of play at 12 races per hour:
 
