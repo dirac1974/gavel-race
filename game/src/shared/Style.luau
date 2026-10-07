@@ -18,11 +18,12 @@ export type Item = {
 	color: string?,    -- main colour hex
 	color2: string?,   -- second colour (paint roof / trim)
 	color3: string?,
-	pattern: string?,  -- cloth pattern: "plain" | "stars" | "checks" | "lightning" | "goldtrim"
+	pattern: string?,  -- cloth pattern: "plain" | "stars" | "checks" | "lightning" | "goldtrim" | "month" (its emoji)
 	model: string?,    -- yard decor model slot
 	emoji: string,
 	set: string?,      -- collection set (the Star Set)
 	fanLevel: number?, -- earned at this Fan level (never sold)
+	month: number?,    -- a monthly stamp cloth (D-063): earned with that month's stamps, never sold
 }
 
 Style.SLOT_LABELS = {
@@ -43,6 +44,20 @@ Style.ITEMS = {
 	{ id = "cloth_checks", name = "Checks cloth", slot = "cloth", price = 75, color = "E5484D", pattern = "checks", emoji = "🏁" },
 	{ id = "cloth_lightning", name = "Lightning cloth", slot = "cloth", price = 100, color = "1D2433", pattern = "lightning", emoji = "⚡" },
 	{ id = "cloth_goldtrim", name = "Gold trim cloth", slot = "cloth", price = 150, color = "7B2D26", pattern = "goldtrim", emoji = "🥇" },
+	-- Monthly stamp cloths (D-063): 8 🎀 from a month's Stable Board jobs earn that month's
+	-- cloth. Never sold, never returned; each one comes back in the same month next year.
+	{ id = "cloth_m01", name = "Snowflake cloth", slot = "cloth", price = 0, month = 1, color = "8EC9F0", pattern = "month", emoji = "❄️" },
+	{ id = "cloth_m02", name = "Heart cloth", slot = "cloth", price = 0, month = 2, color = "F28CA8", pattern = "month", emoji = "💗" },
+	{ id = "cloth_m03", name = "Clover cloth", slot = "cloth", price = 0, month = 3, color = "5DBB63", pattern = "month", emoji = "🍀" },
+	{ id = "cloth_m04", name = "Rainy day cloth", slot = "cloth", price = 0, month = 4, color = "FFD23F", pattern = "month", emoji = "🌂" },
+	{ id = "cloth_m05", name = "Blossom cloth", slot = "cloth", price = 0, month = 5, color = "F7B2C4", pattern = "month", emoji = "🌸" },
+	{ id = "cloth_m06", name = "Sunshine cloth", slot = "cloth", price = 0, month = 6, color = "FF9F1C", pattern = "month", emoji = "☀️" },
+	{ id = "cloth_m07", name = "Seashell cloth", slot = "cloth", price = 0, month = 7, color = "3FB8C9", pattern = "month", emoji = "🐚" },
+	{ id = "cloth_m08", name = "Watermelon cloth", slot = "cloth", price = 0, month = 8, color = "46C46A", pattern = "month", emoji = "🍉" },
+	{ id = "cloth_m09", name = "Apple cloth", slot = "cloth", price = 0, month = 9, color = "E5484D", pattern = "month", emoji = "🍎" },
+	{ id = "cloth_m10", name = "Pumpkin cloth", slot = "cloth", price = 0, month = 10, color = "E07A1F", pattern = "month", emoji = "🎃" },
+	{ id = "cloth_m11", name = "Leaf cloth", slot = "cloth", price = 0, month = 11, color = "A0522D", pattern = "month", emoji = "🍂" },
+	{ id = "cloth_m12", name = "Snowy pine cloth", slot = "cloth", price = 0, month = 12, color = "2F5D3A", pattern = "month", emoji = "🌲" },
 	-- Jockey
 	{ id = "helmet_solid", name = "Solid helmet", slot = "helmet", price = 0, color = "E5484D", emoji = "⛑️" },
 	{ id = "helmet_dots", name = "Polka dot helmet", slot = "helmet", price = 50, color = "17A398", pattern = "dots", emoji = "🔵" },
@@ -96,11 +111,41 @@ function Style.owns(p: any, id: string): boolean
 	local it = byId[id]
 	if not it then return false end
 	if it.fanLevel then return Style.fanLevel(p) >= it.fanLevel end
+	if it.month then return p.style.owned[id] == true end -- earned with stamps only
 	return it.price == 0 or p.style.owned[id] == true
 end
 
 function Style.forSale(it: Item): boolean
-	return it.price > 0 and it.fanLevel == nil
+	return it.price > 0 and it.fanLevel == nil and it.month == nil
+end
+
+-- A free starter for its slot (worn when nothing else is): not a Fan or monthly item.
+function Style.isStarter(it: Item): boolean
+	return it.price == 0 and it.fanLevel == nil and it.month == nil
+end
+
+-- Monthly stamp cloths (D-063) ---------------------------------------------------------
+function Style.monthCloth(month: number): Item?
+	for _, it in Style.ITEMS do
+		if it.month == month then return it end
+	end
+	return nil
+end
+
+-- Month 1-12 of a Jobs monthly period (year * 12 + month).
+function Style.monthOfPeriod(period: number): number
+	local m = period % 12
+	return if m == 0 then 12 else m
+end
+
+-- Earn a month's cloth, once. It is never bought, so it can't be returned. Returns the item
+-- when it is new to this profile, else nil.
+function Style.earnMonthCloth(p: any, month: number): Item?
+	ensure(p)
+	local it = Style.monthCloth(month)
+	if not it or p.style.owned[it.id] == true then return nil end
+	p.style.owned[it.id] = true
+	return it
 end
 
 Style.RETURN_SECONDS = 24 * 60 * 60
@@ -176,7 +221,7 @@ function Style.worn(p: any, slot: string): Item?
 	local it = if typeof(id) == "string" then byId[id] else nil
 	if it and it.slot == slot and Style.owns(p, it.id) then return it end
 	for _, x in Style.ITEMS do
-		if x.slot == slot and x.price == 0 then return x end
+		if x.slot == slot and Style.isStarter(x) then return x end
 	end
 	return nil
 end

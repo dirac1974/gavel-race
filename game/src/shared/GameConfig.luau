@@ -348,6 +348,19 @@ GameConfig.spa = {
 	napLowerStuds = 1.8,             -- no lying model for this coat: the standing horse sinks into a straw bed
 }
 
+-- Reasons to come back (D-063, stage 6). The Welcome Back Hay Bale: after awayDays or more whole
+-- days away, one flat gift (never bigger for a longer absence, never on two days in a row, no
+-- streak). The Horse Book, personal bests ("New best!") and the Photo Finish camera can each be
+-- switched off. studioAwayDays (Studio only): pretend the last visit was this many days ago, for
+-- the parent check without editing a save.
+GameConfig.comeback = {
+	welcome = { enabled = true, awayDays = 3, gift = { hay = 5, seed_carrot = 2, treat = 1 } },
+	horseBook = true,
+	bests = true,
+	photo = true,
+	studioAwayDays = 0,
+}
+
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
 -- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in
 -- TrainingCourses.luau; scoring in TrainingRide.luau.

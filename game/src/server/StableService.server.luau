@@ -372,6 +372,22 @@ local function buildBarn(i: number, owner: Player, data)
 	end
 	-- The Rosette Wall (D-060, D-062): what visitors see; stage 8 hangs the rosettes on it.
 	WorldScene.placeModel(barn, "rosette_wall", plotCF(i, 52, 12, GROUND_Y))
+	-- The photo board (D-063 Photo Finish): its prompt opens Roblox's own capture and share
+	-- prompts on the client (ComeBackClient); nothing is uploaded by the game.
+	if (GameConfig.comeback or {}).photo ~= false then
+		local photoCF = plotCF(i, 54, -4, GROUND_Y)
+		if not WorldScene.placeModel(barn, "photo_frame_stand", photoCF) then
+			part({ Name = "PhotoFrame", Size = Vector3.new(8, 6, 0.6), Color = Color3.fromHex("BFD7FF"), CFrame = photoCF * CFrame.new(0, 4.5, 0) }, barn)
+		end
+		local photoSpot = part({ Name = "PhotoSpot", Size = Vector3.new(4, 4, 4), Transparency = 1, CanCollide = false, CanQuery = false,
+			CanTouch = false, CFrame = photoCF * CFrame.new(0, 2, -4) }, barn)
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "PhotoPrompt"
+		prompt.ActionText, prompt.ObjectText = "📷 Photo", "Photo board"
+		prompt.MaxActivationDistance = 14
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = photoSpot
+	end
 	-- The Stable Board noticeboard by the gate (D-043).
 	local nbCF = plotCF(i, 9, -GATE_W / 2 - 9, GROUND_Y)
 	local nb = WorldScene.placeModel(barn, "noticeboard", nbCF)

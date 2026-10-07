@@ -105,13 +105,29 @@ local function worn(id: string, slot: string): boolean
 	local cur = eq[slot]
 	if cur then return cur == id end
 	local it = Style.item(id)
-	return it ~= nil and it.price == 0 and it.fanLevel == nil
+	return it ~= nil and Style.isStarter(it)
 end
 
 local function owns(id: string): boolean
 	local d = PlayerState.data
 	if not d then return false end
 	return Style.owns({ style = d.style, diamonds = d.diamonds, fan = { xp = (d.fanXp or 0) } }, id)
+end
+
+-- Monthly stamp cloths (D-063): the ones you earned, and this month's as a goal. Other months
+-- stay out of the shop until earned (each comes back in its own month next year).
+local function shown(it): boolean
+	if not it.month then return true end
+	if owns(it.id) then return true end
+	local jobs = PlayerState.data and PlayerState.data.jobs
+	return jobs ~= nil and jobs.monthCloth == it.id
+end
+
+local function stampLine(): string
+	local jobs = PlayerState.data and PlayerState.data.jobs
+	local have = (jobs and jobs.monthStamps) or 0
+	local need = (jobs and jobs.stampsNeeded) or 8
+	return string.format("🎀 %d of %d stamps. Do monthly jobs!", math.min(have, need), need)
 end
 
 local function canReturn(id: string): boolean
@@ -142,6 +158,8 @@ local function itemCard(it, order: number)
 	end
 	Ui.text(card, it.name, 19, { Position = UDim2.new(0, 86, 0, 10), Size = UDim2.new(1, -94, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	local sub = if it.fanLevel then string.format("Earned at Fan level %d (cheer in races!)", it.fanLevel)
+		elseif it.month and own then "🎀 Earned!"
+		elseif it.month then stampLine()
 		elseif it.price == 0 then "Free"
 		elseif own then "Yours"
 		else string.format("💎 %d", it.price)
@@ -162,7 +180,7 @@ local function itemCard(it, order: number)
 	end
 	if own then
 		if on then
-			if it.price > 0 or it.slot == "yard" then
+			if it.price > 0 or it.slot == "yard" or it.month then
 				btn(if it.slot == "yard" then "Put away" else "Take off", C.white, function()
 					gameRemotes:WaitForChild("StyleWear"):FireServer(it.id, false)
 				end)
@@ -254,7 +272,7 @@ render = function()
 	end
 	local order = 0
 	for _, it in Style.ITEMS do
-		if slots[it.slot] then
+		if slots[it.slot] and shown(it) then
 			order += 1
 			itemCard(it, order)
 		end

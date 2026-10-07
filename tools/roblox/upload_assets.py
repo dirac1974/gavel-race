@@ -74,7 +74,7 @@ PROPS = (
     "feed_store", "vet_clinic", "market_corral_booth", "training_shed", "race_board_frame", "trail_gate_arch",
     "lantern_post", "bench", "picnic_table", "trophy_cup", "rosette_ribbon", "horseshoe_decor", "log_jump",
     "wooden_bridge", "hay_cart", "post_box_carrots", "visitor_bell", "rosette_wall",
-    "spa_wash_stall", "towel_rack",
+    "spa_wash_stall", "towel_rack", "welcome_hay_bale", "photo_frame_stand",
 )
 MODELS = {
     # The playtest gallop coats keep their original slot names (horse_<coat>); the race code uses them.

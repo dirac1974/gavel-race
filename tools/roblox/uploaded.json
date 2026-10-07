@@ -412,6 +412,13 @@
   "sha256": "ccfb6e275f9eff95c84a4a305f9355afc64b55f8d6599799fceb2a3a3837131b",
   "uploadedAt": "2026-10-05T06:50:58Z"
  },
+ "photo_frame_stand": {
+  "assetId": 138175926810022,
+  "file": "Models/generated/photo_frame_stand/photo_frame_stand.glb",
+  "kind": "Model",
+  "sha256": "518a8f89b94b786285b2623fa4196be6c0067c1e6a3aa0e42b92bd710406f67e",
+  "uploadedAt": "2026-10-07T18:07:57Z"
+ },
  "picnic_table": {
   "assetId": 87931733117619,
   "file": "Models/generated/picnic_table/picnic_table.glb",
@@ -629,6 +636,13 @@
   "kind": "Model",
   "sha256": "c0f928931bc4566e1cbe813842d67ea343ac07b3315e5b12a85cef0ebac08d71",
   "uploadedAt": "2026-10-05T06:48:34Z"
+ },
+ "welcome_hay_bale": {
+  "assetId": 115478221440793,
+  "file": "Models/generated/welcome_hay_bale/welcome_hay_bale.glb",
+  "kind": "Model",
+  "sha256": "4eae9b4c939e6820e5e9362c9501260becd20071da1953e2ad021a7e384ba228",
+  "uploadedAt": "2026-10-07T18:07:49Z"
  },
  "wheelbarrow": {
   "assetId": 76187646933611,

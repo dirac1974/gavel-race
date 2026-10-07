@@ -865,6 +865,28 @@
       "text_style_prompt": "same stylized horse lying down resting in straw, keep the exact shape, pose, small side eyes and bridle, bare back with no saddle and no saddle cloth: the coat colour continues evenly over the back and flanks with no patches, dapple grey coat: medium steel-grey body covered in clearly visible round charcoal-grey dapples on the shoulders, barrel and hindquarters, dark charcoal lower legs, light silver mane and tail, dark grey muzzle, glossy jet-black hooves on every leg, golden straw, natural colors, glossy healthy coat, soft hand-painted shading, bright daylight colors",
       "negative": "no saddle, no saddle cloth, no flank symbols, no eyelashes, no big glossy eyes, no pastel or fantasy colors, no text, no logos",
       "notes": "Stage 4 (D-058) napping pose, starter coat, 2026-10-07. GENERATED (10 cr). PASS: dapple grey, silver mane, dark hooves."
+    },
+    {
+      "slot_id": "welcome_hay_bale",
+      "kind": "prop",
+      "priority": "P1",
+      "rig": false,
+      "target_polycount": 3000,
+      "retexture_of": "hay_bale",
+      "text_style_prompt": "the same chunky golden hay bale, keep the exact shape, fresh golden yellow straw, the two bands around it painted as wide shiny bright red gift ribbons instead of twine, a small cream gift tag painted on the front, soft hand-painted shading, bright daylight colors, cheerful and toy-like",
+      "negative": "no text, no numbers, no logos",
+      "notes": "Stage 6 Welcome Back Hay Bale (D-063), 2026-10-07. Retexture of hay_bale (10 cr): a retexture can't add a bow or carrots, so the game adds a part-built bow, carrots and an apple on top."
+    },
+    {
+      "slot_id": "photo_frame_stand",
+      "kind": "prop",
+      "priority": "P2",
+      "rig": false,
+      "target_polycount": 3000,
+      "prompt": "a county fair photo board standing on two sturdy wooden legs: a big painted wooden picture frame with a wide empty open centre you can see straight through, little triangle bunting flags along the top edge, a gold rosette ribbon fixed to one top corner, bright and toy-like chunky proportions",
+      "texture_prompt": "sky blue and cream painted wood frame, red yellow and blue bunting flags, shiny gold rosette with a blue ribbon tail, honey brown wooden legs, soft hand-painted shading, bright daylight colors",
+      "negative": "no text, no letters, no picture inside the frame, no glass, no people, no horse, no camera",
+      "notes": "Stage 6 Photo Finish (D-063), 2026-10-07. Text-to-3D (30 cr), one try only (stage cap 50)."
     }
   ]
 }

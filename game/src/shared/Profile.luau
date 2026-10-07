@@ -8,6 +8,7 @@
 
 -- Roblox requires by instance; Lune (tests) by path.
 local Horse = if script then require(script.Parent.Horse) :: any else require("./Horse")
+local HorseBook = if script then require(script.Parent.HorseBook) :: any else require("./HorseBook")
 
 local Profile = {}
 
@@ -248,6 +249,7 @@ function Profile.migrate(data: any, now: number): Profile
 	p.style.equipped = if typeof(p.style.equipped) == "table" then p.style.equipped else {}
 	p.receipts = if typeof(p.receipts) == "table" then p.receipts else {}
 	Profile.repairVisits(p, now)
+	HorseBook.repair(p) -- the Horse Book and personal bests (D-063)
 	return p :: Profile
 end
 

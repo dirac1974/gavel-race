@@ -41,6 +41,7 @@ local Style = require(Shared:WaitForChild("Style"))
 local Spa = require(Shared:WaitForChild("Spa"))
 local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
 local NameGen = require(Shared:WaitForChild("NameGen"))
+local HorseBook = require(Shared:WaitForChild("HorseBook"))
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -78,6 +79,7 @@ local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 i
 local SteerBrush = makeRemote("SteerBrush")       -- server -> all: a brush (mover, other, dir, server time, course), D-057 N5
 local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, the state's race time, course (D-054 S3, D-057 N4)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
+local PersonalBest = makeRemote("PersonalBest")   -- server -> one: distance, ride score, earlier best, course ("New best!", D-063)
 -- On-screen gaps, several times a second; dropping one is harmless, so unreliable.
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
 RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), [lane positions, server time,] course
@@ -1021,10 +1023,14 @@ local function runRace(c, players: { Player })
 				if not card.practice then
 					Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
 				end
+				-- The Horse Book (D-063): this course, and a top-three place in a race that counts.
+				HorseBook.record(data, "courses", c.id)
+				if not card.practice and prize.place <= 3 then HorseBook.record(data, "places", tostring(prize.place)) end
 				if card.cup and prize.place == 1 then
 					local h = Profile.horse(data, horseOf[player.UserId])
 					local nxt = h and Leagues.promote(h)
 					if nxt then
+						HorseBook.record(data, "cups", leagueName)
 						Style.earn(data, Style.EARN_PROMOTION) -- a milestone gift (D-050)
 						task.delay(GameConfig.runInSeconds + 1, function()
 							Profiles.notify(player, string.format("🏆 %s won the %s Cup and moves up to %s!", h.name, leagueName, nxt), "trophy")
@@ -1063,6 +1069,13 @@ local function runRace(c, players: { Player })
 			local tripStars = if trip and steers[p] then Trip.stars(session.tau[i], GameConfig.steering) else nil
 			local tripGain = if tripStars then session:tripGain(i) else nil
 			RideReport:FireClient(p, table.unpack(ResultsText.reportArgs(stars, session:ridingGain(i), placeOf[i], c.id, tripStars, tripGain)))
+			-- Personal best at this distance (D-063): private; only beating an earlier best says so.
+			local data = Profiles.get(p)
+			if data and not (GameConfig.comeback and GameConfig.comeback.bests == false) then
+				local isNew, prev = HorseBook.recordBest(data, cond.distance, S[i])
+				if isNew then PersonalBest:FireClient(p, cond.distance, data.bests[cond.distance], prev, c.id) end
+				Profiles.changed(p)
+			end
 		end
 	end
 	recordIntegrity(players, errors, matched)

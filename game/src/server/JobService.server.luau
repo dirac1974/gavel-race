@@ -19,6 +19,15 @@ local Style = require(Shared:WaitForChild("Style"))
 local function monthlyGift(player: Player, data)
 	local jobs = data.jobs
 	if not jobs then return end
+	-- 8 🎀 this month: the month's saddle cloth (D-063), in Tack & Paint as earned.
+	if typeof(jobs.clothDue) == "table" then
+		for _, id in jobs.clothDue do
+			local it = Style.item(id)
+			if it then Profiles.notify(player, string.format("🎀 You earned the %s!", it.name), "gift") end
+		end
+		jobs.clothDue = nil
+		Profiles.changed(player)
+	end
 	local pay = tonumber(jobs.giftDue) or 0 -- months finished at rollover
 	jobs.giftDue = nil
 	if typeof(jobs.monthly) == "table" and #jobs.monthly > 0 and jobs.giftMonth ~= jobs.monthlyPeriod then

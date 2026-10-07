@@ -293,6 +293,7 @@ end
 raceBtn.Activated:Connect(pressRace)
 -- The Next-thing pill's GO for "Race with Comet!" presses RACE! (D-064, stage 3).
 localEvent("PressRace").Event:Connect(pressRace)
+localEvent("QuickRace").Event:Connect(pressRace) -- the tour's first GO (D-063)
 leaveBtn.Activated:Connect(function()
 	raceRemotes:WaitForChild("JoinRace"):FireServer(false)
 end)
@@ -361,8 +362,10 @@ end
 local phoneMode = false
 local function movable(): { Frame }
 	local list = { cashSlot, horsesSlot, boardSlot, mapSlot }
-	local ride = dock:FindFirstChild("RideSlot") or moreBody:FindFirstChild("RideSlot") -- RideClient's
-	if ride then table.insert(list, ride) end
+	for _, name in { "RideSlot", "BookSlot" } do -- RideClient's and HorseBookClient's (D-063)
+		local s = dock:FindFirstChild(name) or moreBody:FindFirstChild(name)
+		if s then table.insert(list, s) end
+	end
 	return list
 end
 applyPhone = function()
@@ -373,12 +376,13 @@ applyPhone = function()
 		-- the short dock too, so the dock never covers Hop or Gallop.
 		local full = 0
 		for _, s in { cashSlot, horseSlot, horsesSlot, boardSlot, mapSlot, raceSlot,
-			dock:FindFirstChild("RideSlot") or moreBody:FindFirstChild("RideSlot") } do
+			dock:FindFirstChild("RideSlot") or moreBody:FindFirstChild("RideSlot"),
+			dock:FindFirstChild("BookSlot") or moreBody:FindFirstChild("BookSlot") } do
 			if s then full += (s :: Frame).Size.X.Offset + 10 end
 		end
 		on = full * DockLayout.floor(GameConfig.ui) > cam.ViewportSize.X - 24 - LAYOUT.movementColumn
 	end
-	if on == phoneMode and not (on and dock:FindFirstChild("RideSlot")) then return end
+	if on == phoneMode and not (on and (dock:FindFirstChild("RideSlot") or dock:FindFirstChild("BookSlot"))) then return end
 	phoneMode = on
 	for _, s in movable() do
 		s.Parent = if on then moreBody else dock
@@ -389,7 +393,7 @@ applyPhone = function()
 	if not on then closeMore() end
 end
 dock.ChildAdded:Connect(function(ch)
-	if ch.Name == "RideSlot" and phoneMode then task.defer(fitDock) end
+	if (ch.Name == "RideSlot" or ch.Name == "BookSlot") and phoneMode then task.defer(fitDock) end
 end)
 
 -- Touch layout (D-056), switched whenever the kind of input changes: the dock sits left of the

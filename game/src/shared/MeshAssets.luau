@@ -61,6 +61,7 @@ local ids: { [string]: number } = {
 	market_corral_booth = 139727391696917,
 	noticeboard = 74680812655077,
 	oat_crop = 73035596464925,
+	photo_frame_stand = 138175926810022,
 	picnic_table = 87931733117619,
 	pitchfork = 115096225214208,
 	post_box = 138248539444614,
@@ -78,6 +79,7 @@ local ids: { [string]: number } = {
 	vet_clinic = 112190730593960,
 	visitor_bell = 71560735604593,
 	water_trough = 77651926650735,
+	welcome_hay_bale = 115478221440793,
 	wheelbarrow = 76187646933611,
 	wooden_bridge = 74043771820175,
 }

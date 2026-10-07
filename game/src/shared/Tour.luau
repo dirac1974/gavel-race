@@ -9,7 +9,8 @@ export type Step = { id: string, event: string, text: string, go: string? }
 
 -- Text uses {horse} for the active horse's name.
 Tour.STEPS = {
-	{ id = "race", event = "race", text = "Let's race! Tap RACE! and pick a race for {horse}.", go = "raceBoard" },
+	-- The first GO joins a race with your horse at once (D-063: in a race within 2 minutes).
+	{ id = "race", event = "race", text = "Let's race! Tap GO to race with {horse}.", go = "race" },
 	{ id = "feed", event = "feed", text = "Great ride! Head to your barn and give {horse} some hay.", go = "stable" },
 	{ id = "groom", event = "groom", text = "Now brush {horse} until it shines!", go = "stable" },
 	{ id = "plant", event = "plant", text = "Plant your carrot seeds in a garden bed. They grow while you're away.", go = "stable" },
