@@ -7,6 +7,8 @@
 -- Per-league queues (D-061 core, stage 1): only a card your horse can join is ever preselected or
 -- joinable; another league's card shows its badge and "Watch" (hoofprints to the grandstand).
 -- With no joinable card, Join puts you in your league's line for the next free course.
+-- One race button (D-061 stage 2): RACE! joins at once with the active horse, so this picker is
+-- "More choices" (another horse, Practice, the Cup, a course), opened from the queue card.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -57,7 +59,9 @@ task.spawn(function()
 	while not workspace.CurrentCamera do task.wait(0.1) end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 end)
-Ui.text(panel, "🏁 Pick a race", 32, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 38) })
+local QCARD = GameConfig.queueCard or {}
+local moreChoices = QCARD.enabled ~= false and QCARD.oneTapRace ~= false
+Ui.text(panel, if moreChoices then "🔀 More choices" else "🏁 Pick a race", 32, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 38) })
 local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
 
 local cardRow = Instance.new("Frame")

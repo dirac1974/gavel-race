@@ -48,23 +48,48 @@ local function gauss(rng: Rng, mean: number, sd: number): number
 	return mean + sd * math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
 end
 
--- Fill a lobby to `lanes` with bots rated around the humans' median rating.
-function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: any, theme: any, rng: Rng): { LaneInput }
+-- Two-word names from word lists (`parts.FIRST`, `parts.SECOND`: NameGen's horse-name chips, D-061),
+-- never repeating a name already in the field. Falls back to "First" alone, then to the theme list.
+local function botName(parts: any, taken: { [string]: boolean }, rng: Rng): string?
+	for _ = 1, 40 do
+		local a = parts.FIRST[math.floor(rng:NextNumber() * #parts.FIRST) + 1]
+		local b = parts.SECOND[math.floor(rng:NextNumber() * #parts.SECOND) + 1]
+		local name = if a == b then a else a .. " " .. b
+		if not taken[name] then return name end
+	end
+	return nil
+end
+
+-- Fill a lobby to `lanes` with bots. With `opts.league` and config.botRatingAnchor (D-061 stage 2)
+-- each bot is rated that league's anchor ± botRatingSpread, whoever is racing; without them, around
+-- the humans' median rating (before D-061). `opts.nameParts` (NameGen) names bots from the horse-name
+-- chips; without it, from theme.botNames.
+function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: any, theme: any, rng: Rng,
+	opts: { league: string?, nameParts: any? }?): { LaneInput }
 	local field = table.clone(humans)
-	local ratings = {}
-	for _, h in humans do table.insert(ratings, h.rating) end
-	table.sort(ratings)
-	local median = if #ratings > 0 then ratings[math.ceil(#ratings / 2)] else 50
+	local anchor = opts and opts.league and config.botRatingAnchor and config.botRatingAnchor[opts.league]
+	local center = anchor
+	if not center then
+		local ratings = {}
+		for _, h in humans do table.insert(ratings, h.rating) end
+		table.sort(ratings)
+		center = if #ratings > 0 then ratings[math.ceil(#ratings / 2)] else 50
+	end
+	local parts = opts and opts.nameParts
+	local taken: { [string]: boolean } = {}
+	for _, h in humans do taken[h.name] = true end
 	local n = 0
-	local offset = math.floor(rng:NextNumber() * #theme.botNames) -- different bot names each race
+	local offset = if parts then 0 else math.floor(rng:NextNumber() * #theme.botNames) -- different bot names each race
 	while #field < lanes do
 		n += 1
 		local spread = config.botRatingSpread
-		local name = theme.botNames[((n - 1 + offset) % #theme.botNames) + 1]
+		local name = parts and botName(parts, taken, rng)
+		if not name then name = theme.botNames[((n - 1 + offset) % #theme.botNames) + 1] end
+		taken[name] = true
 		table.insert(field, {
 			id = "bot:" .. n,
 			name = name,
-			rating = median + (rng:NextNumber() * 2 - 1) * spread,
+			rating = center + (rng:NextNumber() * 2 - 1) * spread,
 			isBot = true,
 		})
 	end

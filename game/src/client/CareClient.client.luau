@@ -73,6 +73,10 @@ local function closeCard()
 end
 closeBtn.Activated:Connect(closeCard)
 dim.Activated:Connect(closeCard)
+-- Grooming while in line (D-061 stage 2): when your race seats you, the card closes.
+player:GetAttributeChangedSignal("Racing"):Connect(function()
+	if player:GetAttribute("Racing") and gui.Enabled then closeCard() end
+end)
 local function openCard(text: string, height: number?)
 	if onClose then
 		onClose()

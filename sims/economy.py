@@ -10,6 +10,10 @@ Assumptions (edit the CONFIG block; each is logged in docs/memory/DECISIONS.md):
 - Play time includes care and stable activities: RACES_PER_PLAY_HOUR races per hour played.
 - Reaching the league's points threshold unlocks Stakes races; a Stakes win promotes and
   resets points. Each Stakes attempt is one race.
+
+`--solo` reports the solo win rate (D-061 stage 2): one rider against seven league-anchored bots
+(`BOT_RATING_ANCHOR` +- `BOT_RATING_SPREAD`, mirrors GameConfig.botRatingAnchor), by horse and kid.
+The D-061 gate: a fresh starter ridden by an average kid wins 20-35% of solo Rookie races.
 """
 
 from __future__ import annotations
@@ -37,6 +41,69 @@ COHORTS = {
     "engaged": (25, 55),
     "skilled": (25, 70),
 }
+
+
+# Solo races against league-anchored bots (D-061 stage 2). Mirrors GameConfig.luau (a test checks).
+T = {"Rookie": 22, "Bronze": 18, "Silver": 18, "Gold": 14.4, "Champion": 12}
+BOT_RATING_ANCHOR = {"Rookie": 32, "Bronze": 46, "Silver": 56, "Gold": 69, "Champion": 80}
+BOT_RATING_SPREAD = 6
+BOT_PACE = (60, 15)          # GameConfig.botPaceMean, botPaceSd
+BOT_BURST = (55, 15)         # GameConfig.botBurstMean, botBurstSd
+SEGMENTS = ["pace", "pace", "burst", "pace"]
+SEGMENT_WEIGHTS = [1, 1, 2, 1]
+LANES = 8
+# Kids: mean slider score per checkpoint (sd 10) and Final Burst score (sd 20). The D-026 sims
+# put an average kid at 66-75 on the slider and a random burst tap at 50.
+KIDS = {"new": (60, 50), "average": (70, 60), "skilled": (80, 70)}
+STARTER_STAT = 45            # Horse.STARTER_STAT
+CARE_MAX = 0.05              # RaceRating.CARE_MAX
+FRESH_RATING = STARTER_STAT * (1 + CARE_MAX * 0.5)  # a starter on a half-cared day, bond 0
+# A horse entering each league (the last league's ceiling) and at its own ceiling (D-046).
+LEAGUE_ENTRY = {"Rookie": FRESH_RATING, "Bronze": 58, "Silver": 68, "Gold": 78, "Champion": 88}
+LEAGUE_TOP = {"Rookie": 58, "Bronze": 68, "Silver": 78, "Gold": 88, "Champion": 95}
+SOLO_BAND = (0.20, 0.35)
+
+
+def _clamp(x: float) -> float:
+    return min(100.0, max(0.0, x))
+
+
+def solo_win_rate(league: str, rating: float, kid: str = "average", races: int = 20000, seed: int = 1,
+                  anchors: dict | None = None, spread: float = BOT_RATING_SPREAD) -> float:
+    """Mean win chance of one rider against LANES - 1 bots rated anchor +- spread (uniform, as
+    RaceSession.fillWithBots). Uses the live chance (no finish draw), so it converges fast."""
+    rng = random.Random(seed)
+    anchor = (anchors or BOT_RATING_ANCHOR)[league]
+    cfg = m.Config(T=T[league])
+    kid_pace, kid_burst = KIDS[kid]
+    wsum = sum(SEGMENT_WEIGHTS)
+    total = 0.0
+    for _ in range(races):
+        ratings = [rating] + [anchor + (rng.random() * 2 - 1) * spread for _ in range(LANES - 1)]
+        q = m.base_chances(ratings, cfg)
+        S = []
+        for lane in range(LANES):
+            seg_scores = []
+            for kind in SEGMENTS:
+                if lane == 0:
+                    mean, sd = (kid_burst, 20) if kind == "burst" else (kid_pace, 10)
+                else:
+                    mean, sd = BOT_BURST if kind == "burst" else BOT_PACE
+                seg_scores.append(_clamp(rng.gauss(mean, sd)))
+            S.append(sum(w * x for w, x in zip(SEGMENT_WEIGHTS, seg_scores)) / wsum)
+        total += m.live_chances(q, m.skills(S, cfg), cfg)[0]
+    return total / races
+
+
+def solo_report(races: int = 20000, seed: int = 1, anchors: dict | None = None) -> dict:
+    """{league: {"entry"|"top": {kid: win rate}}}."""
+    out = {}
+    for lg in LEAGUES:
+        out[lg] = {
+            where: {kid: solo_win_rate(lg, r[lg], kid, races, seed, anchors) for kid in KIDS}
+            for where, r in (("entry", LEAGUE_ENTRY), ("top", LEAGUE_TOP))
+        }
+    return out
 
 
 def race(rng: random.Random, my_mean: float, league: str):
@@ -110,7 +177,19 @@ def main(argv=None):
     ap.add_argument("--days", type=int, default=60)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--thresholds", default="100,110,1400,3000", help="points to unlock Stakes, Rookie..Gold")
+    ap.add_argument("--solo", action="store_true", help="solo win rate against league-anchored bots (D-061)")
+    ap.add_argument("--races", type=int, default=20000, help="--solo: races per cell")
     args = ap.parse_args(argv)
+    if args.solo:
+        rep = solo_report(args.races, args.seed)
+        print(f"Solo win rate vs bots at {BOT_RATING_ANCHOR} +- {BOT_RATING_SPREAD} "
+              f"(gate: fresh Rookie, average kid, {SOLO_BAND[0]:.0%}-{SOLO_BAND[1]:.0%})")
+        print(f"{'league':9} {'horse':>12}  " + "  ".join(f"{k:>8}" for k in KIDS))
+        for lg, rows in rep.items():
+            for where, cells in rows.items():
+                r = (LEAGUE_ENTRY if where == "entry" else LEAGUE_TOP)[lg]
+                print(f"{lg:9} {where + f' {r:4.1f}':>12}  " + "  ".join(f"{v:8.1%}" for v in cells.values()))
+        return
     th = dict(zip(LEAGUES[:4], [int(x) for x in args.thresholds.split(",")]))
     print(f"Stakes thresholds: {th}")
     results = run(th, args.players, args.days, args.seed)
