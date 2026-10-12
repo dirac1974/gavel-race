@@ -170,9 +170,9 @@ local function grownUpsTab()
 	para(string.format("🎖️ Careers: every %d races a horse earns a career patch. Horses have life stages: Young (training grows a little faster for the first %d races), Prime, and Veteran at %d races. Once a Veteran has finished growing, it races a little slower in rated races, very gently (at most %d Rating), never in Practice; stats, League Points and everything earned stay. The card says so 10 races ahead. A Veteran may retire as a 👑 Legend, only if your child chooses: it moves to the Hall of Fame paddock, keeps its stats and can still be ridden. A Legend can come back to the races any time.",
 		career.badgeEvery, GameConfig.ageing.youngRaces, career.veteranAt, GameConfig.ageing.declineCap), 16, 64)
 	para(string.format("🩺 Legs and the vet: after %d races in a row on one horse, rated races wait for a free 30-second Cool-down Check at the Vet (cool water, soft wraps, a carrot). Practice stays open. Feeding, brushing, %d minutes' rest, a Spa Day or training lowers the count. It only comes from lots of racing, never from neglect; nothing is permanent and nothing is for sale.",
-		GameConfig.legs.runLimit, GameConfig.legs.restSeconds // 60), 16, 64)
+		GameConfig.legs.runLimit, GameConfig.legs.restSeconds // 60), 16, 65)
 	para(string.format("🏫 Riding School: a horse can be lent to %s for free and brought home any time (it stays yours), or sold there. A sale pays half of what your child paid plus a small bonus for its wins (never more than the price; nothing for a tamed or gifted horse, which earns a goodbye rosette instead). It takes two taps, and for %d days a sold horse can come back for the same Green Cash. The first horse is never sold and the last racing horse always stays. Horses are never traded between players.",
-		rehome.school, rehome.undoHours // 24), 16, 65)
+		rehome.school, rehome.undoHours // 24), 16, 66)
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 70)
 end
 
