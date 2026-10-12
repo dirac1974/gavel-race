@@ -302,6 +302,9 @@ local function buildVenue(): Folder
 		tree(f, cx - (rOut + 70) * math.cos(a), cz + L / 2 + (rOut + 70) * math.sin(a), 30)
 	end
 
+	-- County Fair dressing (AAA Phase 4, D-069): bunting, flags, crowd. Drawn only; never stops the venue.
+	local okDress, dressErr = pcall(function() require(script.Parent:WaitForChild("TrackDressing")).build(f) end)
+	if not okDress then warn("[TrackScene] track dressing skipped: " .. tostring(dressErr)) end
 	f.Parent = workspace
 	return f
 end

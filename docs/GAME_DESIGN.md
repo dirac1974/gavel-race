@@ -84,12 +84,12 @@ Scoring is the same in every league; the gavel gets harder through meter speed a
 | League | B | Points to unlock Stakes | Gavel meter (full sweep) | Unlocks |
 | --- | --- | --- | --- | --- |
 | Rookie | 20 | 100 | 2.4 s, 4 s windows | Garden, grooming, first pet |
-| Bronze | 50 | 110 | 2.0 s | Breeding, Tactics |
-| Silver | 120 | 1,400 | 1.6 s | Pool, hill course, clubs |
-| Gold | 300 | 3,000 | 1.3 s, drifting target | Rare NPC bloodlines, weather variants |
+| Bronze | 50 | 200 | 2.0 s | Breeding, Tactics |
+| Silver | 120 | 450 | 1.6 s | Pool, hill course, clubs |
+| Gold | 300 | 900 | 1.3 s, drifting target | Rare NPC bloodlines, weather variants |
 | Champion | 750 | top league | 1.1 s, drifting target, two half-size targets in the final window | Hall of Fame, seasonal trophies |
 
-Values live in `game/src/shared/GameConfig.luau`.
+Values live in `game/src/shared/GameConfig.luau`. Points to unlock, bot anchors and league ceilings were retuned together in AAA Phase 3 (D-068, `docs/reviews/aaa-2026-10-11/phase3-sim.md`): a casual kid opens each Cup in about 20 / 40 / 90 / 180 races.
 
 ## Retention (fun version of each hook)
 

@@ -140,7 +140,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		and string.find(rc, "ReplayTrip.saved(t, s.start, turn[1], turn[2], SPEED)", 1, true) ~= nil
 		and string.find(rc, "ReplayTrip.tuck(s.tuckFrom, t)", 1, true) ~= nil
 		and string.find(rc, "RaceState.recording.steer = true", 1, true) ~= nil
-		and string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)", 1, true) ~= nil,
+		and string.find(rc, "Card.setRide(ResultsText.rowStars(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW))", 1, true) ~= nil,
 		"the race records lanes, the lock, saved turns, tucked spans and the buttons; the card asks ResultsText")
 	check(string.find(replay, "ReplayTrip.laneCurve(rec, k, f, i)", 1, true) ~= nil and string.find(replay, "lanes[subject] or subject", 1, true) ~= nil
 		and string.find(replay, "RaceState.finishFollowed()", 1, true) ~= nil and string.find(replay, "RaceState.restHorses(rec.course, rec.lanes)", 1, true) ~= nil,

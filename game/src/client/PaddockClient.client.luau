@@ -58,27 +58,19 @@ dim.BackgroundTransparency = 0.5
 dim.Parent = gui
 local W, H = 620, 440
 local card = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.paper)
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-local cardScale = Instance.new("UIScale")
-cardScale.Parent = card
-local function rescale()
-	local cam = workspace.CurrentCamera
-	if cam then cardScale.Scale = math.min(1, (cam.ViewportSize.X - 20) / W, (cam.ViewportSize.Y - 20) / H) end
-end
-rescale()
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
+-- Floors (AAA Phase 2): smallest text 16, smallest button 64; it shrinks to 0.875 at most and what
+-- still doesn't fit scrolls.
+local slideIn = Ui.fitPanel(card, W, H, nil, 16, 64)
+local cardScale = card:FindFirstChildOfClass("UIScale") -- (fitPanel's; the training icons read it)
 local title = Ui.text(card, "", 30, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 36) })
-local sub = Ui.text(card, "", 18, { Position = UDim2.new(0, 20, 0, 50), Size = UDim2.new(1, -40, 0, 24) })
+local sub = Ui.text(card, "", 18, { Position = UDim2.new(0, 80, 0, 50), Size = UDim2.new(1, -160, 0, 24) }) -- clear of the ✕
 sub.TextColor3 = C.plum
 local body = Instance.new("Frame")
 body.BackgroundTransparency = 1
 body.Size = UDim2.new(1, -32, 1, -96)
 body.Position = UDim2.new(0, 16, 0, 82)
 body.Parent = card
-local closeBtn = Ui.button(card, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
+local closeBtn = Ui.closeButton(card)
 local cleanup: { () -> () } = {}
 local generation = 0 -- bumps on every clear, so delayed callbacks from a closed game do nothing
 local function clear()
@@ -111,8 +103,7 @@ local function open(t: string, s: string)
 	title.Text, sub.Text = t, s
 	if not gui.Enabled then
 		gui.Enabled = true
-		card.Position = UDim2.fromScale(0.5, 0.55)
-		TweenService:Create(card, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+		slideIn()
 	end
 end
 
@@ -161,7 +152,7 @@ end
 
 local function flash(text: string, color: Color3?)
 	local l = Ui.text(body, text, 34, { Position = UDim2.new(0, 0, 0, 90), Size = UDim2.new(1, 0, 0, 44), ZIndex = 20 })
-	l.TextColor3 = color or C.orangeDark
+	l.TextColor3 = color or C.textWarn
 	l.TextStrokeTransparency = 0.6
 	TweenService:Create(l, TweenInfo.new(0.7), { TextTransparency = 1, Position = UDim2.new(0, 0, 0, 60) }):Play()
 	task.delay(0.75, function() l:Destroy() end)
@@ -227,7 +218,7 @@ function Games.speed(g, done)
 	end)
 	tapper(function()
 		local s = quickTap(g, "tap")
-		if s then flash(label(s), if s >= 75 then C.green else C.orangeDark) end
+		if s then flash(label(s), if s >= 75 then C.textGood else C.textWarn) end
 	end)
 end
 
@@ -254,7 +245,7 @@ function Games.accel(g, done)
 		if s == 0 then
 			flash("Too soon!", C.red) -- that round counts 0, gently
 		elseif s then
-			flash(label(s), if s >= 75 then C.green else C.orangeDark)
+			flash(label(s), if s >= 75 then C.textGood else C.textWarn)
 		end
 	end)
 end
@@ -332,7 +323,7 @@ function Games.grit(g, done)
 	end)
 	tapper(function()
 		local s = quickTap(g, "tap")
-		if s then flash(label(s), if s >= 75 then C.green else C.orangeDark) end
+		if s then flash(label(s), if s >= 75 then C.textGood else C.textWarn) end
 	end)
 end
 
@@ -375,7 +366,7 @@ local function heartGame(done)
 			used[best] = true
 			local s = math.clamp(100 - (bestErr - 0.05) / 0.25 * 70, 30, 100)
 			total += s
-			flash(label(s), if s >= 75 then C.green else C.orangeDark)
+			flash(label(s), if s >= 75 then C.textGood else C.textWarn)
 		end
 	end, "TAP ON THE BEAT")
 end
@@ -420,9 +411,9 @@ local quickScore = nil :: number?
 local function showResult(score: number)
 	quickLive = false
 	clear()
-	Ui.text(body, label(score), 44, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 54) }).TextColor3 = C.orangeDark
+	Ui.text(body, label(score), 44, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 54) }).TextColor3 = C.textWarn
 	Ui.text(body, string.format("Score %d", math.floor(score + 0.5)), 24, { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 30) })
-	local again = Ui.button(body, "Done", UDim2.new(0.4, 0, 0, 56), UDim2.new(0.3, 0, 0, 170), C.green, 24)
+	local again = Ui.button(body, "Done", UDim2.new(0.4, 0, 0, 64), UDim2.new(0.3, 0, 0, 170), C.green, 24)
 	again.Activated:Connect(close)
 end
 
@@ -603,10 +594,10 @@ local function coursePicker()
 		end)
 	end
 	if GameConfig.training.quickTrain then
-		local quick = Ui.button(body, "⏩ Quick train", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.04, 0, 0, 290), C.gold, 22)
+		local quick = Ui.button(body, "⏩ Quick train", UDim2.new(0.44, 0, 0, 64), UDim2.new(0.04, 0, 0, 278), C.gold, 22)
 		quick.Activated:Connect(quickTrainMenu)
 	end
-	local together = Ui.button(body, "👫 Ride together", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.52, 0, 0, 290), C.sky, 22)
+	local together = Ui.button(body, "👫 Ride together", UDim2.new(0.44, 0, 0, 64), UDim2.new(0.52, 0, 0, 278), C.sky, 22)
 	together.Activated:Connect(function()
 		open("👫 Ride together", "Pick a friend nearby")
 		Ui.text(body, "Looking for friends…", 22, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 40) })
@@ -663,7 +654,7 @@ gameRemotes:WaitForChild("TrainFriendsList").OnClientEvent:Connect(function(list
 	l.Parent = row
 	for i, f in list do
 		if i > 4 then break end
-		local b = Ui.button(row, "🐴 " .. tostring(f.name), UDim2.new(1, 0, 0, 56), UDim2.new(), C.cream, 22)
+		local b = Ui.button(row, "🐴 " .. tostring(f.name), UDim2.new(1, 0, 0, 64), UDim2.new(), C.cream, 22)
 		b.Activated:Connect(function() inviteCourse(f) end)
 	end
 end)
@@ -681,22 +672,22 @@ local function passport(h)
 	local l = Instance.new("UIListLayout")
 	l.FillDirection = Enum.FillDirection.Horizontal
 	l.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	l.Padding = UDim.new(0, 8)
+	l.Padding = UDim.new(0, 6)
 	l.Parent = row
 	for _, s in Training.STAMPS do
 		local got = h.stamps and h.stamps[s]
-		local cell = Ui.card(row, UDim2.fromOffset(88, 86), UDim2.new(), if got then C.cream else C.white)
+		local cell = Ui.card(row, UDim2.fromOffset(92, 90), UDim2.new(), if got then C.cream else C.white)
 		Ui.icon(cell, "stamp_" .. s, if got then "✅" else "⬜", UDim2.fromOffset(40, 40), UDim2.new(0.5, -20, 0, 6))
-		local t = Ui.text(cell, Training.STAMP_LABELS[s], 14, { Position = UDim2.new(0, 2, 0, 48), Size = UDim2.new(1, -4, 0, 34) })
-		t.TextColor3 = if got then C.ink else C.shade
+		local t = Ui.text(cell, Training.STAMP_LABELS[s], 16, { Position = UDim2.new(0, 2, 0, 46), Size = UDim2.new(1, -4, 0, 40) })
+		t.TextColor3 = if got then C.ink else C.plum -- (shade failed contrast; the ⬜ shows it's still to get)
 	end
 	-- The Spa Day stamp (D-058), with how many Spa Days this horse has had.
 	local spa = (h.spaDays or 0) > 0
-	local cell = Ui.card(row, UDim2.fromOffset(88, 86), UDim2.new(), if spa then C.cream else C.white)
+	local cell = Ui.card(row, UDim2.fromOffset(92, 90), UDim2.new(), if spa then C.cream else C.white)
 	Ui.text(cell, if spa then "🛁" else "⬜", 30, { Position = UDim2.new(0.5, -20, 0, 6), Size = UDim2.fromOffset(40, 40) })
-	local t = Ui.text(cell, Spa.STAMP_LABEL .. (if (h.spaDays or 0) > 1 then " ×" .. h.spaDays else ""), 14,
-		{ Position = UDim2.new(0, 2, 0, 48), Size = UDim2.new(1, -4, 0, 34) })
-	t.TextColor3 = if spa then C.ink else C.shade
+	local t = Ui.text(cell, Spa.STAMP_LABEL .. (if (h.spaDays or 0) > 1 then " ×" .. h.spaDays else ""), 16,
+		{ Position = UDim2.new(0, 2, 0, 46), Size = UDim2.new(1, -4, 0, 40) })
+	t.TextColor3 = if spa then C.ink else C.plum
 end
 
 -- Spa Day (D-058): hose, brush, towel. Each step is a row of taps on one big button, with the
@@ -725,7 +716,7 @@ local function spaGame(h)
 	local stepIdx, taps = 1, 0
 	local button: TextButton? = nil
 	local function finish()
-		for _, chip in chips do chip.TextColor3 = C.green end
+		for _, chip in chips do chip.TextColor3 = C.textGood end
 		fx.Text = "✨"
 		if button then button.Text, button.AutoButtonColor = "All clean! Time to go", false end
 		local wait = math.max(0, spaCfg.minSeconds + 0.5 - (now() - started))
@@ -737,7 +728,7 @@ local function spaGame(h)
 	end
 	local function showStep()
 		local step = Spa.STEPS[stepIdx]
-		for k, chip in chips do chip.TextColor3 = if k < stepIdx then C.green elseif k == stepIdx then C.ink else C.shade end
+		for k, chip in chips do chip.TextColor3 = if k < stepIdx then C.textGood elseif k == stepIdx then C.ink else C.plum end
 		fx.Text = Spa.STEP_TEXT[step].emoji
 		if button then button.Text = Spa.STEP_TEXT[step].tap end
 	end
@@ -763,7 +754,7 @@ local function spaPick(h)
 	open("🛁 Spa Day for " .. h.name, if closed then "" elseif full then "Hose, brush and dry!" else "Hose, brush and dry. +1 Energy!")
 	if closed then
 		Ui.text(body, "🌙 " .. Spa.CLOSED, 26, { Position = UDim2.new(0, 0, 0, 40), Size = UDim2.new(1, 0, 0, 40) })
-		local ok = Ui.button(body, "OK", UDim2.new(0.3, 0, 0, 56), UDim2.new(0.35, 0, 0, 120), C.green, 24)
+		local ok = Ui.button(body, "OK", UDim2.new(0.3, 0, 0, 64), UDim2.new(0.35, 0, 0, 120), C.green, 24)
 		ok.Activated:Connect(close)
 		return
 	end
@@ -787,7 +778,7 @@ local function vetMenu(spaOnly: boolean)
 		end
 		open("💚 " .. h.name .. " at the Vet", "Health Passport")
 		passport(h)
-		local check = Ui.button(body, "🩺 Check-up", UDim2.new(0.44, 0, 0, 60), UDim2.new(0.04, 0, 0, 220), C.green, 26)
+		local check = Ui.button(body, "🩺 Check-up", UDim2.new(0.44, 0, 0, 64), UDim2.new(0.04, 0, 0, 220), C.green, 26)
 		check.Activated:Connect(function()
 			open("💚 Check-up for " .. h.name, "Tap with each heartbeat")
 			local gen = generation
@@ -798,7 +789,7 @@ local function vetMenu(spaOnly: boolean)
 			end)
 		end)
 		local spaOpen = GameConfig.spa.enabled and (h.spaToday or 0) < GameConfig.spa.perDay
-		local spa = Ui.button(body, if spaOpen then "🛁 Spa Day" else "🌙 " .. Spa.CLOSED, UDim2.new(0.44, 0, 0, 60),
+		local spa = Ui.button(body, if spaOpen then "🛁 Spa Day" else "🌙 " .. Spa.CLOSED, UDim2.new(0.44, 0, 0, 64),
 			UDim2.new(0.52, 0, 0, 220), if spaOpen then C.sky else C.shade, if spaOpen then 26 else 18)
 		spa.TextWrapped = true
 		spa.Activated:Connect(function()

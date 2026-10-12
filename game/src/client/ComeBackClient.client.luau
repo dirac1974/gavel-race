@@ -20,6 +20,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local PickerText = require(Shared:WaitForChild("PickerText")) -- one distance word everywhere ("🐇 Short", not "Sprint")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
@@ -46,7 +47,7 @@ local welcomeScale = Instance.new("UIScale")
 welcomeScale.Parent = welcomeCard
 local welcomeTitle = Ui.text(welcomeCard, "", 26, { Position = UDim2.new(0, 12, 0, 14), Size = UDim2.new(1, -24, 0, 64) })
 local welcomeGift = Ui.text(welcomeCard, "", 20, { Position = UDim2.new(0, 12, 0, 84), Size = UDim2.new(1, -24, 0, 70) })
-welcomeGift.TextColor3 = C.cash
+welcomeGift.TextColor3 = C.textGood
 local thanksBtn = Ui.button(welcomeCard, "💛 Thanks!", UDim2.fromOffset(200, MIN_TOUCH + 8), UDim2.new(0.5, -100, 1, -MIN_TOUCH - 24), C.orange, 24)
 
 local scene: Model? = nil
@@ -238,7 +239,7 @@ choice.Visible = false
 Ui.text(choice, "📷 Nice photo!", 24, { Position = UDim2.new(0, 10, 0, 12), Size = UDim2.new(1, -20, 0, 30) })
 local saveBtn = Ui.button(choice, "💾 Save", UDim2.fromOffset(140, MIN_TOUCH), UDim2.new(0, 20, 1, -MIN_TOUCH - 20), C.green, 20)
 local shareBtn = Ui.button(choice, "📤 Share", UDim2.fromOffset(140, MIN_TOUCH), UDim2.new(1, -160, 1, -MIN_TOUCH - 20), C.sky, 20)
-local closeChoice = Ui.button(choice, "✕", UDim2.fromOffset(MIN_TOUCH, MIN_TOUCH), UDim2.new(1, -MIN_TOUCH - 6, 0, 6), C.white, 22)
+local closeChoice = Ui.closeButton(choice, UDim2.new(1, -MIN_TOUCH - 6, 0, 6), MIN_TOUCH)
 local lastCapture: any = nil
 closeChoice.Activated:Connect(function() choice.Visible = false end)
 saveBtn.Activated:Connect(function()
@@ -314,7 +315,8 @@ end)
 local open = false -- your results card is up (see the Heartbeat below)
 local function showBest()
 	if not pendingBest then return end
-	bestSub.Text = string.format("%s  %d", tostring(pendingBest.distance), tonumber(pendingBest.score) or 0)
+	local dist = tostring(pendingBest.distance)
+	bestSub.Text = string.format("%s  %d", PickerText.DIST_WORD[dist] or dist, tonumber(pendingBest.score) or 0)
 	bestPill.Visible = true
 	Ui.pop(bestPill)
 end

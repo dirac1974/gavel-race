@@ -121,4 +121,25 @@ function QueueView.view(s: State, me: number?, now: number): View
 		subtitle = if full then "Full gate! Here we go" else "🤖 Bots join at 0", slots = slots, showLeave = true, showChoices = true }
 end
 
+-- The compact phone card's one line (AAA Phase 2, D-067): "Race in 12 · 3 riders".
+function QueueView.compactLine(v: View): string
+	if v.phase == "racetime" then return "Race time! GO!" end
+	if v.phase == "countdown" then
+		local riders = 0
+		for _, sl in v.slots do if sl.filled then riders += 1 end end
+		if riders >= #v.slots and #v.slots > 0 then return string.format("Race in %d · full gate!", v.seconds or 0) end
+		return string.format("Race in %d · %d rider%s", v.seconds or 0, riders, if riders == 1 then "" else "s")
+	end
+	return v.title
+end
+
+-- The warm-up slider's word for a practice tap (it counts nothing and is never sent anywhere).
+-- Kind words only: "Early" and "Late" instead of a miss (the race's own rule, D-055).
+function QueueView.warmWord(score: number, early: boolean): string
+	if score >= 95 then return "Perfect!" end
+	if score >= 80 then return "Great!" end
+	if score >= 60 then return "Good!" end
+	return if early then "Early" else "Late"
+end
+
 return QueueView

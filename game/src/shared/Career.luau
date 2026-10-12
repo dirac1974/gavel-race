@@ -37,22 +37,25 @@ function Career.crossed(before: number?, after: number?): (number?, boolean)
 	return badge, veteran
 end
 
--- The one-time Legend suggestion: a Veteran that isn't a Legend and hasn't been asked.
+-- The one-time Legend suggestion: a Veteran that isn't a Legend and hasn't been asked. Off while
+-- career.suggest is false (AAA Phase 3, D-068: no suggestion until breeding exists).
 function Career.suggestLegend(h: any): boolean
-	return cfg().enabled and Career.isVeteran(h) and h.legend == nil and h.legendAsked ~= true
+	return cfg().enabled and cfg().suggest ~= false and Career.isVeteran(h) and h.legend == nil and h.legendAsked ~= true
 end
 
--- Can this horse take Legend Retirement now (leaving the owner's other duties to Leagues)?
+-- Can this horse take Legend Retirement now (leaving the owner's other duties to Leagues)? Never
+-- while careers are off (career.enabled, e.g. GameConfig.corePlaytest).
 function Career.canBeLegend(h: any): boolean
-	if h.legend ~= nil then return false end
+	if h.legend ~= nil or not cfg().enabled then return false end
 	return not cfg().retireNeedsVeteran or Career.isVeteran(h)
 end
 
--- The career row on a horse card: "🎖️ 2 badges · 🏆 1 Cup · Veteran". Short: icons and words.
+-- The career row on a horse card: "🎖️ 2 patches · 🏆 1 Cup · Veteran". Short: icons and words.
+-- AAA Phase 3 (D-068): the 25-race award is a "career patch" (★ is riding only, "badge" is the league's).
 function Career.line(races: number, cups: number, legend: boolean): string
 	local parts = {}
 	local b = Career.badges(races)
-	table.insert(parts, string.format("%s %d %s", Career.BADGE, b, if b == 1 then "badge" else "badges"))
+	table.insert(parts, string.format("%s %d %s", Career.BADGE, b, if b == 1 then "patch" else "patches"))
 	if cups > 0 then table.insert(parts, string.format("🏆 %d %s", cups, if cups == 1 then "Cup" else "Cups")) end
 	if legend then
 		table.insert(parts, Career.LEGEND .. " Legend")
@@ -65,6 +68,10 @@ end
 -- What a horse card shows about its career.
 function Career.view(h: any): { [string]: any }
 	local races = h.record and h.record.races or 0
+	if not cfg().enabled then -- careers off (e.g. GameConfig.corePlaytest): no career row at all
+		return { badges = 0, veteran = false, legend = h.legend ~= nil, canBeLegend = false, suggestLegend = false,
+			cups = h.record and h.record.cups or 0, line = "" }
+	end
 	return {
 		badges = Career.badges(races),
 		toNextBadge = Career.toNextBadge(races),
@@ -84,7 +91,7 @@ end
 
 -- Toasts (each at most ui.toastMaxWords words).
 function Career.badgeToast(name: string, badgeRaces: number): string
-	return string.format("%s %s earned a %d-race badge!", Career.BADGE, name, badgeRaces)
+	return string.format("%s %s earned a %d-race patch!", Career.BADGE, name, badgeRaces)
 end
 
 function Career.veteranToast(name: string): string

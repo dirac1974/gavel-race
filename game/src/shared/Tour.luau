@@ -5,12 +5,15 @@
 
 local Tour = {}
 
-export type Step = { id: string, event: string, text: string, go: string? }
+-- pointText (AAA Phase 2, D-067): the words when the step points at a real button instead of
+-- having its own GO (firstMinute.tourGoOnRace = false: the race step points at RACE!).
+export type Step = { id: string, event: string, text: string, go: string?, pointText: string? }
 
 -- Text uses {horse} for the active horse's name.
 Tour.STEPS = {
 	-- The first GO joins a race with your horse at once (D-063: in a race within 2 minutes).
-	{ id = "race", event = "race", text = "Let's race! Tap GO to race with {horse}.", go = "race" },
+	{ id = "race", event = "race", text = "Let's race! Tap GO to race with {horse}.", go = "race",
+		pointText = "Let's race! Tap 🏁 RACE! down below." },
 	{ id = "feed", event = "feed", text = "Great ride! Head to your barn and give {horse} some hay.", go = "stable" },
 	{ id = "groom", event = "groom", text = "Now brush {horse} until it shines!", go = "stable" },
 	{ id = "plant", event = "plant", text = "Plant your carrot seeds in a garden bed. They grow while you're away.", go = "stable" },
@@ -50,8 +53,15 @@ function Tour.skip(flags: { [string]: any })
 	flags.tourDone = true
 end
 
-function Tour.text(step: Step, horseName: string?): string
-	return (string.gsub(step.text, "{horse}", horseName or "your horse"))
+function Tour.text(step: Step, horseName: string?, pointing: boolean?): string
+	local text = if pointing and step.pointText then step.pointText else step.text
+	return (string.gsub(text, "{horse}", horseName or "your horse"))
+end
+
+-- The tour's step id right now ("race", "feed", ...) or nil.
+function Tour.stepId(flags: { [string]: any }): string?
+	local i = Tour.current(flags)
+	return if i then Tour.STEPS[i].id else nil
 end
 
 return Tour

@@ -12,8 +12,13 @@
 -- Clarity pass (D-064, stage 3): each race card is its league's colour and badge with one short
 -- line (PickerText.cardLine) and a status chip; a horse card says how today's race suits it in
 -- words, never a number; every button is at least ui.panelButtonPx tall.
+-- Open Practice (AAA Phase 3, D-068, GameConfig.queue.openPractice): any league's Practice card is
+-- joinable, and "👫 Friends" lists Roblox friends in this server, each a "🎈 Race with [name]"
+-- button that joins the one Practice line (the friend's course when they're already in it).
+-- Nothing is sent to the friend: no invites.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
@@ -49,8 +54,9 @@ local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.new(), C.paper)
 local slideIn = Ui.fitPanel(panel, W, H) -- never shrinks text under 14 px: scrolls instead (D-064)
 local QCARD = GameConfig.queueCard or {}
 local moreChoices = QCARD.enabled ~= false and QCARD.oneTapRace ~= false
-Ui.text(panel, if moreChoices then "🔀 More choices" else "🏁 Pick a race", 32, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 38) })
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 10, 0, 6), C.white, 26)
+-- The title sits between the 👫 Friends button (left, 160 px) and the ✕ (D-068: never under them).
+Ui.text(panel, if moreChoices then "🔀 More choices" else "🏁 Pick a race", 32, { Position = UDim2.new(0, 170, 0, 12), Size = UDim2.new(1, -340, 0, 38) })
+local closeBtn = Ui.closeButton(panel, UDim2.new(1, -TAP - 10, 0, 6), TAP)
 
 local cardRow = Instance.new("Frame")
 cardRow.BackgroundTransparency = 1
@@ -105,6 +111,93 @@ for _, k in { { "race", "🏁 Race" }, { "cup", "🏆 Cup" }, { "practice", "�
 	end)
 end
 
+local function leagueQueues(): boolean
+	return GameConfig.queue == nil or GameConfig.queue.mode ~= "cards"
+end
+
+local function openPractice(): boolean
+	return leagueQueues() and (GameConfig.queue or {}).openPractice == true
+end
+
+-- Race with a friend (D-068) -------------------------------------------------------------------
+-- Roblox friends in this server (Player:IsFriendsWith, cached; a failed check isn't cached).
+local friendCache: { [number]: boolean } = {}
+local function isFriend(userId: number): boolean
+	if friendCache[userId] == nil then
+		local ok, res = pcall(function() return Players.LocalPlayer:IsFriendsWith(userId) end)
+		if not ok then return false end
+		friendCache[userId] = res == true
+	end
+	return friendCache[userId]
+end
+
+local friendsMode = false
+local friendsBtn = Ui.button(panel, "👫 Friends", UDim2.fromOffset(150, TAP), UDim2.new(0, 10, 0, 6), C.sky, 20)
+friendsBtn.Visible = openPractice()
+local friendRow = Instance.new("ScrollingFrame")
+friendRow.BackgroundTransparency = 1
+friendRow.BorderSizePixel = 0
+friendRow.Size = UDim2.new(1, -32, 0, 150)
+friendRow.Position = UDim2.new(0, 16, 0, 74)
+friendRow.ScrollingDirection = Enum.ScrollingDirection.X
+friendRow.AutomaticCanvasSize = Enum.AutomaticSize.X
+friendRow.CanvasSize = UDim2.new()
+friendRow.ScrollBarThickness = 4
+friendRow.Visible = false
+friendRow.Parent = panel
+local frl = Instance.new("UIListLayout")
+frl.FillDirection = Enum.FillDirection.Horizontal
+frl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+frl.Padding = UDim.new(0, 12)
+frl.Parent = friendRow
+
+local close -- defined below
+local function renderFriends()
+	for _, ch in friendRow:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
+	local note = Ui.text(friendRow, "Looking for your friends…", 20, { Size = UDim2.fromOffset(640, 130), TextWrapped = true })
+	note.TextColor3 = C.plum
+	task.spawn(function()
+		local list = {}
+		for _, p in Players:GetPlayers() do
+			if p ~= Players.LocalPlayer and isFriend(p.UserId) then table.insert(list, p) end
+		end
+		if not friendsMode or not gui.Enabled then return end
+		for _, ch in friendRow:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
+		if #list == 0 then
+			Ui.text(friendRow, "No Roblox friends in this game yet. When one joins, race them in Practice!", 20,
+				{ Size = UDim2.fromOffset(640, 130), TextWrapped = true }).TextColor3 = C.plum
+			return
+		end
+		for _, f in list do
+			local b = Ui.button(friendRow, "🎈 Race with " .. f.DisplayName, UDim2.fromOffset(200, 130), UDim2.new(), C.cream, 20)
+			b.TextWrapped = true
+			b.TextTruncate = Enum.TextTruncate.AtEnd
+			b.Activated:Connect(function()
+				pickedHorse = pickedHorse or (PlayerState.data and PlayerState.data.activeHorse)
+				if not pickedHorse then
+					Ui.toast("Pick a horse first!", "heart", "🐴")
+					return
+				end
+				-- the server sends the one notice: "You're in Sam's race!" or "Ask Sam to tap 🎈 Practice too!"
+				raceRemotes:WaitForChild("JoinRace"):FireServer(true, nil, pickedHorse, "practice", f.UserId)
+				close()
+			end)
+		end
+	end)
+end
+
+local function setFriendsMode(on: boolean)
+	friendsMode = on and openPractice()
+	friendsBtn.Text = if friendsMode then "◀ Races" else "👫 Friends"
+	friendRow.Visible = friendsMode
+	if friendsMode then pickedHorse = pickedHorse or (PlayerState.data and PlayerState.data.activeHorse) end
+	cardRow.Visible = not friendsMode
+	kindRow.Visible = not friendsMode
+	joinBtn.Visible = not friendsMode
+	if friendsMode then renderFriends() end
+end
+friendsBtn.Activated:Connect(function() setFriendsMode(not friendsMode) end)
+
 -- How well a horse suits these conditions: today's Rating minus its average Rating over
 -- every distance, surface and weather (D-014). Positive = a good day for it.
 local avgCache: { [string]: number } = {}
@@ -138,15 +231,12 @@ local function cardFor(course: string)
 	return nil
 end
 
-local function leagueQueues(): boolean
-	return GameConfig.queue == nil or GameConfig.queue.mode ~= "cards"
-end
-
--- Can this horse join this card? An open card takes any league; a claimed one only its own.
+-- Can this horse join this card? An open card takes any league; a claimed one only its own, except
+-- Practice when it's open to every league (D-068).
 local function joinable(c, h): boolean
 	if not c or c.riders >= c.lanes then return false end
 	if not leagueQueues() then return true end
-	return c.open or (h ~= nil and c.league == (h.league or "Rookie"))
+	return c.open or (h ~= nil and c.league == (h.league or "Rookie")) or (c.practice == true and openPractice())
 end
 
 renderKinds = function()
@@ -180,6 +270,7 @@ local function raceCard(c)
 	local full = c.riders >= c.lanes
 	local h = pickedHorse and PlayerState.horse(pickedHorse)
 	local watch = leagueQueues() and not c.open and h ~= nil and c.league ~= (h.league or "Rookie")
+		and not (c.practice and openPractice())
 	-- The league is the card's colour and badge; one short line; lane dots; a status chip.
 	local league = c.league or (h and h.league) or "Rookie"
 	local face = if selected then C.gold elseif full or watch then C.shade else (Ui.leagueColors[league] or C.cream)
@@ -253,7 +344,7 @@ local function horseCard(h, card)
 	local diff = suits(h, card)
 	local line = PickerText.suits(diff, tired) -- words, never a number (D-064)
 	local l = Ui.text(b, line, TEXT, { Position = UDim2.new(0, 8, 0, 74), Size = UDim2.new(1, -16, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
-	l.TextColor3 = if diff and diff > 0.5 then C.green elseif diff and diff < -0.5 then C.orangeDark else C.plum
+	l.TextColor3 = if diff and diff > 0.5 then C.textGood elseif diff and diff < -0.5 then C.textWarn else C.plum
 	b.Activated:Connect(function()
 		if tired then
 			Ui.toast(h.name .. " is napping. Try another horse!", "zzz_resting", "😴")
@@ -324,10 +415,11 @@ local function open()
 	end
 	gui.Enabled = true
 	slideIn()
+	setFriendsMode(false)
 	renderCards(true)
 	renderHorses()
 end
-local function close() gui.Enabled = false end
+close = function() gui.Enabled = false end
 closeBtn.Activated:Connect(close)
 dim.Activated:Connect(close)
 joinBtn.Activated:Connect(function()

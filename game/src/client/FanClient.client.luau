@@ -34,12 +34,13 @@ end
 
 local gui = Ui.screen("Fans", 6)
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local PanelFit = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("PanelFit"))
 local FANS = GameConfig.fans
 local CLAP_AT = UDim2.new(1, FANS.clapOffset[1], 1, FANS.clapOffset[2])
 
 -- Cheer strip ------------------------------------------------------------------------
--- A quiet strip at the top centre, under the status line (D-056): 56 px, chips at least 48 px.
-local STRIP_W, STRIP_H, LINE_H = 560, 56, 40
+-- A quiet strip at the top centre, under the status line (D-056): 64 px, chips 56 px (AAA Phase 2 floors).
+local STRIP_W, STRIP_H, LINE_H = 572, 64, 40
 local bar = Ui.card(gui, UDim2.fromOffset(STRIP_W, STRIP_H), UDim2.new(0.5, 0, 0, 84), C.paper)
 bar.AnchorPoint = Vector2.new(0.5, 0)
 if not FANS.cheerStripTop then -- the D-019 spot, above the dock
@@ -52,7 +53,8 @@ local barScale = Instance.new("UIScale")
 barScale.Parent = bar
 local function rescale()
 	local cam = workspace.CurrentCamera
-	if cam then barScale.Scale = math.min(1, (cam.ViewportSize.X - 20) / bar.Size.X.Offset) end
+	-- never under the floors: the chips' 14 px names and 56 px size stay readable and tappable
+	if cam then barScale.Scale = math.clamp((cam.ViewportSize.X - 20) / bar.Size.X.Offset, PanelFit.floor(14, 56, GameConfig.ui), 1) end
 end
 rescale()
 task.spawn(function()
@@ -82,7 +84,7 @@ end
 local cl = Instance.new("UIListLayout")
 cl.FillDirection = Enum.FillDirection.Horizontal
 cl.HorizontalAlignment = Enum.HorizontalAlignment.Center
-cl.Padding = UDim.new(0, 6)
+cl.Padding = UDim.new(0, 4)
 cl.Parent = chips
 
 -- Clap button and beat ring ---------------------------------------------------------------
@@ -100,7 +102,7 @@ Ui.corner(ring, 40)
 local ringStroke = Ui.stroke(ring, 5, C.orange)
 local clapLabel = Ui.text(gui, "", 26, { Size = UDim2.fromOffset(170, 34), AnchorPoint = Vector2.new(1, 1),
 	Position = CLAP_AT + UDim2.fromOffset(0, -96) })
-clapLabel.TextColor3 = C.orangeDark
+clapLabel.TextColor3 = C.textWarn
 clapLabel.TextStrokeTransparency = 0.6
 
 -- State ------------------------------------------------------------------------------
@@ -123,10 +125,11 @@ end
 local function showChips(laneList)
 	for _, ch in chips:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
 	for i, lane in laneList do
-		local w, h = if FANS.cheerStripTop then 52 else 72, if FANS.cheerStripTop then 46 else 54
+		local w, h = if FANS.cheerStripTop then 56 else 72, if FANS.cheerStripTop then 56 else 60
 		local b = Ui.button(chips, "", UDim2.fromOffset(w, h), UDim2.new(), if lane.isBot then C.shade else LANE[i], 14)
 		Ui.text(b, tostring(i), 20, { Size = UDim2.new(1, 0, 0, h * 0.42), TextColor3 = if i == 3 or i == 2 or i == 6 then C.ink else C.white })
-		local name = Ui.text(b, lane.name, 11, { Position = UDim2.new(0, 2, 0, h * 0.42), Size = UDim2.new(1, -4, 0, h * 0.55) })
+		local name = Ui.text(b, lane.name, 14, { Position = UDim2.new(0, 2, 0, h * 0.42), Size = UDim2.new(1, -4, 0, h * 0.55),
+			TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 		name.TextColor3 = if i == 3 or i == 2 or i == 6 then C.ink else C.white
 		b.Activated:Connect(function()
 			if lane.isBot then
@@ -186,7 +189,10 @@ remotes:WaitForChild("FanStatus").OnClientEvent:Connect(function(courseId, lane,
 	end
 end)
 
-remotes.LiveChances.OnClientEvent:Connect(function(seg, _live, courseId)
+-- Checkpoint 1 closing shuts the cheer window. A preview (D-067: the stretch drive, and after the
+-- far-turn lock, which can come before checkpoint 1 in a Short race) is not a close: ignored.
+remotes.LiveChances.OnClientEvent:Connect(function(seg, _live, courseId, preview)
+	if preview == true then return end
 	if watching and watching.course == courseId and seg == 1 then
 		watching.cheerOpen = false
 		if not watching.cheered then setShown(false, clapOn) end
@@ -281,7 +287,7 @@ for k = 1, 5 do
 	rows[k] = r
 end
 local mine = Ui.text(panel, "", 18, { Position = UDim2.new(0, 16, 1, -62), Size = UDim2.new(1, -32, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
-mine.TextColor3 = C.orangeDark
+mine.TextColor3 = C.textWarn
 local xpLine = Ui.text(panel, "", 16, { Position = UDim2.new(0, 16, 1, -34), Size = UDim2.new(1, -32, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 xpLine.TextColor3 = C.plum
 local hideAt = 0

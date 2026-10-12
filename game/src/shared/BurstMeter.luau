@@ -53,6 +53,18 @@ function BurstMeter.score(t: number, spec: Spec): number
 	return 100 * (1 - math.clamp(BurstMeter.distance(t, spec), 0, 1))
 end
 
+-- Arming (D-066): a tap `t` seconds after the window opened counts only from `armSeconds` on.
+-- An earlier tap is ignored (nil: not scored, and the rider's one tap isn't used up). The marker
+-- runs from its random start the whole time; only input waits. Mirrors src/burst_meter.py.
+function BurstMeter.armed(t: number, armSeconds: number?): boolean
+	return t >= (armSeconds or 0)
+end
+
+function BurstMeter.tapScore(t: number, spec: Spec, armSeconds: number?): number?
+	if not BurstMeter.armed(t, armSeconds) then return nil end
+	return BurstMeter.score(t, spec)
+end
+
 -- Random start shared by every lane (uniform; see the header for why).
 function BurstMeter.randomPhase(rng: Rng): number
 	return rng:NextNumber()

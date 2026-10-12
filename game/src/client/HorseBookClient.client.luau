@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local PickerText = require(Shared:WaitForChild("PickerText")) -- one distance word everywhere ("Short", not "Sprint")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local C = Ui.colors
@@ -61,7 +62,7 @@ local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 local title = Ui.text(panel, "📖 Horse Book", 28, { Position = UDim2.new(0, 16, 0, 10), Size = UDim2.new(1, -100, 0, 36),
 	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false })
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(MIN_TOUCH, MIN_TOUCH), UDim2.new(1, -MIN_TOUCH - 8, 0, 6), C.white, 24)
+local closeBtn = Ui.closeButton(panel, UDim2.new(1, -MIN_TOUCH - 8, 0, 6), MIN_TOUCH)
 
 local tabs = Instance.new("ScrollingFrame")
 tabs.BackgroundTransparency = 1
@@ -107,8 +108,9 @@ local function layout()
 		scale.Scale = 1
 		panel.Size = UDim2.fromOffset(math.min(W, v.X - 16), v.Y - 16)
 	else
+		-- Only screens of at least 820 × 600, where the book fits at full size: never shrunk (AAA Phase 2).
 		panel.Size = UDim2.fromOffset(W, H)
-		scale.Scale = math.min(1, (v.X - 20) / W, (v.Y - 20) / H)
+		scale.Scale = 1
 	end
 end
 task.spawn(function()
@@ -160,7 +162,7 @@ local function entryCard(e, order: number, coatColor: Color3?, extra: string?)
 	label.TextColor3 = if e.earned then C.ink else C.plum
 	if extra then
 		local x = Ui.text(card, extra, SMALL, { Size = UDim2.new(1, -12, 0, 20), Position = UDim2.new(0, 6, 1, -26) })
-		x.TextColor3 = C.cash
+		x.TextColor3 = C.textGood
 	end
 	return card
 end
@@ -187,7 +189,7 @@ local function friendCard(userId: number, order: number)
 	img.Parent = card
 	local label = Ui.text(card, names[userId] or "Friend", TEXT, { Size = UDim2.new(1, -12, 0, 22), Position = UDim2.new(0, 6, 0, 76),
 		TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
-	Ui.text(card, "🐾 Stamp", SMALL, { Size = UDim2.new(1, -12, 0, 18), Position = UDim2.new(0, 6, 1, -24) }).TextColor3 = C.cash
+	Ui.text(card, "📍 Pin", SMALL, { Size = UDim2.new(1, -12, 0, 18), Position = UDim2.new(0, 6, 1, -24) }).TextColor3 = C.textGood
 	if not thumbs[userId] or not names[userId] then
 		task.spawn(function()
 			local ok, url = pcall(function()
@@ -239,7 +241,7 @@ render = function()
 	if page == "tour" then
 		local tour = book.tour or { count = 0, friends = {} }
 		if (tour.count or 0) == 0 then
-			note("No Tour stamps yet. Visit a friend's barn and pat every horse!", 1)
+			note("No Tour pins yet. Visit a friend's barn and pat every horse!", 1)
 			return
 		end
 		note(string.format("👫 %d barn%s toured!", tour.count, if tour.count == 1 then "" else "s"), 0)
@@ -250,7 +252,7 @@ render = function()
 		note("Your best ride at each distance. Only you see these.", 0)
 		for k, b in book.bests or {} do
 			local stars = if b.stars then ResultsText.stars(b.stars) else nil -- how you rode (D-064)
-			entryCard({ earned = b.score ~= nil, emoji = b.emoji, label = b.distance }, k, nil,
+			entryCard({ earned = b.score ~= nil, emoji = b.emoji, label = PickerText.DIST_WORD[b.distance] or b.distance }, k, nil,
 				if b.score then string.format("%s  %d", stars, b.score) else "Race one!")
 		end
 		return

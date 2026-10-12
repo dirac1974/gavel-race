@@ -58,7 +58,7 @@ local W, H = 780, 520
 local board = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.new(), Color3.fromHex("F3DDB3")) -- cork-ish
 local slideIn = Ui.fitPanel(board, W, H)
 Ui.text(board, "📋 Stable Board", 30, { Position = UDim2.new(0, 0, 0, 16), Size = UDim2.new(1, 0, 0, 38) })
-local closeBtn = Ui.button(board, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 10, 0, 6), C.white, 26)
+local closeBtn = Ui.closeButton(board, UDim2.new(1, -TAP - 10, 0, 6), TAP)
 
 local horsesRow = Instance.new("ScrollingFrame")
 horsesRow.BackgroundTransparency = 1
@@ -185,11 +185,11 @@ local function jobCard(parent: Instance, job, index: number)
 	bar(card, job.progress / job.target, done, UDim2.new(0, 10, 0, 64), UDim2.new(1, -86, 0, 16))
 	Ui.text(card, string.format("%d/%d", job.progress, job.target), TEXT, { Position = UDim2.new(1, -72, 0, 61), Size = UDim2.new(0, 64, 0, 22) })
 	local reward = Ui.text(card, rewardText(job.reward), TEXT, { Position = UDim2.new(0, 10, 0, 86), Size = UDim2.new(1, -20, 0, 22) })
-	reward.TextColor3 = C.cash
+	reward.TextColor3 = C.textGood
 	reward.TextTruncate = Enum.TextTruncate.AtEnd
 	local foot = UDim2.new(0, 10, 1, -TAP - 10)
 	if job.claimed then
-		Ui.text(card, "✓ Done!", 22, { Position = UDim2.new(0, 0, 1, -50), Size = UDim2.new(1, 0, 0, 30) }).TextColor3 = C.green
+		Ui.text(card, "✓ Done!", 22, { Position = UDim2.new(0, 0, 1, -50), Size = UDim2.new(1, 0, 0, 30) }).TextColor3 = C.textGood
 	elseif done then
 		local claim = Ui.button(card, "🎁 Claim", UDim2.new(1, -20, 0, TAP), foot, C.green, 20)
 		claim.Activated:Connect(function()
@@ -218,7 +218,7 @@ local function jobChip(parent: Instance, job, order: number)
 	local text = Ui.text(chip, job.text, TEXT, { Position = UDim2.new(0, 54, 0, 4), Size = UDim2.new(1, -60, 0, 44), TextXAlignment = Enum.TextXAlignment.Left })
 	text.TextTruncate = Enum.TextTruncate.AtEnd
 	if job.claimed then
-		Ui.text(chip, "✓ Done!", TEXT, { Position = UDim2.new(0, 10, 0, 54), Size = UDim2.new(1, -20, 0, 22) }).TextColor3 = C.green
+		Ui.text(chip, "✓ Done!", TEXT, { Position = UDim2.new(0, 10, 0, 54), Size = UDim2.new(1, -20, 0, 22) }).TextColor3 = C.textGood
 	else
 		bar(chip, job.progress / job.target, done, UDim2.new(0, 10, 0, 58), UDim2.new(1, -86, 0, 14))
 		Ui.text(chip, if done then "🎁" else string.format("%d/%d", job.progress, job.target), TEXT,
@@ -365,6 +365,8 @@ PlayerState.Changed.Event:Connect(function() render() end)
 -- The Next-thing pill (D-064, stage 3): one suggestion just above the dock, icon + a few words +
 -- GO. It replaces the pinned job (the pill picks the job when a job is the next thing).
 local NEXT = GameConfig.nextThing or { enabled = true, pipHintSeconds = 20, stillStuds = 6 }
+local FIRST = GameConfig.firstMinute or {}
+local Tour = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Tour"))
 local LAYOUT = GameConfig.touchLayout
 local pinGui = Ui.screen("NextThing", 3)
 pinGui.Enabled = NEXT.enabled ~= false
@@ -413,8 +415,8 @@ local function renderPill()
 		return
 	end
 	local nxt = Advice.nextThing(d, workspace:GetServerTimeNow())
-	if inLine and nxt.go == "race" then -- already waiting for a race: nothing to press
-		nxt = { key = "inline", emoji = "🏁", icon = "flag_ready", text = "You're in line. Race soon!", go = nil }
+	if inLine then -- waiting for a race (AAA Phase 2): say so, whatever else is next
+		nxt = { key = "inline", emoji = "🏁", icon = "flag_ready", text = "You're in line! Race soon.", go = nil }
 	end
 	if not current or current.key ~= nxt.key then
 		shownAt, hinted = os.clock(), false
@@ -464,8 +466,11 @@ RunService.Heartbeat:Connect(function()
 	local racing = RaceState.active and RaceState.myLane ~= nil
 	local replay = player.PlayerGui:FindFirstChild("ReplayUI")
 	local more = player.PlayerGui:FindFirstChild("DockMore")
+	-- The tour owns the screen while it runs (firstMinute.tourOwnsScreen): one voice, not two.
+	local d = PlayerState.data
+	local touring = FIRST.tourOwnsScreen ~= false and d ~= nil and #d.horses > 0 and Tour.current(d.flags or {}) ~= nil
 	local show = current ~= nil and not racing and not gui.Enabled and not RaceState.resultsOpen
-		and not (replay and replay.Enabled) and not (more and more.Enabled)
+		and not (replay and replay.Enabled) and not (more and more.Enabled) and not touring
 	if pill.Visible ~= show then pill.Visible = show end
 	if not show then
 		if pipBubble.Visible then pipBubble.Visible = false end

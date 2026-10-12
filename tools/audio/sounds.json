@@ -22,6 +22,8 @@
    "prompt": "Sparkly magical whoosh rising with twinkling chimes, bright and cheerful power-up for a kids game"},
   {"name": "tap_good", "priority": "P0", "kind": "sfx", "seconds": 0.5, "influence": 0.6,
    "prompt": "One soft bright tick, gentle wooden marimba blip, short mobile game tap feedback, clean"},
+  {"name": "tap_ok", "priority": "P1", "kind": "sfx", "seconds": 0.5, "influence": 0.6,
+   "prompt": "One tiny soft wooden tick, very short and quiet, mobile game tap feedback, clean, no echo"},
   {"name": "finish_fanfare", "priority": "P0", "kind": "sfx", "seconds": 2.5, "influence": 0.5,
    "prompt": "Short cheerful brass trumpet fanfare flourish, happy victory, playful, kids game, clean ending"},
   {"name": "ui_pop", "priority": "P0", "kind": "sfx", "seconds": 0.5, "influence": 0.6,

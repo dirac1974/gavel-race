@@ -48,6 +48,48 @@ function HorseLegs.angle(gait: string, leg: string, p: number): number
 	return g.amp * front * wave / 1.17 -- 1.17 ≈ the wave's peak, so amp is the real maximum
 end
 
+-- The body bob in step with the legs (D-066): `bobs` rises and falls a stride, lowest at `plant`,
+-- the phase where the leading forefoot comes down just after its furthest reach (the wave's peak is
+-- at about 0.19 of a cycle, so a leg with offset o plants near 0.21 - o). A gallop rises and falls
+-- once a stride on its lead leg (LegFR); trot and walk twice, once per diagonal or front foot.
+HorseLegs.BOB = {
+	walk = { bobs = 2, plant = 0.96 },  -- LegFL (0.25), then LegFR half a stride on
+	trot = { bobs = 2, plant = 0.21 },  -- LegFL with LegBR (0), then LegFR with LegBL
+	gallop = { bobs = 1, plant = 0.66 }, -- LegFR (0.55), the lead leg, lands last
+}
+
+-- Height of the body (0 at the plant, 1 halfway between plants) and its rock (-1 nose down at the
+-- plant, 1 nose up halfway), for stride phase p in this gait. Standing: 0, 0.
+function HorseLegs.bob(gait: string, p: number): (number, number)
+	local b = HorseLegs.BOB[gait]
+	if not b then return 0, 0 end
+	local c = math.cos(2 * math.pi * b.bobs * (p - b.plant))
+	return 0.5 - 0.5 * c, -c
+end
+
+-- The body's bob for a pose state (D-066): bob() for its gait, cross-faded from the previous gait
+-- over the same quarter second as the legs (mix), so a change of gait out of the gate or pulling up
+-- never jumps the body; times blend (0 standing).
+function HorseLegs.bodyBob(s): (number, number)
+	local lift, nose = HorseLegs.bob(s.gait, s.phase)
+	if s.prev and s.mix < 1 then
+		local l0, n0 = HorseLegs.bob(s.prev, s.phase)
+		lift, nose = l0 + (lift - l0) * s.mix, n0 + (nose - n0) * s.mix
+	end
+	return lift * s.blend, nose * s.blend
+end
+
+-- Did the leading forefoot land between phases `from` and `to` (a step forward of under one
+-- stride)? Used for a dust puff a stride.
+function HorseLegs.crossedPlant(gait: string, from: number, to: number): boolean
+	local b = HorseLegs.BOB[gait]
+	if not b or from == to then return false end
+	local span = (to - from) % 1
+	local per = 1 / b.bobs
+	local since = (from - b.plant) % per -- how far past a plant `from` already was
+	return since + span >= per
+end
+
 -- Phase advance for travelling `dist` studs in this gait.
 function HorseLegs.advance(phase: number, gait: string, dist: number): number
 	local g = HorseLegs.GAITS[gait]
@@ -217,6 +259,15 @@ end
 -- The pose state of a horse `apply` is animating (phase, gait, blend), or nil.
 function HorseLegs.stateOf(model: Instance): any
 	return states[model]
+end
+
+-- Where a horse `apply` is animating is in its stride (D-066): its phase (0..1), gait and blend
+-- (0 standing .. 1 moving), or nil for a horse without running legs. The race view's body bob
+-- reads this, so the bob keeps the legs' cadence (which follows distance) instead of a clock.
+function HorseLegs.phaseOf(model: Instance): (number?, string?, number)
+	local s = states[model]
+	if not s then return nil, nil, 0 end
+	return s.phase, s.gait, s.blend
 end
 
 -- How far the lowest hoof is lifted off the ground (studs) for legs `length` long: the body

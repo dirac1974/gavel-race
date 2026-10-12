@@ -14,6 +14,8 @@
 -- Legend's "🐴 Ride" brings it for a ride. Stalls are stored per horse: cards go stall order,
 -- pasture, then Legends, and a pasture horse moves straight into a free stall. The Hall of Fame
 -- page lists the plaques and the horses at Sunny Meadow Riding School with "↩️ Undo".
+-- AAA Phase 3 (D-068): a Legend's card has "🏁 Back to races" (two taps): it races again in its
+-- league with its record (Leagues.unretire).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -46,7 +48,7 @@ local W, H = 760, 500
 local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.new(), C.paper)
 local slideIn = Ui.fitPanel(panel, W, H, 300) -- shorter on a short screen; the list scrolls (D-064)
 local title = Ui.text(panel, "🐴 My Horses", 28, { Position = UDim2.new(0, 250, 0, 20), Size = UDim2.new(1, -500, 0, 36) })
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 10, 0, 6), C.white, 26)
+local closeBtn = Ui.closeButton(panel, UDim2.new(1, -TAP - 10, 0, 6), TAP)
 local stallBtn = Ui.button(panel, "", UDim2.fromOffset(230, TAP), UDim2.new(0, 12, 0, 6), C.sky, 18)
 local hallBtn = Ui.button(panel, "🏅 Hall of Fame", UDim2.fromOffset(170, TAP), UDim2.new(1, -TAP - 186, 0, 6), C.cream, 18)
 local list = Instance.new("ScrollingFrame")
@@ -65,6 +67,7 @@ grid.Parent = list
 
 local moving: string? = nil -- a pasture horse picked to swap into a stall
 local retiring: string? = nil -- asked once; a second tap retires
+local unretiring: string? = nil -- a Legend asked once; a second tap brings it back to the races (D-068)
 local renameState = nil       -- { id, first, second, picked } kept while renaming
 local mode = "horses"       -- or "rename:<id>"
 
@@ -141,15 +144,27 @@ local function horseCard(h, order: number)
 	rl.FillDirection = Enum.FillDirection.Horizontal
 	rl.Padding = UDim.new(0, 6)
 	rl.Parent = row
-	local function btn(text: string, color: Color3, fn)
-		local b = Ui.button(row, text, UDim2.fromOffset(80, TAP), UDim2.new(), color, TEXT)
+	local function btn(text: string, color: Color3, fn, width: number?)
+		local b = Ui.button(row, text, UDim2.fromOffset(width or 80, TAP), UDim2.new(), color, TEXT)
 		b.Activated:Connect(fn)
+		return b
 	end
 	if h.legend then
 		btn("🐴 Ride", C.orange, function()
 			gameRemotes:WaitForChild("CallHorse"):FireServer(h.id) -- a Legend ride (D-059)
 			gui.Enabled = false
 		end)
+		-- Back to the races (AAA Phase 3, D-068): undo Legend Retirement, two taps like retiring.
+		local back = btn(if unretiring == h.id then "Sure? 🏁" else "🏁 Back to races", if unretiring == h.id then C.green else C.white, function()
+			if unretiring == h.id then
+				gameRemotes:WaitForChild("UnretireHorse"):FireServer(h.id)
+				unretiring = nil
+			else
+				unretiring = h.id
+				render()
+			end
+		end, 140)
+		back.TextWrapped = true -- 140 px, two lines if a device draws the emoji wide (D-068)
 	end
 	if h.stalled and not active then
 		btn("🏇 Ride", C.orange, function() gameRemotes:WaitForChild("SetActiveHorse"):FireServer(h.id) end)
@@ -249,7 +264,7 @@ local function renameView(id: string)
 	box.LayoutOrder = 1
 	box.Parent = list
 	local preview = Ui.text(box, NameGen.build(picked[1], picked[2]) or h.name, 36, { Size = UDim2.new(1, 0, 0, 44) })
-	preview.TextColor3 = C.orangeDark
+	preview.TextColor3 = C.textWarn
 	for r, words in { first, second } do
 		local rowF = Instance.new("Frame")
 		rowF.BackgroundTransparency = 1
@@ -328,7 +343,7 @@ end)
 
 local function open()
 	if not PlayerState.data or #PlayerState.data.horses == 0 then return end
-	mode, moving, retiring, renameState = "horses", nil, nil, nil
+	mode, moving, retiring, unretiring, renameState = "horses", nil, nil, nil, nil
 	gui.Enabled = true
 	slideIn()
 	render()
@@ -387,7 +402,7 @@ local mbody = Instance.new("Frame")
 mbody.BackgroundTransparency = 1
 mbody.Size = UDim2.fromScale(1, 1)
 mbody.Parent = mcard
-local mclose = Ui.button(mcard, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 8, 0, 6), C.white, 26)
+local mclose = Ui.closeButton(mcard, UDim2.new(1, -TAP - 8, 0, 6), TAP)
 mclose.Activated:Connect(function() mgui.Enabled = false end)
 
 local function listingCard(id: string)

@@ -64,14 +64,21 @@ def test_generated_id_modules_cover_every_upload():
     meshes = dict(re.findall(r"^\t(\w+) = (\d+),$", (SHARED / "MeshAssets.luau").read_text(), re.M))
     images = dict(re.findall(r"^\t(\w+) = (\d+),$", (SHARED / "UiImages.luau").read_text(), re.M))
     sounds = dict(re.findall(r"^\t(\w+) = (\d+),$", (SHARED / "SoundAssets.luau").read_text(), re.M))
+    sheet = re.search(r"^\tassetId = (\d+),$", (SHARED / "SoundSheet.luau").read_text(), re.M).group(1)
     for name, rec in state.items():
+        if name == "sound_sheet":  # the stand-in sheet goes to SoundSheet.luau, not SoundAssets
+            assert name not in sounds and sheet in ("0", str(rec["assetId"]))
+            continue
         if rec["kind"] == "Audio" and rec.get("moderation") == "Rejected":
             assert name not in sounds, name  # rejected sounds stay out of the game
             continue
         target = {"Model": meshes, "Decal": images, "Audio": sounds}[rec["kind"]]
         assert target.get(name) == str(rec["assetId"]), name
     assert {"horse_bay", "horse_chestnut", "horse_grey", "horse_black", "horse_palomino", "finish_post", "gate_stall"} <= set(meshes)
-    assert set(images) == {p.stem for p in ATLAS.glob("ui_atlas_*.png")}
+    # UI sheets plus the whole images for Beams, Textures and particles (AAA Phase 4, D-069).
+    textures = {"bunting_strip", "crowd_strip", "confetti_square", "flag_pennant"}
+    assert set(images) == {p.stem for p in ATLAS.glob("ui_atlas_*.png")} | textures
+    assert textures <= {n for n, r in state.items() if r["kind"] == "Decal"}
 
 
 def test_every_uploaded_model_has_a_model_spec():
@@ -83,3 +90,12 @@ def test_every_uploaded_model_has_a_model_spec():
     for slot in meshes:
         prefixes = [k for k in specs if k.endswith("_") and slot.startswith(k)]
         assert slot in specs or prefixes, f"{slot} has no ModelSpecs entry"
+
+
+def test_world_textures_are_whole_images_roblox_can_store():
+    """The track dressing images (tools/ui/make_ui_svgs.py STRIP_NAMES) are uploaded whole, not atlased."""
+    png = ROOT / "assets" / "ui" / "png"
+    for name in ("bunting_strip", "crowd_strip", "confetti_square", "flag_pennant"):
+        w, h = png_size(png / f"{name}.png")
+        assert w <= 1024 and h <= 1024, name
+        assert name not in atlas(), f"{name} must stay out of the atlas (Beams and Textures show a whole image)"

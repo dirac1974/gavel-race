@@ -14,12 +14,15 @@ local RunService = game:GetService("RunService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
 local DiamondProducts = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DiamondProducts"))
 local DockLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DockLayout"))
+local Tour = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Tour"))
+local GuiService = game:GetService("GuiService")
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local raceRemotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 
@@ -100,12 +103,13 @@ local cashCard = Ui.card(cashSlot, UDim2.new(1, 0, 0, 56), UDim2.new(0, 0, 1, -6
 Ui.icon(cashCard, "cash", "💵", UDim2.fromOffset(36, 36), UDim2.new(0, 8, 0.5, -18))
 local cashText = Ui.text(cashCard, "0", 26, { Size = UDim2.new(0.5, -50, 1, 0), Position = UDim2.new(0, 48, 0, 0) })
 cashText.TextXAlignment = Enum.TextXAlignment.Left
-cashText.TextColor3 = C.cash
+cashText.TextColor3 = C.textGood
 -- Diamonds: tap to open the Tack & Paint shop (never opens by itself, D-050). On touch it's a
--- 48 px pill at the top right, below the Roblox top bar: no glow, pulse, badge or sound (D-056).
+-- pill at the top right (ui.minTouchPx tall), below the Roblox top bar: no glow, pulse, badge or
+-- sound (D-056). The ⚙️ sits under it on touch (GrownUps, touchLayout.gearBelowGem).
 local cardGem = Ui.button(cashCard, "💎 0", UDim2.new(0.5, -10, 1, -12), UDim2.new(0.5, 4, 0, 6), C.sky, 20)
 local inset = game:GetService("GuiService"):GetGuiInset()
-local pillGem = Ui.button(gui, "💎 0", UDim2.fromOffset(110, 48), UDim2.new(1, -12, 0, inset.Y + 8), C.sky, 20)
+local pillGem = Ui.button(gui, "💎 0", UDim2.fromOffset(110, GameConfig.ui.minTouchPx), UDim2.new(1, -12, 0, inset.Y + 8), C.sky, 20)
 pillGem.AnchorPoint = Vector2.new(1, 0)
 pillGem:SetAttribute("NoPop", true)
 pillGem.Visible = false
@@ -189,9 +193,40 @@ local raceSub = Ui.text(raceBtn, "", DockLayout.LABEL_PX, { Size = UDim2.new(1, 
 	TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 raceSub.Visible = false
 -- The ✕ that leaves the line: big enough for a fingertip at the dock's smallest scale (D-064).
-local leaveBtn = Ui.button(raceSlot, "✕", UDim2.fromOffset(DockLayout.LEAVE_PX, DockLayout.LEAVE_PX), UDim2.new(1, -44, 1, -118), C.white, 26)
+local leaveBtn = Ui.closeButton(raceSlot, UDim2.new(1, -44, 1, -118), DockLayout.LEAVE_PX)
 leaveBtn.Visible = false
 leaveBtn.ZIndex = 3
+
+-- The first minute (AAA Phase 2, D-067): the tour's race step points here. A gold glow pulses
+-- behind RACE! and a hoofprint arrow bobs above it (Reduced Motion: both hold still).
+local FM = GameConfig.firstMinute or {}
+local raceGlow = Instance.new("Frame")
+raceGlow.Name = "TourGlow"
+raceGlow.AnchorPoint = Vector2.new(0.5, 1)
+raceGlow.Position = UDim2.new(0.5, 0, 1, -74 + 70 + 8)
+raceGlow.Size = UDim2.new(1, 16, 0, 70 + 16)
+raceGlow.BackgroundColor3 = C.gold
+raceGlow.BackgroundTransparency = 0.4
+raceGlow.BorderSizePixel = 0
+raceGlow.ZIndex = 0
+raceGlow.Visible = false
+Ui.corner(raceGlow, 22)
+raceGlow.Parent = raceSlot
+local raceArrow = Ui.text(raceSlot, "🐾\n👇", 30, { Size = UDim2.new(1, 0, 0, 72), AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -84), TextWrapped = false })
+raceArrow.LineHeight = 0.9
+raceArrow.TextStrokeTransparency = 0.6
+raceArrow.TextStrokeColor3 = C.paper
+raceArrow.Visible = false
+local function reducedMotion(): boolean
+	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
+	return ok and on == true
+end
+local function tourRaceStep(): boolean
+	local d = PlayerState.data
+	if not d or #d.horses == 0 then return false end
+	return Tour.stepId(d.flags or {}) == "race"
+end
 
 -- What one tap on RACE! joins for the active horse (D-061): a Race; the Cup when the horse has
 -- outgrown its league's races; Practice while it naps (no Energy) outside the free leagues.
@@ -211,8 +246,13 @@ local function setRaceButton(state: string, detail: string?)
 		raceBtn.Text, raceBtn.BackgroundColor3 = "🐴 Pick a horse", C.gold
 		leaveBtn.Visible = false
 	elseif state == "line" then
-		raceBtn.Text, raceBtn.BackgroundColor3 = "In line! " .. (detail or ""), C.teal
-		leaveBtn.Visible = true
+		-- Two short lines that never clip (AAA Phase 2): "In line!" and the seconds only.
+		raceBtn.Text, raceBtn.BackgroundColor3 = "In line!", C.teal
+		raceBtn.TextSize = 26
+		raceBtn.TextYAlignment = Enum.TextYAlignment.Top
+		raceSub.Text = detail or ""
+		raceSub.Visible = detail ~= nil and detail ~= ""
+		leaveBtn.Visible = not Ui.queueLeaveShown -- (D-069) the queue card's ✕ is the one way out while it shows
 	else
 		local h = PlayerState.activeHorse()
 		raceBtn.Text, raceBtn.BackgroundColor3 = "🏁 RACE!", C.orange
@@ -273,6 +313,8 @@ RaceState.ResultsShown.Event:Connect(function(shown: boolean)
 end)
 
 local function pressRace()
+	-- (D-069, N2) Any answer to this press shows even while the first minute holds toasts.
+	Ui.racePressed(FM.raceReasonSeconds or 4)
 	if not PlayerState.data then
 		Ui.toast("Your stable is loading…", "hay", "🐴")
 		return
@@ -288,6 +330,7 @@ local function pressRace()
 		if Sound then Sound.play("horse_nicker") end
 		return
 	end
+	Ui.racePressed(FM.raceReasonPickerSeconds or 30) -- (the join comes from the picker, a little later)
 	OpenRacePicker:Fire() -- pick a course and a horse (D-036)
 end
 raceBtn.Activated:Connect(pressRace)
@@ -298,14 +341,11 @@ leaveBtn.Activated:Connect(function()
 	raceRemotes:WaitForChild("JoinRace"):FireServer(false)
 end)
 
-local COURSE_SHORT = { dirt = "Dirt", turf = "Turf" }
 raceRemotes:WaitForChild("QueueStatus").OnClientEvent:Connect(function(isIn, count, seconds, courseId)
 	inLine = isIn
 	if isIn then
-		local detail = if seconds then string.format("%ds", seconds) else ""
-		if COURSE_SHORT[courseId] then detail = string.format("%s %s", COURSE_SHORT[courseId], detail)
-		elseif courseId == nil then detail = "next race" end -- waiting in your league's queue (D-061)
-		if count and count > 1 then detail = string.format("%s · %d riders", detail, count) end
+		-- The seconds only (the queue card has the course and the riders).
+		local detail = if seconds then string.format("⏳ %ds", seconds) else "next race"
 		setRaceButton("line", detail)
 	else
 		render(PlayerState.data)
@@ -419,10 +459,28 @@ RunService.Heartbeat:Connect(function()
 	local hide = riding or RaceState.resultsOpen or (replay and replay.Enabled)
 	if dock.Visible == hide then dock.Visible = not hide end
 	if hide and moreGui.Enabled then moreGui.Enabled = false end
+	-- (D-069, the UI/UX consult) One ✕ to leave the line: the dock's hides while the queue card shows its own.
+	local leaveShown = inLine and not Ui.queueLeaveShown
+	if leaveBtn.Visible ~= leaveShown then leaveBtn.Visible = leaveShown end
 	-- The 💎 door: shut around races (D-050, D-056); the pill also steps aside for the race map.
 	local gemShown = not RaceState.shopClosed(DiamondProducts.afterRaceSeconds)
+	-- The first minute (D-067): the tour's race step owns the screen. RACE! glows under a hoofprint
+	-- arrow, and the 💎 door waits until that first race (firstMinute.hideGemPill).
+	local pointing = FM.pulseRace ~= false and not inLine and not hide and tourRaceStep()
+	if raceGlow.Visible ~= pointing then raceGlow.Visible = pointing end
+	if raceArrow.Visible ~= pointing then raceArrow.Visible = pointing end
+	if pointing then
+		local still = reducedMotion()
+		local t = os.clock()
+		raceGlow.BackgroundTransparency = if still then 0.4 else 0.35 + 0.3 * (0.5 + 0.5 * math.sin(t * 5))
+		raceArrow.Position = UDim2.new(0.5, 0, 1, -84 - (if still then 0 else math.floor(6 * math.abs(math.sin(t * 4)))))
+	end
+	if FM.hideGemPill ~= false and tourRaceStep() then gemShown = false end
 	local pill = gemOnPill()
-	if pill then gemShown = gemShown and not (RaceState.active and not RaceState.watchHidden) and not hide end
+	if pill then
+		-- (and for a training ride's ✕ Stop, which sits top right)
+		gemShown = gemShown and not (RaceState.active and not RaceState.watchHidden) and not hide and not TrainingState.active
+	end
 	if pillGem.Visible ~= (pill and gemShown) then pillGem.Visible = pill and gemShown end
 	if cardGem.Visible ~= (not pill and gemShown) then cardGem.Visible = not pill and gemShown end
 end)

@@ -1,0 +1,104 @@
+{
+ "file": "assets/audio/sound_sheet.wav",
+ "sampleRate": 44100,
+ "gapSeconds": 0.25,
+ "seconds": 27.13,
+ "muted": [],
+ "clips": {
+  "gallop_loop": {
+   "start": 0.1,
+   "length": 2.0,
+   "loop": true
+  },
+  "crowd_cheer": {
+   "start": 2.35,
+   "length": 3.0,
+   "loop": false
+  },
+  "gate_bell": {
+   "start": 5.6,
+   "length": 1.5,
+   "loop": false
+  },
+  "count_tick": {
+   "start": 7.35,
+   "length": 0.5,
+   "loop": false
+  },
+  "lock_tick": {
+   "start": 8.1,
+   "length": 0.8,
+   "loop": false
+  },
+  "bump_soft": {
+   "start": 9.15,
+   "length": 0.4,
+   "loop": false
+  },
+  "burst_whoosh": {
+   "start": 9.8,
+   "length": 1.5,
+   "loop": false
+  },
+  "tap_good": {
+   "start": 11.55,
+   "length": 0.5,
+   "loop": false
+  },
+  "tap_ok": {
+   "start": 12.3,
+   "length": 0.15,
+   "loop": false
+  },
+  "finish_fanfare": {
+   "start": 12.7,
+   "length": 2.5,
+   "loop": false
+  },
+  "ui_pop": {
+   "start": 15.45,
+   "length": 0.18,
+   "loop": false
+  },
+  "coin": {
+   "start": 15.88,
+   "length": 1.0,
+   "loop": false
+  },
+  "horse_nicker": {
+   "start": 17.13,
+   "length": 1.2,
+   "loop": false
+  },
+  "brush": {
+   "start": 18.58,
+   "length": 1.5,
+   "loop": false
+  },
+  "munch": {
+   "start": 20.33,
+   "length": 2.0,
+   "loop": false
+  },
+  "harvest_pop": {
+   "start": 22.58,
+   "length": 0.8,
+   "loop": false
+  },
+  "job_done": {
+   "start": 23.63,
+   "length": 1.5,
+   "loop": false
+  },
+  "clap": {
+   "start": 25.38,
+   "length": 0.45,
+   "loop": false
+  },
+  "heartbeat": {
+   "start": 26.08,
+   "length": 0.8,
+   "loop": false
+  }
+ }
+}

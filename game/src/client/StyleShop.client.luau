@@ -49,8 +49,10 @@ local function layout()
 		scale.Scale = 1
 		panel.Size = UDim2.fromOffset(math.min(W, v.X - 16), v.Y - 16)
 	else
+		-- Wide screens only (at least 820 × 600), where the panel fits at full size: never shrunk,
+		-- so its 16 px text and 56 px buttons stay at the floors (AAA Phase 2).
 		panel.Size = UDim2.fromOffset(W, H)
-		scale.Scale = math.min(1, (v.X - 20) / W, (v.Y - 20) / H)
+		scale.Scale = 1
 	end
 end
 task.spawn(function()
@@ -64,11 +66,11 @@ end)
 Ui.text(panel, "🎨 Tack & Paint", 30, { Position = UDim2.new(0, 0, 0, 10), Size = UDim2.new(1, 0, 0, 36) })
 local balance = Ui.text(panel, "", 22, { Position = UDim2.new(0, 18, 0, 14), Size = UDim2.new(0, 200, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
 balance.TextColor3 = Color3.fromHex("2E5AAC")
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 8), C.white, 22)
+local closeBtn = Ui.closeButton(panel, UDim2.new(1, -74, 0, 8))
 local tabs = Instance.new("ScrollingFrame")
 tabs.BackgroundTransparency = 1
-tabs.Size = UDim2.new(1, -32, 0, 46)
-tabs.Position = UDim2.new(0, 16, 0, 54)
+tabs.Size = UDim2.new(1, -32, 0, 64)
+tabs.Position = UDim2.new(0, 16, 0, 78)
 tabs.ScrollingDirection = Enum.ScrollingDirection.X
 tabs.AutomaticCanvasSize = Enum.AutomaticSize.X
 tabs.CanvasSize = UDim2.new()
@@ -80,8 +82,8 @@ tl.Padding = UDim.new(0, 6)
 tl.Parent = tabs
 local list = Instance.new("ScrollingFrame")
 list.BackgroundTransparency = 1
-list.Size = UDim2.new(1, -32, 1, -112)
-list.Position = UDim2.new(0, 16, 0, 102)
+list.Size = UDim2.new(1, -32, 1, -156)
+list.Position = UDim2.new(0, 16, 0, 146)
 list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 list.CanvasSize = UDim2.new()
 list.ScrollBarThickness = 6
@@ -164,7 +166,7 @@ local function itemCard(it, order: number)
 		elseif own then "Yours"
 		else string.format("💎 %d", it.price)
 	local subL = Ui.text(card, sub, 16, { Position = UDim2.new(0, 86, 0, 36), Size = UDim2.new(1, -94, 0, 36), TextXAlignment = Enum.TextXAlignment.Left })
-	subL.TextColor3 = if own then C.green else C.plum
+	subL.TextColor3 = if own then C.textGood else C.plum
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
 	row.Size = UDim2.new(1, -20, 0, 56)
@@ -233,14 +235,14 @@ local function diamondsTab()
 	local info = Ui.card(list, UDim2.new(), UDim2.new(), C.cream)
 	info.LayoutOrder = 0
 	Ui.text(info, "💎 Diamonds buy looks only. 1 Diamond = 1 Robux.", 17, { Position = UDim2.new(0, 12, 0, 10), Size = UDim2.new(1, -24, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
-	Ui.text(info, "They never buy speed, horses, Green Cash or wins. Free Diamonds come from moving up a league, finishing every monthly job and new Fan levels.", 14,
+	Ui.text(info, "They never buy speed, horses, Green Cash or wins. Free Diamonds come from moving up a league, finishing every monthly job and new Fan levels.", 16,
 		{ Position = UDim2.new(0, 12, 0, 36), Size = UDim2.new(1, -24, 0, 60), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
 	for k, pack in (shop and shop.packs) or {} do
 		local card = Ui.card(list, UDim2.new(), UDim2.new(), C.white)
 		card.LayoutOrder = k
 		Ui.text(card, "💎 " .. pack.diamonds, 30, { Position = UDim2.new(0, 0, 0, 14), Size = UDim2.new(1, 0, 0, 36) })
-		local b = Ui.button(card, if pack.ready then string.format("R$ %d", pack.robux) else "Coming soon", UDim2.fromOffset(170, 44),
-			UDim2.new(0.5, -85, 1, -56), if pack.ready then C.gold else C.shade, 18)
+		local b = Ui.button(card, if pack.ready then string.format("R$ %d", pack.robux) else "Coming soon", UDim2.fromOffset(170, 56),
+			UDim2.new(0.5, -85, 1, -66), if pack.ready then C.gold else C.shade, 18)
 		b.Activated:Connect(function()
 			if pack.ready then gameRemotes:WaitForChild("BuyDiamonds"):FireServer(pack.index) end
 		end)
@@ -254,13 +256,13 @@ render = function()
 	for _, ch in list:GetChildren() do if not ch:IsA("UIGridLayout") then ch:Destroy() end end
 	grid.CellSize = if compact then UDim2.new(1, -8, 0, 148) else UDim2.new(0.5, -8, 0, 148)
 	for _, cat in Style.CATEGORIES do
-		local b = Ui.button(tabs, cat.label, UDim2.fromOffset(112, 44), UDim2.new(), if tab == cat.id then C.gold else C.white, 15)
+		local b = Ui.button(tabs, cat.label, UDim2.fromOffset(124, 56), UDim2.new(), if tab == cat.id then C.gold else C.white, 16)
 		b.Activated:Connect(function()
 			tab, confirming = cat.id, nil
 			render()
 		end)
 	end
-	local db = Ui.button(tabs, "💎 Diamonds", UDim2.fromOffset(112, 44), UDim2.new(), if tab == "diamonds" then C.gold else C.sky, 15)
+	local db = Ui.button(tabs, "💎 Diamonds", UDim2.fromOffset(136, 56), UDim2.new(), if tab == "diamonds" then C.gold else C.sky, 16)
 	db.Activated:Connect(function()
 		tab, confirming = "diamonds", nil
 		render()

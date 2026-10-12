@@ -84,10 +84,13 @@ return function(check: (boolean, string) -> (), _close: any)
 		local same = true
 		for _, s in Horse.STATS do same = same and h.stats[s] == before[s] end
 		check(same and h.record.races == 150, "no ageing: 150 races never lower a stat")
-		check(Career.isVeteran(h) and Career.suggestLegend(h), "a Veteran gets the Legend suggestion")
+		check(GameConfig.career.suggest == false and not Career.suggestLegend(h), "no Legend suggestion until breeding (career.suggest, D-068)")
+		GameConfig.career.suggest = true
+		check(Career.isVeteran(h) and Career.suggestLegend(h), "a Veteran gets the Legend suggestion (career.suggest on)")
+		GameConfig.career.suggest = false
 		check(string.find(Career.line(150, 2, false), "Veteran") ~= nil and string.find(Career.line(150, 2, false), "2 Cups") ~= nil,
 			"career line: badges, Cups and Veteran")
-		check(string.find(Career.line(10, 0, false), "0 badges") ~= nil, "career line for a new horse")
+		check(string.find(Career.line(10, 0, false), "0 patches") ~= nil, "career line for a new horse (a career patch, D-068)")
 		-- the race hook reports what a race crossed
 		local p = stable(1)
 		local h2 = p.horses[2]
@@ -135,8 +138,10 @@ return function(check: (boolean, string) -> (), _close: any)
 		-- suggested once
 		local r = stable(1)
 		r.horses[2].record.races = 100
+		GameConfig.career.suggest = true
 		check(Career.suggestLegend(r.horses[2]), "suggested at 100")
 		check(Leagues.markAsked(r, r.horses[2].id) and not Career.suggestLegend(r.horses[2]), "never suggested twice")
+		GameConfig.career.suggest = false
 		check(Career.canBeLegend(r.horses[2]), "still a Legend later, from its card")
 		-- a Legend survives a save and load
 		local saved = reload(p, T0 + DAY)

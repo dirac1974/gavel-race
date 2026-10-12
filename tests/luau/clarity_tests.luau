@@ -52,7 +52,8 @@ local function horse(over: { [string]: any }): any
 end
 
 local function profile(h: any, jobs: any?): any
-	return { activeHorse = h.id, horses = { h }, garden = {}, jobs = jobs or { daily = {}, weekly = {}, monthly = {} } }
+	return { activeHorse = h.id, horses = { h }, garden = {}, jobs = jobs or { daily = {}, weekly = {}, monthly = {} },
+		totals = { races = 10 } }
 end
 
 return function(check: (boolean, string) -> (), _close: (number, number, number) -> boolean)
@@ -93,6 +94,82 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	table.insert(two.horses, horse({ id = "h2", name = "Pip Two", fed = true }))
 	two.activeHorse = "h2"
 	check(Advice.nextThing(two, T0).key == "race:h2", "the pill follows the horse you ride")
+
+	-- A new player races first (AAA Phase 2, D-067): before chores and jobs, for the first races.
+	local N = NT.raceFirstUntilRaces
+	check(N == 3, "nextThing.raceFirstUntilRaces = 3")
+	local fresh = profile(horse({ fed = false, groomed = false }), { daily = { job }, weekly = { done }, monthly = {} })
+	fresh.totals.races = 0
+	ok(Advice.nextThing(fresh, T0), "race:h1", "race", "a brand-new player: race before feeding, brushing or a prize")
+	fresh.totals.races = N - 1
+	ok(Advice.nextThing(fresh, T0), "race:h1", "race", "still new")
+	fresh.totals.races = N
+	ok(Advice.nextThing(fresh, T0), "claim", "board", "after the first races, the usual order")
+	local napNew = profile(horse({ resting = true, spaToday = 1 }))
+	napNew.totals.races = 0
+	ok(Advice.nextThing(napNew, T0), "nap", nil, "a napping horse is never sent to race")
+
+	-- Text colours (D-067): textGood and textWarn pass 4.5:1 on every light card; the bright fills don't.
+	local function lum(hex: string): number
+		local function ch(i: number): number
+			local c = tonumber(string.sub(hex, i, i + 1), 16) / 255
+			return if c <= 0.03928 then c / 12.92 else ((c + 0.055) / 1.055) ^ 2.4
+		end
+		return 0.2126 * ch(1) + 0.7152 * ch(3) + 0.0722 * ch(5)
+	end
+	local function contrast(a: string, b: string): number
+		local la, lb = lum(a), lum(b)
+		return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
+	end
+	local uiText = fs.readFile("game/src/client/Ui.luau")
+	local function hexOf(name: string): string
+		if name == "white" then return "FFFFFF" end -- (Color3.new(1, 1, 1))
+		return string.match(uiText, "	" .. name .. " = Color3%.fromHex%(\"(%x+)\"%)") or "000000"
+	end
+	for _, fg in { "textGood", "textWarn", "ink" } do
+		for _, bg in { "paper", "cream", "white", "gold", "sky" } do
+			local r = contrast(hexOf(fg), hexOf(bg))
+			check(r >= 4.5, `{fg} on {bg}: {math.floor(r * 10) / 10}:1 >= 4.5`)
+		end
+	end
+	for _, bg in { "paper", "cream", "white" } do
+		check(contrast(hexOf("plum"), hexOf(bg)) >= 4.5, `plum sublines on {bg} pass 4.5:1`)
+	end
+	check(contrast(hexOf("green"), hexOf("white")) < 4.5, "bright green is a fill colour, not text")
+
+	-- The phone queue card (D-067): one line, and kind words for the practice slider.
+	local QueueView = require("../../game/src/shared/QueueView")
+	local qs = QueueView.new(8, 15)
+	QueueView.status(qs, true, 3, 12, "dirt", 0)
+	QueueView.gate(qs, "dirt", { { name = "Comet", user = 1 }, { name = "Pip" }, { name = "Star" } }, 8, 12, false, 0)
+	local qv = QueueView.view(qs, 1, 0)
+	check(QueueView.compactLine(qv) == "Race in 12 · 3 riders", `compact line: "{QueueView.compactLine(qv)}"`)
+	QueueView.raceTime(qs, "dirt", 3, 1)
+	check(QueueView.compactLine(QueueView.view(qs, 1, 1)) == "Race time! GO!", "compact line at race time")
+	check(QueueView.warmWord(97, true) == "Perfect!" and QueueView.warmWord(85, false) == "Great!"
+		and QueueView.warmWord(10, true) == "Early" and QueueView.warmWord(10, false) == "Late", "warm-up words: never a miss")
+	for _, w in { QueueView.warmWord(0, true), QueueView.warmWord(0, false), QueueView.compactLine(qv) } do
+		check(Words.banned(w) == nil, `no banned word in "{w}"`)
+	end
+	-- The tour's race step points at the real RACE! button when it has no GO of its own.
+	local Tour = require("../../game/src/shared/Tour")
+	check(GameConfig.firstMinute.tourGoOnRace == false and string.find(Tour.text(Tour.STEPS[1], "Comet", true), "RACE!", 1, true) ~= nil
+		and Tour.stepId({}) == "race", "the first tour step points at RACE!")
+	-- (the race screen is being rebuilt: RaceController, RaceView and Replay join this scan after it)
+	local RACE_SCREEN = { ["RaceController.client.luau"] = true, ["RaceView.client.luau"] = true, ["Replay.client.luau"] = true }
+	for _, path in luauFiles("game/src/client", {}) do
+		local file = string.match(path, "[^/]+$") :: string
+		if RACE_SCREEN[file] then continue end
+		for n, ln in string.split(code(fs.readFile(path)), string.char(10)) do
+			if string.find(ln, "TextColor3", 1, true) then
+				for _, pat in { "C%.green[^%w]", "C%.cash[^%w]", "C%.orange[^%w]", "C%.orangeDark[^%w]" } do
+					if string.find(ln .. " ", pat) then
+						check(false, `{file}:{n}: bright {pat} as text fails contrast (use textGood / textWarn)`)
+					end
+				end
+			end
+		end
+	end
 
 	-- Pip's hint
 	local cfg = { pipHintSeconds = 20 }
@@ -163,7 +240,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 
 	-- One results row -----------------------------------------------------------------------------------
 	local rc = code(fs.readFile("game/src/client/RaceController.client.luau"))
-	check(string.find(rc, "ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)", 1, true) ~= nil
+	check(string.find(rc, "Card.setRide(ResultsText.rowStars(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW))", 1, true) ~= nil
 		and string.find(rc, "ResultsText.gainedLine(horse, rideReport.gain, rideReport.tripGain, STEER.scale)", 1, true) ~= nil
 		and string.find(rc, "Good trip", 1, true) == nil and string.find(rc, "if TRIP_ROW then ResultsText.tripLine(", 1, true) ~= nil,
 		"the results card has one star row and the taps line (the trip row only with the switch-back)")

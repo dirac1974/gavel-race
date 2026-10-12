@@ -1,0 +1,1 @@
+- [Memory file quirks](reference_memory_file_quirks.md) — line endings drift (detect per file), AAA review source locations, check CHANGELOG vs git log

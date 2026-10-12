@@ -25,9 +25,12 @@ end
 return function(check: (boolean, string) -> (), _close: (number, number, number) -> boolean)
 	-- Config ---------------------------------------------------------------------------------
 	check(GameConfig.firstWinBonus == 10 and Leagues.FIRST_WIN_BONUS == 10, "firstWinBonus is 10")
-	check(GameConfig.stakesUnlockPoints.Silver == 750, "Silver Cup at 750 points (sims/economy.py --silver)")
-	check(GameConfig.stakesUnlockPoints.Rookie == 100 and GameConfig.stakesUnlockPoints.Bronze == 110
-		and GameConfig.stakesUnlockPoints.Gold == 3000, "other D-013 thresholds unchanged")
+	-- AAA Phase 3 (D-068): the ladder retuned on realistic Ratings (sims/economy.py --ladder phase3)
+	local U, A, L = GameConfig.stakesUnlockPoints, GameConfig.botRatingAnchor, GameConfig.leagueCeiling
+	check(U.Rookie == 100 and U.Bronze == 200 and U.Silver == 450 and U.Gold == 900, "Cup points 100/200/450/900 (D-068)")
+	check(A.Rookie == 32 and A.Bronze == 35 and A.Silver == 38 and A.Gold == 48 and A.Champion == 56, "bot anchors 32/35/38/48/56 (D-068)")
+	check(L.Rookie == 55 and L.Bronze == 57 and L.Silver == 60 and L.Gold == 66, "ceilings 55/57/60/66 (D-068)")
+	check(L.Rookie < L.Bronze and L.Bronze < L.Silver and L.Silver < L.Gold, "ceilings rise league to league")
 
 	-- Badges by win count in the horse's own league -------------------------------------------
 	do

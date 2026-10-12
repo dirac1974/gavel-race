@@ -1,0 +1,2 @@
+- [Ladder Phase 3 retune](project_ladder_phase3.md) — D-068 realistic-Rating sim: PHASE3 anchors/Cup points/ceilings, Champion drift + cash flags
+- [Sim/config test conventions](sim_conventions.md) — strict conditional xfail until GameConfig lands; whole-ladder test; pin history tests

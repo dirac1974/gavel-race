@@ -28,10 +28,14 @@ Ui.colors = {
 	green = Color3.fromHex("46C46A"),
 	cash = Color3.fromHex("2E9E5B"),
 	sky = Color3.fromHex("BFD7FF"),
-	plum = Color3.fromHex("7D6B91"),
+	plum = Color3.fromHex("6B5A80"), -- D-067: darkened from 7D6B91 so sublines pass 4.5:1 on paper and cream
 	red = Color3.fromHex("E5484D"),
 	white = Color3.new(1, 1, 1),
 	shade = Color3.fromHex("C9B99A"),
+	-- Text colours that pass 4.5:1 on paper, cream, white and the gold "selected" card (AAA Phase 2,
+	-- D-067; clarity_tests checks them). The bright green and orange stay for fills only.
+	textGood = Color3.fromHex("18692F"),
+	textWarn = Color3.fromHex("8F4700"),
 }
 Ui.coatColors = {
 	bay = Color3.fromHex("8B4A2B"), chestnut = Color3.fromHex("B5562B"), grey = Color3.fromHex("B9BCC2"),
@@ -243,7 +247,12 @@ end
 -- text and touch floors (PanelFit); what still doesn't fit scrolls in a column, or, for a panel
 -- with its own list (minHeight), the panel gets shorter and its list scrolls. Returns a function
 -- that plays the open slide.
-function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?): () -> ()
+-- minText / minButton: the panel's smallest text and button (unscaled; default ui.panelMinText and
+-- ui.panelButtonPx). The panel never shrinks so far that either renders under the floors, so a
+-- panel with 16 px text and 56 px buttons doesn't shrink at all: it scrolls (tests/test_clarity_floors.py
+-- checks every literal size in the file against these).
+-- The returned slide function takes an optional new height, for a card whose height changes.
+function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?, minText: number?, minButton: number?): (number?) -> ()
 	local cfg = GameConfig.ui
 	local scale = panel:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
 	scale.Parent = panel
@@ -261,13 +270,16 @@ function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?)
 	column.Parent = panel.Parent
 	panel.AnchorPoint = Vector2.new(0.5, 0)
 	panel.Parent = column
+	-- A hidden panel takes its column with it, so the column never catches taps meant for the world.
+	column.Visible = panel.Visible
+	panel:GetPropertyChangedSignal("Visible"):Connect(function() column.Visible = panel.Visible end)
 	local top = 0
 	local centre = UDim.new(0.5, 0)
 	local function apply()
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		local v = cam.ViewportSize
-		local f = PanelFit.layout(v.X, v.Y, w, h, cfg.panelMinText, cfg.panelButtonPx, cfg, minHeight)
+		local f = PanelFit.layout(v.X, v.Y, w, h, minText or cfg.panelMinText, minButton or cfg.panelButtonPx, cfg, minHeight)
 		scale.Scale = f.scale
 		panel.Size = UDim2.fromOffset(w, f.height)
 		local colW = math.min(v.X, math.ceil(w * f.scale) + 20)
@@ -284,12 +296,25 @@ function Ui.fitPanel(panel: GuiObject, w: number, h: number, minHeight: number?)
 		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(apply)
 		apply()
 	end)
-	return function()
+	return function(newHeight: number?, still: boolean?)
+		if newHeight then h = newHeight end
 		apply()
+		if still then return end -- a re-layout (the card grew), no slide
 		column.CanvasPosition = Vector2.zero
 		panel.Position = UDim2.new(centre, UDim.new(0, top + 30))
 		TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.new(centre, UDim.new(0, top)) }):Play()
 	end
+end
+
+-- The one ✕ (AAA Phase 2, D-067): every panel closes with the same 64 px button (ui.closePx) in its
+-- top-right corner. `pos` and `px` move or resize it (the queue card's ✕ sits in its own row).
+function Ui.closeButton(parent: Instance, pos: UDim2?, px: number?): TextButton
+	local size = px or GameConfig.ui.closePx
+	local b = Ui.button(parent, "✕", UDim2.fromOffset(size, size), pos or UDim2.new(1, -(size + 10), 0, 10), Ui.colors.white,
+		math.max(22, math.floor(size * 0.45)))
+	b.Name = "Close"
+	b.ZIndex = math.max(b.ZIndex, 4)
+	return b
 end
 
 -- Fade an icon (a spent Energy pip) or bring it back.
@@ -308,18 +333,115 @@ function Ui.pop(obj: GuiObject)
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 end
 
+-- The top-centre spot (AAA Phase 2, D-067): one card at a time. Each card that wants the spot calls
+-- its `want(on)` (from Ui.slot) whenever it would like to show, and shows only while that returns
+-- true: the highest priority wanting it wins (GameConfig.topSlot: the tour over the queue card,
+-- "Race time!" over both). Toasts never take the spot: they stack just below whatever card is up.
+local GuiService = game:GetService("GuiService")
+local RunService = game:GetService("RunService")
+local SLOT = GameConfig.topSlot or { gapPx = 8, sideReservePx = 134 }
+local slotWants: { [string]: { priority: number, on: boolean, frame: GuiObject? } } = {}
+
+local function slotOwner(): string?
+	local best, bestP = nil, -math.huge
+	for id, w in slotWants do
+		if w.on and (w.priority > bestP or (w.priority == bestP and id < (best or "~"))) then best, bestP = id, w.priority end
+	end
+	return best
+end
+
+function Ui.slot(id: string, priority: number, frame: GuiObject?): (boolean, number?) -> boolean
+	slotWants[id] = { priority = priority, on = false, frame = frame }
+	return function(on: boolean, newPriority: number?): boolean
+		local w = slotWants[id]
+		w.on = on
+		if newPriority then w.priority = newPriority end
+		return on and slotOwner() == id
+	end
+end
+
+function Ui.slotOwner(): string?
+	return slotOwner()
+end
+
+-- Where the top-centre card goes: under the Roblox top bar, centred; on a narrow screen it keeps
+-- clear of the top-right column (the 💎 pill and the ⚙️ under it). Returns the card's centre x
+-- (px from the left), its width (at most `want`) and its top y.
+function Ui.topSlotPlace(want: number): (number, number, number)
+	local cam = workspace.CurrentCamera
+	local vx = if cam then cam.ViewportSize.X else 1280
+	local reserve = SLOT.sideReservePx or 134
+	local top = GuiService:GetGuiInset().Y + 8
+	if want <= vx - 2 * reserve then return vx / 2, want, top end
+	local room = vx - reserve - 24
+	local w = math.min(want, room)
+	return 12 + room / 2, w, top
+end
+
+-- The bottom edge of the card now in the spot (or the top bar's), where toasts start.
+function Ui.slotBottom(): number
+	local id = slotOwner()
+	local w = id and slotWants[id]
+	local f = w and w.frame
+	local top = GuiService:GetGuiInset().Y + 8
+	if f and f.Visible and f:FindFirstAncestorOfClass("ScreenGui") and (f:FindFirstAncestorOfClass("ScreenGui") :: ScreenGui).Enabled then
+		return math.max(top, f.AbsolutePosition.Y + f.AbsoluteSize.Y + (SLOT.gapPx or 8))
+	end
+	return top
+end
+
+-- Holding toasts (the first minute, D-067): while held, toasts wait in order and show when let go
+-- (the newest few only; a kid needn't read a backlog).
+local held: { { any } }? = nil
+local HOLD_KEEP = 3
+-- (AAA Phase 4, D-069; code review N2) A toast that comes soon after a RACE! press is never held: it is
+-- the reason the race didn't start ("Both races are full…", a napping horse) and must show at once.
+-- Hud calls Ui.racePressed(seconds) as RACE! is pressed.
+local holdBypassUntil = -math.huge
+function Ui.racePressed(seconds: number)
+	holdBypassUntil = math.max(holdBypassUntil, os.clock() + seconds)
+end
+-- QueueCard sets this while its card shows its own leave ✕ (the dock then hides its ✕: one way to leave).
+Ui.queueLeaveShown = false
+
 -- Toasts: short friendly messages that slide in under the top bar and fade away.
 local toastGui: ScreenGui? = nil
 local toastList: Frame? = nil
+local showToast
 function Ui.toast(text: string, icon: string?, emoji: string?)
+	if held and os.clock() > holdBypassUntil then
+		table.insert(held, { text, icon, emoji })
+		while #held > HOLD_KEEP do table.remove(held, 1) end
+		return
+	end
+	showToast(text, icon, emoji)
+end
+
+function Ui.holdToasts(on: boolean)
+	if on then
+		held = held or {}
+		return
+	end
+	local waiting = held
+	held = nil
+	for k, t in waiting or {} do
+		task.delay((k - 1) * 0.6, function() showToast(t[1], t[2], t[3]) end)
+	end
+end
+
+showToast = function(text: string, icon: string?, emoji: string?)
 	if not toastGui then
 		toastGui = Ui.screen("Toasts", 20)
 		local list = Instance.new("Frame")
 		list.BackgroundTransparency = 1
 		list.AnchorPoint = Vector2.new(0.5, 0)
-		list.Position = UDim2.new(0.5, 0, 0, 64)
+		list.Position = UDim2.new(0.5, 0, 0, Ui.slotBottom())
 		list.Size = UDim2.new(0, 420, 0, 300)
 		list.Parent = toastGui
+		RunService.Heartbeat:Connect(function()
+			local y = Ui.slotBottom()
+			if list.Position.Y.Offset ~= y then list.Position = UDim2.new(0.5, 0, 0, y) end
+		end)
 		local layout = Instance.new("UIListLayout")
 		layout.Padding = UDim.new(0, 8)
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center

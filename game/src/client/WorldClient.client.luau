@@ -95,29 +95,22 @@ dim.Size = UDim2.fromScale(1, 1)
 dim.BackgroundColor3 = C.ink
 dim.BackgroundTransparency = 0.45
 dim.Parent = gui
-local PANEL_W, PANEL_H = 760, 300
+local PANEL_W, PANEL_H = 736, 316
 local panel = Ui.card(gui, UDim2.fromOffset(PANEL_W, PANEL_H), UDim2.fromScale(0.5, 0.5), C.paper)
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-local scale = Instance.new("UIScale")
-scale.Parent = panel
-local function rescale()
-	local v = workspace.CurrentCamera.ViewportSize
-	scale.Scale = math.min(1, (v.X - 24) / PANEL_W, (v.Y - 24) / PANEL_H)
-end
-rescale()
-workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+-- Floors (AAA Phase 2): smallest text 18, smallest button 64; at 0.875 it fits a 667 px phone.
+local slideIn = Ui.fitPanel(panel, PANEL_W, PANEL_H, nil, 18, 64)
 local title = Ui.text(panel, "Where to?", 34, { Position = UDim2.new(0, 0, 0, 14), Size = UDim2.new(1, 0, 0, 40) })
 local row = Instance.new("Frame")
 row.BackgroundTransparency = 1
 row.Size = UDim2.new(1, -32, 0, 190)
-row.Position = UDim2.new(0, 16, 0, 70)
+row.Position = UDim2.new(0, 16, 0, 80)
 row.Parent = panel
 local layout = Instance.new("UIListLayout")
 layout.FillDirection = Enum.FillDirection.Horizontal
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-layout.Padding = UDim.new(0, 12)
+layout.Padding = UDim.new(0, 10)
 layout.Parent = row
-local close = Ui.button(panel, "✕", UDim2.fromOffset(56, 56), UDim2.new(1, -68, 0, 10), C.white, 24)
+local close = Ui.closeButton(panel)
 
 local friendsPage: Frame
 local back: TextButton
@@ -128,8 +121,7 @@ local function show()
 	friendsPage.Visible = false
 	back.Visible = false
 	title.Text = "Where to?"
-	panel.Position = UDim2.fromScale(0.5, 0.56)
-	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	slideIn()
 end
 for _, dest in WorldLayout.MAP do
 	local b = Ui.button(row, "", UDim2.fromOffset(108, 170), UDim2.new(), C.cream, 18)
@@ -154,11 +146,11 @@ Ui.text(friendsBtn, "Friends' barns", 20, { Position = UDim2.new(0, 4, 0, 104), 
 
 friendsPage = Instance.new("Frame")
 friendsPage.BackgroundTransparency = 1
-friendsPage.Size = UDim2.new(1, -32, 1, -70)
-friendsPage.Position = UDim2.new(0, 16, 0, 62)
+friendsPage.Size = UDim2.new(1, -32, 1, -88)
+friendsPage.Position = UDim2.new(0, 16, 0, 80)
 friendsPage.Visible = false
 friendsPage.Parent = panel
-back = Ui.button(panel, "◀ Back", UDim2.fromOffset(140, 56), UDim2.new(0, 12, 0, 10), C.white, 22)
+back = Ui.button(panel, "◀ Back", UDim2.fromOffset(140, 64), UDim2.new(0, 12, 0, 10), C.white, 22)
 back.Visible = false
 local faces = Instance.new("ScrollingFrame")
 faces.BackgroundTransparency = 1
@@ -206,8 +198,8 @@ end
 
 local function showStamps()
 	local n = PlayerState.data and PlayerState.data.tourStamps or 0
-	stampText.Text = if n == 0 then "Tour stamps: none yet. Pat every horse in a friend's barn to get one!"
-		else "Tour stamps: " .. n .. (if n == 1 then " barn toured" else " barns toured")
+	stampText.Text = if n == 0 then "Tour pins: none yet. Pat every horse in a friend's barn to get one!"
+		else "Tour pins: " .. n .. (if n == 1 then " barn toured" else " barns toured")
 end
 
 local function drawFriends(list)

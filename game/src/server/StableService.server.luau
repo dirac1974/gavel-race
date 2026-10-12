@@ -991,7 +991,7 @@ VisitFriend.OnServerEvent:Connect(function(player: Player, userId: any)
 	lastTravel[player] = os.clock()
 	local x, z, lx, lz = WorldLayout.gateArrival(i)
 	arriveAt(player, x, z, lx, lz)
-	Profiles.notify(player, "Welcome to " .. owner.DisplayName .. "'s barn! Pat each horse for a stamp", "heart")
+	Profiles.notify(player, "Welcome to " .. owner.DisplayName .. "'s barn! Pat each horse for a pin", "heart")
 end)
 
 PostBox.OnServerEvent:Connect(function(player: Player, userId: any)

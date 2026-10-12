@@ -10,10 +10,24 @@
 -- over the gate. Steering (D-054): ◀ In / Out ▶ buttons, A/D or the arrows, the D-pad or a
 -- left-stick flick change lanes from the gate to the far-turn lock; none of them taps. Drawn from the shared server clock; all scoring happens on the server (this
 -- screen only predicts it for feedback).
+-- Race feel (D-066, GameConfig.raceFx): every counted tap ticks (pitched by its score) and its word
+-- pops; a Perfect surges your horse (RaceView) and widens the view a little. RaceCamera owns the
+-- camera kicks: one budget (raceFx.fovMaxDeg), none under Reduced Motion. The Final Burst arms
+-- burstArmSeconds after it opens: its bar stays grey and taps are ignored until then. The bar
+-- under the slider is "RIDING" (it never was speed), and on a phone with the ◀ ▶ pad the slider
+-- sits right of the pad; the tap words step below the burst bar while it's up.
+-- AAA Phase 2 (D-067): the finish moment as your horse crosses (FinishMoment: the orbit to the
+-- replay's side view, confetti for 1st, the ribbon stamp for 1st to 4th; skippable, the card up
+-- within finish.cardWithinSeconds of the line), the results card (ResultsCard, at the floors, with
+-- 🏁 Race again and "Best ride in the race!" for the top 3 only), first-race coaching (the rule, the
+-- ghost thumb over the green, "NOW!") and every tap's word at the marker. The status line uses the
+-- picker's words ("🐇 Short", never "Sprint").
+-- AAA Phase 4 (D-069): the HUD in the art direction's colours (RaceHudStyle: Paper panels, Ink outlines, a
+-- Gold glow on Slate) and a smaller, lower YOU marker in your chase view; the gate line-up camera pass in
+-- the countdown (GateIntro, riders only); the music bed (MusicBed); the card's stars count in (ResultsCard).
 -- Placeholder shapes show until the uploaded atlas art arrives (UiArt).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -33,17 +47,25 @@ local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local ReplayTrip = require(Shared:WaitForChild("ReplayTrip"))
 local SteerHud = require(Shared:WaitForChild("SteerHud"))
 local SteerChips = require(Shared:WaitForChild("SteerChips"))
+local RaceFx = require(Shared:WaitForChild("RaceFx"))
+local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
+local PickerText = require(Shared:WaitForChild("PickerText"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
-local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
-if not okSound then Sound = nil end
+local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
+local Sound = (function()
+	local ok, module = pcall(require, script.Parent:WaitForChild("Sound", 5))
+	return if ok then module else nil
+end)()
 
-local player = Players.LocalPlayer
+local player = game:GetService("Players").LocalPlayer
 local myId = tostring(player.UserId)
-local DEFAULT_MAX_ZOOM = 128
 local HUD = GameConfig.hud
 local BOUNCE = GameConfig.pace.bounceSeconds or 0
 local STEER, SHUD = GameConfig.steering, GameConfig.steerHud
+local FX = GameConfig.raceFx
+local ARM = GameConfig.burstArmSeconds or 0
+local BURST_HINT = "One big tap in the glow. It counts double!"
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -53,11 +75,12 @@ end
 -- and a newer or stopped race cancels pending cues. Riders always hear their own race;
 -- spectators hear it at half volume, and only near that race's course. Only riders hear
 -- their own hoofbeats, and only while they're in the saddle.
-local cueRace, cueVolume, cueRider, cueCourse = 0, 1, false, "dirt"
+local cueRace = 0
+local cueTo = { volume = 1, rider = false, course = "dirt" } -- who hears this race's cues
 local nearCourse = RaceState.nearCourse -- within GameConfig.spectate.rangeStuds (D-052, D-055)
 local function cue(at: number, ...)
 	if not Sound then return end
-	local id, names, volume, rider, course = cueRace, { ... }, cueVolume, cueRider, cueCourse
+	local id, names, volume, rider, course = cueRace, { ... }, cueTo.volume, cueTo.rider, cueTo.course
 	task.delay(math.max(0, at - serverNow()), function()
 		if id ~= cueRace then return end
 		if not rider and not nearCourse(course) then return end
@@ -65,9 +88,16 @@ local function cue(at: number, ...)
 	end)
 end
 local stopGallop = nil
-local function gallop(on: boolean)
+local gallopDucked = false
+-- (D-066) Hoofbeats at the legs' cadence (race speed over the gallop stride, against the loop's own
+-- rate), ducked under the tap tick while the slider runs (raceFx.gallopDuck; the loop restarts at
+-- the new level, only as the slider starts or pauses).
+local function gallop(on: boolean, ducked: boolean?)
 	if stopGallop then stopGallop() end
-	stopGallop = if on and Sound then Sound.loop("gallop_loop") else nil
+	local rate = GameConfig.raceSpeedStudsPerSecond / HorseLegs.GAITS.gallop.stride / (FX.gallopLoopStridesPerSecond or 2)
+	gallopDucked = ducked == true
+	local volume = if gallopDucked and FX.enabled then FX.gallopDuck else nil
+	stopGallop = if on and Sound then Sound.loop("gallop_loop", volume, rate) else nil
 end
 local function seated(): boolean
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -75,9 +105,16 @@ local function seated(): boolean
 end
 player.CharacterAdded:Connect(function() gallop(false) end) -- a new character isn't in the saddle
 
-local function reducedMotion(): boolean
+-- Reduced Motion, read once and then on change (it's checked every frame).
+local still = false
+local function readStill()
 	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
-	return ok and on == true
+	still = ok and on == true
+end
+readStill()
+pcall(function() GuiService:GetPropertyChangedSignal("ReducedMotionEnabled"):Connect(readStill) end)
+local function reducedMotion(): boolean
+	return still
 end
 
 -- While riding, a jump would throw you out of the saddle, and Space is also a tap key. The move
@@ -100,34 +137,9 @@ local function setJumping(enabled: boolean)
 	end
 end
 
--- Riding camera (D-026, amended): a close chase view from just behind and above the rider,
--- a little wider than normal so nearby horses are in view, turning with the horse round
--- the bends (Follow camera). Scroll or pinch in for first person, or out for more.
-local RIDE_ZOOM, RIDE_FOV, NORMAL_FOV = 14, 80, 70
-local rideCamOn = false
-local function rideCamera(on: boolean)
-	local camera = workspace.CurrentCamera
-	rideCamOn = on
-	if on then
-		if camera then
-			camera.CameraType = Enum.CameraType.Follow
-			camera.FieldOfView = RIDE_FOV
-		end
-		player.CameraMinZoomDistance = RIDE_ZOOM
-		player.CameraMaxZoomDistance = RIDE_ZOOM -- snaps the camera to the chase distance
-		task.delay(0.2, function()
-			player.CameraMinZoomDistance = 0.5 -- then allow zooming in to first person
-			player.CameraMaxZoomDistance = 40
-		end)
-	else
-		if camera then
-			camera.CameraType = Enum.CameraType.Custom
-			camera.FieldOfView = NORMAL_FOV
-		end
-		player.CameraMaxZoomDistance = DEFAULT_MAX_ZOOM
-		player.CameraMinZoomDistance = 0.5
-	end
-end
+-- The riding camera and the camera kicks (D-026, D-066): RaceCamera owns both (one budget,
+-- raceFx.fovMaxDeg; none under Reduced Motion).
+local Cam = require(script.Parent:WaitForChild("RaceCamera"))
 
 -- Off the race horse for any reason (Done, the timeout, the next race on the course rebuilding
 -- its horses): the normal camera and jumping come back straight away.
@@ -135,13 +147,13 @@ local function watchSeat(character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid then return end
 	local function restore()
-		if humanoid.SeatPart == nil and rideCamOn then
-			rideCamera(false)
+		if humanoid.SeatPart == nil and Cam.on then
+			Cam.ride(false)
 			setJumping(true)
 		end
 	end
 	humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
-		if humanoid.SeatPart ~= nil or not rideCamOn then return end
+		if humanoid.SeatPart ~= nil or not Cam.on then return end
 		local replay = player.PlayerGui:FindFirstChild("ReplayUI")
 		if replay and replay.Enabled then
 			RaceState.ReplayClosed.Event:Once(restore) -- the replay owns the camera until it closes
@@ -152,7 +164,7 @@ local function watchSeat(character: Model)
 end
 if player.Character then task.spawn(watchSeat, player.Character) end
 player.CharacterAdded:Connect(function(character)
-	if rideCamOn then rideCamera(false) end -- a new character starts on foot
+	if Cam.on then Cam.ride(false) end -- a new character starts on foot
 	setJumping(true) -- ...never in a race saddle: the move controls come back (Disable outlives a respawn)
 	task.spawn(watchSeat, character)
 end)
@@ -201,8 +213,8 @@ local status = label(gui, UDim2.new(1, 0, 0, 40), UDim2.new(0, 0, 0, 40), "", 24
 local board = Instance.new("Frame")
 board.Size = UDim2.new(0, 300, 0, 8 * 26 + 10)
 board.Position = UDim2.new(0, 12, 0, 90)
-board.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
-board.BackgroundTransparency = 0.3
+board.BackgroundColor3 = Color3.fromHex("FFF7E6") -- Paper (RaceHudStyle)
+board.BackgroundTransparency = 0
 board.ZIndex = 4
 board.Visible = false
 board.Parent = gui
@@ -225,6 +237,19 @@ end
 
 local feedback = label(gui, UDim2.new(1, 0, 0, 46), UDim2.new(0, 0, 0.62, 0), "", 32)
 local hint = label(gui, UDim2.new(1, 0, 0, 28), UDim2.new(0, 0, 0.68, 0), "", 20)
+-- The tap word pops in (D-066): from labelPopScale back to 1, with its shape above it. Under
+-- Reduced Motion the word just shows.
+local feedbackScale = Instance.new("UIScale")
+feedbackScale.Parent = feedback
+local popTween: Tween? = nil
+local function popFeedback()
+	if popTween then popTween:Cancel() end
+	feedbackScale.Scale = 1
+	if not (FX.enabled and FX.labelPop) or reducedMotion() then return end
+	feedbackScale.Scale = FX.labelPopScale
+	popTween = TweenService:Create(feedbackScale, TweenInfo.new(FX.labelPopSeconds, Enum.EasingStyle.Back), { Scale = 1 })
+	popTween:Play()
+end
 
 -- A slider (bar, glowing target, marker). The pace meter and the Final Burst share the build;
 -- the burst is bigger and rainbow-coloured to show it matters most.
@@ -242,9 +267,10 @@ local function makeMeter(widthScale: number, height: number, y: number, rainbow:
 	stroke.Thickness = if rainbow then 6 else 3
 	stroke.Color = if rainbow then Color3.fromHex("FFD34D") else Color3.fromHex("1F2430")
 	stroke.Parent = bar
+	local g = nil
 	if rainbow then
 		bar.BackgroundColor3 = Color3.new(1, 1, 1)
-		local g = Instance.new("UIGradient")
+		g = Instance.new("UIGradient")
 		g.Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromHex("FF5A5F")), ColorSequenceKeypoint.new(0.25, Color3.fromHex("FFB347")),
 			ColorSequenceKeypoint.new(0.5, Color3.fromHex("FFF06A")), ColorSequenceKeypoint.new(0.75, Color3.fromHex("6BD66B")),
@@ -257,7 +283,7 @@ local function makeMeter(widthScale: number, height: number, y: number, rainbow:
 	local zone = Instance.new("Frame")
 	zone.AnchorPoint = Vector2.new(0.5, 0)
 	zone.Size = UDim2.new(0.2, 0, 1, 0)
-	zone.BackgroundColor3 = if rainbow then Color3.new(1, 1, 1) else Color3.fromRGB(60, 200, 90)
+	zone.BackgroundColor3 = if rainbow then Color3.new(1, 1, 1) else Color3.fromHex("FFD23F") -- the Gold glow
 	zone.BackgroundTransparency = if rainbow then 0.25 else 0
 	zone.BorderSizePixel = 0
 	zone.ZIndex = 4
@@ -277,11 +303,14 @@ local function makeMeter(widthScale: number, height: number, y: number, rainbow:
 	mStroke.Thickness = 2
 	mStroke.Color = Color3.fromHex("1F2430")
 	mStroke.Parent = marker
-	return { bar = bar, zone = zone, zone2 = zone2, marker = marker, stroke = stroke }
+	return { bar = bar, zone = zone, zone2 = zone2, marker = marker, stroke = stroke, gradient = g }
 end
 
 local pace = makeMeter(0.7, 34, 0.80, false)
 local burst = makeMeter(0.9, 72, 0.44, true)
+-- The tap's word at the marker and first-race coaching (D-067): RaceCoach draws both on this slider.
+local Coach = require(script.Parent:WaitForChild("RaceCoach"))
+Coach.attach(pace)
 -- "3, 2, 1, GO!" over the gate (D-055): big for riders, smaller for spectators.
 local countLabel = label(gui, UDim2.new(1, 0, 0, 160), UDim2.new(0, 0, 0.26, 0), "", 140)
 countLabel.Font = Enum.Font.GothamBlack
@@ -290,25 +319,31 @@ countLabel.TextStrokeTransparency = 0.2
 countLabel.ZIndex = 9
 countLabel.Visible = false
 -- On keyboard devices the slider shows which key taps.
-local keyCap = label(pace.bar, UDim2.fromOffset(70, 24), UDim2.new(1, 10, 0.5, -12), "SPACE", 14)
-keyCap.BackgroundTransparency = 0.1
-keyCap.BackgroundColor3 = Color3.fromHex("F4EFE6")
-keyCap.TextColor3 = Color3.fromHex("1F2430")
-keyCap.TextStrokeTransparency = 1
-keyCap.ZIndex = 6
-round(keyCap, UDim.new(0, 6))
-keyCap.Visible = UserInputService.KeyboardEnabled and not UserInputService.TouchEnabled
-local burstTitle = label(gui, UDim2.new(1, 0, 0, 60), UDim2.new(0, 0, 0.34, 0), "FINAL BURST  ×2", 52)
+do
+	local keyCap = label(pace.bar, UDim2.fromOffset(70, 24), UDim2.new(1, 10, 0.5, -12), "SPACE", 14)
+	keyCap.BackgroundTransparency = 0.1
+	keyCap.BackgroundColor3 = Color3.fromHex("F4EFE6")
+	keyCap.TextColor3 = Color3.fromHex("1F2430")
+	keyCap.TextStrokeTransparency = 1
+	keyCap.ZIndex = 6
+	round(keyCap, UDim.new(0, 6))
+	keyCap.Visible = UserInputService.KeyboardEnabled and not UserInputService.TouchEnabled
+end
+-- "FINAL BURST ×2" and, after your tap, your result banner sit just above the burst bar (their
+-- bottoms 10 px over it), smaller on short screens (layout), so neither covers the bar.
+local burstTitle = label(gui, UDim2.new(1, 0, 0, 60), UDim2.new(0, 0, 0.44, -10), "FINAL BURST  ×2", 52)
+burstTitle.AnchorPoint = Vector2.new(0, 1)
 burstTitle.Font = Enum.Font.GothamBlack
 burstTitle.TextColor3 = Color3.fromHex("FFD34D")
 burstTitle.Visible = false
 
--- Speed meter: fills from your last few passes.
+-- Riding meter (D-066: was "SPEED", which it never changed): fills from your last few passes, gold
+-- over slate (ART_DIRECTION: no red-to-green).
 local speed = Instance.new("Frame")
 speed.AnchorPoint = Vector2.new(0.5, 0)
 speed.Size = UDim2.new(0.4, 0, 0, 16)
-speed.Position = UDim2.new(0.5, 0, 0.75, 0)
-speed.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+speed.Position = UDim2.new(0.5, 0, 0.75, -10)
+speed.BackgroundColor3 = Color3.fromHex("3A4250") -- slate
 speed.BackgroundTransparency = 0.2
 speed.ZIndex = 3
 speed.Visible = false
@@ -320,22 +355,21 @@ speedFill.BackgroundColor3 = Color3.new(1, 1, 1)
 speedFill.ZIndex = 4
 speedFill.Parent = speed
 round(speedFill, UDim.new(0, 8))
-local speedGradient = Instance.new("UIGradient")
-speedGradient.Color = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromHex("FF5A5F")), ColorSequenceKeypoint.new(0.5, Color3.fromHex("FFD34D")),
-	ColorSequenceKeypoint.new(1, Color3.fromHex("46C46A")),
-})
-speedGradient.Parent = speedFill
-local speedLabel = label(speed, UDim2.new(0, 70, 1, 0), UDim2.new(0, -78, 0, 0), "SPEED", 16)
-speedLabel.TextXAlignment = Enum.TextXAlignment.Right
+do
+	local speedGradient = Instance.new("UIGradient")
+	speedGradient.Color = ColorSequence.new(Color3.fromHex("F2B630"), Color3.fromHex("FFD34D")) -- gold
+	speedGradient.Parent = speedFill
+	local speedLabel = label(speed, UDim2.new(0, 70, 1, 0), UDim2.new(0, -78, 0, 0), HUD.rideMeterLabel or "RIDING", 16)
+	speedLabel.TextXAlignment = Enum.TextXAlignment.Right
+end
 
 -- Your place in the race (D-030): big, top right under the minimap.
 local placeBadge = Instance.new("Frame")
 placeBadge.AnchorPoint = Vector2.new(1, 0)
 placeBadge.Position = UDim2.new(1, -16, 0, 268) -- under the race map
 placeBadge.Size = UDim2.fromOffset(150, 70)
-placeBadge.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
-placeBadge.BackgroundTransparency = 0.2
+placeBadge.BackgroundColor3 = Color3.fromHex("FFF7E6") -- Paper (RaceHudStyle)
+placeBadge.BackgroundTransparency = 0
 placeBadge.ZIndex = 6
 placeBadge.Visible = false
 placeBadge.Parent = gui
@@ -377,48 +411,44 @@ local function showResultIcon(labelText: string?)
 end
 
 -- Burst celebration (own screen only, after scoring).
-local burstBanner = label(gui, UDim2.new(1, 0, 0, 80), UDim2.new(0, 0, 0.30, 0), "", 64)
+local burstBanner = label(gui, UDim2.new(1, 0, 0, 80), UDim2.new(0, 0, 0.44, -10), "", 64)
+burstBanner.AnchorPoint = Vector2.new(0, 1)
+local bannerTextPx = 64 -- (layout: scaled on short screens)
 burstBanner.Font = Enum.Font.GothamBlack
 burstBanner.TextColor3 = Color3.fromRGB(255, 225, 90)
 burstBanner.Visible = false
 local rays = Instance.new("ImageLabel")
 rays.AnchorPoint = Vector2.new(0.5, 0.5)
-rays.Position = UDim2.new(0.5, 0, 0.30, 40)
+rays.Position = UDim2.new(0.5, 0, 0.44, -50) -- behind the banner
 rays.Size = UDim2.fromOffset(340, 340)
 rays.BackgroundTransparency = 1
 rays.ZIndex = 4
 rays.Visible = false
 rays.Parent = gui
 
--- Results panel with ribbons for 1st-4th (D-016 ribbons: Blue, Red, Yellow, White).
-local RIBBONS = { "ribbon_blue", "ribbon_red", "ribbon_yellow", "ribbon_white" }
-local results = Instance.new("Frame")
-results.AnchorPoint = Vector2.new(0.5, 0)
-results.Position = UDim2.new(0.5, 0, 0.32, 0)
-local RESULT_ROWS, ROW_HEIGHT = 5, 40
-local CARD_HEIGHT, GAIN_ROW = RESULT_ROWS * ROW_HEIGHT + 12, 30
-results.Size = UDim2.fromOffset(360, CARD_HEIGHT)
-results.BackgroundColor3 = Color3.fromRGB(20, 30, 25)
-results.BackgroundTransparency = 0.25
-results.ZIndex = 6
-results.Visible = false
-results.Parent = gui
-round(results, UDim.new(0, 16))
-local resultsScale = Instance.new("UIScale")
-resultsScale.Parent = results
+-- The results card (D-067): ResultsCard builds and fits it; this script fills it and shows it.
+local Card = require(script.Parent:WaitForChild("ResultsCard"))
+local results = Card.results -- (the card's column: showing it shows the card)
+local TRIP_ROW = (GameConfig.results or {}).tripRow == true
 
--- Small (phone) screens: the board, place badge and results card shrink with the screen, the
--- badge sits under the race map (scaled the same way), and the card moves up (D-055). The
--- steering buttons size and place themselves too (steerLayout, below).
+-- Small (phone) screens: the board and place badge shrink with the screen and the badge sits under
+-- the race map (scaled the same way, D-055); the results card fits itself (fitCard). The steering
+-- buttons size and place themselves too (steerLayout, below).
 local steerLayout: (() -> ())? = nil
 local function layout()
 	local camera = workspace.CurrentCamera
 	local height = if camera then camera.ViewportSize.Y else 720
 	local k = RaceState.hudScale()
-	boardScale.Scale, badgeScale.Scale, resultsScale.Scale = k, k, k
+	boardScale.Scale, badgeScale.Scale = k, k
 	board.Position = UDim2.new(0, 12, 0, math.floor(90 * k))
 	placeBadge.Position = UDim2.new(1, -16, 0, math.floor(RaceState.MAP_TOP + (RaceState.MAP_HEIGHT + 10) * k))
-	results.Position = UDim2.new(0.5, 0, if height < 500 then 0.24 else 0.32, 0)
+	if results.Visible then Card.layout() end -- (one or two columns: the screen may have turned)
+	-- Short screens: the burst title and banner shrink with the HUD (28 px at least).
+	local textK = if height < 500 then k else 1
+	burstTitle.TextSize = math.max(28, math.floor(52 * textK))
+	burstTitle.Size = UDim2.new(1, 0, 0, burstTitle.TextSize + 8)
+	bannerTextPx = math.max(28, math.floor(64 * textK))
+	burstBanner.Size = UDim2.new(1, 0, 0, bannerTextPx + 16)
 	if steerLayout then steerLayout() end
 end
 local function watchViewport()
@@ -428,54 +458,13 @@ local function watchViewport()
 end
 watchViewport()
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchViewport)
--- One row above the card (D-064): "You rode ★★☆", the trip folded into the same stars. In the
--- card's foot: "Your taps gained Comet 2 places!", only when it's a gain.
-local rideLine = label(results, UDim2.new(1, -24, 0, 34), UDim2.new(0, 12, 0, -42), "", 28)
-rideLine.ZIndex = 7
-rideLine.Font = Enum.Font.GothamBlack
-rideLine.TextColor3 = Color3.fromHex("FFD34D")
-local gainLine = label(results, UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, CARD_HEIGHT - 4), "", 20)
-gainLine.ZIndex = 7
--- The switch-back only (GameConfig.results.tripRow): D-054's "Good trip" row above the ride row.
-local TRIP_ROW = (GameConfig.results or {}).tripRow == true
-local tripRowLine = label(results, UDim2.new(1, -24, 0, 26), UDim2.new(0, 12, 0, -72), "", 22)
-tripRowLine.ZIndex = 7
-tripRowLine.Font = Enum.Font.GothamBlack
-tripRowLine.TextColor3 = Color3.fromHex("9FE07A")
 
-local function button(parent, text: string, size: UDim2, pos: UDim2, colour: Color3): TextButton
-	local b = Instance.new("TextButton")
-	b.Size, b.Position = size, pos
-	b.BackgroundColor3 = colour
-	b.Text = text
-	b.Font = Enum.Font.GothamBlack
-	b.TextScaled = true
-	b.TextColor3 = Color3.fromHex("1F2430")
-	b.ZIndex = 8
-	b.AutoButtonColor = true
-	b.Parent = parent
-	round(b, UDim.new(0, 12))
-	return b
-end
--- Replay (D-034): the same small buttons after every race; never auto-played.
-local watchBtn = button(results, "↺ Watch the finish", UDim2.new(0.62, 0, 0, 40), UDim2.new(0, 10, 1, 8), Color3.fromHex("FFD34D"))
-local fullBtn = button(results, "Whole race ×3", UDim2.new(0.34, 0, 0, 40), UDim2.new(0.64, 0, 1, 8), Color3.fromHex("BFD7FF"))
-local doneBtn = button(results, "Done ✕", UDim2.new(0, 110, 0, 36), UDim2.new(1, -110, 0, -110), Color3.new(1, 1, 1))
 
-local resultRows = {}
-for i = 1, RESULT_ROWS do
-	local icon = Instance.new("ImageLabel")
-	icon.Size = UDim2.fromOffset(28, 34)
-	icon.Position = UDim2.new(0, 12, 0, 8 + (i - 1) * ROW_HEIGHT)
-	icon.BackgroundTransparency = 1
-	icon.ZIndex = 7
-	icon.Visible = false
-	icon.Parent = results
-	local text = label(results, UDim2.new(1, -60, 0, 34), UDim2.new(0, 50, 0, 8 + (i - 1) * ROW_HEIGHT), "", 22)
-	text.ZIndex = 7
-	text.TextXAlignment = Enum.TextXAlignment.Left
-	resultRows[i] = { icon = icon, text = text }
-end
+-- (AAA Phase 4, D-069) The HUD in the art direction's colours, and the music bed.
+require(script.Parent:WaitForChild("RaceHudStyle")).apply({ board = board, rows = rows, placeBadge = placeBadge, placeText = placeText,
+	placeOf = placeOf, pace = pace, speed = speed, countLabel = countLabel, status = status, feedback = feedback, hint = hint,
+	burstTitle = burstTitle, burstBanner = burstBanner })
+require(script.Parent:WaitForChild("MusicBed")).start()
 
 -- State ---------------------------------------------------------------------
 local lanes = {}
@@ -484,12 +473,16 @@ local sparkleUntil = {}
 local riding = false
 local myLaneIndex = nil
 local youMarkerPlace: TextLabel? = nil
-local lastHud = 0
-local lastWatchCheck = 0
+local lastAt = { hud = 0, watch = 0, arrow = -math.huge } -- when the HUD, the watch check and the chance arrow last ran
 -- pace = { passes, tapsByPass = {}, done = 0, recent = {} } for the race
 local paceState = nil
 -- active burst = { seg, open, close, spec, tapped }
 local burstState = nil
+-- AAA Phase 2 (D-067): the finish moment and first-race coaching (both below).
+local finishSeq = nil
+local coach = nil -- { race, hintPasses, passes, burstHinted } in a coached race
+local clearFinishFx: () -> () = function() end
+local endOrbit: () -> () = function() end
 
 -- The running-order board (D-030, D-055). During a race the rows follow the running order;
 -- before it they're in lane order. Rows show place, lane badge and name, with a 📣 (and an up or
@@ -532,7 +525,7 @@ local function renderBoard()
 				then string.format("  %d%%  %s %d", math.round((chances[i] or 0) * 100), ThemePack.words.purse, lane.purse)
 				else ""
 			row.Text = string.format("%s  %s%s%s%s%s", lead, lane.name, star, sparkle, you, extra)
-			row.TextColor3 = lane.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
+			row.TextColor3 = if lane.id == myId then Color3.fromHex("8F4700") else Color3.fromHex("1D2433") -- Ink on Paper; yours dark orange
 			UiArt.set(rowBadges[r], if sparkle ~= "" then `lane_{i}_sparkle` else `lane_{i}`)
 		else
 			row.Text = ""
@@ -557,7 +550,7 @@ local function greyGlow()
 	paint(Color3.fromRGB(150, 150, 150))
 	task.delay(0.3, function()
 		if token == greyToken then
-			zone.BackgroundColor3 = Color3.fromRGB(60, 200, 90)
+			zone.BackgroundColor3 = Color3.fromHex("FFD23F") -- the Gold glow
 			for _, d in zone:GetDescendants() do
 				if d:IsA("ImageLabel") then d.ImageColor3 = Color3.new(1, 1, 1) end
 			end
@@ -567,33 +560,51 @@ end
 
 local function hideMeters()
 	pace.bar.Visible, burst.bar.Visible, speed.Visible, burstTitle.Visible, tapArea.Visible = false, false, false, false, false
+	if steerLayout then steerLayout() end -- the tap words leave the burst bar's place
 end
 
 local function celebrate(score: number, labelText: string)
 	burstBanner.Text = string.format("%s! %d", labelText, math.round(score))
 	burstBanner.Visible = true
 	burstBanner.TextTransparency = 0
-	burstBanner.TextSize = 40
-	TweenService:Create(burstBanner, TweenInfo.new(0.25, Enum.EasingStyle.Back), { TextSize = 64 }):Play()
+	burstBanner.TextSize = math.floor(bannerTextPx * 0.625)
+	TweenService:Create(burstBanner, TweenInfo.new(0.25, Enum.EasingStyle.Back), { TextSize = bannerTextPx }):Play()
 	if score >= 80 and UiArt.set(rays, "burst_rays") then
 		rays.ImageTransparency = 0.2
 		TweenService:Create(rays, TweenInfo.new(1.8), { ImageTransparency = 1 }):Play()
 	end
-	if score >= 80 and not reducedMotion() then
-		local camera = workspace.CurrentCamera
-		if camera then
-			local fov = camera.FieldOfView
-			TweenService:Create(camera, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), { FieldOfView = fov - 3 }):Play()
-		end
-	end
+	if score >= 80 then Cam.kick(FX.burstFovDeg, 2 * FX.fovFallSeconds) end -- the big kick (D-066; none under Reduced Motion)
 	task.delay(1.6, function()
 		TweenService:Create(burstBanner, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+	end)
+end
+
+-- A tap while the Final Burst is still grey (D-066): the bar gives a small shake (none under
+-- Reduced Motion), with the early hint.
+local shakeToken = 0
+local function shakeBurst()
+	local px = HUD.burstEarlyShakePx or 0
+	if px <= 0 or reducedMotion() then return end
+	shakeToken += 1
+	local token = shakeToken
+	task.spawn(function()
+		for _, dx in { px, -px, 0.6 * px, -0.6 * px, 0 } do
+			if token ~= shakeToken then return end
+			burst.bar.Position = UDim2.new(0.5, dx, 0.44, 0)
+			task.wait(0.04)
+		end
 	end)
 end
 
 local function tap()
 	local t = serverNow()
 	if burstState and not burstState.tapped and t >= burstState.open and t <= burstState.close then
+		-- Not armed yet (D-066): ignored, not used up; the server ignores it too.
+		if not BurstMeter.armed(t - burstState.open, ARM) then
+			if HUD.burstEarlyHint and HUD.burstEarlyHint ~= "" then hint.Text = HUD.burstEarlyHint end -- kind, no sound
+			shakeBurst()
+			return
+		end
 		burstState.tapped = true
 		remotes.BurstTap:FireServer(burstState.seg, t)
 		tapArea.Visible = false
@@ -618,15 +629,33 @@ local function tap()
 		end
 		feedback.Text = labelText
 		showResultIcon(labelText)
-		hint.Text = ""
+		popFeedback()
+		Coach.judge(labelText, PaceMeter.position(pass, t)) -- (D-067) the word at the marker too
+		if not (coach and coach.race == cueRace and k <= (FX.coachHintPasses or 0)) then hint.Text = "" end -- (a coached race holds the rule)
+		-- The tap tick (D-066): every counted tap, pitched by its score (Sound.play's 4th argument is
+		-- the PlaybackSpeed). With the tick off, Great and Perfect chime as before.
+		local ticked = FX.enabled and FX.tapTick and Sound ~= nil
+		if ticked then
+			pcall(Sound.play, "tap_ok", FX.tickVolume, nil, RaceFx.tickSpeed(GameConfig.labelFor(score), FX))
+		end
+		-- Great-or-better taps in a row: every surgeOnGreatStreak-th surges too (no camera kick).
+		paceState.streak = if labelText == "Perfect" or labelText == "Great" then (paceState.streak or 0) + 1 else 0
+		if labelText == "Great" and FX.enabled and RaceFx.streakSurges(paceState.streak, FX) then RaceState.surgeAt = t end
 		if labelText == "Perfect" or labelText == "Great" then
-			if Sound then Sound.play("tap_good") end
+			if Sound and not ticked then Sound.play("tap_good") end
+			-- A Perfect has its own sound on top of the tick (Great just ticks).
+			if Sound and ticked and labelText == "Perfect" then pcall(Sound.play, "tap_good", FX.perfectChimeVolume) end
 			RaceState.nudgeAt = t -- instant, luck-free nudge on your own horse (D-033)
+		end
+		if labelText == "Perfect" and FX.enabled then
+			RaceState.surgeAt = t -- the surge on your own horse (RaceView, D-066)
+			Cam.kickPerfect() -- (rate-limited: RaceFx.canKickPerfect)
 		end
 		if RaceState.recording then table.insert(RaceState.recording.events, { t = t, kind = "tap", label = labelText }) end
 	else
 		feedback.Text = "One tap!"
 		showResultIcon("Too fast")
+		paceState.streak = 0
 		hint.Text = "One tap each time the marker crosses"
 	end
 end
@@ -727,12 +756,14 @@ steerChip.TextWrapped = true
 steerChip.ZIndex = 9
 steerChip.Visible = false
 round(steerChip, UDim.new(0, 12))
-local chipText = Instance.new("UITextSizeConstraint")
-chipText.MaxTextSize, chipText.MinTextSize = 20, 12
-chipText.Parent = steerChip
-local chipPad = Instance.new("UIPadding")
-chipPad.PaddingLeft, chipPad.PaddingRight = UDim.new(0, 10), UDim.new(0, 10)
-chipPad.Parent = steerChip
+do
+	local chipText = Instance.new("UITextSizeConstraint")
+	chipText.MaxTextSize, chipText.MinTextSize = 20, 12
+	chipText.Parent = steerChip
+	local chipPad = Instance.new("UIPadding")
+	chipPad.PaddingLeft, chipPad.PaddingRight = UDim.new(0, 10), UDim.new(0, 10)
+	chipPad.Parent = steerChip
+end
 local chipScale = Instance.new("UIScale")
 chipScale.Parent = steerChip
 
@@ -766,7 +797,12 @@ end
 
 -- Buttons at least minButtonPx (88 px), bigger on big screens; bottom-left, above the speed
 -- meter. On a narrow screen the tap words (feedback, hint) move right of the buttons while
--- they're up, so nothing hides behind them.
+-- they're up, so nothing hides behind them. On a phone, in a race where you have the buttons
+-- (hud.sliderClearOfPad, D-066), the slider and the riding meter sit right of the pad for the
+-- whole race (they don't jump when the pad fades), so a thumb on Out ▶ never covers the glow.
+-- While the Final Burst bar is up the tap words step below it (on a phone they'd sit on it).
+local padRace = false -- this race shows you the ◀ ▶ pad (SteerControls)
+local burstLaidOut = false
 steerLayout = function()
 	local camera = workspace.CurrentCamera
 	local w = if camera then camera.ViewportSize.X else 1280
@@ -781,11 +817,34 @@ steerLayout = function()
 	steerChip.Size = UDim2.fromOffset(math.max(2 * size + gap, 320), 44)
 	thumbX, thumbY = left + size / 2, -8 - size / 2
 	local right = (steerGui.AbsolutePosition.X - gui.AbsolutePosition.X) + left + 2 * size + gap + 12
-	if steerPad.Visible and w / 2 - 260 < right then
+	-- The slider and the riding meter (its label sits 78 px left of the meter). Moved right of the
+	-- pad on any screen where the pad's right edge reaches the slider or the meter's label (phones,
+	-- and tablets at 1024x768 or 1280x720) and at least 200 px are left for the slider. The meter
+	-- sits 10 px higher than it used to, clear of the marker's top (the marker is 1.6x the bar).
+	local overlaps = right > 0.15 * w or right > 0.3 * w - 78
+	if padRace and HUD.sliderClearOfPad ~= false and overlaps and w - 12 - right >= 200 then
+		local barW = w - 12 - right
+		pace.bar.Size, pace.bar.Position = UDim2.new(0, barW, 0, 34), UDim2.new(0, right + barW / 2, 0.80, 0)
+		local meterW = math.min(barW - 78, math.floor(0.4 * w))
+		speed.Size, speed.Position = UDim2.new(0, meterW, 0, 16), UDim2.new(0, right + 78 + meterW / 2, 0.75, -10)
+	else
+		pace.bar.Size, pace.bar.Position = UDim2.new(0.7, 0, 0, 34), UDim2.new(0.5, 0, 0.80, 0)
+		speed.Size, speed.Position = UDim2.new(0.4, 0, 0, 16), UDim2.new(0.5, 0, 0.75, -10)
+	end
+	-- The tap words: under the burst bar while it's up (the icon on top, then the word, then the hint)...
+	burstLaidOut = burst.bar.Visible
+	if burstLaidOut then
+		local below = burst.bar.AbsolutePosition.Y - gui.AbsolutePosition.Y + burst.bar.AbsoluteSize.Y + 6
+		feedbackIcon.Position = UDim2.new(0.5, 0, 0, below + 52)
+		feedback.Position, feedback.Size = UDim2.new(0, 0, 0, below + 54), UDim2.new(1, 0, 0, 46)
+		local h = if camera then camera.ViewportSize.Y else 720
+		hint.Position, hint.Size = UDim2.new(0, 0, 0, math.min(below + 100, h - 32)), UDim2.new(1, 0, 0, 28) -- (off the bottom edge)
+	-- ...else right of the buttons on a narrow screen while they're up...
+	elseif steerPad.Visible and w / 2 - 260 < right then
 		feedback.Position, feedback.Size = UDim2.new(0, right, 0.62, 0), UDim2.new(1, -right - 12, 0, 46)
 		hint.Position, hint.Size = UDim2.new(0, right, 0.68, 0), UDim2.new(1, -right - 12, 0, 28)
 		feedbackIcon.Position = UDim2.new(0.5, (right - 12) / 2, 0.62, -2)
-	else
+	else -- ...else centred
 		feedback.Position, feedback.Size = UDim2.new(0, 0, 0.62, 0), UDim2.new(1, 0, 0, 46)
 		hint.Position, hint.Size = UDim2.new(0, 0, 0.68, 0), UDim2.new(1, 0, 0, 28)
 		feedbackIcon.Position = UDim2.new(0.5, 0, 0.62, -2)
@@ -905,6 +964,10 @@ local function clearSteer()
 	bindSteer(false)
 	chipToken += 1
 	steerChip.Visible, thumb.Visible, wind.Visible = false, false, false
+	if padRace then
+		padRace = false
+		steerLayout()
+	end
 end
 
 -- A press: one lane in (-1) or out (1). The server decides; your own glide starts at once.
@@ -986,6 +1049,7 @@ local function updateSteer(t: number, dt: number)
 	end
 	if s.tipUntil and os.clock() < s.tipUntil then
 		local press = if reducedMotion() then 0 else -10 * math.abs(math.sin(os.clock() * math.pi))
+		thumb.Text, thumb.AnchorPoint = "👆", Vector2.new(0.5, 0) -- (first-race coaching points it down at the slider)
 		thumb.Position = UDim2.new(0, thumbX, 0.75, thumbY + press)
 		thumb.Visible = true
 	else
@@ -1153,8 +1217,8 @@ RunService.RenderStepped:Connect(function(dt)
 	local burstUp = burst.bar.Visible
 	RaceState.burstShowing = burstUp
 	-- Watching (D-055): the HUD hides while you're busy or have walked out of range.
-	if os.clock() - lastWatchCheck > 0.25 then
-		lastWatchCheck = os.clock()
+	if os.clock() - lastAt.watch > 0.25 then
+		lastAt.watch = os.clock()
 		RaceState.watchHidden = myLaneIndex == nil and RaceState.focus ~= nil
 			and (RaceState.busy() or not RaceState.nearCourse(RaceState.focus, GameConfig.spectate.keepStuds))
 	end
@@ -1167,11 +1231,11 @@ RunService.RenderStepped:Connect(function(dt)
 	board.Visible = showBoard
 	status.Visible = not RaceState.watchHidden or player:GetAttribute("InLine") == true
 	if not RaceState.active then placeBadge.Visible = false end
-	if RaceState.active and os.clock() - lastHud > 0.2 then
-		lastHud = os.clock()
+	if RaceState.active and os.clock() - lastAt.hud > 0.2 then
+		lastAt.hud = os.clock()
 		renderBoard()
 		local myPlace = myLaneIndex and RaceState.place[myLaneIndex]
-		placeBadge.Visible = myPlace ~= nil and not burstUp
+		placeBadge.Visible = myPlace ~= nil and not burstUp and not finishSeq -- (gone for the finish moment, D-067)
 		if myPlace then
 			placeText.Text = RaceState.ordinal(myPlace)
 			placeOf.Text = string.format("of %d", RaceState.lanes)
@@ -1184,6 +1248,10 @@ RunService.RenderStepped:Connect(function(dt)
 		-- During the countdown the slider shows still, with the first glow lit.
 		local waiting = k == nil and passes[1] ~= nil and t < passes[1].t0
 		pace.bar.Visible = k ~= nil or waiting
+		-- The hoofbeats duck while the slider runs (D-066), switching once it has held for 0.3 s.
+		local live = k ~= nil
+		if live ~= paceState.duckWant then paceState.duckWant, paceState.duckSince = live, os.clock() end
+		if stopGallop and live ~= gallopDucked and os.clock() - (paceState.duckSince or 0) >= 0.3 then gallop(true, live) end
 		speed.Visible = k ~= nil
 		tapArea.Visible = k ~= nil or (burstState ~= nil and not burstState.tapped)
 		if k then
@@ -1192,11 +1260,19 @@ RunService.RenderStepped:Connect(function(dt)
 		elseif waiting then
 			placeMarker(pace, PaceMeter.position(passes[1], passes[1].t0), passes[1].center, false)
 		end
+		-- First-race coaching (D-067): for the first coachPasses passes (and the countdown before
+		-- them) the ghost thumb points at the green and presses as the marker crosses it, with "NOW!"
+		-- on the green; the rule stays up for coachHintPasses passes.
+		local coached = coach ~= nil and coach.race == cueRace
+		Coach.frame(coached, pace, passes, k or (if waiting then 1 else nil), k ~= nil, t, thumb, steerGui,
+			steer ~= nil and steer.tipUntil ~= nil and os.clock() < steer.tipUntil)
+		if coached and k and k > (FX.coachHintPasses or 0) and hint.Text == FX.coachHint then hint.Text = "" end
 		-- Finished passes feed the speed meter (missed or doubled count 0).
 		while paceState.done < #passes and passes[paceState.done + 1].t1 <= t do
 			paceState.done += 1
 			local j = paceState.done
 			local s = if paceState.tapsByPass[j] == 1 then PaceMeter.tapScore(passes[j], paceState.firstTap[j]) else 0
+			if not paceState.tapsByPass[j] then paceState.streak = 0 end -- (a missed pass ends a Great streak)
 			if not paceState.tapsByPass[j] and j > 1 then
 				feedback.Text = HUD.missedPassLabel
 				showResultIcon(if HUD.missedPassLabel ~= "" then HUD.missedPassLabel else nil)
@@ -1211,17 +1287,36 @@ RunService.RenderStepped:Connect(function(dt)
 		if paceState.burstOpen and not burstState and t < paceState.burstOpen
 			and t >= paceState.burstOpen - GameConfig.burstLeadSeconds then
 			burstTitle.Visible = true -- "FINAL BURST" shows as the field turns into the homestretch
+			if coach and coach.race == cueRace and not coach.burstHinted then -- (D-067) a coached race gets a heads-up
+				coach.burstHinted = true
+				hint.Text = FX.coachBurstHint
+			end
 		end
 	end
 	if burstState then
 		local rel = t - burstState.open
 		if rel >= 0 and t <= burstState.close then
 			local shown = riding or not RaceState.watchHidden -- not over the barn (D-055)
-			burst.bar.Visible, burstTitle.Visible = shown, shown
+			burst.bar.Visible = shown
+			burstTitle.Visible = shown and not burstState.tapped -- your result banner takes its place
+			if burstLaidOut ~= burst.bar.Visible then steerLayout() end
 			local spec = burstState.spec
 			placeMarker(burst, BurstMeter.position(rel, spec.sweepSeconds, spec.phase),
 				BurstMeter.targetCenter(rel, spec), spec.twoTargets)
-			if not reducedMotion() then
+			-- Grey until armed (D-066), then the rainbow and the pulsing gold rim. The marker runs throughout.
+			local armed = BurstMeter.armed(rel, ARM)
+			if burstState.armedShown ~= armed then
+				burstState.armedShown = armed
+				if burst.gradient then burst.gradient.Enabled = armed end
+				burst.bar.BackgroundColor3 = if armed then Color3.new(1, 1, 1) else Color3.fromRGB(150, 150, 150)
+				burst.stroke.Color = if armed then Color3.fromHex("FFD34D") else Color3.fromRGB(110, 110, 110)
+				burst.zone.BackgroundTransparency = if armed then 0.25 else 0.6
+				burst.zone2.BackgroundTransparency = burst.zone.BackgroundTransparency -- (Champion's second glow)
+				burst.stroke.Thickness = 6
+				-- An early tap's "wait" hint gives way to the real one as the colours come on.
+				if armed and riding and not burstState.tapped and hint.Text == HUD.burstEarlyHint then hint.Text = BURST_HINT end
+			end
+			if armed and not reducedMotion() then
 				burst.stroke.Thickness = 6 + 2 * math.abs(math.sin(t * 6)) -- pulsing gold rim (3 Hz)
 			end
 		elseif t > burstState.close then
@@ -1229,6 +1324,7 @@ RunService.RenderStepped:Connect(function(dt)
 			if riding and not burstState.tapped then feedback.Text = "Finish strong!" end -- riders only
 			burst.bar.Visible, burstTitle.Visible = false, false
 			burstState = nil
+			steerLayout() -- the tap words go back
 		end
 	end
 end)
@@ -1247,7 +1343,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	-- The next race on the course of your results card rebuilds its horses: the card stays
 	-- (RaceState.consider keeps the focus on it), but there's nothing left to replay.
 	if RaceState.resultsOpen and RaceState.holdFocus and (courseId or "dirt") == RaceState.myCourse then
-		watchBtn.Visible, fullBtn.Visible = false, false
+		Card.watchBtn.Visible, Card.fullBtn.Visible = false, false
+		Card.layout()
 	end
 	-- Two races can run at once (D-036): follow yours, or the newest when watching.
 	if not RaceState.consider(courseId or "dirt", laneList, start) then return end
@@ -1258,6 +1355,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 	pendingBurstOpen = burstOpen
 	lanes = laneList
 	chances = {}
+	lastAt.from, lastAt.arrow = nil, -math.huge
 	sparkleUntil = {}
 	riding = false
 	myLaneIndex = nil
@@ -1283,19 +1381,27 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 			tuckedFor = 0, tuckedTotal = 0, tuckChips = 0, tuckChipAt = -math.huge, pressed = false,
 			hud = SteerHud.new(), chips = SteerChips.new(), lane = nil, pressDir = 0, pressAt = -math.huge, brushAt = -math.huge }
 	end
-	local conditions = cond and string.format("%s · %s · %s", cond.distance, cond.surface, cond.weather) or ""
-	status.Text = string.format("%s race: %s%s", league, conditions, if riding then "" else "  (watching)")
+	-- The picker's words for the race (D-064, AAA Phase 2 wording pass): "Bronze · 🐇 Short · Dirt ☀️",
+	-- never "Sprint" on one screen and "🐇 Short" on another.
+	local line = if cond then PickerText.cardLine({ league = league, distance = cond.distance, surface = cond.surface,
+		weather = cond.weather, course = courseId }) else league
+	status.Text = line .. (if riding then "" else "  (watching)")
 	if COURSE_NAME[courseId] and not riding then status.Text = COURSE_NAME[courseId] .. " · " .. status.Text end
-	feedback.Text, hint.Text = "", if riding then "Tap when the marker crosses the glow" else ""
+	-- First-race coaching (D-067): the rule, the ghost thumb over the green and "NOW!".
+	local racesBefore = PlayerState.data and PlayerState.data.totals and PlayerState.data.totals.races
+	coach = if riding and FX.enabled and PlayerState.data and RaceFx.coached(racesBefore, FX) then { race = cueRace } else nil
+	feedback.Text = ""
+	hint.Text = if coach then FX.coachHint elseif riding then "Tap when the marker crosses the glow" else ""
 	burstBanner.Visible = false
 	results.Visible = false
+	clearFinishFx()
 	RaceState.resultsOpen, RaceState.holdFocus = false, false
 	showResultIcon(nil)
 	speedFill.Size = UDim2.fromScale(0, 1)
 	renderBoard()
 	-- Sound cues: the bell as the gate opens and "And they're off!" just after it (so they don't
 	-- stack), "Into the far turn!" as the field enters the final far turn, your hoofbeats while you ride.
-	cueVolume, cueRider, cueCourse = if riding then 1 else 0.5, riding, courseId or "dirt"
+	cueTo.volume, cueTo.rider, cueTo.course = if riding then 1 else 0.5, riding, courseId or "dirt"
 	gallop(false)
 	keyHintShown = false
 	cheerArrow = nil
@@ -1354,8 +1460,15 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 			task.wait(math.max(0, start - countFrom - serverNow()))
 			while id == cueRace and not seated() and serverNow() < start + 1 do task.wait(0.05) end
 			if id == cueRace and seated() then
-				rideCamera(true)
+				Cam.ride(true)
 				setJumping(false) -- again: leaving the other course's horse may have brought the controls back
+				-- (AAA Phase 4, D-069) The gate line-up pass, then the chase view before GO (riders only; never
+				-- under Reduced Motion; a late seat skips it).
+				if myLaneIndex then
+					require(script.Parent:WaitForChild("GateIntro")).run(start, courseId, myLaneIndex, function()
+						return id == cueRace and seated()
+					end)
+				end
 			end
 		end)
 	end
@@ -1407,6 +1520,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 			txt.Parent = bb
 		end
 		bb.Parent = horse
+		require(script.Parent:WaitForChild("RaceHudStyle")).youMarker(bb) -- (D-069) small and low in your chase view
 	end)
 end)
 
@@ -1420,6 +1534,10 @@ remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smar
 	if s.shown and tip then s.tipAt = s.start + 1.5 end
 	if s.shown and RaceState.recording then RaceState.recording.steer = true end -- the replay draws your line
 	bindSteer(s.shown)
+	if padRace ~= s.shown then
+		padRace = s.shown
+		steerLayout() -- (D-066) the slider moves clear of the pad before the gate
+	end
 	armBell(s)
 end)
 -- Your own lane from the server (D-057 N4): only riders with the buttons hear it, so spectators
@@ -1499,8 +1617,9 @@ remotes.BurstOpened.OnClientEvent:Connect(function(seg, open, close, spec, _name
 	if not RaceState.isFocus(courseId) then return end
 	pace.bar.Visible = false
 	burstState = { seg = seg, open = open, close = close, spec = spec, tapped = false, race = cueRace }
-	cue(open, "burst_whoosh", "vo_burst")
-	feedback.Text, hint.Text = "", if riding then "One big tap in the glow. It counts double!" else ""
+	cue(open, "vo_burst")
+	cue(open + ARM, "burst_whoosh") -- the whoosh says it's armed (D-066)
+	feedback.Text, hint.Text = "", if riding then BURST_HINT else ""
 	showResultIcon(nil)
 	tapArea.Visible = riding
 end)
@@ -1527,16 +1646,22 @@ remotes.BurstSparkle.OnClientEvent:Connect(function(laneIds, courseId)
 	task.delay(4.1, renderBoard)
 end)
 
-remotes.LiveChances.OnClientEvent:Connect(function(_seg, live, courseId)
+-- (D-067) A preview (the stretch drive, or after the far-turn lock: the trailing `preview`) moves
+-- the horses but, with hud.arrowOnPreview off, never the up or down arrows: those compare checkpoint
+-- closes only (RaceFx.arrowShows), so the arrow doesn't flicker once a second.
+remotes.LiveChances.OnClientEvent:Connect(function(_seg, live, courseId, preview)
 	if not RaceState.isFocus(courseId) then return end
 	local before = {}
 	for i, v in chances do before[i] = v end
 	chances = live
 	renderBoard()
+	local from = lastAt.from or before
+	local since = os.clock() - lastAt.arrow
 	for i, lane in lanes do
-		if lane.id == myId and before[i] and math.abs(live[i] - before[i]) > 0.003 then
-			if UiArt.set(chanceArrow, if live[i] > before[i] then "chance_up" else "chance_down") then
+		if lane.id == myId and from[i] and RaceFx.arrowShows(live[i] - from[i], preview == true, since, HUD) then
+			if UiArt.set(chanceArrow, if live[i] > from[i] then "chance_up" else "chance_down") then
 				arrowUntil = os.clock() + 2
+				lastAt.arrow = os.clock()
 			end
 		end
 		if lane.id == myId and HUD.boardShowsChance then -- off by default: the badge arrow says it (D-055)
@@ -1545,12 +1670,16 @@ remotes.LiveChances.OnClientEvent:Connect(function(_seg, live, courseId)
 			status.Text = string.format("%s: %d%% (%s%d)", ThemePack.words.winChance, math.round(live[i] * 100), sign, delta)
 		end
 	end
-	-- Watching: the rider you cheered gets an up or down arrow on the board.
+	-- Watching: the rider you cheered gets an up or down arrow on the board (the same rule).
 	local cheered = RaceState.myCheer()
-	if not riding and cheered and before[cheered] and live[cheered] and math.abs(live[cheered] - before[cheered]) > 0.003 then
-		cheerArrow = { up = live[cheered] > before[cheered], untilT = os.clock() + 3 }
+	if not riding and cheered and from[cheered] and live[cheered]
+		and RaceFx.arrowShows(live[cheered] - from[cheered], preview == true, since, HUD) then
+		cheerArrow = { up = live[cheered] > from[cheered], untilT = os.clock() + 3 }
+		lastAt.arrow = os.clock()
 		renderBoard()
 	end
+	-- The next arrow compares against this checkpoint (or, with arrows on previews, this one too).
+	if preview ~= true or HUD.arrowOnPreview == true then lastAt.from = table.clone(live) end
 end)
 
 remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
@@ -1559,12 +1688,15 @@ remotes:WaitForChild("RaceAborted").OnClientEvent:Connect(function(courseId)
 	cueRace += 1
 	clearSteer()
 	gallop(false)
-	paceState, burstState = nil, nil
+	paceState, burstState, coach = nil, nil, nil
+	finishSeq = nil
+	endOrbit()
+	clearFinishFx()
 	hideMeters()
 	burstBanner.Visible, results.Visible, placeBadge.Visible = false, false, false
 	RaceState.resultsOpen, RaceState.holdFocus = false, false
 	if riding then
-		rideCamera(false)
+		Cam.ride(false)
 		setJumping(true)
 		RaceState.resultsPending = false
 		RaceState.ResultsShown:Fire(false) -- no results card is coming
@@ -1578,26 +1710,177 @@ remotes.IntegrityNote.OnClientEvent:Connect(function(text)
 end)
 
 local rideReport = nil -- { stars, gain, place }
+local rideRank = nil   -- your ride score's rank, sent only for the top 3 (RideRank, D-067)
+local shownSummary, shownRace = nil, nil -- what the card shows (refreshed if your report comes late)
+
+-- The finish moment (AAA Phase 2, D-067, GameConfig.finish) ---------------------------------------
+-- On the rider's own screen only. As your horse crosses the line: confetti and a gold outline for
+-- 1st, the ribbon stamping onto the screen for 1st to 4th, and the camera arcing from behind your
+-- horse to the replay's side view (RaceState.sideRig) over orbitSeconds while the field gallops out.
+-- Any tap skips to the card; the card is up at the latest cardWithinSeconds after the leader's
+-- crossing (RaceFx.cardAt), and the camera holds the side view on your horse behind it. Reduced
+-- Motion: no orbit and no confetti, the world dims and the card fades in. Drawn only: nothing here
+-- reads or changes a score, the order or the result (the summary is already the result).
+local FIN = GameConfig.finish or { enabled = false }
+local Finish = require(script.Parent:WaitForChild("FinishMoment")) -- the stamp, the win glow and confetti, the orbit
+-- finishSeq = { race, summary, place, lane, course, leaderAt, phase ("wait" | "play" | "card"), crossAt, cardAt,
+--   orbiting, orbitFrom, from, skip }
+
+-- The camera leaves the orbit: back behind your horse if you're still in the saddle.
+endOrbit = function()
+	local seq = finishSeq
+	if seq then seq.orbiting = false end
+	local camera = workspace.CurrentCamera
+	if camera and camera.CameraType == Enum.CameraType.Scriptable then
+		local replay = player.PlayerGui:FindFirstChild("ReplayUI")
+		if not (replay and replay.Enabled) then -- (the replay owns the camera while it plays)
+			camera.CameraType = if seated() and Cam.on then Enum.CameraType.Follow else Enum.CameraType.Custom
+			camera.FieldOfView = if Cam.on then Cam.RIDE_FOV else Cam.NORMAL_FOV
+		end
+	end
+end
+
+-- (N4) The finish's pieces go, and a Reduced Motion dim left up with no card on screen goes too.
+clearFinishFx = function()
+	Finish.clear()
+	if not results.Visible then Card.dim.Visible = false end
+end
+
+-- Your horse is over the line (or the wait ran out): the moment starts.
+local function startFinish(seq, t: number)
+	seq.phase, seq.crossAt = "play", t
+	local still = reducedMotion()
+	seq.cardAt = RaceFx.cardAt(t, seq.leaderAt, FIN, still)
+	placeBadge.Visible = false
+	Cam.clearKicks()
+	local horse = Finish.horse(seq.course, seq.lane)
+	if seq.place == 1 and horse then Finish.win(horse, still) end
+	if seq.place and seq.place <= 4 and FIN.stamp ~= false then Finish.stamp(seq.place, still) end
+	local camera = workspace.CurrentCamera
+	if FIN.orbit ~= false and not still and camera and Cam.on and seated() and horse then
+		camera.FieldOfView = Cam.RIDE_FOV
+		camera.CameraType = Enum.CameraType.Scriptable
+		seq.orbiting, seq.orbitFrom, seq.from = true, t, nil
+		Finish.hideYou(horse) -- (the YOU marker would clutter the side view)
+	end
+	if still then -- a simple fade: the world dims over fadeSeconds, then the card shows
+		Card.dimIn()
+	end
+end
+
+-- The results card's contents for this summary (your report and ride rank too, if they've come).
+local function fillCard(summary)
+	local mine = nil
+	for _, row in summary do
+		if row.id == myId then mine = row end
+	end
+	local horse = if mine then mine.name else ""
+	-- The headline: the place under its ribbon, and a kind line for every place (D-067).
+	local place = if rideReport and rideReport.place then rideReport.place elseif mine then mine.place else nil
+	if GameConfig.results.headline ~= false and place then
+		Card.headText.Text = ResultsText.headline(place, if rideReport then rideReport.stars else nil)
+		local ribbon = Card.RIBBONS[place]
+		Card.headRibbon.Visible = ribbon ~= nil and UiArt.set(Card.headRibbon, ribbon)
+		Card.cheerText.Text = ResultsText.cheer(place, if rideReport then rideReport.stars else nil, horse)
+	else
+		Card.headText.Text, Card.cheerText.Text = if place then "" else "Results", ""
+		Card.headRibbon.Visible = false
+	end
+	-- "Best ride" for the top 3 only, and only with a ride of rankMinStars or more (never beside ★☆☆).
+	local rankOk = GameConfig.results.riderRank ~= false and rideReport ~= nil
+		and (rideReport.stars or 0) >= (GameConfig.results.rankMinStars or 0)
+	Card.rankText.Text = if rankOk then ResultsText.rankLine(rideRank) else ""
+	-- Top four with ribbons, plus your own place if you finished lower.
+	local shown = {}
+	for _, row in summary do
+		if row.place <= 4 then table.insert(shown, row) end
+	end
+	for _, row in summary do
+		if row.id == myId and row.place > 4 then table.insert(shown, row) end
+	end
+	table.sort(shown, function(a, b) return a.place < b.place end)
+	for i, r in Card.rows do
+		local row = shown[i]
+		if row then
+			local cash = row.cash > 0 and string.format("  +%d", row.cash) or ""
+			local you = row.id == myId and "  ◀ YOU" or ""
+			r.text.Text = string.format("%d. %s%s%s", row.place, row.name, cash, you)
+			r.text.TextColor3 = if row.id == myId then Card.WARM else Card.INK
+			if not (Card.RIBBONS[row.place] and UiArt.set(r.icon, Card.RIBBONS[row.place])) then r.icon.Visible = false end
+		else
+			r.text.Text = ""
+			r.icon.Visible = false
+		end
+	end
+	-- One row (D-064): your ride in stars (the trip folded in for riders with the steering
+	-- buttons), then "Your taps gained Comet N places!" only if it's a gain.
+	if rideReport then
+		-- (AAA Phase 4, D-069) the stars count in as the card shows: ResultsCard writes "You rode ★★☆"
+		Card.setRide(ResultsText.rowStars(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW))
+		Card.gainLine.Text = ResultsText.gainedLine(horse, rideReport.gain, rideReport.tripGain, STEER.scale)
+		Card.tripRowLine.Text = if TRIP_ROW then ResultsText.tripLine(rideReport.tripStars, STEER.scale) or "" else ""
+	else
+		Card.setRide(nil)
+		Card.gainLine.Text, Card.tripRowLine.Text = "", ""
+	end
+	-- 🏁 Race again (your own card only): what RACE! would join now, and it says Practice when it is.
+	Card.againBtn.Visible = GameConfig.results.raceAgain ~= false and rideReport ~= nil
+	if Card.againBtn.Visible then
+		local h = PlayerState.activeHorse()
+		Card.againKind = ResultsText.nextKind(h, GameConfig.energy, PlayerState.data and PlayerState.data.horses,
+			GameConfig.results.feedWhenNapping == true)
+		Card.againBtn.Text = ResultsText.raceAgainLabel(Card.againKind, h and h.name)
+	end
+	local hasRecording = RaceState.recording ~= nil and #RaceState.recording.frames > 10
+	Card.watchBtn.Visible, Card.fullBtn.Visible = hasRecording, hasRecording
+	Card.doneBtn.Visible = true
+	Card.layout()
+end
+
 local function closeResults()
 	results.Visible = false
 	RaceState.resultsOpen, RaceState.holdFocus = false, false
+	finishSeq = nil
+	clearFinishFx()
 	remotes.Dismount:FireServer()
-	rideCamera(false)
+	Cam.ride(false)
 	setJumping(true)
 	RaceState.releaseMyRace()
 end
-doneBtn.Activated:Connect(closeResults)
--- The card hides while a replay plays; if the replay can't start, ReplayClosed brings it back.
-watchBtn.Activated:Connect(function()
-	results.Visible = false
-	RaceState.ReplayRequested:Fire("finish")
+Card.doneBtn.Activated:Connect(function()
+	if Card.ready() then closeResults() end
 end)
-fullBtn.Activated:Connect(function()
-	results.Visible = false
-	RaceState.ReplayRequested:Fire("full")
+-- 🏁 Race again (D-067): off the race horse, then what RACE! does (Hud: the same league's line, the
+-- Cup past the ceiling, Practice while napping). Not a purchase prompt (D-050 unaffected).
+Card.againBtn.Activated:Connect(function()
+	if not Card.ready() then return end
+	closeResults()
+	if Card.againKind == "feed" then -- (napping, nothing else ready) to the stall to feed it
+		Card.goStable()
+		return
+	end
+	local events = ReplicatedStorage:FindFirstChild("HudEvents")
+	local press = events and events:FindFirstChild("PressRace")
+	if press and press:IsA("BindableEvent") then press:Fire() end
 end)
+-- The card hides while a replay plays; if the replay can't start, ReplayClosed brings it back. The
+-- replay takes the camera from the finish moment's side view.
+local function replay(mode: string)
+	if not Card.ready() then return end
+	if finishSeq then finishSeq.orbiting = false end
+	clearFinishFx()
+	results.Visible = false
+	RaceState.ReplayRequested:Fire(mode)
+end
+Card.watchBtn.Activated:Connect(function() replay("finish") end)
+Card.fullBtn.Activated:Connect(function() replay("full") end)
 RaceState.ReplayClosed.Event:Connect(function()
-	if RaceState.resultsOpen then results.Visible = true end -- back to the results card, not the lobby
+	if RaceState.resultsOpen then
+		endOrbit()
+		results.Visible = true -- back to the results card, not the lobby
+		Card.shownAt = os.clock()
+		Card.dimIn()
+	end
 end)
 
 -- (stars, gain, place, course), or for a rider with the steering buttons (D-054) (stars, gain,
@@ -1605,6 +1888,13 @@ end)
 remotes.RideReport.OnClientEvent:Connect(function(starCount, gain, finishPlace, a, b)
 	rideReport = ResultsText.rideReport(starCount, gain, finishPlace, a, b)
 	if RaceState.recording then RaceState.recording.ride = rideReport end
+	if results.Visible and shownSummary and shownRace == cueRace then fillCard(shownSummary) end -- (it came late)
+end)
+-- "Best ride in the race!" (D-067): sent only when your ride score is 1st to 3rd in the race.
+remotes:WaitForChild("RideRank").OnClientEvent:Connect(function(rank, courseId)
+	if courseId ~= nil and RaceState.myCourse ~= nil and courseId ~= RaceState.myCourse then return end
+	rideRank = if type(rank) == "number" and rank >= 1 and rank <= 3 then rank else nil
+	if results.Visible and shownSummary and shownRace == cueRace then fillCard(shownSummary) end
 end)
 
 local function showResults(summary, raceId: number)
@@ -1616,46 +1906,10 @@ local function showResults(summary, raceId: number)
 		end
 		return
 	end
-	-- Top four with ribbons, plus your own place if you finished lower.
-	local shown = {}
-	for _, row in summary do
-		if row.place <= 4 then table.insert(shown, row) end
-	end
-	for _, row in summary do
-		if row.id == myId and row.place > 4 then table.insert(shown, row) end
-	end
-	table.sort(shown, function(a, b) return a.place < b.place end)
-	for i, r in resultRows do
-		local row = shown[i]
-		if row then
-			local cash = row.cash > 0 and string.format("  +%d", row.cash) or ""
-			local you = row.id == myId and "  ◀ YOU" or ""
-			r.text.Text = string.format("%d. %s%s%s", row.place, row.name, cash, you)
-			r.text.TextColor3 = row.id == myId and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)
-			if not (RIBBONS[row.place] and UiArt.set(r.icon, RIBBONS[row.place])) then r.icon.Visible = false end
-		else
-			r.text.Text = ""
-			r.icon.Visible = false
-		end
-	end
-	-- One row (D-064): your ride in stars (the trip folded in for riders with the steering
-	-- buttons), then "Your taps gained Comet N places!" only if it's a gain.
-	if rideReport then
-		local horse = ""
-		for _, row in summary do
-			if row.id == myId then horse = row.name end
-		end
-		rideLine.Text = ResultsText.oneRow(rideReport.stars, rideReport.tripStars, STEER.scale, TRIP_ROW)
-		gainLine.Text = ResultsText.gainedLine(horse, rideReport.gain, rideReport.tripGain, STEER.scale)
-		tripRowLine.Text = if TRIP_ROW then ResultsText.tripLine(rideReport.tripStars, STEER.scale) or "" else ""
-	else
-		rideLine.Text, gainLine.Text, tripRowLine.Text = "", "", ""
-	end
-	results.Size = UDim2.fromOffset(360, CARD_HEIGHT + (if gainLine.Text ~= "" then GAIN_ROW else 0))
-	local hasRecording = RaceState.recording ~= nil and #RaceState.recording.frames > 10
-	watchBtn.Visible, fullBtn.Visible = hasRecording, hasRecording
-	doneBtn.Visible = true
-	results.Visible = true
+	Finish.hideStamp() -- the card's headline carries the ribbon now
+	shownSummary, shownRace = summary, raceId
+	fillCard(summary)
+	Card.show(reducedMotion()) -- the world dims and the card rises in (Reduced Motion: it just shows)
 	RaceState.resultsOpen = true
 	RaceState.holdFocus = rideReport ~= nil -- your own card keeps the HUD until Done
 	if raceId == cueRace then cue(0, "vo_finish") end -- "What a finish!", only if the HUD still follows this race
@@ -1669,6 +1923,46 @@ local function showResults(summary, raceId: number)
 	showResultIcon(nil)
 end
 
+-- Each frame of the finish moment: wait for your horse to cross, run the orbit, show the card on
+-- time (or at once on a skip), then hold the side view behind the card until it closes.
+local function stepFinish(t: number)
+	local seq = finishSeq
+	if not seq then return end
+	if seq.race ~= cueRace then -- the HUD moved on (a new race): no moment, no card for this one
+		finishSeq = nil
+		endOrbit()
+		clearFinishFx()
+		if RaceState.resultsPending then -- the Hud's held coin chime: no card is coming
+			RaceState.resultsPending = false
+			RaceState.ResultsShown:Fire(false)
+		end
+		return
+	end
+	if seq.phase == "wait" then
+		if (RaceState.progress[seq.lane] or 0) >= 1 or t >= seq.leaderAt + (FIN.crossWaitSeconds or 1.5) then
+			startFinish(seq, t)
+		end
+	elseif seq.phase == "play" and (seq.skip or t >= seq.cardAt) then
+		seq.phase = "card"
+		showResults(seq.summary, seq.race)
+	end
+	if seq.orbiting and finishSeq == seq then Finish.orbitFrame(seq, t) end
+end
+RunService.RenderStepped:Connect(function()
+	stepFinish(serverNow())
+end)
+-- Any tap while the moment plays skips to the card (the orbit carries on behind it).
+UserInputService.InputBegan:Connect(function(input)
+	local seq = finishSeq
+	if not seq or seq.phase ~= "play" then return end
+	-- (the feel consult) Not in the first finish.skipAfterSeconds: a reflex tap from the stretch drive.
+	if serverNow() - (seq.crossAt or 0) < (FIN.skipAfterSeconds or 0) then return end
+	local kind = input.UserInputType
+	if kind == Enum.UserInputType.Touch or kind == Enum.UserInputType.MouseButton1 or TAP_KEYS[input.KeyCode] then
+		seq.skip = true
+	end
+end)
+
 remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	if not RaceState.isFocus(courseId) then return end
 	-- The horses run home first (RaceView), then the results; riders are dismounted 3 s later.
@@ -1677,13 +1971,24 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	paceState, burstState = nil, nil
 	feedback.Text, hint.Text = "", ""
 	showResultIcon(nil)
+	coach = nil
 	local id = cueRace
 	task.delay(math.max(0, finishAt - serverNow()), function()
 		if id == cueRace then status.Text = "And they're home!" end -- as the leader reaches the line
 	end)
 	cue(finishAt, "finish_fanfare", "crowd_cheer")
-	task.delay(GameConfig.runInSeconds, showResults, summary, cueRace)
-	rideReport = nil
+	rideReport, rideRank = nil, nil
+	if riding and FIN.enabled ~= false and myLaneIndex then
+		-- Your own race: the finish moment as your horse crosses, then the card (D-067).
+		local place = nil
+		for _, row in summary do
+			if row.id == myId then place = row.place end
+		end
+		finishSeq = { race = cueRace, summary = summary, place = place, lane = myLaneIndex, course = courseId or "dirt",
+			leaderAt = if finishAt > serverNow() - 5 then finishAt else serverNow() + 1, phase = "wait" }
+	else
+		task.delay(GameConfig.runInSeconds, showResults, summary, cueRace)
+	end
 	if riding then
 		RaceState.resultsPending = true -- the Hud holds the coin chime for the results card
 		-- Riders stay on their horse for the results and replay; Done gets them off. The
@@ -1691,7 +1996,10 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 		task.delay(GameConfig.dismountTimeoutSeconds + 0.5, function()
 			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 			if humanoid and humanoid.SeatPart == nil and not (RaceState.active and RaceState.myLane) then
-				rideCamera(false)
+				finishSeq = nil
+				endOrbit()
+				clearFinishFx()
+				Cam.ride(false)
 				setJumping(true)
 				results.Visible = false
 				RaceState.resultsOpen, RaceState.holdFocus = false, false
