@@ -825,6 +825,22 @@ GameConfig.legs = {
 GameConfig.vetCheck = { enabled = true, minSeconds = 12, lagAllowance = 1.5, hoseTaps = 3,
 	wraps = { "FF7EB6", "5BC0EB", "FFD23F", "7ED957" }, wrapNames = { "Pink", "Blue", "Gold", "Green" } }
 
+-- Studio test block (playtest 2026-10-12, game/TONIGHT.md): sets the active horse's long-horizon state on
+-- join so ageing, the legs run, the class path and the Cup bar can be seen without hundreds of races.
+-- Applied by Profiles on profile load ONLY when RunService:IsStudio() is true (StudioTest.luau); a live
+-- server never applies it. It writes the save, so set everything back to off after testing.
+-- Off by default: 0 / false. horseRaces: counted races; horseWins: wins (also in its own league);
+-- nearPotential: stats to ageing.peakShare of Potential; legsRun: the legs run; leaguePoints: points;
+-- legsFromRaces: a number overrides legs.fromRaces on this server (e.g. 0), false keeps it.
+GameConfig.studioTest = {
+	horseRaces = 0,
+	horseWins = 0,
+	nearPotential = false,
+	legsRun = 0,
+	leaguePoints = 0,
+	legsFromRaces = false :: number | boolean,
+}
+
 -- How a horse looks (D-077, D-078), built in code (0 Meshy): the Cool-down Check's leg wraps, and the
 -- Veteran look, a frosted muzzle and brows plus a silver-and-blue bridle rosette (gold on a Legend).
 -- The model faces -Z; positions are fractions of its bounding box (x across, y up from the ground, z

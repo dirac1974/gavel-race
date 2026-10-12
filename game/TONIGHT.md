@@ -1,44 +1,67 @@
-# Tonight's playtest (2026-10-07): about 45 minutes
+# Tonight's playtest (2026-10-12): about 60–75 minutes
 
-Everything below was built today from debate 013 (D-058 to D-065) and has passed every automated test, but none of it has run in Roblox Studio yet. Go in order; stop and note anything that breaks (a screenshot of the Output window helps most). The full checklists are in `PLAYTEST.md`, section names in brackets.
+Everything below was built since the last playtest (D-071 to D-079). It has passed every automated test, but none of it has run in Roblox Studio yet. Go in order; stop and note anything that breaks (a screenshot of the Output window helps most). The full checklists are in `PLAYTEST.md`, section names in brackets.
+
+**New tonight: the Studio test block.** `GameConfig.studioTest` (in `ReplicatedStorage.Shared.GameConfig`, or `game/src/shared/GameConfig.luau` with Rojo) sets your active horse's long-term state when you join, so you don't have to race hundreds of times. It works only in Studio, never on a live server. Each change needs **Stop, then Play** (it runs on join), and the Output shows one `[StudioTest]` line saying what it set. All values start off (`0` / `false`). It writes your Studio save, so set everything back to off when you're done.
 
 ## Setup (5 min)
-1. Open `game/GiddyUp.rbxl` in Roblox Studio (or `cd game && rojo serve` and connect the Rojo plugin).
+1. Open `game/GiddyUp.rbxl` in Roblox Studio (Claude rebuilds it after tonight's changes), or run `cd game && rojo serve` and connect the Rojo plugin.
 2. Game Settings → Security → turn on **Enable Studio Access to API Services** (so saving works).
-3. Publish to the **LlamaWorks** group once (File → Publish to Roblox As) so today's new models and icons can load. Until Roblox moderation approves them you'll see simple placeholder shapes or emoji; that's expected.
-4. Press **Play**. The Output window should have no red errors. Note any red line.
+3. Press **Play**. Pick a horse if you don't have one yet.
+4. Check the Output window: no red errors. Note any red line.
 
-## 1. It doesn't get stuck (5 min) [Playtest-safe fixes]
-- You get into the game; you are never stuck on "loading" and never kicked. (Stop and press Play again right away: you should see "Opening your stable…", not a kick.)
-- The player list (top right) shows no Green Cash or Wins column.
-- Device emulator → a phone in landscape: the bottom dock has 3 big buttons (horse card, RACE!, ☰ More), all fingertip-sized, words readable.
+## 1. Forward jump (5 min) [Forward jump]
+studioTest: all off.
+- Ride, stop, press Space (phone: ⬆️ Hop): the horse hops **forward** about half a body length, never straight up.
+- Gallop and hop: it carries about 2 lengths and lands without stopping. No stutter in the air; a second press within 0.6 s does nothing.
+- In the air the legs fold and the nose tips up then down; on landing a small squash, a soft thud and a dust puff.
 
-## 2. One tap to race (10 min) [One race button and the queue card]
-- Tap **🏁 RACE! with Comet**: a card shows a countdown ring, 8 gate slots filling with horse names, "🤖 Bots join at 0". You're in a gate within about 20 s.
-- While waiting, walk off and brush your horse: "Race time!" calls you back.
-- Race 2 or 3 times: you should win some (about 1 in 4 for a new horse), not every race and not never.
-- The results card is one simple row: "You rode ★★☆", plus "Your taps gained Comet N places!" only when it's good news. "🏅 New best!" appears when you beat your best.
+## 2. Race arrows, filing in and passing (15 min) [Race arrows] [Filing in and passing]
+studioTest: all off. Race 3 or 4 times.
+- The ◀ ▶ buttons show from race 1. After "Lanes locked!" and on the results card, ←/→ do nothing and the camera never turns. On foot after Done, the arrows turn the camera again.
+- After the gate, most horses drift to the rail and run as a loose pack that wanders, not in columns.
+- Bots stuck behind a slower horse move out, go by side by side for about a second, then come back in. Nothing pops or teleports.
+- Press toward a bot level with you: sometimes it shuts the door (turns a little toward you, a soft knock, "No room yet!"). It never moves you.
+- In Output, each race prints a `[Trip]` line ending `pack: out N, passes N, doors shut N`. Expect a few passes a race.
+- **The passing calibration may still be pending.** If Output shows `[RaceService] no trip baseline for …`, the style baselines are missing (posts count as equal). Tell Claude which course it was.
 
-## 3. Tired horse and Spa Day (5 min) [Spa Day and rest cues]
-- After a race the dock still says **Ready** with horseshoes. Race until 0 horseshoes: it says **Napping**, and in the stall the horse yawns at 1 and lies down at 0. No word anywhere says hurt, sore or sick.
-- Go to the Vet: choose **🛁 Spa Day**, then Rinse, Brush, Dry. You get +1 horseshoe, a Spa stamp and a sparkle on the next race. Try again: "🌙 Spa opens again tomorrow".
+## 3. Find it (10 min) [Find it]
+studioTest: all off. Device emulator at 667 × 375 landscape, touch on, for the phone checks.
+- 🗺️ **Map**: 13 tiles in a 5 × 3 grid, each with a picture and a short line. All fit on the phone with nothing cut off.
+- **GO**: from your barn tap Market: a cream fade, you arrive, and the first horse card opens. From Fair Street tap Feed & Seed: golden hoofprints instead of a trip.
+- **Phone dock**: 5 items: horse portrait, 🏁 RACE! with 🔀 Pick, 🗺️ Map, 📋 Jobs, ☰ More. Nothing covers Hop or Gallop. Dragging the thumbstick from the portrait walks you and doesn't open My Horses.
+- **Queue card ❓**: join a race: the card names the line ("🟠 Bronze race line"). The first time, a 3-picture "How racing works" strip opens by itself; ❓ opens it again any time.
+- **🔀 Pick**: opens "Pick a race" without putting you in line; its Join button names the line.
 
-## 4. Clear screens (5 min) [Clarity pass]
-- One "Next thing" pill suggests one action with a GO button; following it works.
-- The Stable Board has Today / Week / Month / 🏵️ Goals tabs; jobs show there, not as a flood of pop-ups.
-- Stars only ever mean "how you rode"; Energy is always the horseshoe.
+## 4. Visible progress (8 min) [Visible progress]
+studioTest: `horseWins = 4`, `leaguePoints = 90`. Stop, Play.
+- 🐴 My Horses: five chips 🐣 🚀 🎽 💐 🏆 with 🎽 Open gold, "💐 Top Horse: 1 more win", and a 🏆 Cup bar almost full with **no number**.
+- Win a rated race (not Practice). The results card shows "🏆 Cup +10" and the bar fills with rising ticks. RACE! again is tappable at once.
+- Ride home to your Rosette Wall: a gold sparkle, a ding and three claps, and one line about the new step. It ends by itself in under 4 s.
 
-## 5. Coming back, careers, classes (10 min) [Reasons to come back] [Careers, Legends and rehoming] [Classes and the Rosette Wall]
-- **📖 Book** (in ☰ More on phones): coats, rosettes, courses, Passport and bests pages, with grey "?" for not-yet-earned.
-- After a win: the **📷** photo button opens Roblox's own save/share prompt.
-- Horse cards show a class badge (🐣 First Win → 🚀 Rising Star → 🎽 Open) and a career row; your yard has a Rosette Wall.
-- Market Corral → **Sunny Meadow Riding School** sign: rehoming a bought horse (not your starter) offers half what you paid, then a goodbye card with **Undo** (72 h). Your starter and your last racing horse can't go.
+## 5. Legs and the vet (10 min) [Legs and the vet]
+studioTest: `legsFromRaces = 0`, `legsRun = 5` (others off). Stop, Play.
+- The card's Legs row: 5 sky-blue pips and "🧣 Worked hard! Cool-down soon". Nothing red.
+- Race one rated race: RACE! turns sky blue and says "🩺 VET CHECK". A rated race from 🔀 Pick is turned away ("🩺 Vet check first! Practice is open."); Practice still joins.
+- Tap VET CHECK: you go to the Vet and the Cool-down Check opens. Check legs, hose, wraps in a colour, carrot. About 30 s, no price anywhere.
+- After it: "🩺 Comet is fresh and ready!", empty pips, coloured wraps on the horse for the next 3 races.
+- Nowhere says hurt, sore, injury, limp or sick.
 
-## 6. Two players (5 min) [Visiting friends' barns]
-- Test → Clients and Servers → 2 players (they aren't Roblox friends): Map → **👫 Friends' barns** is empty for both, and walking into the other player's plot walks you back out.
-- Visiting a real friend's barn (pat for a Tour stamp, one treat, a carrot in the post box, the owner's **🚪 Close gate**) needs two friend accounts on a published server; leave it for another day if that's awkward.
+## 6. Life arc and the Riding School (10 min) [The life arc and the Riding School]
+- studioTest `horseRaces = 345` (others off): the card says "🦉 Veteran in 5 races".
+- Then `horseRaces = 400`, `nearPotential = true`: 🦉 Veteran chip, "💪 Comet is at full strength!", a frosted muzzle and a silver-and-blue rosette by the left ear (stall, ride and race), and the 👑 Legend button. The strong stats may open the Cup; that's expected.
+- Then `horseRaces = 445` (keep `nearPotential`): "🦉 Comet is getting wise. Soon a little slower." No number is ever shown.
+- 🏫 School on the horse card: "🏫 Lend" and "💵 Sell", each needing a second tap. Lend a horse (needs a second horse): it leaves its stall and stands by the school sign; 🏠 Home brings it back. The word "Rehome" appears nowhere.
+- Set studioTest back to all off.
 
-## What to tell Claude afterwards
-- Any red errors in Output, and what you were doing.
-- Anything a kid wouldn't understand, or a button that was hard to hit on the phone emulator.
-- The provisional calls to confirm or change, listed in `docs/memory/REVIEW_QUEUE.md` (top ones: no injury or ageing; rehoming at half price; Silver Cup opening at 750 points, which also brings Gold sooner).
+## 7. Visiting with 3 players (10 min) [Visiting other stables]
+studioTest: all off. Test → Clients and Servers → **3 players**; each picks a starter horse.
+- ⚙️ Settings: "Who can visit my stable?" with 👫 Friends (gold), 🌍 Everyone here, 🔒 Nobody.
+- Player 1 sets 🌍 Everyone here. Player 2's Map → Visit barns lists that barn with a 🏡 picture. Tap it: you land outside the gate; walk in: bell, "Welcome to …'s barn!", the visitor bar.
+- Follow the gold hoofprints through 4 stops for a 📍 Tour pin. Strangers get Pat only (no Treat, no post box). 🎉 Cheer floats an emoji over the door.
+- Player 1's 🚪 Close gate walks everyone out; 🔒 Nobody does too.
+- **The friend rows need a live server**: Studio's test accounts aren't Roblox friends, so 👫 Friend rows, Treat and the post box can't be checked here.
+
+## What to send back
+- Screenshots of any red errors in Output, and what you were doing.
+- Anything confusing, or a button that was hard to hit on the phone emulator.
