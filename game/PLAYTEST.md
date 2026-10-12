@@ -790,6 +790,86 @@ Map, GO, the phone dock, the queue card and "New!" pointers (D-075). Do the phon
   - A rider on a horse can pass under or through the arms without getting stuck.
   - **Studio check:** that the tips point outward and the words aren't mirrored.
 
+## Visible progress (fun-and-return phase 2, D-076)
+
+Switches: `GameConfig.classes.path`, `GameConfig.cupBar` (`enabled`, `results`), `GameConfig.classUp.enabled`. Step wins: `classes.topWins` (5); `classes.starIsRace` false (true = "💐 Big Race").
+
+1. Open 🐴 My Horses. Each racing horse shows five chips 🐣 🚀 🎽 💐 🏆 with the current one gold and wider with its word, then one goal line ("Next: win a race!", "🎽 Open: 2 more wins", "💐 Top Horse: 2 more wins", "Next: fill the 🏆 Cup bar"), then "🏆 Cup" with a bar and **no number**. A Champion horse has four chips and no bar.
+2. Race a Rookie race and finish in the top four. The results card shows "🏆 Cup +6" (or +10, +4...) and the bar fills from where it was with rising ticks (at most 10). Under Reduced Motion the bar just shows full-length, no ticks. The goal line sits under it.
+3. Practice race: no Cup row. A Cup win that moves you up: no Cup row (the move-up toast says it).
+4. 🏁 Race again is tappable as soon as the card shows; nothing waits for the bar.
+5. Win your first race in a league, then ride home to your Rosette Wall. Within about 40 studs: a gold sparkle burst on the wall, a ding then three claps, and "🚀 Comet is a Rising Star!". It ends by itself in under 4 s; tapping anywhere ends it at once. It never plays while racing, in line or on the results card.
+6. Rejoin the game: no ceremony replays for steps you already had.
+7. On a phone, My Horses cards are short with a "📈 Progress" button; tapping it opens the path, Cup bar, stages and Legs rows on every card ("📈 Hide" folds them). The buttons never scroll out of reach.
+8. Win a Cup and move up, then win in the new league: the ceremony still plays (it's counted per league).
+
+## Legs and the vet (fun-and-return phase 3, D-077, David's decision)
+
+Switches: `GameConfig.legs.enabled`, `GameConfig.vetCheck.enabled`. Numbers: `legs.runLimit` 6, `warnAt` 5, `careLowers` 2, `restSeconds` 1800, `fromRaces` 26, `careCooldownSeconds` 7200, `wrapRaces` 3; `vetCheck.minSeconds` 12. For a quick test in Studio set `legs.fromRaces = 0`.
+
+1. A horse with fewer than 27 counted races never builds a run (the Legs pips stay empty).
+2. Race the same horse 5 rated races in a row: the card's Legs row has 5 sky-blue pips and "🧣 Worked hard! Cool-down soon". Nothing red anywhere.
+3. One more: RACE! turns sky blue and says "🩺 VET CHECK". The results card's button says "🩺 Vet check". The Next-thing pill says "Vet check for Comet!".
+4. Tap VET CHECK: you travel to the Vet (fade) and the Cool-down Check opens. Practice from 🔀 Pick still joins.
+5. Try a rated race from 🔀 Pick with that horse: the toast "🩺 Vet check first! Practice is open." and you are **not** put in line (the server turns it away).
+6. The check: tap each of the 4 legs (gold ring, rising tick), hose each leg 3 taps (💧 then ❄️, water sound), pick a colour then tap each leg (🧶), tap the 🥕 Carrot (munch, nicker, chime, hearts). About 30 s. No price, no 💎, no 💵 anywhere. Closing early does nothing to the horse.
+7. After it: "🩺 Comet is fresh and ready!", RACE! is back, the pips are empty, and the stall horse wears coloured wraps on its legs. They show in the next 3 races (check they follow the running legs; if not, set `horseLook.wrapsInRace = false`) and then come off.
+8. Feed then brush a horse at 6: the run drops to 4 then 2. Brushing again within 2 h doesn't lower it again. A Spa Day, a training ride, or 30 min without racing that horse empties it.
+9. Words: nowhere does any screen say hurt, sore, injury, limp or sick (the lint test checks every string; also read the Grown-ups page).
+
+## The life arc and the Riding School (fun-and-return phase 4, D-078; ageing is David's decision)
+
+Switches: `GameConfig.ageing.declineScale` (1 = real decline; 0 = stages only), `GameConfig.horseLook.veteranLook`, `GameConfig.lend.enabled`, `GameConfig.rehome.enabled`. Sell bonus cap `sell.recordBonusCap` 100.
+
+1. Stage chips 🍼 Young · 💪 Prime · 🦉 Veteran · 👑 Legend on every card, the current one gold and wide enough for its word ("🦉 Veteran" fits). 🍼, not 🌱: 🌱 is the garden seeds and the Market family line. A horse under 30 races says "🍼 Young: training grows faster!" and a training ride gains about a quarter more (never past Potential or the week's cap).
+2. In Studio, set a horse's `record.races` to 345: "🦉 Veteran in 5 races". At 350 with stats near Potential: "💪 Comet is at full strength!". At 390-399: "🦉 Comet is getting wise. Soon a little slower." No number is ever shown.
+3. A Veteran (350+ races) in its stall, on a ride and in a race has a frosted (pale) muzzle and brows and a silver-and-blue rosette by its left ear; a Legend's rosette is gold. **Studio check:** the frost sits on the nose (tune `horseLook.muzzle`, `brow`, `rosette` fractions per coat model), and the horse looks wise, not ill.
+4. The 👑 Legend button appears only at 350 races (`career.veteranAt`).
+5. 🏫 School on a horse card (or the school sign at the Market Corral, prompt "Lend or sell") opens the Riding School card with that horse first. Two buttons per horse: "🏫 Lend" and "💵 Sell"; each needs a second tap ("Sure? 🏫" / "Sure? 💵").
+6. A lent horse shows only 🏠 Home (no Sell over it); selling it is refused with "Bring Comet home first!".
+7. Lend: free. The horse leaves its stall (a pasture horse moves in), can't race, its card says "🏫 At Sunny Meadow Riding School" with "🏠 Home", and it stands by the school sign at the corral with its name. 🏠 Home brings it back to a free stall (or the pasture). Your last racing horse can't be lent.
+8. Sell a Market horse: the card shows "Sell for 💵 N" = half the price paid plus 5 a win and 100 a Cup, at most +100; never more than you paid. A tamed or gifted horse shows "🏵️ Goodbye rosette" and sells for 0. The first horse never shows Sell. Undo still works for 3 days.
+9. The word "Rehome" appears nowhere on screen.
+
+## Visiting other stables (D-079)
+Setup: Studio → Test → Clients and Servers with **3 players**, or a live private server with 3 accounts. Account **A** owns the barn. Account **F** is A's Roblox friend. Account **S** is not friends with A or F. Each account picks a starter horse first, so each has a barn. Studio's local test accounts aren't Roblox friends, so the friend rows need a live server with two real accounts that are friends (or a TrainingFriends stub for Studio only).
+
+**Permission matrix** (what the server allows; a closed gate blocks every cell):
+
+| A's setting | Visitor | Come in / Map list | Tour + pin | Pat | Cheer | Treat | Post box |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 👫 Friends (default) | F (friend) | yes | yes | yes | yes | yes | yes |
+| 👫 Friends | S (stranger) | no | no | no | no | no | no |
+| 🌍 Everyone here | F | yes | yes | yes | yes | yes | yes |
+| 🌍 Everyone here | S | yes | yes | yes | yes | **no** | **no** |
+| 🔒 Nobody | F or S | no | no | no | no | no | no |
+
+Strangers also need Roblox to allow content sharing for **both** accounts (PolicyService `IsContentSharingAllowed`, and not `IsSubjectToChinaPolicies`). If it doesn't, A's barn reads as Friends for S: S sees solid walls and no listing, and is never bounced back to the gate.
+
+- [ ] **The setting.** On A, open ⚙️ → Settings. "Who can visit my stable?" shows three buttons: 👫 Friends, 🌍 Everyone here and 🔒 Nobody. Friends is gold on a new profile. All three fit beside the label.
+- [ ] **Old saves.** A profile saved before D-079 with "Club" shows Friends as gold and works as Friends.
+- [ ] **The one-time ask.** On S, open Map → Visit barns for the first time. Under the list (the list stays visible), a strip says "Let other riders visit?" and "Who can come to your barn?", with 👫 Friends (gold, the current choice), 🌍 Everyone and Not now. Not now keeps Friends; it asks again after a rejoin. Pick Friends or Everyone: close and reopen shows no ask, and rejoining still shows none. If you set Nobody in ⚙️ on a new profile first, the ask never shows and Nobody stays.
+- [ ] **Friends, the default.** A on Friends. On S: Visit barns shows no A, and A's walls are solid. On F: A shows with A's face and "👫 Friend ▶".
+- [ ] **Everyone here.** Set A to 🌍 Everyone here. On S: within a second, A's barn shows with a 🏡 picture (never A's avatar face) and "🌍 Open ▶". Friends' barns are listed first. There are no numbers, likes or rankings on any row.
+- [ ] **Teleport to the gate.** On S, tap A's barn. S lands on Barn Lane outside A's gate, facing in, never inside the fence.
+- [ ] **Arrival banner.** On S, walk through the gate. The gate bell rings once and "Welcome to A's barn!" pops in and fades after about 2.5 s. With Reduced Motion on, it shows without the pop. The top bar shows "🏡 A's barn", 4 pips, 🎉 Cheer and 🏠 Home. On F the bar also shows 👫.
+- [ ] **Walkaround.** Gold hoofprints lead to the Rosette Wall. Standing there plays a tap sound and shows "Look! Rosette Wall", and the first pip turns 📍. Each stop gives the featured thing (the wall, a stall horse, a yard piece, the paddock or the garden) a gold outline for 1.2 s and a small gold sparkle (outline only with Reduced Motion). Then the trail goes to the horses, then their yard, then the Legend paddock if A has a Legend, otherwise their garden ("Look! Their garden"). On the 4th stop, "📍 Tour pin! You toured A's barn" shows with the job-done sound and the trail stops. Visit barns and the Horse Book show one more Tour pin.
+- [ ] **Pin once per barn.** On S, leave, come back and walk all 4 stops again, even on another day: no second pin. A different open barn gives a second pin.
+- [ ] **Stranger actions.** On S at A's barn: the stall doors show **Pat** only (no Treat). The post box shows no "Drop a carrot". Pat gives "Comet nuzzles you!" with hearts, and A's horse gets no bond.
+- [ ] **Server refuses a stranger's treat.** From S's command bar, fire `VisitCare` with A's id, a horse id and "treat", and `PostBox` with A's id. Nothing happens: no bond, no carrot.
+- [ ] **Cheers.** On S, tap 🎉 Cheer: 4 buttons (👏 🎉 😍 🌈) replace the name. Tap 👏: a 👏 floats up about 3 studs from A's barn door and fades, with a clap. 🎉 plays the tap_good sound instead. S sees "Cheer sent! 👏". A sees "A visitor cheered! 👏", with no name, and the same emoji over the door if A is home. The 4th cheer in total that day says "You cheered here today. Thank you!". A sees at most one cheer toast every 30 s.
+- [ ] **Friend actions.** On F at A's barn: Pat, Treat (+1 bond, once a day) and Drop a carrot (one a day) all work, as before D-079.
+- [ ] **The owner's gate works for everyone.** With S (or F) in A's yard, A sees 🚪 Close gate. Tap it: everyone is walked out to the lane, the walls go solid, and S's barns list drops A. Tap 🔓 Open gate: "Gate open. Visitors welcome." and A is listed again.
+- [ ] **Ask to leave.** With S in A's yard, A sees 👋 Ask to leave beside 🚪 Close gate. Tap it: a list of who's in the yard. Tap S's name: S is walked out to the lane and sees "Time to head home!". For 2 minutes A's walls stay solid for S and S's barns list drops A, then A is back. F stays inside the whole time. Firing `AskToLeave` from a non-owner, or for someone outside A's yard, does nothing.
+- [ ] **No second bell.** Walk out of A's gate and straight back in: no bell and no banner, but the bar returns. After 20 s outside, it rings again.
+- [ ] **Nobody blocks all.** Set A to 🔒 Nobody while S and F are inside: both are walked out within a second, neither lists A, and every remote (VisitHello pat, cheer and stop; VisitCare; PostBox; VisitFriend) does nothing.
+- [ ] **Rate limits.** Spam VisitHello from S's command bar: at most one call each 0.5 s does anything. Spam VisitFriend: one trip each 3 s.
+- [ ] **Stop spoofing.** From S's command bar, fire `VisitHello` with A's id, "stop" and "paddock" while standing at the gate: nothing counts. Only standing at the stop does.
+- [ ] **No text anywhere.** There's no text box or typed field in any visit screen.
+- [ ] **Racing.** Join a race while visiting: the visitor bar hides, and no pats or cheers send during the race.
+- [ ] **Home.** 🏠 Home takes S back to S's own stable and clears the trail.
+- **Studio check:** PolicyService must answer for both players, or strangers are kept out (fail closed). If S can't see A on Everyone here in Studio, try a live private server. The yard stop (inward 72, across 28) and the paddock stop should stand in open ground; move them in `GameConfig.visit.tourStops` if a prop is in the way. A barn with no Legends still has the paddock stop (an empty fenced spot).
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

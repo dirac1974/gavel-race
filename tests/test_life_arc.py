@@ -83,6 +83,13 @@ def test_game_config_mirrors_python():
                            GAME_CONFIG.read_text(encoding="utf-8")).group(1)) == la.SELL["share"]
 
 
+def test_game_config_legs_mirrors_python():
+    """GameConfig.legs (phase 3, D-077) carries life_arc.LEGS, and its care cooldown is Energy's."""
+    legs = _luau_table("legs")
+    assert {k: legs[k] for k in la.LEGS} == {k: float(v) for k, v in la.LEGS.items()}
+    assert legs["wrapRaces"] == 3
+
+
 def test_consensus_numbers():
     c = la.AGEING
     assert (c["veteranAt"], c["declinePer"], c["declineCap"], c["youngRaces"], c["youngTrainMult"], c["warnAhead"]) \

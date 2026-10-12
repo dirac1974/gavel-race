@@ -43,7 +43,7 @@ end
 FindIt.HINTS = {
 	stable = "Your barn", track = "Watch races", raceBoard = "Pick races", plaza = "Shops here", feedStore = "Buy food",
 	barnBuilder = "Build things", tackShop = "Dress up", vet = "Check-ups", market = "Meet horses", paddock = "Train here",
-	trainingGround = "Ride courses", trailGate = "Wild horses", visit = "Friends' barns",
+	trainingGround = "Ride courses", trailGate = "Wild horses", visit = "Look around", -- (D-079: friends' and open barns)
 }
 
 local function activeHorse(profile: any): any

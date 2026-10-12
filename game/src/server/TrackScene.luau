@@ -21,6 +21,7 @@ local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
 local UiAtlas = require(Shared:WaitForChild("UiAtlas"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
+local HorseLook = require(Shared:WaitForChild("HorseLook")) -- wraps and the Veteran look (D-077, D-078)
 
 local TrackScene = {}
 
@@ -432,8 +433,8 @@ local function spaShine(horse: Model)
 end
 
 -- Per race: the gate where this distance starts, and the horses in it. shines[i]: the horse in
--- lane i had a Spa Day since its last race (D-058).
-function Course:build(plan, coats: { string? }?, shines: { [number]: boolean }?)
+-- lane i had a Spa Day since its last race (D-058). looks[i]: its wraps and Veteran look (HorseLook, D-077/D-078).
+function Course:build(plan, coats: { string? }?, shines: { [number]: boolean }?, looks: { [number]: any }?)
 	if not venue or not venue.Parent then
 		Lighting.ClockTime = 15
 		venue = buildVenue()
@@ -494,6 +495,7 @@ function Course:build(plan, coats: { string? }?, shines: { [number]: boolean }?)
 		saddle.CFrame = horse:GetPivot() * CFrame.new(0, seatY, seatZ)
 		saddle.Parent = horse
 		if shines and shines[i] then spaShine(horse) end
+		if looks and looks[i] then HorseLook.apply(horse, looks[i]) end
 		horse.Parent = horseFolder
 		self.horses[i] = horse
 		self.saddles[i] = saddle
@@ -649,7 +651,7 @@ end
 
 -- The dirt course, for callers that don't care about courses.
 local dirt = TrackScene.course("dirt", CFG)
-function TrackScene.build(plan, coats, shines) dirt:build(plan, coats, shines) end
+function TrackScene.build(plan, coats, shines, looks) dirt:build(plan, coats, shines, looks) end
 function TrackScene.laneCFrame(i: number, p: number): CFrame return dirt:laneCFrame(i, p) end
 function TrackScene.dismountAll() for _, c in courses do c:dismountAll() end end
 

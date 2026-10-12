@@ -310,7 +310,7 @@ return function(check: (boolean, string) -> (), _close: any)
 		} do
 			local why = Market.rehomeBlock(p, other.id, busy)
 			check(why ~= nil and not Market.rehome(p, other.id, T0, busy) and Profile.horse(p, other.id) ~= nil, "busy refused: " .. label)
-			check(string.find(why or "", "Rehome") ~= nil or string.find(why or "", "rehome") ~= nil, "busy says rehome: " .. label)
+			check(string.find(string.lower(why or ""), "sell") ~= nil, "busy says sell (the Riding School, D-078): " .. label)
 		end
 		check(Market.rehomeBlock(p, other.id, { ridingHorse = starter.id }) == nil, "another horse can go while you ride")
 		check(Market.rehomeBlock(p, "nope", {}) ~= nil, "only your horses")
@@ -378,7 +378,7 @@ return function(check: (boolean, string) -> (), _close: any)
 					local code = string.match(line, "^(.-)%-%-") or line
 					for lit in string.gmatch(code, "\"([^\"]*)\"") do
 						local low = string.lower(lit)
-						for _, w in { "farm", "sold", "sell", "dies", "died", "gone forever" } do
+						for _, w in { "farm", "sold", "dies", "died", "gone forever" } do -- "Sell" is the Riding School button now (D-078, David's decision)
 							check(string.find(low, "%f[%a]" .. w .. "%f[%A]") == nil, string.format("%s: no %q in %q", f, w, lit))
 						end
 					end

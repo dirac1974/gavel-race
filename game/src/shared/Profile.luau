@@ -10,6 +10,8 @@
 local Horse = if script then require(script.Parent.Horse) :: any else require("./Horse")
 local HorseBook = if script then require(script.Parent.HorseBook) :: any else require("./HorseBook")
 local Career = if script then require(script.Parent.Career) :: any else require("./Career")
+local Legs = if script then require(script.Parent.Legs) :: any else require("./Legs")
+local Ageing = if script then require(script.Parent.Ageing) :: any else require("./Ageing")
 
 local Profile = {}
 
@@ -33,7 +35,7 @@ export type Profile = {
 	nextHorseId: number,
 	days: { played: number, last: number },
 	totals: { races: number, wins: number, cashEarned: number },
-	settings: { visits: string, sound: boolean?, easyRein: boolean, shareGhost: boolean, smartSteer: boolean },
+	settings: { visits: string, sound: boolean?, easyRein: boolean, shareGhost: boolean, smartSteer: boolean, visitAsked: boolean? },
 	flags: { [string]: boolean },
 	garden: { { seed: string, at: number } },
 	chores: { [string]: number },
@@ -41,15 +43,18 @@ export type Profile = {
 	postBox: { day: number, today: number, total: number },
 }
 
--- Visiting friends' barns (D-060), on the visitor's profile: a Tour stamp per friend whose
--- horses you've all patted (kept, at most MAX_TOUR_STAMPS), and today's pats, treats and
--- carrots per friend (only today's are kept). Keys are friends' user ids as strings.
+-- Visiting other barns (D-060, D-079), on the visitor's profile: a Tour stamp (a "Tour pin" on
+-- screen) per barn whose 4 tour stops you've seen in a day (kept, at most MAX_TOUR_STAMPS), and
+-- today's pats, stops, cheers, treats and carrots per barn (only today's are kept). Keys are the
+-- owners' user ids as strings.
 export type Tour = {
-	stamps: { [string]: number },              -- friend -> day the stamp was earned
-	day: number,                               -- the day the three maps below belong to
-	patted: { [string]: { [string]: boolean } }, -- friend -> horse ids patted today
-	treats: { [string]: number },              -- friend -> treats given today
-	carrots: { [string]: number },             -- friend -> carrots dropped today
+	stamps: { [string]: number },              -- owner -> day the stamp was earned
+	day: number,                               -- the day the maps below belong to
+	patted: { [string]: { [string]: boolean } }, -- owner -> horse ids patted today
+	stops: { [string]: { [string]: boolean } }?, -- owner -> tour stops seen today (D-079)
+	cheers: { [string]: number }?,             -- owner -> cheers sent today (D-079)
+	treats: { [string]: number },              -- owner -> treats given today
+	carrots: { [string]: number },             -- owner -> carrots dropped today
 }
 
 Profile.BEDS = 3
@@ -57,7 +62,7 @@ Profile.MAX_TOUR_STAMPS = 200
 Profile.MAX_TOUR_FRIENDS = 50 -- friends a day in the patted, treats and carrots maps
 
 function Profile.emptyTour(day: number): Tour
-	return { stamps = {}, day = day, patted = {}, treats = {}, carrots = {} }
+	return { stamps = {}, day = day, patted = {}, stops = {}, cheers = {}, treats = {}, carrots = {} }
 end
 
 function Profile.emptyGarden(): { { seed: string, at: number } }
@@ -210,6 +215,8 @@ function Profile.migrate(data: any, now: number): Profile
 			if typeof(h) == "table" and typeof(h.id) == "string" then
 				local fixed = Horse.repair(h, now)
 				Profile.repairTraining(fixed)
+				Legs.ensure(fixed) -- the vet run (D-077): older saves start fresh
+				Ageing.ensure(fixed) -- declineFrom (D-078): older saves aren't at their peak yet
 				table.insert(horses, fixed)
 			end
 		end
@@ -227,7 +234,9 @@ function Profile.migrate(data: any, now: number): Profile
 	p.totals = if typeof(p.totals) == "table" then p.totals else {}
 	for _, k in { "races", "wins", "cashEarned" } do p.totals[k] = tonumber(p.totals[k]) or 0 end
 	p.settings = if typeof(p.settings) == "table" then p.settings else {}
-	if not table.find({ "Friends", "Club", "Nobody" }, p.settings.visits) then p.settings.visits = "Friends" end
+	-- (D-079) Everyone joins; an old "Club" stays as saved and reads as Friends (Visits.setting).
+	if not table.find({ "Friends", "Everyone", "Club", "Nobody" }, p.settings.visits) then p.settings.visits = "Friends" end
+	p.settings.visitAsked = if p.settings.visitAsked == true then true else nil -- the barns list asked once (D-079)
 	p.settings.easyRein = p.settings.easyRein == true
 	p.settings.shareGhost = p.settings.shareGhost == true
 	if typeof(p.settings.smartSteer) ~= "boolean" then p.settings.smartSteer = true end -- on unless turned off
@@ -385,6 +394,21 @@ function Profile.repairVisits(p: any, now: number)
 	if tonumber(t.day) == today then
 		tour.treats = countMap(t.treats, Profile.MAX_TOUR_FRIENDS)
 		tour.carrots = countMap(t.carrots, Profile.MAX_TOUR_FRIENDS)
+		tour.cheers = countMap(t.cheers, Profile.MAX_TOUR_FRIENDS)
+		local m = 0
+		if typeof(t.stops) == "table" then
+			for k, set in t.stops do
+				if m >= Profile.MAX_TOUR_FRIENDS then break end
+				if userKey(k) and typeof(set) == "table" then
+					local seen = {}
+					for _, id in { "wall", "horses", "decor", "paddock", "garden" } do -- Visits.ALL_STOPS
+						if set[id] == true then seen[id] = true end
+					end
+					tour.stops[k] = seen
+					m += 1
+				end
+			end
+		end
 		local n = 0
 		if typeof(t.patted) == "table" then
 			for k, ids in t.patted do
@@ -504,7 +528,7 @@ end
 function Profile.pasture(p: Profile): { Horse.Horse }
 	local out = {}
 	for _, h in p.horses do
-		if h.stall == nil and h.legend == nil then table.insert(out, h) end
+		if h.stall == nil and h.legend == nil and (h :: any).lent == nil then table.insert(out, h) end
 	end
 	return out
 end
@@ -517,13 +541,22 @@ function Profile.legends(p: Profile): { Horse.Horse }
 	return out
 end
 
--- Horses that can race (not Legends).
+-- Horses that can race (not Legends, not lent to the Riding School).
 function Profile.racers(p: Profile): number
 	local n = 0
 	for _, h in p.horses do
-		if h.legend == nil then n += 1 end
+		if h.legend == nil and (h :: any).lent == nil then n += 1 end
 	end
 	return n
+end
+
+-- Horses lent to the Riding School (D-078): still yours, out of the racing roster.
+function Profile.lent(p: Profile): { Horse.Horse }
+	local out = {}
+	for _, h in p.horses do
+		if (h :: any).lent ~= nil then table.insert(out, h) end
+	end
+	return out
 end
 
 function Profile.isStalled(p: Profile, id: string): boolean
@@ -558,7 +591,7 @@ end
 
 function Profile.addHorse(p: Profile, h: Horse.Horse)
 	table.insert(p.horses, h)
-	h.stall = if h.legend == nil then Profile.freeStall(p) else nil
+	h.stall = if h.legend == nil and (h :: any).lent == nil then Profile.freeStall(p) else nil
 	if not p.activeHorse and h.stall then p.activeHorse = h.id end
 end
 
@@ -586,7 +619,7 @@ end
 -- (or naming no stalled horse) a pasture horse moves into a free stall, if there is one.
 function Profile.swapStall(p: Profile, stalledId: string?, pastureId: string): boolean
 	local b = Profile.horse(p, pastureId)
-	if not b or b.stall ~= nil or b.legend ~= nil then return false end
+	if not b or b.stall ~= nil or b.legend ~= nil or (b :: any).lent ~= nil then return false end
 	local a = stalledId and Profile.horse(p, stalledId)
 	if not a or a.stall == nil then
 		local k = Profile.freeStall(p)
@@ -609,7 +642,7 @@ function Profile.repairStalls(p: Profile)
 		local k = 0
 		for _, h in p.horses do
 			h.stall = nil
-			if h.legend == nil and k < p.stalls then
+			if h.legend == nil and (h :: any).lent == nil and k < p.stalls then
 				k += 1
 				h.stall = k
 			end
@@ -619,7 +652,7 @@ function Profile.repairStalls(p: Profile)
 	end
 	local taken = {}
 	for _, h in p.horses do
-		if h.stall and (h.legend ~= nil or h.stall > p.stalls or taken[h.stall]) then h.stall = nil end
+		if h.stall and (h.legend ~= nil or (h :: any).lent ~= nil or h.stall > p.stalls or taken[h.stall]) then h.stall = nil end
 		if h.stall then taken[h.stall] = true end
 	end
 end
@@ -644,6 +677,8 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 		local v = Horse.view(h, now, energyCfg)
 		v.stalled = h.stall ~= nil
 		v.career = Career.view(h)
+		v.legs = Legs.view(h, now) -- the vet run (D-077)
+		v.life = Ageing.view(h) -- the life stage and its kind notes (D-078)
 		table.insert(horses, v)
 	end
 	-- Horses at Sunny Meadow Riding School that can still come back (D-059): no clock, just "days".

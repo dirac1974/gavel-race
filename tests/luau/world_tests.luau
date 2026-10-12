@@ -2126,6 +2126,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(not Training.ready(th, T0 + 60) and Training.ready(th, T0 + 8 * 86400), "cap resets next week")
 	local th2 = Horse.starter("h8", "Daisy", "grey", rng, T0)
 	th2.potential.stamina = 75
+	th2.record.races = 30 -- a Prime horse: the classic gains (D-078: a Young horse trains x ageing.youngTrainMult)
 	local _, ga = Training.train(th2, "stamina", 0, T0)                    -- rested, poor score: 0.12 × 30 × 0.5 × 1.5 = 2.7
 	local _, gb = Training.train(th2, "stamina", 100, T0 + 600)            -- not rested: 0.12 × 27.3 × 1.0 = 3.276 → capped at 3.3 (6 − 2.7)
 	check(close(ga, 2.7, 1e-9) and close(gb, 3.3, 1e-9), "gain follows room left, score and rest; cap total")

@@ -38,6 +38,16 @@ function Advice.forHorse(h: any, profile: any, now: number): Tip
 	else
 		fact = name .. " is rested and ready to race"
 	end
+	-- (D-078) the life stage's kind notes, as facts
+	local life = h.life
+	if type(life) == "table" and life.warning then
+		fact = name .. " is getting wise"
+	end
+	-- (D-077) after a run of races: the Cool-down Check first (Practice stays open). Never blame.
+	local legs = h.legs
+	if type(legs) == "table" and legs.needsVet then
+		return { emoji = "🩺", fact = name .. " ran a lot today!", next = "Next: a vet check", go = "vetCheck" }
+	end
 	-- One next step, the most useful first.
 	if not h.fed then
 		return { emoji = "🌾", fact = fact, next = "Next: a meal of hay", go = "stable" }
@@ -135,6 +145,10 @@ function Advice.nextThing(profile: any, now: number, ctx: BuildCtx?): Next
 		for _, j in set do
 			if jobReady(j) then return { key = "claim", emoji = "🎁", icon = "gift", text = "Get your job prize!", go = "board" } end
 		end
+	end
+	-- (D-077) VET CHECK: the Cool-down Check at the Vet (a positive play moment, free)
+	if type(h.legs) == "table" and h.legs.needsVet then
+		return { key = "vet:" .. tostring(h.id), emoji = "🩺", icon = "stethoscope", text = "Vet check for " .. name .. "!", go = "vetCheck" }
 	end
 	if not h.fed then
 		return { key = "feed:" .. tostring(h.id), emoji = "🌾", icon = "hay", text = "Feed " .. name .. " some hay", go = "stable" }

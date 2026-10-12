@@ -4,8 +4,11 @@
 --   invisible walls solid for itself when it isn't allowed in (default Friends only) or the
 --   owner has closed the gate (D-060).
 --   Map: the dock's Map button opens every place as a tile (Find it, D-075): GO takes you there and
---   opens what's there (GoTo). "Visit barns" (D-060) lists the faces and names of Roblox friends in
---   this server whose barn lets you in; tap one to go to their gate. Your Tour stamps show under it.
+--   opens what's there (GoTo). "Visit barns" (D-060, D-079) lists Roblox friends' barns in this
+--   server that let you in (faces, "👫 Friend") and every other barn open to Everyone here (a barn
+--   picture, never a face); tap one to go to its gate. No counts, likes or rankings. The first time
+--   it opens it asks once, "Let other riders visit?" (👫 Friends · 🌍 Everyone; never over a Nobody).
+--   Your Tour pins show under it.
 --   Race Board: its prompt puts you in line like the RACE! button.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -38,13 +41,18 @@ local function isFriend(userId: number): boolean
 	return friendCache[userId]
 end
 
+local Visits = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Visits"))
 local function allowed(plot: Model): boolean
 	local owner = plot:GetAttribute("OwnerId")
-	if not owner or owner == player.UserId then return true end
-	local visits = plot:GetAttribute("Visits") or "Friends"
-	if visits == "Nobody" then return false end
-	if plot:GetAttribute("GateClosed") then return false end -- the owner closed the gate (D-060)
-	return isFriend(owner) -- "Club" is treated as Friends until clubs exist
+	if typeof(owner) ~= "number" or owner == player.UserId then return true end
+	-- The server's matrix on what it publishes (D-079, code review S2): the owner's effective setting,
+	-- the gate (D-060), this player's PolicyService answer and Ask to leave, so the walls never let in
+	-- someone the server would walk back out.
+	local visits = plot:GetAttribute("Visits")
+	return Visits.clientMay({ visits = visits, gateClosed = plot:GetAttribute("GateClosed"),
+		friend = Visits.setting(visits) ~= "Nobody" and isFriend(owner), strangersOk = player:GetAttribute("VisitStrangersOk"),
+		askedOutOf = player:GetAttribute("AskedOutOf"), askedOutUntil = player:GetAttribute("AskedOutUntil"), ownerId = owner,
+		serverNow = workspace:GetServerTimeNow() }, "enter")
 end
 
 local function applyPlot(plot: Model)
@@ -85,6 +93,21 @@ task.spawn(function()
 	if not plots then return end
 	for _, plot in plots:GetChildren() do watchPlot(plot) end
 	plots.ChildAdded:Connect(watchPlot)
+	-- This player's PolicyService answer or an Ask to leave changes every plot's walls; an Ask to
+	-- leave runs out by itself, so look again then (D-079).
+	local function applyAll()
+		for _, plot in plots:GetChildren() do
+			if plot:IsA("Model") then applyPlot(plot) end
+		end
+	end
+	player:GetAttributeChangedSignal("VisitStrangersOk"):Connect(applyAll)
+	player:GetAttributeChangedSignal("AskedOutUntil"):Connect(function()
+		applyAll()
+		local untilT = player:GetAttribute("AskedOutUntil")
+		if typeof(untilT) == "number" then
+			task.delay(math.max(0, untilT - workspace:GetServerTimeNow()) + 0.5, applyAll)
+		end
+	end)
 end)
 
 -- Map -----------------------------------------------------------------------------
@@ -170,8 +193,8 @@ for _, tile in FindIt.tiles() do
 		GoTo.place(dest)
 	end)
 end
--- Friends' barns (D-060) are the "Visit barns" tile. Phase 5 hook: the list is whatever the server's
--- FriendBarns sends (Visits.list), so barns open to everyone join it there, not here.
+-- The barns list (D-060, D-079) is the "Visit barns" tile: whatever the server's FriendBarns sends
+-- (Visits.list), friends' barns and barns open to everyone here.
 tiles.visit.button.Visible = GameConfig.visit.enabled and GameConfig.visit.mapList
 PlayerState.Changed.Event:Connect(function()
 	if gui.Enabled and row.Visible then renderHints() end
@@ -240,8 +263,45 @@ end
 
 local function showStamps()
 	local n = PlayerState.data and PlayerState.data.tourStamps or 0
-	stampText.Text = if n == 0 then "Tour pins: none yet. Pat every horse in a friend's barn to get one!"
+	stampText.Text = if n == 0 then "Tour pins: walk a barn's 4 stops!"
 		else "Tour pins: " .. n .. (if n == 1 then " barn toured" else " barns toured")
+end
+
+-- The one-time ask (D-079): "Let other riders visit?" the first time the barns list opens. A strip
+-- under the list, never over it (code review S4): 👫 Friends (gold, the current choice), 🌍 Everyone,
+-- and Not now (keeps Friends; asks again next time the game starts).
+local ask = Instance.new("Frame")
+ask.BackgroundTransparency = 1
+ask.Size = UDim2.new(1, 0, 0, 108)
+ask.Position = UDim2.new(0, 0, 0, 180)
+ask.Visible = false
+ask.Parent = friendsPage
+Ui.card(ask, UDim2.fromScale(1, 1), UDim2.new(), C.cream)
+Ui.text(ask, "Let other riders visit?", 22, { Position = UDim2.new(0, 12, 0, 18), Size = UDim2.new(0, 210, 0, 30),
+	TextXAlignment = Enum.TextXAlignment.Left })
+Ui.text(ask, "Who can come to your barn?", 16, { Position = UDim2.new(0, 12, 0, 52), Size = UDim2.new(0, 210, 0, 40),
+	TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+local askFriends = Ui.button(ask, "👫 Friends", UDim2.fromOffset(120, 64), UDim2.new(1, -388, 0, 20), C.gold, 18)
+local askEveryone = Ui.button(ask, "🌍 Everyone", UDim2.fromOffset(120, 64), UDim2.new(1, -260, 0, 20), C.white, 18)
+local askLater = Ui.button(ask, "Not now", UDim2.fromOffset(120, 64), UDim2.new(1, -132, 0, 20), C.white, 18)
+local askedThisSession = false
+local function closeAsk()
+	ask.Visible = false
+	stampRow.Visible = true
+	askedThisSession = true
+end
+local function answer(v: string)
+	closeAsk()
+	gameRemotes:WaitForChild("SetSetting"):FireServer("visitAsk", v)
+	if PlayerState.data and PlayerState.data.settings then PlayerState.data.settings.visitAsked = true end
+end
+askFriends.Activated:Connect(function() answer("Friends") end)
+askEveryone.Activated:Connect(function() answer("Everyone") end)
+askLater.Activated:Connect(closeAsk) -- nothing saved: Friends stays, and it asks again another day
+local function needsAsk(): boolean
+	local s = PlayerState.data and PlayerState.data.settings
+	return GameConfig.visit.askOnce ~= false and GameConfig.visit.everyone ~= false and s ~= nil
+		and s.visitAsked ~= true and s.visits ~= "Nobody" and not askedThisSession
 end
 
 local function drawFriends(list)
@@ -250,7 +310,7 @@ local function drawFriends(list)
 	end
 	if typeof(list) ~= "table" then list = {} end
 	empty.Visible = #list == 0
-	empty.Text = "No friends' barns here yet.\nWhen a Roblox friend is in this game, their face shows up here."
+	empty.Text = "No open barns yet"
 	for k, f in list do
 		if typeof(f) == "table" and typeof(f.userId) == "number" and typeof(f.name) == "string" then
 			local b = Ui.button(faces, "", UDim2.fromOffset(132, 168), UDim2.new(), if f.closed then C.white else C.cream, 18)
@@ -261,11 +321,17 @@ local function drawFriends(list)
 			img.Position = UDim2.new(0.5, -42, 0, 10)
 			img.Parent = b
 			Ui.corner(img, 42)
-			face(f.userId, img)
+			if f.friend == true then
+				face(f.userId, img) -- a friend's face; a stranger's barn shows a barn, never a profile picture (D-079)
+			else
+				Ui.text(img, "🏡", 48, { Size = UDim2.fromScale(1, 1), TextWrapped = false })
+			end
 			-- ✨ (D-070): something new built at that barn in the last two days; never a count
 			Ui.text(b, if f.fresh == true then "✨ " .. f.name else f.name, 18,
 				{ Position = UDim2.new(0, 4, 0, 98), Size = UDim2.new(1, -8, 0, 26), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
-			local go = Ui.text(b, if f.closed then "🔒 Gate closed" else "🏡 Visit ▶", 18, { Position = UDim2.new(0, 4, 0, 128), Size = UDim2.new(1, -8, 0, 30) })
+			-- who's a friend (D-079): "👫 Friend" or "🌍 Open"; a closed friend's gate says so
+			local go = Ui.text(b, if f.closed then "🔒 Gate closed" elseif f.friend == true then "👫 Friend ▶" else "🌍 Open ▶", 18,
+				{ Position = UDim2.new(0, 4, 0, 128), Size = UDim2.new(1, -8, 0, 30) })
 			go.TextColor3 = if f.closed then C.plum else C.ink
 			if f.closed then
 				img.ImageTransparency = 0.5
@@ -282,7 +348,9 @@ local function drawFriends(list)
 end
 
 gameRemotes:WaitForChild("FriendBarns").OnClientEvent:Connect(function(list)
-	if friendsPage.Visible then drawFriends(list) end
+	if friendsPage.Visible then
+		drawFriends(list)
+	end
 end)
 
 showFriends = function()
@@ -293,13 +361,15 @@ showFriends = function()
 	row.Visible = false
 	friendsPage.Visible = true
 	back.Visible = true
-	title.Text = "Friends' barns"
+	title.Text = "Visit barns"
 	empty.Visible = true
-	empty.Text = "Looking for your friends..."
+	empty.Text = "Looking for barns..."
 	for _, ch in faces:GetChildren() do
 		if ch:IsA("GuiObject") then ch:Destroy() end
 	end
 	showStamps()
+	ask.Visible = needsAsk()
+	stampRow.Visible = not ask.Visible -- the strip sits where the Tour pins line goes; the list stays
 	gameRemotes:WaitForChild("FriendBarns"):FireServer()
 end
 local function showPlaces()

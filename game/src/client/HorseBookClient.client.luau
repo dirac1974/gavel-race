@@ -241,7 +241,7 @@ render = function()
 	if page == "tour" then
 		local tour = book.tour or { count = 0, friends = {} }
 		if (tour.count or 0) == 0 then
-			note("No Tour pins yet. Visit a friend's barn and pat every horse!", 1)
+			note("No Tour pins yet. Walk a barn's 4 stops!", 1) -- (D-079)
 			return
 		end
 		note(string.format("👫 %d barn%s toured!", tour.count, if tour.count == 1 then "" else "s"), 0)

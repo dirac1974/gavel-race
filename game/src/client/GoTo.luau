@@ -34,7 +34,10 @@ GoTo.OPENS = {
 	raceBoard = "picker", pick = "picker", feedStore = "feedShop", barnBuilder = "barnBuilder", tackShop = "tackShop",
 	vet = "vet", spa = "spa", market = "market", paddock = "train", trainingGround = "train",
 	board = "board", book = "book", horses = "horses", visit = "visit",
+	vetCheck = "coolDown", -- (D-077) VET CHECK and the vet Advice: the Vet, then the Cool-down Check
 }
+-- Places that stand at another place ("vetCheck" is the Vet).
+GoTo.AT = { vetCheck = "vet" }
 
 local opens: { [string]: () -> () } = {}
 function GoTo.register(id: string, fn: () -> ())
@@ -85,6 +88,7 @@ end
 
 -- Where to walk to for a place (x, z), and which Map trip gets you there; nil when it has no spot.
 local function spot(place: string): (number?, number?, string?)
+	place = GoTo.AT[place] or place
 	if place == "stable" or place == "wall" then
 		local i = player:GetAttribute("PlotIndex")
 		if not i then return nil, nil, nil end

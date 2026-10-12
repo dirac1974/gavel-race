@@ -23,6 +23,10 @@
 --     rinse with the hose, brush and dry with a towel, tapping only (about 30 s). +1 Energy, a
 --     Spa stamp and a shine on the next race, once per horse per day; after that the button says
 --     "Spa opens again tomorrow" (no clock anywhere).
+--   Cool-down Check (fun-and-return phase 3, D-077): after a run of races RACE! says 🩺 VET CHECK and GO
+--     opens this. About 30 s in 4 tap steps on a drawn horse: check each leg, cold hose (vetCheck.hoseTaps
+--     taps per leg), soft wraps in a colour, then a carrot. Sky blue; free (no Green Cash, no Diamonds,
+--     no timer). The server takes it after vetCheck.minSeconds: a fresh run and wraps for 3 races.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -44,6 +48,7 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
 local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
 local Spa = require(Shared:WaitForChild("Spa"))
+local Legs = require(Shared:WaitForChild("Legs")) -- the Cool-down Check (D-077)
 
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local C = Ui.colors
@@ -762,6 +767,151 @@ local function spaPick(h)
 	spaGame(h)
 end
 
+-- The Cool-down Check (D-077) ------------------------------------------------------------------
+local LEG_SPOTS = { 150, 222, 306, 378 } -- x of each leg in the 588 px area: front pair, back pair
+local function coolDownGame(h)
+	local vc = GameConfig.vetCheck
+	local gen = generation
+	local started = now()
+	gameRemotes:WaitForChild("VetCheckStart"):FireServer(h.id)
+	local a = area(220)
+	-- step chips along the top
+	local chips = {}
+	for k, step in Legs.STEPS do
+		local info = Legs.STEP_TEXT[step]
+		local chip = Ui.text(a, info.emoji .. " " .. info.title, 16, { Size = UDim2.new(0.25, -6, 0, 28), Position = UDim2.new((k - 1) / 4, 3, 0, 6) })
+		chip.TextColor3 = C.plum
+		chips[k] = chip
+	end
+	-- the horse, drawn side-on: head, body, and four big legs to tap
+	local coat = Ui.coatColors[h.coat] or Ui.coatColors.bay
+	local bodyF = Instance.new("Frame")
+	bodyF.Size, bodyF.Position = UDim2.fromOffset(300, 70), UDim2.fromOffset(144, 58)
+	bodyF.BackgroundColor3 = coat
+	Ui.corner(bodyF, 30)
+	Ui.stroke(bodyF, 2)
+	bodyF.Parent = a
+	local head = Instance.new("Frame")
+	head.Size, head.Position = UDim2.fromOffset(74, 54), UDim2.fromOffset(84, 36)
+	head.BackgroundColor3 = coat
+	Ui.corner(head, 22)
+	Ui.stroke(head, 2)
+	head.Parent = a
+	local face = Ui.text(a, "😊", 26, { Size = UDim2.fromOffset(40, 40), Position = UDim2.fromOffset(92, 42) })
+	local legs = {}
+	for k, x in LEG_SPOTS do
+		local b = Ui.button(a, "", UDim2.fromOffset(64, 84), UDim2.fromOffset(x, 128), coat, 24)
+		b:SetAttribute("NoPop", true)
+		b.TextColor3 = C.white
+		b.TextStrokeTransparency = 0.4
+		legs[k] = { button = b, checked = false, cool = 0, wrapped = false }
+	end
+	local hint = Ui.text(body, "", 22, { Position = UDim2.new(0, 0, 0, 226), Size = UDim2.new(1, 0, 0, 30) })
+	hint.TextColor3 = C.ink
+	local row = Instance.new("Frame")
+	row.BackgroundTransparency = 1
+	row.Size, row.Position = UDim2.new(1, 0, 0, 64), UDim2.new(0, 0, 0, 262)
+	row.Parent = body
+	local stepIdx, ticks = 1, 0
+	local colour: string? = nil
+	local function showStep()
+		for k, chip in chips do
+			chip.TextColor3 = if k < stepIdx then C.textGood elseif k == stepIdx then C.ink else C.plum
+		end
+		row:ClearAllChildren()
+		local step = Legs.STEPS[stepIdx]
+		if not step then return end
+		hint.Text = Legs.STEP_TEXT[step].tap
+		if step == "wraps" then
+			for k, hex in vc.wraps do
+				local cb = Ui.button(row, "🧶", UDim2.fromOffset(64, 64), UDim2.new(0.5, -152 + (k - 1) * 76, 0, 0), Color3.fromHex(hex), 26)
+				cb.Activated:Connect(function()
+					colour = hex
+					hint.Text = "Now tap each leg"
+					for _, o in row:GetChildren() do
+						if o:IsA("TextButton") then
+							local st = o:FindFirstChildOfClass("UIStroke")
+							if st then st.Thickness = if o == cb then 5 else 2 end
+						end
+					end
+				end)
+			end
+		elseif step == "carrot" then
+			local carrot = Ui.button(row, "🥕 Carrot!", UDim2.fromOffset(220, 64), UDim2.new(0.5, -110, 0, 0), C.orange, 28)
+			carrot.Activated:Connect(function()
+				if not alive(gen) or stepIdx ~= 4 then return end
+				stepIdx = 5
+				face.Text = "😋"
+				if Sound then
+					Sound.play("munch")
+					task.delay(0.5, function() if Sound then Sound.play("horse_nicker") end end)
+					task.delay(1.0, function() if Sound then Sound.play("job_done") end end)
+				end
+				flash("❤️ ❤️ ❤️", C.red)
+				for _, chip in chips do chip.TextColor3 = C.textGood end
+				row:ClearAllChildren()
+				hint.Text = "All fresh! Ready to race!"
+				local wait = math.max(0, vc.minSeconds + 0.5 - (now() - started))
+				task.delay(wait, function()
+					if not alive(gen) then return end
+					gameRemotes:WaitForChild("VetCheckDone"):FireServer(h.id, colour)
+					task.delay(0.8, function() if gui.Enabled and generation == gen then close() end end)
+				end)
+			end)
+		end
+	end
+	local function nextStep(line: string?)
+		stepIdx += 1
+		ticks = 0
+		if line then flash(line, C.textGood) end
+		showStep()
+	end
+	local function allDone(field: string, want: any): boolean
+		for _, l in legs do
+			if l[field] ~= want then return false end
+		end
+		return true
+	end
+	for _, l in legs do
+		l.button.Activated:Connect(function()
+			if not alive(gen) then return end
+			local step = Legs.STEPS[stepIdx]
+			if step == "check" and not l.checked then
+				l.checked = true
+				l.button.Text = "✓"
+				local st = l.button:FindFirstChildOfClass("UIStroke")
+				if st then st.Thickness, st.Color = 4, C.gold end
+				ticks += 1
+				if Sound then Sound.play("tap_ok", nil, nil, 1 + 0.1 * ticks) end
+				if allDone("checked", true) then nextStep("Warm legs! Let's cool them.") end
+			elseif step == "hose" and l.cool < vc.hoseTaps then
+				l.cool += 1
+				l.button.BackgroundColor3 = coat:Lerp(Color3.fromHex("8ED6FF"), 0.5 * l.cool / vc.hoseTaps)
+				l.button.Text = if l.cool >= vc.hoseTaps then "❄️" else "💧"
+				if Sound then Sound.play("brush", 0.4, nil, 0.7) end
+				if allDone("cool", vc.hoseTaps) then nextStep("Nice and cool!") end
+			elseif step == "wraps" and not l.wrapped then
+				if not colour then
+					hint.Text = "Pick a colour first!"
+					return
+				end
+				l.wrapped = true
+				l.button.BackgroundColor3 = Color3.fromHex(colour :: string)
+				l.button.Text = "🧶"
+				if Sound then Sound.play("bump_soft", nil, nil, 1.2) end
+				if allDone("wrapped", true) then nextStep("Snug and comfy!") end
+			end
+		end)
+	end
+	if Sound then Sound.play("heartbeat") end
+	showStep()
+end
+
+local function coolDownPick(h)
+	open("🩺 Cool-down Check", h.name .. " gets a cool-down. Free!")
+	coolDownGame(h)
+end
+
 local function vetMenu(spaOnly: boolean)
 	if spaOnly then
 		open("🛁 Spa Day", "Pick a horse for a wash and a shine!")
@@ -796,7 +946,25 @@ local function vetMenu(spaOnly: boolean)
 		spa.Activated:Connect(function()
 			if spaOpen then spaPick(h) end
 		end)
+		if GameConfig.vetCheck.enabled and GameConfig.legs.enabled then -- (D-077) the Cool-down Check, free
+			local need = h.legs and h.legs.needsVet
+			local cool = Ui.button(body, if need then "🩺 Vet check time!" else "🩺 Cool-down Check", UDim2.new(0.92, 0, 0, 64),
+				UDim2.new(0.04, 0, 0, 292), C.sky, 24)
+			cool.Activated:Connect(function() coolDownPick(h) end)
+		end
 	end)
+end
+
+-- GO for VET CHECK (D-077): straight into the Cool-down Check for the horse that needs it (the active
+-- one first), else the Vet card.
+local function coolDownGo()
+	local pick = nil
+	local active = PlayerState.activeHorse()
+	if active and active.legs and active.legs.needsVet then pick = active end
+	for _, h in stalledHorses() do
+		if not pick and h.legs and h.legs.needsVet then pick = h end
+	end
+	if pick and GameConfig.vetCheck.enabled then coolDownPick(pick) else vetMenu(false) end
 end
 
 -- Prompts at the paddock gate and the vet's door -----------------------------------------
@@ -842,6 +1010,7 @@ end
 -- GO (D-075): the Training and Riding Ring tiles open the Train menu; the Vet & Spa tile the vet card.
 GoTo.register("train", trainingMenu)
 GoTo.register("vet", function() vetMenu(false) end)
+GoTo.register("coolDown", coolDownGo) -- (D-077) VET CHECK and the vet Advice
 if GameConfig.spa.enabled then GoTo.register("spa", function() vetMenu(true) end) end
 
 -- Your queued race starting closes the paddock card (the race HUD needs the screen and keys).

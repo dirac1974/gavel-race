@@ -10,6 +10,13 @@
 -- friend's gate (VisitFriend), the owner's one-tap gate (GateToggle, GateState to the owner
 -- only) and the post box (PostBox). Once a second, anyone standing in a plot who isn't let in
 -- (not a friend, "Nobody", or the gate closed) is walked out to Barn Lane.
+-- Visiting other stables (D-079): the same list also holds every barn whose owner chose Everyone
+-- here (Visits.list), anyone may travel to those gates (never inside) and stand in the yard, and
+-- the post box stays friends-only (VisitAccess.check names each action). Pats, cheers, the tour
+-- and the arrival banner are VisitService's. Ask to leave (AskToLeave, code review S3): the owner
+-- walks one visitor in their yard out to the lane, kindly, and that visitor stays out for
+-- visit.askLeaveSeconds. GateState now also carries who's in the yard (id and display name, for the
+-- owner's Ask to leave list only).
 -- Rest cues (D-058, stage 4): a stalled horse at energy.yawnAt (1) shows a "🥱 Yawn!" bubble; at
 -- 0 it naps in a straw bed with "💤 Napping" (the horse_lie_<coat> model when it's uploaded, else
 -- the standing horse sunk into the straw). Happy-tired only: never sore, hurt or ill.
@@ -43,12 +50,14 @@ local Horse = require(Shared:WaitForChild("Horse"))
 local Spa = require(Shared:WaitForChild("Spa"))
 local StableStar = require(Shared:WaitForChild("StableStar"))
 local BarnDecor = require(script.Parent:WaitForChild("BarnDecor")) -- Barn Builder pieces (D-070)
+local HorseLook = require(Shared:WaitForChild("HorseLook")) -- the Cool-down Check's wraps and the Veteran look (D-077, D-078)
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
 local FriendBarns = Profiles.remote("FriendBarns")  -- client -> server: ask; server -> client: { {userId, name, closed} }
 local VisitFriend = Profiles.remote("VisitFriend")  -- client -> server: friend's userId
 local GateToggle = Profiles.remote("GateToggle")    -- client -> server: owner opens or closes their gate
-local GateState = Profiles.remote("GateState")      -- server -> owner only: visitorsIn, closed
+local GateState = Profiles.remote("GateState")      -- server -> owner only: visitorsIn, closed, { {userId, name} } in the yard
+local AskToLeave = Profiles.remote("AskToLeave")    -- client -> server: the owner asks one visitor (userId) to head home (D-079)
 local PostBox = Profiles.remote("PostBox")          -- client -> server: owner's userId (drop a carrot)
 local GROUND_Y = WorldScene.GROUND_Y
 local C = WorldScene.colors
@@ -281,6 +290,7 @@ local function buildPaddock(i: number, owner: Player, data, barn: Instance)
 			for _, dd in hm:GetDescendants() do
 				if dd:IsA("BasePart") then dd.Anchored, dd.CanCollide = true, false end
 			end
+			HorseLook.apply(hm, HorseLook.of(h)) -- (D-078) the frosted muzzle and a gold rosette
 			hm:SetAttribute("LegendId", h.id)
 			hm:SetAttribute("Owner", owner.UserId)
 			hm:SetAttribute("HorseName", h.name)
@@ -503,6 +513,7 @@ local function buildBarn(i: number, owner: Player, data)
 				if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
 			end
 			hm:SetAttribute("Rest", pose or "")
+			HorseLook.apply(hm, HorseLook.of(h)) -- (D-077, D-078) wraps after a Cool-down Check; the Veteran look
 			hm.Parent = barn
 			if pose == "nap" then
 				bubble(hm, Spa.NAP, "RestBubble")
@@ -847,6 +858,7 @@ local function signature(data, now: number, player: Player?): string
 	for _, h in data.horses do
 		local golds = table.concat(Profile.rosettes(h), ",")
 		table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name .. ":" .. golds) -- gold rosettes (D-053)
+		table.insert(parts, HorseLook.key(HorseLook.of(h))) -- wraps and the Veteran look (D-077, D-078)
 	end
 	for k = 1, data.stalls do -- rest cues (D-058): yawning or napping
 		local h = Profile.stallHorse(data, k)
@@ -861,7 +873,7 @@ local function refresh(player: Player)
 	if not i or not data then return end
 	local shell = plotModels[i]
 	shell:SetAttribute("OwnerId", player.UserId)
-	shell:SetAttribute("Visits", data.settings.visits)
+	shell:SetAttribute("Visits", VisitAccess.setting(player)) -- Friends, Everyone or Nobody (D-079)
 	shell:SetAttribute("GateClosed", VisitAccess.gateClosed(player))
 	local label = shell:FindFirstChild("OwnerLabel", true)
 	if label then label.Text = "🏡 " .. player.DisplayName .. "'s Stable" end
@@ -1024,7 +1036,8 @@ local function barnOwners(): { Visits.Owner }
 		local data = Profiles.get(player)
 		if data then
 			table.insert(out, { userId = player.UserId, name = player.DisplayName, visits = data.settings.visits,
-				gateClosed = VisitAccess.gateClosed(player), hasBarn = #data.horses > 0, fresh = BarnDecor.freshId(data, os.time()) ~= nil })
+				gateClosed = VisitAccess.gateClosed(player), hasBarn = #data.horses > 0, fresh = BarnDecor.freshId(data, os.time()) ~= nil,
+				policyOk = VisitAccess.policyOk(player) })
 		end
 	end
 	return out
@@ -1038,13 +1051,13 @@ end
 FriendBarns.OnServerEvent:Connect(function(player: Player)
 	if (lastVisitAsk[player] or 0) > os.clock() - 0.5 then return end
 	lastVisitAsk[player] = os.clock()
-	FriendBarns:FireClient(player, Visits.list(player.UserId, barnOwners(), isFriend, CFG))
+	FriendBarns:FireClient(player, Visits.list(player.UserId, barnOwners(), isFriend, CFG, VisitAccess.policyOk(player)))
 end)
 
 VisitFriend.OnServerEvent:Connect(function(player: Player, userId: any)
 	if not CFG.mapList then return end
 	local owner = VisitAccess.owner(userId)
-	local ok, why = VisitAccess.check(player, owner)
+	local ok, why = VisitAccess.check(player, owner, "enter") -- friends, or anyone at an Everyone here barn (D-079)
 	if not ok then
 		if why == "closed" then Profiles.notify(player, "That gate is closed right now. Try again later!", "heart") end
 		return
@@ -1056,15 +1069,14 @@ VisitFriend.OnServerEvent:Connect(function(player: Player, userId: any)
 	if not i or not odata or #odata.horses == 0 then return end -- the same barns Visits.list shows
 	lastTravel[player] = os.clock()
 	local x, z, lx, lz = WorldLayout.gateArrival(i)
-	arriveAt(player, x, z, lx, lz)
-	Profiles.notify(player, "Welcome to " .. owner.DisplayName .. "'s barn! Pat each horse for a pin", "heart")
+	arriveAt(player, x, z, lx, lz) -- on Barn Lane outside the gate, never inside (VisitService's banner says hello)
 end)
 
 PostBox.OnServerEvent:Connect(function(player: Player, userId: any)
 	if (lastPost[player] or 0) > os.clock() - 0.5 then return end
 	lastPost[player] = os.clock()
 	local owner = VisitAccess.owner(userId)
-	if not VisitAccess.check(player, owner) or not VisitAccess.near(player, owner) then return end
+	if not VisitAccess.check(player, owner, "post") or not VisitAccess.near(player, owner) then return end -- friends only (D-079)
 	local vdata, odata = Profiles.get(player), Profiles.get(owner)
 	if not vdata or not odata then return end
 	local ok, res = Visits.post(vdata, odata, owner.UserId, os.time(), CFG)
@@ -1082,12 +1094,18 @@ end)
 
 -- The gate (D-060): the owner's button shows while anyone is visiting or the gate is closed.
 local gateSent: { [Player]: string } = {}
-local function sendGate(owner: Player, visitorsIn: boolean)
+local function sendGate(owner: Player, visitors: { Player })
 	local closedNow = VisitAccess.gateClosed(owner)
-	local k = tostring(visitorsIn) .. tostring(closedNow)
+	local list, ids = {}, {}
+	for _, v in visitors do
+		table.insert(list, { userId = v.UserId, name = v.DisplayName })
+		table.insert(ids, tostring(v.UserId))
+	end
+	table.sort(ids)
+	local k = tostring(#visitors > 0) .. tostring(closedNow) .. table.concat(ids, ",")
 	if gateSent[owner] == k then return end
 	gateSent[owner] = k
-	GateState:FireClient(owner, visitorsIn, closedNow)
+	GateState:FireClient(owner, #visitors > 0, closedNow, list)
 end
 
 local function applyGate(owner: Player)
@@ -1118,14 +1136,14 @@ local function sweep()
 			if pos and p ~= owner then table.insert(people, { userId = p.UserId, x = pos.X, z = pos.Z }) end
 		end
 		local inside = Visits.toWalkOut(rect, owner.UserId, people)
-		local visitorsIn = false
+		local visitorsIn = {}
 		for _, uid in inside do
 			local visitor = Players:GetPlayerByUserId(uid)
 			if visitor and not visitor:GetAttribute("Racing") then
-				local ok, why = VisitAccess.check(visitor, owner)
+				local ok, why = VisitAccess.check(visitor, owner, "enter")
 				if ok then
-					visitorsIn = true
-				elseif why == "friends" or why == "private" or why == "closed" then
+					table.insert(visitorsIn, visitor)
+				elseif why == "friends" or why == "private" or why == "closed" or why == "asked" then
 					-- ("off", visits switched off in GameConfig, leaves friends where they are, as before D-060)
 					local x, z, lx, lz = WorldLayout.gateArrival(i)
 					arriveAt(visitor, x, z, x + (x - lx), z + (z - lz)) -- facing the lane, back to the gate
@@ -1140,19 +1158,41 @@ local function sweep()
 	end
 end
 
+-- Ask to leave (D-079): only the owner, only someone standing in their yard right now.
+local lastAsk: { [Player]: number } = {}
+AskToLeave.OnServerEvent:Connect(function(player: Player, userId: any)
+	local i = plotOf[player]
+	if not i then return end
+	if (lastAsk[player] or 0) > os.clock() - CFG.askLeaveGapSeconds then return end
+	lastAsk[player] = os.clock()
+	local visitor = VisitAccess.owner(userId)
+	if not visitor or visitor == player then return end
+	local pos = VisitAccess.position(visitor)
+	if not pos or not Visits.inside(WorldLayout.plotRect(i), pos.X, pos.Z) then return end
+	VisitAccess.askOut(player, visitor)
+	if not visitor:GetAttribute("Racing") then
+		local x, z, lx, lz = WorldLayout.gateArrival(i)
+		arriveAt(visitor, x, z, x + (x - lx), z + (z - lz)) -- on the lane, facing away from the gate
+	end
+	Profiles.notify(visitor, "Time to head home!", "heart") -- kind, no blame, no name
+	gateSent[player] = nil
+	sweep()
+end)
+
 GateToggle.OnServerEvent:Connect(function(player: Player)
 	if not plotOf[player] then return end
 	if (lastGate[player] or 0) > os.clock() - 0.5 then return end
 	lastGate[player] = os.clock()
 	VisitAccess.setGate(player, not VisitAccess.gateClosed(player))
 	applyGate(player)
-	Profiles.notify(player, if VisitAccess.gateClosed(player) then "Gate closed. Visitors head home." else "Gate open. Friends can visit.", "map_stable")
+	Profiles.notify(player, if VisitAccess.gateClosed(player) then "Gate closed. Visitors head home." else "Gate open. Visitors welcome.", "map_stable")
 	gateSent[player] = nil
 	sweep()
 end)
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	lastVisitAsk[player], lastPost[player], lastGate[player], walkedAt[player], gateSent[player] = nil, nil, nil, nil, nil
+	lastAsk[player] = nil
 end)
 
 task.spawn(function()

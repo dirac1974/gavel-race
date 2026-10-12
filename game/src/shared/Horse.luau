@@ -43,6 +43,7 @@ export type Horse = {
 	legend: number?,   -- when it became a Legend (os.time()), nil while racing
 	legendAsked: boolean?, -- the one-time Legend suggestion has been shown
 	goodbyeRosette: boolean?, -- a goodbye rosette was given for it (once per horse)
+	lent: number?,     -- lent to the Riding School (os.time()), nil at home (D-078)
 }
 
 export type EnergyConfig = { maxPerRacer: number, regenSeconds: number, careCooldownSeconds: number, restingLabelAt: number?, yawnAt: number? }
@@ -224,6 +225,7 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		goodbyeRosette = h.goodbyeRosette == true,
 		stall = h.stall,
 		legend = h.legend ~= nil,
+		lent = h.lent ~= nil, -- at the Riding School (D-078)
 		-- training rides (D-053): best ribbon and best run per course
 		ribbons = table.clone((h :: any).ribbons or {}),
 		trainingBest = (function()
@@ -280,6 +282,10 @@ function Horse.repair(h: any, now: number): Horse
 	if h.legend then h.stall = nil end
 	h.legendAsked = h.legendAsked == true
 	h.goodbyeRosette = h.goodbyeRosette == true
+	-- Lent to the Riding School (fun-and-return phase 4, D-078): when, or nil; a lent horse has no stall.
+	local lent = tonumber(h.lent)
+	h.lent = if lent and lent == lent and h.legend == nil then lent else nil
+	if h.lent then h.stall = nil end
 	return h :: Horse
 end
 

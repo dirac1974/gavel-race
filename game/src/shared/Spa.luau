@@ -9,6 +9,7 @@
 --   cosmetic shine on the horse's next race. Never bond, Rating or win chance.
 
 local Horse = if script then require(script.Parent.Horse) :: any else require("./Horse")
+local Legs = if script then require(script.Parent.Legs) :: any else require("./Legs")
 
 local Spa = {}
 
@@ -64,6 +65,7 @@ function Spa.give(h: any, now: number, energyCfg: any, cfg: SpaConfig): (boolean
 	Horse.addEnergy(h, cfg.energy, now, energyCfg)
 	local gained = h.energy - before
 	if cfg.shine then h.shine = true end
+	Legs.reset(h) -- a Spa Day is a rest for the legs too (D-077)
 	if gained > 0 then
 		return true, "✨ " .. h.name .. " is squeaky clean! +" .. gained .. " Energy", gained
 	end

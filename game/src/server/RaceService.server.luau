@@ -47,6 +47,10 @@ local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
 local NameGen = require(Shared:WaitForChild("NameGen"))
 local HorseBook = require(Shared:WaitForChild("HorseBook"))
 local StableStar = require(Shared:WaitForChild("StableStar")) -- first-win rosettes on the Rosette Wall (D-062)
+local Legs = require(Shared:WaitForChild("Legs"))           -- the vet run (fun-and-return phase 3, D-077)
+local Ageing = require(Shared:WaitForChild("Ageing"))       -- the gentle Veteran decline (phase 4, D-078)
+local ClassPath = require(Shared:WaitForChild("ClassPath")) -- the class path and Cup bar (phase 2, D-076)
+local HorseLook = require(Shared:WaitForChild("HorseLook")) -- wraps and the Veteran look (D-077, D-078)
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -376,6 +380,8 @@ local function rideable(player: Player, horseId: string?, card)
 	if card then
 		local ok, why = Leagues.canEnter(h, card, bestRating(h))
 		if not ok then return nil, why end
+		-- (D-077) a horse that needs its Cool-down Check waits for rated races; Practice stays open
+		if not card.practice and Legs.needsVet(h, os.time()) then return nil, Legs.REJECT end
 		local cost = costOf(card, h)
 		if cost > 0 and Horse.syncEnergy(h, os.time(), GameConfig.energy) < cost then
 			return nil, h.name .. " is napping. Try a Practice race!"
@@ -396,6 +402,7 @@ Profiles.addDecorator(function(data, view)
 			-- Class badge (D-062): First Win, Rising Star, Open or Cup, a label only.
 			hv.class = Leagues.classOf(h, hv.cupOpen)
 			hv.leagueWins = table.clone(Leagues.wins(h))
+			hv.classPath = ClassPath.view(h, hv.cupOpen) -- (D-076) the path, the next goal and the Cup bar
 		end
 	end
 	view.hallOfFame = data.hallOfFame or {}
@@ -446,6 +453,11 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	local pick = data and ((id and Profile.isStalled(data, id) and Profile.horse(data, id)) or Profile.activeHorse(data))
 	local wanted = { league = if pick then pick.league else DEFAULT_LEAGUE, cup = kind == "cup", practice = kind == "practice" }
 	local h, why = rideable(player, id, wanted)
+	if not h and why == Legs.REJECT then -- (D-077) the server turns a rated join away: the vet first
+		Profiles.notify(player, why, "stethoscope")
+		if not inLine[player] and not RaceQueues.isWaiting(waits, player) then QueueStatus:FireClient(player, false, 0, nil, nil) end
+		return
+	end
 	if not h and kind == "race" then -- (D-061 stage 2) a tired or outgrown horse still gets a race: Practice
 		local practice = { league = wanted.league, cup = false, practice = true }
 		local hp = rideable(player, id, practice)
@@ -674,6 +686,7 @@ local function runRace(c, players: { Player })
 	local horseOf: { [number]: string } = {}
 	local coatOf: { [string]: string } = {}
 	local shineOf: { [string]: boolean } = {} -- a Spa Day's shine, for this race (D-058)
+	local lookOf: { [string]: any } = {}     -- wraps and the Veteran look, for this race (D-077, D-078)
 	local riders = {}
 	for _, p in players do
 		local h = rideable(p, chosen[p], card)
@@ -683,6 +696,10 @@ local function runRace(c, players: { Player })
 		local data = Profiles.get(p)
 		if h and data and not riding[p] and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
 			local rating = Horse.rating(h, cond, os.time(), RaceRating)
+			-- (D-078) the gentle Veteran decline: rated races only, from h.ageing.declineFrom; never Practice,
+			-- League Points, ceilings (bestRating) or stats
+			rating = Ageing.racedRating(rating, h.record.races, Ageing.declineFromOf(h), card.practice)
+			lookOf[tostring(p.UserId)] = HorseLook.forRace(h, Legs.takeWrap(h))
 			table.insert(humans, { id = tostring(p.UserId), name = h.name, rating = rating, isBot = false })
 			horseOf[p.UserId] = h.id
 			coatOf[tostring(p.UserId)] = h.coat
@@ -709,9 +726,11 @@ local function runRace(c, players: { Player })
 	if card.practice and GameConfig.queue.practiceEqualHorses then RaceSession.equalizeRatings(lanes) end -- D-068
 	local coats = {}
 	local shines = {}
+	local looks = {}
 	for i, lane in lanes do
 		coats[i] = coatOf[lane.id] -- bots keep the default coats
 		shines[i] = shineOf[lane.id]
+		looks[i] = lookOf[lane.id]
 	end
 	local session = RaceSession.new({
 		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape },
@@ -763,8 +782,9 @@ local function runRace(c, players: { Player })
 	session:assignPosts(order)
 	local postCoats = {}
 	local postShines = {}
-	for post, old in order do postCoats[post], postShines[post] = coats[old], shines[old] end
-	coats, shines = postCoats, postShines
+	local postLooks = {}
+	for post, old in order do postCoats[post], postShines[post], postLooks[post] = coats[old], shines[old], looks[old] end
+	coats, shines, looks = postCoats, postShines, postLooks
 
 	-- Steering (D-054): the trip state, built after the posts (lane index = post), drawing its
 	-- two uniforms per lane after every other gate draw. Bots steer with Smart Steer and its bot
@@ -804,7 +824,7 @@ local function runRace(c, players: { Player })
 	end
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
-	c.scene:build(plan, coats, shines) -- rebuilt each race: the gate moves with the distance, riders' own coats
+	c.scene:build(plan, coats, shines, looks) -- rebuilt each race: the gate moves with the distance, riders' own coats
 	local title = if card.cup then leagueName .. " Cup" elseif card.practice then "Practice" else leagueName
 	RaceStarted:FireAllClients(title, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
 	if trip then
@@ -1255,13 +1275,21 @@ local function runRace(c, players: { Player })
 		if card.practice then
 			cash, points = 0, 0 -- the Cup winner's purse is already the locked session purse
 		end
-		table.insert(summary, { name = lane.name, place = prize.place, cash = cash, isBot = prize.isBot, id = prize.id, lane = laneIdx })
+		local row = { name = lane.name, place = prize.place, cash = cash, isBot = prize.isBot, id = prize.id, lane = laneIdx }
+		table.insert(summary, row)
 		if not prize.isBot then
 			local player = Players:GetPlayerByUserId(tonumber(prize.id))
 			local data = player and Profiles.get(player)
 			if data and horseOf[player.UserId] then
+				local hp = Profile.horse(data, horseOf[player.UserId])
+				local pointsBefore = hp and hp.points or 0
+				local leagueBefore = hp and hp.league
 				if not card.practice then
 					local before, after = Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+					if hp then
+						Legs.afterRace(hp, os.time()) -- (D-077) one more counted race in a row on this horse
+						Ageing.note(hp) -- (D-078) declineFrom, the first time it's a Veteran at its peak
+					end
 					-- Careers (D-059): a badge every career.badgeEvery races, Veteran at career.veteranAt.
 					local badge, veteran = Career.crossed(before, after)
 					local hc = (badge or veteran) and Profile.horse(data, horseOf[player.UserId])
@@ -1305,6 +1333,18 @@ local function runRace(c, players: { Player })
 							Profiles.notify(player, string.format("🏆 %s won the %s Cup and moves up to %s!", h.name, leagueName, nxt), "trophy")
 						end)
 						Progress.record(player, "promote", 1)
+					end
+				end
+				-- (D-076) the results card's Cup bar: League Points this race as a fill (never a number), the
+				-- next goal on the class path. Not in Practice, not after a move up, not in the top league.
+				if hp and not card.practice and GameConfig.cupBar and GameConfig.cupBar.enabled ~= false then
+					local from = ClassPath.cupFill(leagueBefore, pointsBefore)
+					if from and hp.league == leagueBefore then
+						local open = Leagues.cupOpen(hp, bestRating(hp))
+						local path = ClassPath.view(hp, open)
+						row.points = math.max(0, hp.points - pointsBefore)
+						row.cupFrom, row.cupTo, row.cupOpen = from, path.cupFill or from, path.cupOpen
+						row.classNext = path.next
 					end
 				end
 				Profiles.changed(player)

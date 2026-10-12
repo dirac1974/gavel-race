@@ -98,6 +98,7 @@ end
 -- Can this horse enter a race card? (card = { league, cup, practice })
 function Leagues.canEnter(h: any, card: any, bestRating: number): (boolean, string?)
 	if h.legend ~= nil then return false, h.name .. " is a Legend now. Ride for fun!" end -- D-059
+	if h.lent ~= nil then return false, h.name .. " is at the Riding School!" end -- D-078: lent, not racing
 	if card.practice and Leagues.openPractice() then return true, nil end -- any league's Practice (D-068)
 	if card.league and card.league ~= h.league then
 		return false, string.format("That race is for %s horses. %s is %s.", card.league, h.name, h.league)
@@ -125,7 +126,7 @@ end
 -- Why a horse can't retire (or be rehomed, D-059) right now, or nil (D-065): never one that's
 -- racing, queued, ridden or on a training ride. `busy` is the owner's state: racing, inLine (any
 -- horse), racingHorse, ridingHorse (the horse ids from the player's attributes) and trainingRide.
--- `verb` is "Retire" (the default) or "Rehome".
+-- `verb` is "Retire" (the default), "Sell" or "Lend" (the Riding School, D-078).
 function Leagues.retireBlock(name: string, id: string, busy: any, verb: string?): string?
 	local v = verb or "Retire"
 	if busy.racing or busy.inLine or busy.racingHorse == id then return v .. " after your race!" end
@@ -147,6 +148,7 @@ function Leagues.retire(p: any, id: string, now: number): (any, string?)
 	local h = Profile.horse(p, id)
 	if not h then return nil, "No such horse" end
 	if h.legend ~= nil then return nil, h.name .. " is already a Legend!" end
+	if h.lent ~= nil then return nil, "Bring " .. h.name .. " home first!" end -- D-078
 	if not GameConfig.career.enabled then return nil, "Legends are resting today!" end -- careers off (corePlaytest)
 	if not Career.canBeLegend(h) then
 		return nil, string.format("Legends need %d races. Keep going!", GameConfig.career.veteranAt)

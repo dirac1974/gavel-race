@@ -339,11 +339,12 @@ end
 -- What one tap on RACE! joins for the active horse (D-061): a Race; the Cup when the horse has
 -- outgrown its league's races; Practice while it naps (no Energy) outside the free leagues.
 local function oneTapKind(h): string
+	if h.legs and h.legs.needsVet then return "vet" end -- (D-077) the Cool-down Check first; Practice stays open
 	if h.overCeiling then return if h.cupOpen then "cup" else "practice" end
 	local tired = (h.energy or 0) < GameConfig.energy.costPerCashRace and not GameConfig.energy.freeLeagues[h.league or "Rookie"]
 	return if tired then "practice" else "race"
 end
-local KIND_WORD = { race = "🏁 RACE!", cup = "🏆 CUP!", practice = "🎈 PRACTICE" }
+local KIND_WORD = { race = "🏁 RACE!", cup = "🏆 CUP!", practice = "🎈 PRACTICE", vet = "🩺 VET CHECK" }
 
 local inLine = false
 local function setRaceButton(state: string, detail: string?)
@@ -369,9 +370,9 @@ local function setRaceButton(state: string, detail: string?)
 		if oneTap and h then
 			local kind = oneTapKind(h)
 			raceBtn.Text = KIND_WORD[kind]
-			raceBtn.TextSize = if kind == "practice" then 24 else 30 -- one line above "with Comet ▶"
+			raceBtn.TextSize = if kind == "practice" or kind == "vet" then 24 else 30 -- one line above "with Comet ▶"
 			raceFit.MaxTextSize = raceBtn.TextSize
-			raceBtn.BackgroundColor3 = if kind == "practice" then C.sky else C.orange
+			raceBtn.BackgroundColor3 = if kind == "practice" or kind == "vet" then C.sky else C.orange
 			raceBtn.TextYAlignment = Enum.TextYAlignment.Top
 			raceSub.Text = "with " .. h.name .. " ▶"
 			raceSub.Visible = true
@@ -465,6 +466,10 @@ local function pressRace()
 	if inLine then return end
 	if oneTap then -- one tap, one race (D-061): the active horse joins its league's line
 		local h = PlayerState.activeHorse()
+		if oneTapKind(h) == "vet" then -- (D-077) VET CHECK: GO to the Vet and open the Cool-down Check
+			require(script.Parent:WaitForChild("GoTo")).place("vetCheck")
+			return
+		end
 		raceRemotes:WaitForChild("JoinRace"):FireServer(true, nil, h.id, oneTapKind(h))
 		if Sound then Sound.play("horse_nicker") end
 		return

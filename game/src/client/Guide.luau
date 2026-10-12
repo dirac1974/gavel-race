@@ -100,6 +100,11 @@ function Guide.clear()
 	end
 end
 
+-- Where the trail leads now (nil: no trail). The visit walkaround (D-079) clears only its own trail.
+function Guide.target(): Vector3?
+	return target
+end
+
 function Guide.to(x: number, z: number, onArrive: (() -> ())?, arriveStuds: number?)
 	if not folder or not folder.Parent then
 		folder = Instance.new("Folder")

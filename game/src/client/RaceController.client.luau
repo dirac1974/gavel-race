@@ -1897,6 +1897,7 @@ local function fillCard(summary)
 		Card.setRide(nil)
 		Card.gainLine.Text, Card.tripRowLine.Text = "", ""
 	end
+	Card.setCup(mine) -- (D-076) the Cup bar and the class path's next goal (your row only)
 	-- 🏁 Race again (your own card only): what RACE! would join now, and it says Practice when it is.
 	Card.againBtn.Visible = GameConfig.results.raceAgain ~= false and rideReport ~= nil
 	if Card.againBtn.Visible then

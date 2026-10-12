@@ -226,10 +226,24 @@ end
 -- horse). For rehome.undoHours it can come back at the same price, with its name and stats.
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 
+-- Selling at the Riding School (fun-and-return phase 4, D-078): half the price paid plus the record
+-- bonus, min(sell.perWin x wins + sell.perCup x Cups, sell.recordBonusCap). Market horses only: tamed
+-- and gifted horses sell for 0 (and give the goodbye rosette); the starter never sells. Mirrors
+-- src/life_arc.py sell_value. The cap stays under half the cheapest Market horse, so buy -> race ->
+-- sell never pays more than the price (sims/lifearc.py --sell).
 function Market.rehomeValue(h: any): number
+	local origin = h.origin
 	local paid = math.max(0, math.floor(tonumber(h.paid) or 0))
-	return math.min(paid, math.floor(paid * GameConfig.rehome.share))
+	if not (origin == "market" or (origin == nil and paid > 0)) then return 0 end
+	local base = math.min(paid, math.floor(paid * GameConfig.rehome.share))
+	local rec = if typeof(h.record) == "table" then h.record else {}
+	local wins = math.max(0, math.floor(tonumber(rec.wins) or 0))
+	local cups = math.max(0, math.floor(tonumber(rec.cups) or 0))
+	local sell = GameConfig.sell
+	local bonus = sell.perWin * wins + sell.perCup * cups
+	return base + math.max(0, math.min(sell.recordBonusCap, bonus))
 end
+Market.sellValue = Market.rehomeValue
 
 -- Why this horse can't be rehomed, or nil. `busy` as Leagues.retireBlock.
 function Market.rehomeBlock(p: any, id: string, busy: any?, now: number?): string?
@@ -239,13 +253,48 @@ function Market.rehomeBlock(p: any, id: string, busy: any?, now: number?): strin
 	if not h then return "No such horse" end
 	if h.origin == "starter" then return h.name .. " was your first horse. Friends forever!" end
 	if h.legend ~= nil then return h.name .. " is a Legend and lives with you!" end
+	if h.lent ~= nil then return "Bring " .. h.name .. " home first!" end -- (D-078) lent horses never sell from the school
 	if Profile.racers(p) <= 1 then return "Keep one horse racing with you!" end
 	local waiting = 0
 	for _, e in (if typeof(p.rehomed) == "table" then p.rehomed else {}) do
 		if now == nil or now < e.expires then waiting += 1 end
 	end
 	if waiting >= GameConfig.rehome.maxWaiting then return "The riding school is full. Try again soon!" end
-	return Leagues.retireBlock(h.name, id, busy or {}, "Rehome")
+	return Leagues.retireBlock(h.name, id, busy or {}, "Sell")
+end
+
+-- Lending (D-078): free, take back any time. The horse stays yours (never deleted), leaves its stall
+-- and the racing roster, and stands at the school. Why it can't go now, or nil.
+function Market.lendBlock(p: any, id: string, busy: any?): string?
+	local Leagues = if script then require(script.Parent.Leagues) :: any else require("./Leagues")
+	if not (GameConfig.lend and GameConfig.lend.enabled) or not GameConfig.rehome.enabled then return "The riding school is closed today" end
+	local h = Profile.horse(p, id)
+	if not h then return "No such horse" end
+	if h.lent ~= nil then return h.name .. " is at the school already!" end
+	if h.legend ~= nil then return h.name .. " is a Legend and lives with you!" end
+	if Profile.racers(p) <= 1 then return "Keep one horse racing with you!" end
+	return Leagues.retireBlock(h.name, id, busy or {}, "Lend")
+end
+
+function Market.lend(p: any, id: string, now: number, busy: any?): (boolean, string)
+	local why = Market.lendBlock(p, id, busy)
+	if why then return false, why end
+	local h = Profile.horse(p, id) :: any
+	h.lent = now
+	h.stall = nil
+	Profile.fillStalls(p) -- its stall goes to the first pasture horse
+	Profile.fixActive(p)
+	return true, string.format("🏫 %s is helping at the school!", h.name)
+end
+
+-- Take a lent horse home: a free stall, or the pasture when the barn is full.
+function Market.takeBack(p: any, id: string): (boolean, string)
+	local h = Profile.horse(p, id) :: any
+	if not h or h.lent == nil then return false, "That horse is home already" end
+	h.lent = nil
+	h.stall = Profile.freeStall(p)
+	Profile.fixActive(p)
+	return true, if h.stall then string.format("🏠 Welcome home, %s!", h.name) else string.format("🏠 %s is home in the pasture!", h.name)
 end
 
 -- Horses whose undo window has closed leave for good.

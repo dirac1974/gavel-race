@@ -1,9 +1,12 @@
 --!nonstrict
--- RehomeClient (D-059, stage 7): three cards, each one clear thing for an 8-10 year old.
---   Rehome card: at the Market Corral, the Sunny Meadow Riding School sign's prompt lists your
---   horses with what the school pays (half of what you paid; 🏵️ a goodbye rosette for tamed and
---   gifted horses). Two taps: "🏫 Rehome", then "Sure?". The starter, your last racing horse, a
---   Legend and a busy horse say why they stay.
+-- RehomeClient (D-059, stage 7; the Riding School card, fun-and-return phase 4, D-078): three cards,
+-- each one clear thing for an 8-10 year old.
+--   Riding School card: from the Sunny Meadow Riding School sign at the Market Corral, or "🏫 School"
+--   on a horse's card in My Horses (that horse first). Each horse has two buttons, each two taps:
+--   "🏫 Lend" (free, take back any time: it stands at the school, out of your racing roster, still
+--   yours) and "💵 Sell" (half the price paid plus the record bonus, Market.rehomeValue; 🏵️ a goodbye
+--   rosette for tamed and gifted horses). A lent horse has "🏠 Home". The starter never sells; your
+--   last racing horse, a Legend and a busy horse say why they stay.
 --   Goodbye card: "Comet is joining Sunny Meadow Riding School!", the cash or rosette, and
 --   "↩️ Undo" for rehome.undoHours (said in days, never a clock).
 --   Legend card: once per horse, when it becomes a Veteran: "👑 Show me" opens My Horses, where
@@ -65,7 +68,8 @@ end
 local RW, RH = 600, 470
 local rgui, rpanel, rbody, rslide, rdim = modal("RehomeCard", RW, RH)
 local rclose = Ui.closeButton(rpanel, UDim2.new(1, -TAP - 8, 0, 6), TAP)
-local sure: string? = nil
+local sure: string? = nil -- "sell:<id>" or "lend:<id>": asked once, a second tap does it
+local focus: string? = nil -- the horse that opened the card from My Horses comes first
 
 local function renderRehome()
 	if not rgui.Enabled then return end
@@ -75,8 +79,10 @@ local function renderRehome()
 	Ui.text(rbody, "🏫 " .. SCHOOL, 24, { Position = UDim2.new(0, 16, 0, 14), Size = UDim2.new(1, -TAP - 40, 0, 32), TextXAlignment = Enum.TextXAlignment.Left })
 	Ui.text(rbody, "Kids there ride and love every horse.", TEXT,
 		{ Position = UDim2.new(0, 16, 0, 50), Size = UDim2.new(1, -32, 0, 22), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
-	Ui.text(rbody, string.format("You get half what you paid. Undo for %d days.", GameConfig.rehome.undoHours // 24), TEXT,
-		{ Position = UDim2.new(0, 16, 0, 74), Size = UDim2.new(1, -32, 0, 22), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+	Ui.text(rbody, "🏫 Lend: free, back any time.", TEXT,
+		{ Position = UDim2.new(0, 16, 0, 74), Size = UDim2.new(0.5, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+	Ui.text(rbody, "💵 Sell: half back, plus wins.", TEXT,
+		{ Position = UDim2.new(0.5, 4, 0, 74), Size = UDim2.new(0.5, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
 	local list = Instance.new("ScrollingFrame")
 	list.BackgroundTransparency = 1
 	list.Size = UDim2.new(1, -24, 1, -112)
@@ -90,43 +96,58 @@ local function renderRehome()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
 	local n = 0
+	local function twoTap(row: Instance, key: string, word: string, sureWord: string, colour: Color3, x: number, fire: () -> ())
+		local asked = sure == key
+		local b = Ui.button(row, if asked then sureWord else word, UDim2.fromOffset(120, TAP), UDim2.new(1, x, 0.5, -TAP / 2),
+			if asked then C.gold else colour, 18)
+		b.Activated:Connect(function()
+			if sure == key then
+				sure = nil
+				fire()
+			else
+				sure = key
+				renderRehome()
+			end
+		end)
+	end
 	for _, h in d.horses do
 		if not h.legend then
 			n += 1
-			local row = Ui.card(list, UDim2.new(1, -10, 0, TAP + 16), UDim2.new(), if sure == h.id then C.gold else C.cream)
-			row.LayoutOrder = n
+			local row = Ui.card(list, UDim2.new(1, -10, 0, TAP + 16), UDim2.new(), if focus == h.id then C.gold else C.cream)
+			row.LayoutOrder = if focus == h.id then 0 else n
 			dot(row, h.coat, 40, UDim2.new(0, 10, 0.5, -20))
-			local nm = Ui.text(row, h.name, 20, { Position = UDim2.new(0, 60, 0, 6), Size = UDim2.new(1, -250, 0, 26), TextXAlignment = Enum.TextXAlignment.Left })
+			local nm = Ui.text(row, h.name, 20, { Position = UDim2.new(0, 60, 0, 6), Size = UDim2.new(1, -320, 0, 26), TextXAlignment = Enum.TextXAlignment.Left })
 			nm.TextTruncate = Enum.TextTruncate.AtEnd
-			local worth = if h.rehomeBlock then h.rehomeBlock
-				elseif (h.rehomeValue or 0) > 0 then string.format("School pays 💵 %d", h.rehomeValue)
+			local worth = if h.lent then "🏫 Helping at the school"
+				elseif h.rehomeBlock then h.rehomeBlock
+				elseif (h.rehomeValue or 0) > 0 then string.format("Sell for 💵 %d", h.rehomeValue)
 				elseif h.goodbyeRosette then "❤️ Free to a happy home"
 				else "🏵️ Goodbye rosette"
-			local sub = Ui.text(row, worth, TEXT, { Position = UDim2.new(0, 60, 0, 36), Size = UDim2.new(1, -250, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true })
+			local sub = Ui.text(row, worth, TEXT, { Position = UDim2.new(0, 60, 0, 36), Size = UDim2.new(1, -320, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true })
 			sub.TextColor3 = C.plum
-			if not h.rehomeBlock then
-				local b = Ui.button(row, if sure == h.id then "Sure? ✓" else "🏫 Rehome", UDim2.fromOffset(170, TAP),
-					UDim2.new(1, -180, 0.5, -TAP / 2), if sure == h.id then C.red else C.sky, 18)
-				b.Activated:Connect(function()
-					if sure == h.id then
-						sure = nil
-						remote("RehomeHorse"):FireServer(h.id)
-						rgui.Enabled = false
-					else
-						sure = h.id
-						renderRehome()
-					end
+			if h.lent then
+				local home = Ui.button(row, "🏠 Home", UDim2.fromOffset(120, TAP), UDim2.new(1, -130, 0.5, -TAP / 2), C.green, 18)
+				home.Activated:Connect(function() remote("LendHorse"):FireServer(h.id, false) end)
+			end
+			if not h.lent and not h.lendBlock then
+				twoTap(row, "lend:" .. h.id, "🏫 Lend", "Sure? 🏫", C.sky, -256, function() remote("LendHorse"):FireServer(h.id, true) end)
+			end
+			if not h.lent and not h.rehomeBlock then -- (B1) a lent horse shows only 🏠 Home
+				twoTap(row, "sell:" .. h.id, "💵 Sell", "Sure? 💵", C.white, -130, function()
+					remote("RehomeHorse"):FireServer(h.id)
+					rgui.Enabled = false
 				end)
-			else
+			elseif not h.lent and h.lendBlock then
 				Ui.text(row, "❤️ Stays", 18, { Position = UDim2.new(1, -150, 0.5, -14), Size = UDim2.new(0, 140, 0, 28) })
 			end
 		end
 	end
 end
 
-local function openRehome()
+local function openRehome(id: string?)
 	if not PlayerState.data or not GameConfig.rehome.enabled then return end
 	sure = nil
+	focus = if typeof(id) == "string" then id else nil
 	rgui.Enabled = true
 	rslide()
 	renderRehome()
@@ -220,18 +241,29 @@ PlayerState.Changed.Event:Connect(function()
 end)
 task.defer(checkLegend)
 
+-- "🏫 School" on a horse's card in My Horses (D-078) opens this card with that horse first.
+do
+	local ev = HudEvents:FindFirstChild("OpenRidingSchool")
+	if not ev then
+		ev = Instance.new("BindableEvent")
+		ev.Name = "OpenRidingSchool"
+		ev.Parent = HudEvents
+	end
+	ev.Event:Connect(function(id) openRehome(id) end)
+end
+
 -- The riding school sign's prompt at the corral ------------------------------------------------
 local function attach(spot: Instance)
 	if not spot:IsA("BasePart") or spot.Name ~= "RehomeSpot" or spot:FindFirstChild("RehomePrompt") then return end
 	local p = Instance.new("ProximityPrompt")
 	p.Name = "RehomePrompt"
-	p.ActionText = "Rehome a horse"
+	p.ActionText = "Lend or sell"
 	p.ObjectText = SCHOOL
 	p.MaxActivationDistance = 14
 	p.RequiresLineOfSight = false
 	p.Enabled = spot:GetAttribute("Rehome") ~= false
 	p.Parent = spot
-	p.Triggered:Connect(openRehome)
+	p.Triggered:Connect(function() openRehome(nil) end)
 end
 
 task.spawn(function()

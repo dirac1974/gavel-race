@@ -761,7 +761,7 @@ Template:
 ## D-056 — Riding feel and world fixes
 
 - Date: 2026-10-05
-- Status: Accepted (provisional)
+- Status: Accepted (provisional). Partly reversed by D-075 (2026-10-12): the phone portrait in the thumbstick zone is tappable again (tap-vs-drag rule, `ui.portraitTap`).
 - Decided by: team, debate 011 (4/4 on direction; the moderator settled sizes and words). The QA riding-and-world audit (Lune sims) supplied the findings; the pure bugs are fixed separately.
 - Decision:
   - **Hop button:**
@@ -1257,7 +1257,7 @@ Template:
 
 ## D-058 — Rest and the Spa Day (no injury)
 - Date: 2026-10-07
-- Status: Accepted (provisional). **Flagged for David** (OPEN_QUESTIONS 5): he asked on 2026-10-07 for "injury or care at the vet" from over-running; this decision gives vet care without injury.
+- Status: Accepted (provisional). **Flagged for David** (OPEN_QUESTIONS 5): he asked on 2026-10-07 for "injury or care at the vet" from over-running; this decision gives vet care without injury. **Superseded in part by D-077 (2026-10-12):** David decided over-running can need the vet (the Cool-down Check); the Spa and the never-say-hurt copy rule stay. OPEN_QUESTIONS 5 resolved.
 - Decided by: team, debate 013 (4/4 against any sore or injured state; Spa details settled in rebuttal)
 - Context: David's 2026-10-07 wish for injury and vet care meets hard rule 3 ("never … sicken"), D-039 ("sore legs after hard races" rejected) and his own 2026-10-05 "skip sick horses". The audit also found "Resting" shows after one cash race while the horse can race 4 more times, so today's rest words are wrong.
 - Decision:
@@ -1272,7 +1272,7 @@ Template:
 
 ## D-059 — Careers, Legend Retirement and Rehoming
 - Date: 2026-10-07
-- Status: Accepted (provisional)
+- Status: Accepted (provisional). **Superseded in part by D-078 (2026-10-12):** David decided horses age and decline and can be sold; "no ageing, no decline" and the word "Rehome" are reversed, and Veteran moves from 100 to 350 races (Lend/Sell at the Riding School). Careers, career patches and Legend Retirement stay.
 - Decided by: team, debate 013 (4/4; rehome undo 3–1)
 - Context: David: "Horses can age and become less effective, be sold". D-037 rules out ageing, decline and trading; the research shows kid games make age a gain.
 - Decision:
@@ -1288,7 +1288,7 @@ Template:
 
 ## D-060 — Visiting friends' barns
 - Date: 2026-10-07
-- Status: Accepted (provisional)
+- Status: Accepted (provisional). **Superseded in part by D-079 (2026-10-12):** David decided players can visit other users' stables; barns set to Everyone here are listed to strangers in the server too.
 - Decided by: team, debate 013 (4/4 after rebuttal)
 - Context: David: "People could go around and visit other users' stables". D-042 set the safety rules, but there's no visit button and nothing to do on a visit.
 - Decision:
@@ -1321,7 +1321,7 @@ Template:
 
 ## D-062 — Class badges, first-win points and the Rosette Wall
 - Date: 2026-10-07
-- Status: Accepted (provisional). The Silver Cup target is **not changed** until the economy sim.
+- Status: Accepted (provisional). The Silver Cup target is **not changed** until the economy sim. Extended by D-076 (2026-10-12): the labels became a class path with a Top Horse step, the Cup bar and a class-up ceremony.
 - Decided by: team, debate 013 (4/4 on badges and the wall; the Silver target split, sim decides)
 - Context: David: "Horse classes to qualify for certain races/prestige?" The research suggests real racing's maiden → allowance → stakes ladder, without claiming races. The audit: Silver Cup at 1,400 points takes about 470 Silver races.
 - Decision:
@@ -1353,7 +1353,7 @@ Template:
 
 ## D-064 — One symbol per meaning, phones first
 - Date: 2026-10-07
-- Status: Accepted (provisional). Reverses part of D-054's results card ("Good trip" row).
+- Status: Accepted (provisional). Reverses part of D-054's results card ("Good trip" row). Its 3-item phone dock is replaced by D-075's 5-item dock (2026-10-12; `ui.dockPhoneItems = 3` restores it).
 - Decided by: team, debate 013 (4/4 on symbols and floors; 3–1 on the 3-item phone dock)
 - Context: the audit found stars meaning 8 things, Energy with 3 looks and ⚡ also meaning Sprint, phone dock buttons rendered about 35 px with 8 px labels, panels at about 10 px text, a picker that reads like a test, and two star rows on the results card.
 - Decision:
@@ -1612,3 +1612,111 @@ Template:
 - Consequences: jumps travel forward (about 5.5 studs from a standstill, about 19.5 at a gallop). Studio checks: a hop at a turn flies straight for up to 0.39 s (Easy Rein and the magnet are overridden), so check it never carries a kid through a rail (review N5); a gamepad player must enter UI navigation to reach "Done" (review N4, not new).
 - Links: `docs/reviews/race-realism-2026-10-12/` (brief, steeplechase-plan, consensus, quickfix-code-review), D-053 (training rides, Mud Splash), D-056 (riding feel), D-073 (Hurdles), game/PLAYTEST.md "Forward jump (D-074)"
 - Built (2026-10-12, branch `claude/race-realism`, uncommitted; not yet played in Studio): `shared/HorseJump.luau` (new), `HorseLegs.luau` air pose, `Rides.luau`, `RideClient` and `TrainingRideClient` hop sites, `TrainingState.hopCap`, `TC.hopCap` and the derived `TC.RIDE_HOP`, `tests/luau/horse_jump_tests.luau` (new), world tests, PLAYTEST. Code review was CHANGES REQUESTED (B1, S1–S7); the fixes above landed, and the two new files are staged (review S1). Still open: N3 (the spec's `airPose` vs the code's `AIR_POSE`), N4, N5.
+
+## D-075 — Find it: every place on the Map, GO opens it, the queue explained
+- Date: 2026-10-12
+- Status: Accepted (provisional). **Reverses** D-056's "nothing tappable in the thumbstick zone" for the phone portrait (tap-vs-drag rule below) and D-064's 3-item phone dock (now 5, with a shrink order).
+- Decided by: team, fun-and-return run (`docs/reviews/fun-and-return-2026-10-12/`: `brief.md` quotes David's request, `inventory.md`, the research note `docs/research/2026-10-12-fun-and-return.md`, the four proposals and cross-votes, the tech lead's `consensus.md`). Explaining the queue was David's own ask ("how does the queue work for each [one]?").
+- Context: David asked for visiting, selling, classes, the vet and a clear queue. The inventory found that much of it already existed (visits D-060, rehoming D-059, the queue card D-061, class badges D-062, the Spa D-058, the Horse Book and welcome-back gift D-063) and he hadn't found it. So discoverability and ease of understanding came first.
+- Decision (`GameConfig.findIt`, `shared/FindIt.luau`, `client/GoTo.luau`):
+  - **The Map shows all 13 places** in a 5 × 3 grid (`WorldLayout.MAP`: My Stable, Racetrack, Race Board, Fair Street, Feed & Seed, Barn Builder, Tack & Paint, Vet, Market Corral, Training Paddock, Training Ground, Trail, barns to visit), 116 × 96 px tiles, each with a "what to do here" line of at most 2 words.
+  - **GO opens the feature**, not just the place: it walks with hoofprints when the place is within 120 studs, else fades and travels, then opens it. Never while in a race line, racing or on a training ride (those only get hoofprints; GO while racing says "After your race!").
+  - **A 5-item phone dock**: the horse portrait, RACE! with a 🔀 Pick strip (64 px), Map, Jobs and ☰ More (`ui.dockPhoneItems` 5; 3 brings back D-064's dock). On a phone too narrow for five, Jobs and then Map move into ☰ More (`ui.dockShrinkOrder = { "jobs", "map" }`).
+  - **The phone portrait opens My Horses on a tap** (`ui.portraitTap` true): a touch that moves more than 10 px (`portraitTapMovePx`) or lasts over 0.5 s (`portraitTapSeconds`) is a thumbstick drag and walks. This reverses D-056's display-only rule for that one button; `portraitTap = false` restores it (My Horses stays in ☰ More).
+  - **Named queue lines**: the queue card names your line and why ("Bronze race line"), with a ❓ (64 px) that opens a 3-picture "how racing works" strip ("Join a line" · "Riders fill the gate" · "Bots fill spots at 0"), shown by itself once, the first time in line, and closed by "Race time!" or the race starting.
+  - **League marks are colour dots**, not 🥉/🥈/🥇 (🥉 means 3rd place); the word ("Bronze race line") carries the meaning, so colour is never the only cue.
+  - **🔀 Pick a race before joining**: "Pick a race" and "Join Bronze line".
+  - **Paced "New!" pointers**: at most one per 180 s (`pointers.gapSeconds`), never on the tour, in line, racing, on the results card or within 120 s of your race (`afterRaceSeconds`); each unlocks after a set number of races (Pick 3, Book 2, Train 3, Builder 4, Market 6, Visit 10); a 1 Hz gold ring round its dock button (still under Reduced Motion); seen pointers are saved.
+  - **A Fair Street signpost** at spawn, built from parts in code (0 Meshy), one arm per place (Racetrack, Stable, Feed & Seed, Vet, Market, Training Paddock), each pointing at it.
+  - The Map/Book LayoutOrder bug is fixed.
+- Alternatives: keeping D-064's 3-item phone dock (everything in ☰ More is what hid the features); a display-only portrait (D-056; the UI/UX consult accepted the tap provisionally because it fires only on release inside the portrait); league medal emoji (🥉 reads as 3rd place); a Meshy signpost (cap 15 credits; built in code); pointers on a timer or in a burst (pacing rule instead).
+- Consequences: every feature David asked about is one GO away. Risk: the tappable portrait sits where a thumb lands to move; PLAYTEST checks it. The build call record (code review S9): seen pointers are saved as `seen_<id>` flags, not `flags.seen[id]`; the Pick strip is 64 px (the plan said 56, matched to the card's floor); the RACE! slot is 210 px; the 5-item dock is 463.75 px wide in 467 px of room at 667 px (3 px margin).
+- Links: `docs/reviews/fun-and-return-2026-10-12/` (brief, inventory, consensus, proposal-ui-ux, votes-*, phase1-code-review, consult-phase1-ui-ux), D-056, D-061, D-064, game/PLAYTEST.md "Find it" section
+- Built (2026-10-12, branch `claude/race-realism`; first pass in wip commit 2b70430 with the life-arc model, review fixes uncommitted; not yet played in Studio): `FindIt.luau`, `GoTo.luau`, `HowRacing.luau`, `findit_tests.luau` (new), Hud, QueueCard, QueueView, StableBoard, WorldClient, WorldScene, DockLayout, WorldLayout, SettingsService. Meshy: 0 credits.
+- Review fixes in: the pointer re-checks its gates before showing again (`FindIt.pointerOk`, code review B1: a pointer latched before a race no longer returns right after it); the portrait logged here as a reversal (B2, option b); the server refuses Travel while `InLine` or on a `TrainingRide` (S4); a walk that started calm doesn't open a feature in line (S5); "seen" has its own limit bucket (S6); Map labels, the HowRacing caption and RACE! use `TextScaled` with size constraints (S7, consult must-fix 2 and 3); the dock shrink order with a Lune check at 568 px (consult must-fix 1); the Race Board tile drops the 🏁 atlas icon (S8); a join from GO's picker gets its reason window (N10); the barns GO toasts when visits are off (N11).
+- Still open: "Bots fill spots at 0" wording (N12, a picture-caption test with the young-player designer); atlas icons for the 5 Map tiles still on emoji (Barn Builder, Tack & Paint, Market, Training Paddock, Training Ground, plus Race Board; `make_ui_svgs.py`, no Meshy); the Studio thumbstick-drag check on the portrait.
+
+## D-076 — Visible progress: the class path, the Cup bar and the class-up ceremony
+- Date: 2026-10-12
+- Status: Accepted (provisional). Extends D-062's class labels into a path. The word "Stakes" was dropped (hard rule 1).
+- Decided by: team, fun-and-return run (consensus Phase 2; the phases 2–4 code review and the gameplay and UI/UX consults). David asked for "Horse classes to qualify for certain races/prestige".
+- Context: classes were labels only (D-062), and League Points were hidden as a number (D-064), so a race rarely showed progress. Named prestige races were deferred to the next build, so tonight the path shows them as the next goal.
+- Decision (`shared/ClassPath.luau`, `GameConfig.classes`, `cupBar`, `client/ClassUp.client.luau`):
+  - **The class path**, per league, from the horse's wins in its own league: 🐣 First Win → 🚀 Rising Star → 🎽 Open → 💐 **Top Horse** (5 wins, `classes.topWins`) → 🏆 Cup. On the horse card and the results card, with the next goal ("💐 Top Horse: 2 more wins"). An open Cup takes priority. The top league has no Cup, so its path ends at Top Horse.
+  - **Top Horse becomes "💐 Big Race"** when the named races ship: one flip, `classes.starIsRace = true` ("💐 Comet is Big Race ready!"). Until then the line is "💐 Comet is a Top Horse!", so the path never promises a race that doesn't exist (gameplay consult must-fix 1).
+  - **The current step** shows emoji plus word in a double-width chip; the other steps show the emoji only (UI/UX consult must-fix 2).
+  - **The Cup bar**: League Points as a 🏆 fill, never a number (160 × 12); the results card fills it from before to after with up to 10 ticks over 0.6 s ("🏆 Cup +6"); under Reduced Motion it just shows.
+  - **The class-up ceremony**: when a horse's step rises, a short mini-ceremony at the Rosette Wall the next time the kid is there, never in the way of "Race again".
+  - On phones the class, stage and Legs rows fold behind "📈 Progress" (UI/UX should-fix).
+- Alternatives: "Stakes" as the step name (the consensus wording; dropped, a wagering word under hard rule 1); "Star Race" (the build name; promised a race that doesn't exist and put two "Star" names on one path, with ★ meaning "how you rode", D-064); "Star horse" (the gameplay consult's interim name; the build chose "Top Horse"); a real Maiden → Allowance → Stakes → Graded ladder with separate races (deferred to the named-races build); a points number (D-064 hid it).
+- Consequences: every race moves something visible. No change to win chance, Rating, League Points or demotion (there is none). Stale comments still say "Star Race" in `ClassUp.client.luau`, `HorsesClient.client.luau` and `ResultsCard.luau` (code is right).
+- Links: `docs/reviews/fun-and-return-2026-10-12/` (consensus, proposal-gameplay, votes-*, phase2-4-code-review, consult-phase2-4-gameplay, consult-phase2-4-ui-ux), D-062, D-064, game/PLAYTEST.md "Visible progress"
+- Built (2026-10-12, uncommitted; not yet played in Studio): `ClassPath.luau`, `ClassUp.client.luau`, `progress_tests.luau` (new; untracked until commit), HorsesClient, ResultsCard, ResultsText. Review fix in: the ceremony's "seen" is keyed by horse and league, so a promotion doesn't stop later ceremonies (code review S1).
+
+## D-077 — Legs and the vet: over-running needs a Cool-down Check
+- Date: 2026-10-12
+- Status: **Accepted, decided by David (2026-10-12)**, that over-running can need the vet. The numbers and the form are Accepted (provisional). Supersedes D-058's "no injury" (the "Never: a sore, hurt … state" clause stays for the words and the look). Answers OPEN_QUESTIONS 5.
+- Decided by: **David** for the rule: "We don't want sick, but over running horses could cause injury or care at the vet needed" (his second ask, after 2026-10-07). **Team** for the design: consensus (3 of 4 votes for the run model), the `--legs` sim and the systems rulings in `lifearc-sim.md`.
+- Context: D-058 gave a daily Spa with no injury, and OPEN_QUESTIONS 5 asked David whether to keep it. He asked again. The brief binds the gentlest real version: only from over-running, never neglect; no permanent harm, death or illness; no paid cure or Diamonds; kind copy that never blames the kid; the vet as a positive play moment; a visible, avoidable cause. Roblox's maturity page puts realistic injuries at Moderate, so the check shows no wound, blood, limp or pain (research note).
+- Decision (`GameConfig.legs`, `vetCheck`, `shared/Legs.luau`, the Python mirror `src/life_arc.py`):
+  - **The run**: counted races in a row on one horse, server-authoritative and saved. Practice never counts and always stays open.
+  - **Only from race 26** (`legs.fromRaces` 26): the run grows only after a horse's first 26 counted races. **A departure from the agreed 10**: the `--legs` sim found casual kids met the vet 0.40 times a session in the free Rookie phase (races 11–26), because Rookie races have no Energy top-ups to lower the run; at 26 that falls to 0.00, so a new kid's first two sessions are vet-free (systems ruling 2).
+  - **The warning at 5** (`warnAt`): "🧣 Worked hard! Cool-down soon" (was 💦, which means Mud Splash and Grit, D-064; code review S2 and UI/UX must-fix 1).
+  - **The check at 6** (`runLimit`): RACE! and "Race again" become 🩺 VET CHECK for rated races and go straight to it; the server turns rated joins away ("🩺 Vet check first! Practice is open.").
+  - **Lowering the run**: feed or groom −2 (`careLowers`), once per kind per horse per 2 h (`careCooldownSeconds` 7,200, the same as Energy's care cooldown; ruling 4, so grooming can't be spammed); 30 min without a counted race on that horse (`restSeconds` 1,800), the Spa, a training session or the Cool-down Check reset it.
+  - **The Cool-down Check** at the Vet: about 30 s in 4 tap steps (check each leg, cold hose 3 taps a leg, soft wraps in a colour the kid picks, a carrot), then "Fresh legs!". Free: no Green Cash, no Diamonds, no timer. The server takes it only for your stalled horse, at the Vet, not racing, and at least `minSeconds` 12 (less 1.5 lag) after it started. Sky-blue states, never red.
+  - **Wraps** in pink, blue, gold or green are worn on the horse for the next 3 races (`wrapRaces`), built in code (`HorseLook.luau`, 0 Meshy).
+  - **A "Legs" row** on the horse card: 6 sky-blue pips and the chip. Advice entries point to the check.
+  - **No effect** on Rating, bond, Energy or cash.
+  - **The hurt-word lint**: a copy test scans every string in `game/src` (over 1,000) for hurt, sore, injury, limp and sick (the parents' page excepted).
+- Alternatives: keep the Spa only (D-058; David asked twice); systems' workload model (+1 per race, drains 1 per 40 min, vet at 8, back to 2 after) (lost 3–1 to the run model, which kids can read); the agreed `fromRaces` 10 (sim: too many vet stops for new kids); `runLimit` 5 (casual 0.47 a session after Rookie, too often) or 7 (keen 0.22, too rare); a "sore" or "tired legs" state that lowers Rating (hard rule 3 and D-015).
+- Consequences: the sim re-run after the rulings (300 kids × 8 weeks): vet checks per session casual 0.03, average 0.20, keen 0.64 (1.09 in 20+ race sessions), about 0.01 in the Rookie phase; the rule's own time costs 0.2–0.5% of races per hour. Keen kids meet the vet about once a long session, casual kids rarely. Rotating horses avoids it, which feeds the next-horse loop.
+- Links: `docs/reviews/fun-and-return-2026-10-12/` (brief, consensus, proposal-systems, proposal-feel, votes-*, lifearc-sim.md "The vet run" and "Rulings", phase2-4-code-review, consult-phase2-4-gameplay, consult-phase2-4-ui-ux), `docs/research/2026-10-12-fun-and-return.md`, D-039, D-058, OPEN_QUESTIONS 5 (resolved), game/PLAYTEST.md "Legs and the vet"
+- Built (2026-10-12; the Python model in wip commit 2b70430, the game side uncommitted; not yet played in Studio): `Legs.luau`, `HorseLook.luau`, `legs_tests.luau` (new; untracked until commit), `src/life_arc.py`, `sims/lifearc.py --legs`, `tests/test_life_arc.py`, TrainingService (the check), RaceService (`rideable`), Hud, ResultsText, HorsesClient, Advice. Review fix in: the check has its own throttle (`lastVetCheck`, not the Spa's; code review S3).
+- Still open: the playtest checks (a kid on run 5 sees the chip before the stop; feeding visibly drops the pips).
+
+## D-078 — Life arc: ageing, gentle decline and the Riding School (Lend or Sell)
+- Date: 2026-10-12
+- Status: **Accepted, decided by David (2026-10-12)**, that horses age, become less effective, and can be sold. The numbers are Accepted (provisional). Reverses D-059's "No ageing, no decline" and its "Rehome" naming; amends D-059's Veteran at 100 to 350.
+- Decided by: **David**: "Horses can age and become less effective, be sold etc…". **Team** for the arc and the numbers: consensus, the `--ageing` and `--sell` sims, the systems rulings and re-run (`lifearc-sim.md`).
+- Context: D-059 chose careers with no decline. David asked again for ageing and selling. The brief: a gentle decline, visible ahead of time, never a punishment, a reason to raise the next horse; no player trading (Roblox policy and scam risk).
+- Decision (`GameConfig.ageing`, `career`, `sell`, `lend`, `shared/Ageing.luau`, `src/life_arc.py`):
+  - **Stages** on the horse card: 🍼 Young (races 0–29) · 💪 Prime (30–349) · 🦉 Veteran (350+) · 👑 Legend (opt-in from Veteran). The current stage shows emoji plus word in a double-width chip (UI/UX must-fix 3). The Young chip is 🍼 in the build; the gameplay consult asked for 🌱, but 🌱 already means a good family line in the market (D-064), so the final chip is a playtest call.
+  - **One "Veteran"**: `career.veteranAt` 100 → **350**, equal to `ageing.veteranAt` (a test keeps them equal; ruling 3). The Veteran toast fires once, at 350. Old saves: Legends stay Legends; horses at 100–349 races show Prime and lose nothing.
+  - **Youngster bonus**: training ×1.25 for the first 30 races (`youngRaces`, `youngTrainMult`).
+  - **Decline waits for the peak** (ruling 1): it starts only once a horse has **350 counted races AND its stats reach 90% of Potential** (`peakShare` 0.90, the mean of stat/Potential over the four stats); that race count is stored once as `h.ageing.declineFrom` and never un-set. Then **−1 Race Rating per 50 races, capped at −4** (`declinePer` 50, `declineCap` 4), **`declineScale` 1** (real decline; 0 = stages only). Rated races only, never Practice; League Points, ceilings, `bestRating` and stats are untouched. At the peak the card says "💪 Comet is at his best!"; each step is warned 10 races ahead ("🦉 Comet is getting wise" / "Soon a little slower").
+  - **The Veteran look**, built in code: a frosted muzzle and brows and a silver-and-blue bridle rosette (gold on a Legend).
+  - **The Riding School card** replaces Rehome: 🏫 **Lend** (free, take back any time; the horse stays yours but leaves the racing roster: no stall, no races, training, vet or retiring; up to 6 shown at the school by the Market Corral) and 💵 **Sell** (half the price paid, `rehome.share` 0.5, plus a record bonus of 5 a win and 100 a Cup, capped at **`sell.recordBonusCap` 100**; 72 h undo at the same price). Tamed and gifted horses sell for 0 and get the goodbye rosette. Each is a two-tap "Sure? ⟨icon⟩" confirm. Selling now works from the horse card anywhere, not only at the corral. A lent horse must come home before it can be sold (code review B1). No player trading.
+- Alternatives: no decline (D-059; David asked for it); gameplay's −1 per 25, cap −6, or systems' Veteran at 300, −1 per 40, cap −5 (consensus took 350 / 50 / 4); decline from 350 races alone (the first sim: kids aren't Champion-strong by then, and decline pushed some cells under 30% win chance); `declinePer` 100 (helped only casual kids); "Wise" as the stage name (gameplay, systems; "Veteran" was already the career word, so one word); a record bonus cap of 600 (feel) or anything ≥ 125 (a sale could beat the price paid); keeping the word "Rehome"; a lent horse that can be sold (rejected for "take back any time").
+- Consequences: the `--ageing` re-run (80 horses per cell, 1,500 races): median `declineFrom` 630 (casual), 640 (average), 1,020 (keen), so the first step comes about week 23, 23 and 18; no window where decline alone takes a kid from ≥ 30% to under 30% win chance; the Champion plateau (1,200–1,500 races) goes from 49.2 → 41.0% (casual), 55.2 → 47.1% (average), 55.5 → 47.7% (keen), inside the 30–50% gate, which also fixes the Champion stomp (D-068); no change before 350; cash per race −1% to +3%. Very few players will ever see a step (an estimate: under 10%). Gates pass. The `--sell` sim: half of 250 plus 100 is 225, under the cheapest Market horse (250), so a sale never returns more than the price and buy → race → sell always nets less than racing; a test keeps the cap under 125. The Youngster bonus moves no league arrival (the weekly cap binds).
+- Links: `docs/reviews/fun-and-return-2026-10-12/` (brief, consensus, proposal-systems, proposal-gameplay, votes-*, lifearc-sim.md, phase2-4-code-review, consult-phase2-4-gameplay, consult-phase2-4-ui-ux), `docs/research/2026-10-12-fun-and-return.md`, D-059, D-068, game/PLAYTEST.md "The life arc and the Riding School"
+- Built (2026-10-12; the model, `Ageing.luau`, `sims/lifearc.py`, `tests/fixtures/ageing.json` and the tests in wip commit 2b70430; the game side and review fixes uncommitted; not yet played in Studio): `Ageing.luau`, `HorseLook.luau`, `Market.luau` (lend, sell value), MarketService (`LendHorse`), RehomeClient, HorsesClient, RaceService (`Ageing.racedRating`), `lifearc_tests.luau` (new; untracked until commit). Review fixes in: a lent horse can't be sold ("Bring Comet home first!", B1); `LendHorse` takes only `true` or `false` (S5); "is getting wise" / "Soon a little slower" split into two lines (N2).
+- Still open: "X is a Legend and lives with you!" is 8 words (N2); the parents' page says "no countdowns" while the card shows "🦉 Veteran in N races" (N3, say "no timers"); explicit LayoutOrder for the card buttons (N4); `row.points` sent to every rider's client (N5); `Market.luau`'s origin-nil sale vs `life_arc.sell_value` (N1); the Young chip.
+
+## D-079 — Visiting other stables: Friends, Everyone here or Nobody
+- Date: 2026-10-12
+- Status: **Accepted, decided by David (2026-10-12)**, that players can visit other users' stables, not only friends'. The settings, permissions and numbers are Accepted (provisional). **Reverses** D-060's friends-only listing and its consequence "only friends are ever listed, so the teleport can't help a stranger follow a kid" for barns whose owners choose Everyone here.
+- Decided by: **David**: "People could go around and visit other users stables etc…". **Team** for the design: consensus (all four votes: Friends by default, strangers only pat and cheer), the phase 5 code review and the feel consult.
+- Context: D-060 listed only friends. The research note found where Roblox's 2025–26 hits went wrong with strangers (stealing, raids, paid defences), so server-wide visiting must be look-and-pat only, with nothing taken or given that matters.
+- Decision (`GameConfig.visit`, `shared/Visits.luau`, `server/VisitAccess.luau`, `server/VisitService.server.luau`, `client/VisitTour.client.luau`):
+  - **The owner's setting**: **Friends (default) · Everyone here · Nobody** (Nobody keeps friends out too). Old saves with "Club" read as Friends.
+  - **The one-time ask**: the first time a kid opens the barns list: "Let other riders visit?" with "Who can come to *your* barn?", Friends · Everyone · **Not now** (keeps Friends and asks again next session), the current choice in gold (code review S4). It never overwrites Nobody; a choice in ⚙️ counts as asked.
+  - **The barns list** on the Map shows friends' barns **and every barn open to everyone** in the server. A stranger's row shows 🏡, never their avatar; no counts, likes or rankings.
+  - **The permission matrix** (`Visits.may`, tested in every cell): strangers may enter, look, walk the 4-stop tour, pat (a care effect and a toast only: no bond, nothing saved) and send one of 4 preset cheers (3 per barn per day, at most 50 barns); treats and the post box stay friends only. No text, nothing to take or change, no ratings. A closed gate blocks everyone.
+  - **PolicyService gate** for stranger contact: both players must have `IsContentSharingAllowed == true` and `IsSubjectToChinaPolicies == false`; it fails closed (friends only) and retries once after 10 s (`policyRetrySeconds`). The effective state is published (`VisitStrangersOk` on each player, the shell's `Visits` attribute) so the walls and prompts on every client agree with the server (code review S1, S2).
+  - **👋 Ask to leave**: while anyone is in the yard, beside 🚪 Close gate, the owner can walk one visitor out kindly; that visitor can't come back for 120 s (`askLeaveSeconds`) (code review S3; built, not deferred).
+  - **The owner's display name is shown to strangers** on the barns list, the arrival banner and the pin toast. It matches the barn sign everyone can already see (UI/UX §3d); votes-systems' "no names of non-friends" is read as no names of *visitors* (the owner's cheer toast has no name) (code review N4).
+  - **Arrival**: lands at the gate on Barn Lane (never inside), a `gate_bell` and "Welcome to Mia's barn!" banner for 2.5 s, not repeated within 20 s for the same barn.
+  - **The 4-stop walkaround** with a Tour pin: Rosette Wall, The horses, Their yard, and the Legend paddock when the owner has a Legend, else Their garden. At each stop a gold outline on the featured object for 1.2 s and a 12-particle sparkle (outline only under Reduced Motion). A sent cheer floats its emoji up from the barn door with `clap` (🎉: `tap_good`) (feel consult must-fixes 1–3).
+  - Switches: `visit.everyone = false` (Everyone here reads as Friends), `visit.askOnce = false`.
+- Alternatives: friends only (D-060; David asked for more); a list of all barns with the full friend actions (stranger treats and carrots: alt-account farming, D-014, and gifting to strangers); a forced one-time choice with no "Not now" (a kid opening the list to go visiting may read "Everyone" as "let me see everyone's barns"); treating "the call returned" as policy OK (the first build; replaced by the two fields); deferring Ask to leave (three of four votes asked for it); hiding the owner's name from strangers (it's already on the barn sign).
+- Consequences: David's "go around and visit other users' stables" works for anyone in the server whose owner opts in, behind Roblox's content-sharing policy. Kid-safety change for David's review: a stranger can now teleport to an Everyone-here barn's gate. Mitigations: Friends by default, Nobody, Ask to leave, Close gate, a once-a-second sweep that walks out anyone not let in, no text and no stranger gifts.
+- Links: `docs/reviews/fun-and-return-2026-10-12/` (brief, consensus, proposal-*, votes-*, phase5-code-review, consult-phase5-feel), `docs/research/2026-10-12-fun-and-return.md`, D-042, D-060, game/PLAYTEST.md "Visiting other stables (D-079)"
+- Built (2026-10-12, uncommitted; not yet played in Studio): `VisitService.server.luau`, `VisitTour.client.luau` (new; untracked until commit), `Visits.luau`, `VisitAccess.luau`, `VisitClient`, `WorldClient`, `StableService`, `SettingsService`, `CareService`, `Profile`, GrownUps (parents' page), `visit_tests.luau`. At commit (code review B1): add the two new files and commit with phases 3–4, since `Profile.luau` and `StableService` now require `Legs`, `Ageing` and `HorseLook`.
+- Still open: the old pat-all-horses Tour stamp is still reachable by firing `VisitCare "pat"` by hand (N3); `stop` returns ok with an empty list at the 50-barn cap (N2); the PLAYTEST cheer line wording (N5); feel nice-to-haves (stall horses greet visitors, a pin confetti, the cheer emoji over the owner's own door).
+
+## Fun-and-return run: deferred and not built (2026-10-12)
+Not a decision of its own; recorded so the next build knows what was left out (`consensus.md`).
+- **Deferred to the next build:** named prestige races (the "💐 Big Race" step, `classes.starIsRace`) with the winner's circle and the 10-credit trophy retexture; rival bots; the arrival fly-in; ambient life; the retirement ceremony; breeding (D-047); D-072 phase B (the stored move); D-073 Hurdles.
+- **Not built: Derby Day** (gameplay's Saturday event; opposed by 3 of 4 designers, feel, systems and UI/UX: a weekday event teaches "come back Saturday", mild FOMO, hard rule 3). Revisit after named races exist.
+- **Meshy:** 0 credits this run (cap 15 of a 60-credit balance); the signpost, wraps and Veteran look are built in code.

@@ -13,6 +13,9 @@
 -- AAA Phase 4 (D-069): the stars count in one by one as the card shows (Card.setRide; RacePresent.starSteps),
 -- each with a rising tick (finish.starTick); under Reduced Motion they show at once. Ribbon colours from
 -- ART_DIRECTION.
+-- Fun-and-return phase 2 (D-076): under your ride, "🏆 Cup +6" with the Cup bar filling from before to
+-- after (one tick per point, at most cupBar.ticksMax; Reduced Motion: it just shows; never a number of
+-- points left), then the class path's next goal ("💐 Top Horse: 2 more wins"). Never delays Race again.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -108,6 +111,24 @@ Card.tripRowLine = cardText(20, Card.GOOD) -- the switch-back only: D-054's "Goo
 Card.rideLine = cardText(26, Card.WARM)
 Card.rideLine.Font = Enum.Font.GothamBlack
 Card.gainLine = cardText(18)
+-- (D-076) the Cup bar row: words on the left, the bar on the right inside the same line
+Card.cupLine = cardText(18, INK, Enum.TextXAlignment.Left)
+Card.cupLine.Font = Enum.Font.GothamBlack
+local cupBar = Instance.new("Frame")
+cupBar.AnchorPoint = Vector2.new(1, 0.5)
+cupBar.Size, cupBar.Position = UDim2.new(0.5, 0, 0, 14), UDim2.new(1, 0, 0.5, 0)
+cupBar.BackgroundColor3 = Ui.colors.white
+cupBar.ZIndex = 4
+Ui.corner(cupBar, 7)
+Ui.stroke(cupBar, 1.5)
+cupBar.Parent = Card.cupLine
+local cupFill = Instance.new("Frame")
+cupFill.Size = UDim2.fromScale(0, 1)
+cupFill.BackgroundColor3 = Ui.colors.teal
+cupFill.ZIndex = 5
+Ui.corner(cupFill, 7)
+cupFill.Parent = cupBar
+Card.nextLine = cardText(16, Ui.colors.plum)
 local divider = Instance.new("Frame")
 divider.Size = UDim2.new(1, -2 * PAD, 0, 2)
 divider.BackgroundColor3 = INK
@@ -203,7 +224,7 @@ local function stackLines(x: number, y: number, colW: number): number
 		head.Position = UDim2.fromOffset(hx, y)
 		y += rowH + 6
 	end
-	for _, l in { Card.cheerText, Card.rankText, Card.tripRowLine, Card.rideLine, Card.gainLine } do
+	for _, l in { Card.cheerText, Card.rankText, Card.tripRowLine, Card.rideLine, Card.gainLine, Card.cupLine, Card.nextLine } do
 		local h = textHeight(l, colW)
 		l.Visible = h > 0
 		if h > 0 then
@@ -329,6 +350,44 @@ function Card.setRide(stars: number?)
 	end
 end
 
+-- (D-076) the Cup bar for your row of the summary (row.points, cupFrom, cupTo, cupOpen, classNext from
+-- RaceService), or nothing (Practice, a move up, the top league). The fill runs when the card shows.
+local cup = { from = 0, to = 0, points = 0, token = 0 }
+local CUP = GameConfig.cupBar or {}
+function Card.setCup(row: any?)
+	cup.token += 1
+	if not row or row.cupFrom == nil or CUP.enabled == false or CUP.results == false then
+		Card.cupLine.Text, Card.nextLine.Text = "", ""
+		return
+	end
+	cup.from, cup.to, cup.points = row.cupFrom, row.cupTo or row.cupFrom, row.points or 0
+	cup.open = row.cupOpen == true
+	Card.cupLine.Text = if cup.open then "🏆 Cup open!" elseif cup.points > 0 then string.format("🏆 Cup +%d", cup.points) else "🏆 Cup"
+	Card.nextLine.Text = row.classNext or ""
+	cupFill.Size = UDim2.fromScale(math.clamp(cup.from, 0.03, 1), 1)
+	cupFill.BackgroundColor3 = if cup.open or cup.to >= 1 then Ui.colors.gold else Ui.colors.teal
+end
+local function fillCup(still: boolean)
+	cup.token += 1
+	local token = cup.token
+	local target = UDim2.fromScale(math.clamp(cup.to, 0.03, 1), 1)
+	if still or cup.to <= cup.from then
+		cupFill.Size = target
+		return
+	end
+	local seconds = CUP.fillSeconds or 0.6
+	TweenService:Create(cupFill, TweenInfo.new(seconds, Enum.EasingStyle.Quad), { Size = target }):Play()
+	local ticks = math.min(cup.points, CUP.ticksMax or 10)
+	local speeds = CUP.tickSpeeds or { 1.0, 1.3 }
+	for k = 1, ticks do
+		task.delay(seconds * (k - 1) / math.max(1, ticks), function()
+			if token ~= cup.token or not results.Visible or not Sound then return end
+			local f = if ticks > 1 then (k - 1) / (ticks - 1) else 1
+			Sound.play(CUP.tick or "tap_ok", 0.6, nil, speeds[1] + (speeds[2] - speeds[1]) * f)
+		end)
+	end
+end
+
 -- Show it: the world dims (if it hasn't for the finish moment) and the card rises in (Reduced
 -- Motion: it just shows). The stars count in.
 function Card.show(still: boolean)
@@ -336,6 +395,7 @@ function Card.show(still: boolean)
 	Card.shownAt = os.clock()
 	ride.still = still
 	countStars()
+	if Card.cupLine.Text ~= "" then fillCup(still) end
 	if not still then
 		local to = card.Position
 		card.Position = to + UDim2.fromOffset(0, 30)

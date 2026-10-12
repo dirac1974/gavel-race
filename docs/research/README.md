@@ -4,6 +4,7 @@ Notes by `roblox-researcher`, newest first. Each note: question, short answer, e
 
 | Date | Topic | File |
 | --- | --- | --- |
+| 2026-10-12 | Fun and return: pet and horse games, life stages, the vet without injury, class ladders, visiting strangers safely, queues, phone UI; input to the fun-and-return run (D-075 to D-079) | [2026-10-12-fun-and-return.md](2026-10-12-fun-and-return.md) |
 | 2026-10-07 | Retention, horse life (ageing, rest and vet, selling), visits, classes and the queue, kid-clear UI; input to debate 013 | [2026-10-07-retention-and-horse-life.md](2026-10-07-retention-and-horse-life.md) |
 | 2026-10-07 | Systems audit: owner themes against the code, clarity problems, code risks (input to debate 013) | [2026-10-07-systems-audit.md](2026-10-07-systems-audit.md) |
 | 2026-10-05 | Race steering calibration (D-054 stage S0, by the model engineer): tuned values and the acceptance report | [steering-calibration.md](steering-calibration.md) |

@@ -69,6 +69,7 @@ local Ghost = require(Shared:WaitForChild("Ghost"))
 local RideTogether = require(Shared:WaitForChild("RideTogether"))
 local TapTime = require(Shared:WaitForChild("TapTime"))
 local Spa = require(Shared:WaitForChild("Spa"))
+local Legs = require(Shared:WaitForChild("Legs")) -- the Cool-down Check (fun-and-return phase 3, D-077)
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Ghosts = require(script.Parent:WaitForChild("Ghosts"))
 local TrainingFriends = require(script.Parent:WaitForChild("TrainingFriends"))
@@ -93,6 +94,8 @@ local TrainTogether = Profiles.remote("TrainTogether")       -- server -> riders
 local VetVisit = Profiles.remote("VetVisit")       -- client -> server: horseId, score
 local SpaStart = Profiles.remote("SpaStart")       -- client -> server: horseId (the Spa Day begins)
 local SpaDone = Profiles.remote("SpaDone")         -- client -> server: horseId (hose, brush and towel done)
+local VetCheckStart = Profiles.remote("VetCheckStart") -- client -> server: horseId (the Cool-down Check begins, D-077)
+local VetCheckDone = Profiles.remote("VetCheckDone")   -- client -> server: horseId, wrap colour (all 4 steps done)
 local TrainStart = Profiles.remote("TrainStart")   -- client -> server: horseId, course
 local TrainBegin = Profiles.remote("TrainBegin")   -- server -> client: course, seed, countdown seconds
 local TrainEnd = Profiles.remote("TrainEnd")       -- server -> client: result
@@ -114,6 +117,8 @@ local lastTrain: { [Player]: number } = {}
 local lastVet: { [Player]: number } = {}
 local spaStarted: { [Player]: { id: string, at: number } } = {}
 local lastSpa: { [Player]: number } = {}
+local vetStarted: { [Player]: { id: string, at: number } } = {}
+local lastVetCheck: { [Player]: number } = {} -- its own throttle (not the Spa's)
 local sessions: { [Player]: any } = {}
 local history: { [Player]: { number } } = {}
 local pending: { [Player]: boolean } = {}
@@ -821,9 +826,45 @@ SpaDone.OnServerEvent:Connect(function(player: Player, horseId: any)
 	end
 end)
 
+-- The Cool-down Check (D-077): free, at the Vet, not racing, taken only vetCheck.minSeconds (less the
+-- lag allowance) after it began. A fresh run and wraps for the next legs.wrapRaces races. Never Rating,
+-- bond, Energy or cash; no Diamonds anywhere.
+local function vetCheckFor(player: Player, horseId: any)
+	local h = horseFor(player, horseId)
+	if not h or not GameConfig.vetCheck.enabled or not Legs.enabled() then return nil end
+	if racing(player) then return nil end
+	if not near(player, "vet", 30) then
+		Profiles.notify(player, "Vet checks happen at the Vet!", "map_vet")
+		return nil
+	end
+	return h
+end
+
+VetCheckStart.OnServerEvent:Connect(function(player: Player, horseId: any)
+	if os.clock() - (lastVetCheck[player] or 0) < 1 then return end
+	lastVetCheck[player] = os.clock()
+	if vetCheckFor(player, horseId) then vetStarted[player] = { id = horseId, at = os.clock() } end
+end)
+
+VetCheckDone.OnServerEvent:Connect(function(player: Player, horseId: any, colour: any)
+	local started = vetStarted[player]
+	vetStarted[player] = nil
+	local cfg = GameConfig.vetCheck
+	if not started or started.id ~= horseId or os.clock() - started.at < cfg.minSeconds - cfg.lagAllowance then
+		if horseFor(player, horseId) then Profiles.notify(player, "Let's do the vet check again!", "map_vet") end
+		return
+	end
+	local h = vetCheckFor(player, horseId)
+	if not h then return end
+	Legs.vetDone(h, if typeof(colour) == "string" then colour else nil)
+	Profiles.notify(player, Legs.freshLine(h.name), "stethoscope")
+	Profiles.changed(player)
+end)
+
 Players.PlayerRemoving:Connect(function(player: Player)
 	lastTrain[player], lastVet[player] = nil, nil
 	spaStarted[player], lastSpa[player] = nil, nil
+	vetStarted[player], lastVetCheck[player] = nil, nil
 	if sessions[player] then restGroup(player, sessions[player]) end
 	sessions[player], history[player], pending[player], cards[player] = nil, nil, nil, nil
 	quick[player], lastAsk[player] = nil, nil

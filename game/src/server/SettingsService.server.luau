@@ -1,6 +1,8 @@
 --!nonstrict
 -- SettingsService (D-042, D-045, D-049): the owner's own settings and the gentle extras.
---   Stable visits: Friends (default) or Nobody (D-042); the plot's walls follow it.
+--   Stable visits: Friends (default), Everyone here or Nobody (D-042, D-079); the plot's walls follow
+--   it. "visitAsk" is the barns list's one-time "Let other riders visit?" (Friends or Everyone only,
+--   once; never over a Nobody someone already chose). Any visits choice counts as asked.
 --   Break reminder: optional, off by default (D-045).
 --   Sound: on by default; Off mutes the client's effects and announcer (Sound.luau).
 --   Seen (D-075): the "New!" pointers and the queue card's ❓ strip, each shown once (FindIt.SEEN_IDS).
@@ -23,7 +25,8 @@ local SetSetting = Profiles.remote("SetSetting")   -- client -> server: key, val
 local TourSkip = Profiles.remote("TourSkip")       -- client -> server
 local BoardOpened = Profiles.remote("BoardOpened") -- client -> server: the Stable Board was opened (tour step)
 
-local VISITS = { Friends = true, Nobody = true }
+local VISITS = { Friends = true, Everyone = true, Nobody = true } -- (D-079) Everyone here
+local ASK = { Friends = true, Everyone = true } -- the one-time ask offers these two
 local last: { [Player]: number } = {}
 
 local function week(t: number): number
@@ -82,6 +85,11 @@ SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
 	ensure(data)
 	if key == "visits" and typeof(value) == "string" and VISITS[value] then
 		data.settings.visits = value
+		data.settings.visitAsked = true
+	elseif key == "visitAsk" and typeof(value) == "string" and ASK[value] then
+		if data.settings.visitAsked then return end -- asked once; ⚙️ changes it after that
+		if data.settings.visits ~= "Nobody" then data.settings.visits = value end
+		data.settings.visitAsked = true
 	elseif key == "breakReminder" and typeof(value) == "boolean" then
 		data.settings.breakReminder = value
 	elseif key == "sound" and typeof(value) == "boolean" then

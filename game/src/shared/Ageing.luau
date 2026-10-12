@@ -107,4 +107,58 @@ function Ageing.trainMult(n: any, cfg: any?): number
 	return if races(n) < c.youngRaces then c.youngTrainMult else 1
 end
 
+-- On a horse record (fun-and-return phase 4, D-078) -------------------------------------------------
+Ageing.STAGES = { "Young", "Prime", "Veteran", "Legend" }
+Ageing.EMOJI = { Young = "🍼", Prime = "💪", Veteran = "🦉", Legend = "👑" }
+
+-- h.ageing = { declineFrom = n? }: repaired on load (older saves have none: not at its peak yet).
+function Ageing.ensure(h: any): any
+	local a = if typeof(h.ageing) == "table" then h.ageing else {}
+	local f = tonumber(a.declineFrom)
+	a.declineFrom = if f and f == f and f >= 0 and f < 1e9 then math.floor(f) else nil
+	h.ageing = a
+	return a
+end
+
+function Ageing.declineFromOf(h: any): number?
+	return Ageing.ensure(h).declineFrom
+end
+
+-- After a counted race: store declineFrom the first time the horse is a Veteran at its peak.
+function Ageing.note(h: any, cfg: any?): number?
+	local a = Ageing.ensure(h)
+	a.declineFrom = Ageing.updateDeclineFrom(a.declineFrom, h.record and h.record.races or 0, h.stats or {}, h.potential or {}, cfg)
+	return a.declineFrom
+end
+
+-- What the owner's card shows: the stage, "Veteran in N races" (veteranSoon), the kind warning 10
+-- races before the first decline step, "at full strength" once declineFrom is stored (before any
+-- step), and the steps taken. Never a Rating number.
+function Ageing.view(h: any, cfg: any?): { [string]: any }
+	local c = cfgOf(cfg)
+	local n = races(h.record and h.record.races or 0)
+	local from = Ageing.declineFromOf(h)
+	local steps = if c.declineScale > 0 then Ageing.declineSteps(n, from, c) else 0
+	local warn = steps == 0 and Ageing.declineWarning(n, from, c)
+	return {
+		stage = Ageing.stage(n, h.legend ~= nil and h.legend ~= false, c),
+		toVeteran = if Ageing.veteranSoon(n, c) then c.veteranAt - n else nil,
+		warning = warn,
+		peak = from ~= nil and steps == 0 and not warn,
+		steps = steps,
+		young = n < c.youngRaces,
+	}
+end
+
+-- Kind words (the copy test reads these).
+function Ageing.warnLines(name: string): (string, string)
+	return "🦉 " .. name .. " is getting wise", "Soon a little slower"
+end
+function Ageing.peakLine(name: string): string
+	return "💪 " .. name .. " is at full strength!"
+end
+Ageing.WISE_LINE = "🦉 Wise and steady"
+Ageing.YOUNG_LINE = "🍼 Young: training grows faster!"
+Ageing.PRACTICE_LINE = "Equal in Practice!"
+
 return Ageing

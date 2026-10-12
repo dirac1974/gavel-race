@@ -33,6 +33,7 @@ local Unretire = Profiles.remote("UnretireHorse")  -- client -> server: horse id
 local Rehome = Profiles.remote("RehomeHorse")      -- client -> server: horse id (at the Market Corral, D-059)
 local UndoRehome = Profiles.remote("UndoRehome")   -- client -> server: horse id (within rehome.undoHours)
 local RehomeResult = Profiles.remote("RehomeResult") -- server -> client: the goodbye card { name, coat, id, cash, rosette, days }
+local LendHorse = Profiles.remote("LendHorse")      -- client -> server: horse id, true = lend / false = take home (D-078)
 local Leagues = require(Shared:WaitForChild("Leagues"))
 
 local last: { [Player]: number } = {}
@@ -112,14 +113,15 @@ Profiles.addDecorator(function(data, view)
 		canTame = (Market.canTame(data, now)),
 		maxHorses = Market.MAX_HORSES,
 	}
-	-- Rehoming (D-059): what the school would pay for each horse, or why it stays (busy checks
-	-- happen on the server when it's asked).
+	-- The Riding School (D-059, D-078): what a sale pays for each horse (half the price + the record
+	-- bonus), or why it stays, and why it can't be lent (busy checks happen on the server when asked).
 	Market.pruneRehomed(data, now)
 	for i, hv in view.horses or {} do
 		local h = data.horses[i]
 		if h and h.id == hv.id then
 			hv.rehomeValue = Market.rehomeValue(h)
 			hv.rehomeBlock = Market.rehomeBlock(data, h.id, {}, now)
+			hv.lendBlock = if h.lent == nil then Market.lendBlock(data, h.id, {}) else nil
 		end
 	end
 end, "market")
@@ -263,15 +265,12 @@ LegendAsked.OnServerEvent:Connect(function(player: Player, id: any)
 	if data and Leagues.markAsked(data, id) then Profiles.changed(player) end
 end)
 
--- Rehoming (D-059): at the Market Corral only; undo anywhere within rehome.undoHours.
+-- Selling at the Riding School (D-059, D-078): from the card at the corral or on My Horses; undo
+-- anywhere within rehome.undoHours.
 Rehome.OnServerEvent:Connect(function(player: Player, id: any)
 	if busy(player, 1, "rehome") or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
-	if not atCorral(player) then
-		Profiles.notify(player, "Rehoming happens at the Market Corral", "map_fair")
-		return
-	end
 	local ok, msg, info = Market.rehome(data, id, os.time(), busyState(player))
 	if not ok then
 		Profiles.notify(player, msg, "heart")
@@ -293,8 +292,84 @@ UndoRehome.OnServerEvent:Connect(function(player: Player, id: any)
 	end
 end)
 
+-- Lending (D-078): free, take back any time; the horse stays yours and stands at the school.
+local schoolDirty = true
+LendHorse.OnServerEvent:Connect(function(player: Player, id: any, lend: any)
+	if busy(player, 1, "lend") or typeof(id) ~= "string" or typeof(lend) ~= "boolean" then return end -- (S5) only true / false
+	local data = Profiles.get(player)
+	if not data then return end
+	local ok, msg
+	if lend == false then
+		ok, msg = Market.takeBack(data, id)
+	elseif lend == true then
+		ok, msg = Market.lend(data, id, os.time(), busyState(player))
+	end
+	Profiles.notify(player, msg, "heart")
+	if ok then
+		schoolDirty = true
+		Profiles.changed(player)
+	end
+end)
+
+-- Lent horses stand by the school sign (at most lend.shownMax from this server), each with its name.
+local schoolFolder: Folder? = nil
+local schoolKey = ""
+local function buildSchool()
+	schoolDirty = false
+	local list = {}
+	local keys = {}
+	for _, pl in Players:GetPlayers() do
+		local data = Profiles.get(pl)
+		for _, h in (data and Profile.lent(data)) or {} do
+			if #list < (GameConfig.lend.shownMax or 6) then
+				table.insert(list, h)
+				table.insert(keys, pl.UserId .. h.id .. h.coat .. h.name)
+			end
+		end
+	end
+	local key = table.concat(keys, "|")
+	if key == schoolKey and (schoolFolder == nil or schoolFolder.Parent ~= nil) then return end
+	schoolKey = key
+	if schoolFolder then schoolFolder:Destroy() end
+	schoolFolder = nil
+	if not (GameConfig.lend and GameConfig.lend.enabled) or #list == 0 then return end
+	local world = workspace:FindFirstChild("World")
+	if not world then return end
+	local f = Instance.new("Folder")
+	f.Name = "SchoolHorses"
+	local p = WorldLayout.places.market
+	local shown = 0
+	do
+		for _, h in list do
+			shown += 1
+			local x, z = p.x + p.w / 2 - 12 - shown * 7, p.z + 24
+			local cf = CFrame.lookAt(Vector3.new(x, WorldScene.GROUND_Y, z), Vector3.new(x, WorldScene.GROUND_Y, p.z - 10))
+			local m = WorldScene.model("horse_stand_" .. h.coat) or WorldScene.model("horse_gallop_" .. h.coat) or WorldScene.model("horse_" .. h.coat)
+			if m then
+				m.Name = "School_" .. h.id
+				m:PivotTo(cf)
+				for _, d in m:GetDescendants() do
+					if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
+				end
+				m.Parent = f
+			end
+			WorldScene.sign(f, (cf * CFrame.new(0, WorldScene.GROUND_Y + 8, 0)).Position, cf.LookVector, h.name, "🏫", 6, 1.6)
+		end
+	end
+	f.Parent = world
+	schoolFolder = f
+end
+Profiles.Changed.Event:Connect(function() schoolDirty = true end)
+Players.PlayerRemoving:Connect(function() schoolDirty = true end)
+task.spawn(function()
+	while true do
+		task.wait(3)
+		if schoolDirty then pcall(buildSchool) end
+	end
+end)
+
 Players.PlayerRemoving:Connect(function(player: Player)
-	for _, k in { "market", "tame", "rename", "retire", "asked", "rehome", "undo" } do last[k .. ":" .. player.UserId] = nil end
+	for _, k in { "market", "tame", "rename", "retire", "asked", "rehome", "undo", "lend" } do last[k .. ":" .. player.UserId] = nil end
 end)
 
 -- Build the corral now, rebuild when models load and when the week turns.

@@ -496,6 +496,44 @@ GameConfig.visit = {
 	nearStuds = 30,           -- how far outside a friend's plot still counts as "at their barn"
 	travelGapSeconds = 3,     -- between two visits by the Friends' barns list
 	listMax = 12,             -- faces on the Friends' barns list
+	-- Visiting other stables (D-079). everyone: owners may choose "Everyone here" (false: it reads as
+	-- Friends). askOnce: "Let other riders visit?" the first time the barns list opens. Strangers may
+	-- look, walk the tour, pat and cheer; treats and the post box stay friends-only (Visits.may).
+	everyone = true,
+	askOnce = true,
+	helloGapSeconds = 0.5,    -- the server's gap between two pats, cheers or tour stops from one visitor
+	cheersPerBarnPerDay = 3,  -- preset cheers one visitor can send one barn a day
+	ownerCheerGapSeconds = 30, -- the owner's anonymous "A visitor cheered!" toast, at most this often
+	arriveCheckSeconds = 1,   -- how often the server looks for visitors walking into a barn
+	bannerSeconds = 2.5,      -- the arrival banner, then it fades
+	bellVolume = 0.4,         -- gate_bell on arrival (existing SoundSheet clip)
+	bellSpeed = 1.3,
+	stopStuds = 16,           -- the server: this near a tour stop counts as there
+	stopArriveStuds = 10,     -- the client: this near a stop sends it (inside stopStuds)
+	-- The walkaround's stops as (inward from the lane, across) on the plot (StableService's plotCF), where
+	-- you stand, and lookIn/lookAcross, the thing it features (outlined when you get there): the Rosette
+	-- Wall (52, 12), the stall fronts (barn front 88), the yard props where Barn Builder pieces stand
+	-- (82, 35), and the 4th: the Legend paddock's arch (62, -22) with a Legend, else the garden beds
+	-- (inward 26-54, across -35). Visits.stopsFor picks the 4.
+	tourStops = {
+		{ id = "wall", inward = 44, across = 12, lookIn = 52, lookAcross = 12 },
+		{ id = "horses", inward = 78, across = 0, lookIn = 88, lookAcross = 0 },
+		{ id = "decor", inward = 72, across = 28, lookIn = 82, lookAcross = 35 },
+		{ id = "paddock", inward = 56, across = -22, lookIn = 71, lookAcross = -22 },
+		{ id = "garden", inward = 40, across = -26, lookIn = 40, lookAcross = -35 },
+	},
+	lookStuds = 14,           -- the featured object is the barn piece nearest the look point, this near
+	-- PolicyService (VisitAccess): one retry this long after a failed read; until then strangers are out.
+	policyRetrySeconds = 10,
+	arriveRepeatSeconds = 20, -- walking back into the same barn this soon: no second bell or banner (N1)
+	-- Ask to leave (code review S3): the owner walks one visitor out; they can't come back in for this long.
+	askLeaveSeconds = 120,
+	askLeaveGapSeconds = 1,   -- the server's gap between two of one owner's asks
+	-- A tour stop in the world (feel consult): a gold sparkle and a gold outline on the featured thing.
+	stopFx = { sparkles = 12, sparkleLife = 0.8, sparkleSpeed = 6, color = "FFD23F", highlightSeconds = 1.2, fadeSeconds = 0.3 },
+	-- A sent cheer (feel consult): its emoji floats up from the barn door (door at plot inward 88, across 0).
+	cheerFx = { px = 64, startStuds = 4, riseStuds = 3, seconds = 1.2, fadeSeconds = 0.4, volume = 0.4, yaySpeed = 1.2,
+		doorIn = 88, doorAcross = 0 },
 }
 -- Riding your own horse (D-056).
 GameConfig.riding = {
@@ -574,7 +612,21 @@ GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 200, Silver = 450, Gold
 -- (fewer than risingStarBelow), Open, or Cup when its Cup is open. Labels only: one queue per
 -- league, no demotion, never a change to win chance.
 GameConfig.firstWinBonus = 10
-GameConfig.classes = { risingStarBelow = 3 }
+GameConfig.classes = { risingStarBelow = 3,
+	-- Visible progress (fun-and-return phase 2, D-076): the class path on the horse card and the results
+	-- card, First Win -> Rising Star -> Open -> Top Horse -> Cup. topWins: wins in the league for the
+	-- Top Horse step. starIsRace = true (once the named prestige races exist) calls that step Big Race.
+	-- path = false hides the path and the Cup bar.
+	path = true, topWins = 5, starIsRace = false }
+-- The Cup bar (D-076): League Points shown as a bar, never a number (D-064 hid "pts"). On the results
+-- card the bar fills from before to after with one tick per point (at most ticksMax, speeds rising
+-- tickSpeeds[1] -> [2]) over fillSeconds; under Reduced Motion it just shows. results = false: horse card only.
+GameConfig.cupBar = { enabled = true, results = true, ticksMax = 10, tickSpeeds = { 1.0, 1.3 }, fillSeconds = 0.6, tick = "tap_ok" }
+-- The class-up ceremony at the Rosette Wall (D-076): when a horse's class path step rises, the next time
+-- you're within nearStuds of your Rosette Wall (never racing, in line or on the results card) a sparkle
+-- bursts on the wall with sound (tap_good, then clap x claps) and one line, for at most seconds; any tap skips.
+-- It never touches Race again. enabled = false: no ceremony (the path still moves).
+GameConfig.classUp = { enabled = true, seconds = 3.5, nearStuds = 40, sound = "tap_good", clap = "clap", claps = 3, sparkles = 40 }
 -- League ceilings (D-046): a horse whose best base Rating passes this has its Cup opened and
 -- its league's regular races closed. The Cup winner gets cupPurseB × B (D-048).
 -- AAA Phase 3 (D-068): an average kid wins about 36% at each ceiling, and they rise league to
@@ -626,7 +678,7 @@ GameConfig.firstMinute = {
 }
 -- One card at a time at the top centre (Ui.slot): the highest priority that wants the spot shows;
 -- toasts stack below whatever card is up. raceTime: the queue card's "Race time!" outranks the tour.
-GameConfig.topSlot = { tour = 30, queueCard = 20, raceTime = 40, gapPx = 8, sideReservePx = 134 }
+GameConfig.topSlot = { tour = 30, queueCard = 20, raceTime = 40, visit = 10, gapPx = 8, sideReservePx = 134 } -- visit: the visitor bar (D-079), under every other card
 
 -- Macro detection (D-022). Log only until a month of real data sets the threshold.
 GameConfig.integrity = {
@@ -742,6 +794,46 @@ GameConfig.sell = {
 	perCup = 100,
 	recordBonusCap = 100,            -- < half the cheapest Market horse (250): a sale never pays more than the price
 }
+
+-- Lending to the Riding School (fun-and-return phase 4, D-078): free, take back any time. A lent horse
+-- stays yours (never deleted) but leaves your racing roster: no stall, no races, shown at the school
+-- by the Market Corral (at most shownMax horses from this server stand there).
+GameConfig.lend = { enabled = true, shownMax = 6 }
+
+-- Legs and the vet (fun-and-return phase 3, D-077; David's decision: over-running can need the vet).
+-- Counted races in a row on one horse (Practice never counts). warnAt: the "🧣 Worked hard! Cool-down soon" chip;
+-- runLimit: RACE! becomes 🩺 VET CHECK for rated races (Practice stays open) and the server turns rated
+-- joins away. Feed or groom: -careLowers, once per kind per horse per careCooldownSeconds
+-- (= energy.careCooldownSeconds). restSeconds without a counted race on that horse, the Spa, a training
+-- session or the Cool-down Check reset it. The run only grows after the horse's first fromRaces counted
+-- races. Never Rating, bond, Energy or cash. Mirrors src/life_arc.py LEGS (tests/test_life_arc.py).
+-- enabled = false: no run, no chip, no VET CHECK.
+GameConfig.legs = {
+	enabled = true,
+	runLimit = 6,
+	warnAt = 5,
+	careLowers = 2,
+	restSeconds = 1800,
+	fromRaces = 26,
+	careCooldownSeconds = 7200,
+	wrapRaces = 3,                   -- the Cool-down Check's wraps show on the horse for this many races
+}
+-- The Cool-down Check at the Vet (D-077, the feel lead's B1): about 30 s in 4 tap steps (check each leg,
+-- cold hose hoseTaps per leg, soft wraps in a colour, a carrot). Free: no Green Cash, no Diamonds, no
+-- timer. The server takes it only minSeconds (less lagAllowance) after it started, at the Vet, not racing.
+-- wraps: the four wrap colours (hex). Sky-blue UI.
+GameConfig.vetCheck = { enabled = true, minSeconds = 12, lagAllowance = 1.5, hoseTaps = 3,
+	wraps = { "FF7EB6", "5BC0EB", "FFD23F", "7ED957" }, wrapNames = { "Pink", "Blue", "Gold", "Green" } }
+
+-- How a horse looks (D-077, D-078), built in code (0 Meshy): the Cool-down Check's leg wraps, and the
+-- Veteran look, a frosted muzzle and brows plus a silver-and-blue bridle rosette (gold on a Legend).
+-- The model faces -Z; positions are fractions of its bounding box (x across, y up from the ground, z
+-- along, - = front), tuned in Studio. veteranLook = false: no frost or rosette. wrapsInRace = false:
+-- wraps only in the stall and on rides (if race legs don't carry them).
+GameConfig.horseLook = { veteranLook = true, wrapsInRace = true, legendRosette = true,
+	frost = "E9ECEF", frostTransparency = 0.25, silver = "C0C7D4", blue = "2F6FDE", gold = "FFD23F",
+	muzzle = { x = 0, y = 0.70, z = -0.48, size = 0.11 }, brow = { x = 0.07, y = 0.86, z = -0.40, size = 0.05 },
+	rosette = { x = -0.09, y = 0.95, z = -0.36, size = 0.07 }, wrap = { from = 0.08, to = 0.38, grow = 1.18 } }
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
 -- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in
