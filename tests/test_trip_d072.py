@@ -299,7 +299,7 @@ def test_style_baseline_and_learner_floor_in_tau():
         trip.tau(trips, posts, base, CFG, None, [0.0] * 7)
 
 
-def learner_race(presses, learner=True, post=1, distance="Mile"):
+def learner_race(presses, learner=True, post=1, distance="Mile", lock_with=None):
     """A learner (manual) at `post` among bots on the dirt Mile (turn first), pressing `presses`
     ({tick: dir}); returns the state after the lock."""
     geo = trip.phase_a("dirt", distance)
@@ -313,7 +313,7 @@ def learner_race(presses, learner=True, post=1, distance="Mile"):
     for tick in range(ticks_to_lock(geo)):
         trip.step(st, setup["q"] if tick < 150 else setup["p1"],
                   [(post - 1, presses[tick])] if tick in presses else [], tick * DT, DT)
-    trip.lock(st)
+    trip.lock(st, lock_with)
     return st
 
 
@@ -331,7 +331,7 @@ def test_learner_floor_is_the_passive_race():
     passive, _ = taus(learner_race({}))
     bounds = learner_race({30: -1, 60: -1})  # on the rail: "bounds", nothing moves
     t_bounds, floors = taus(bounds)
-    assert bounds.presses[0] == 2 and floors[0] is not None
+    assert bounds.presses[0] == 2 and floors[0] is None and bounds.shadows == {}  # bounds forks no passive race
     assert t_bounds == passive  # no edge from pressing
     wide = learner_race({k: 1 for k in range(20, 120, 6)})  # out through the turn: loses ground
     raw = trip.tau(trip.trip_values(wide), wide.posts, [0.0] * 8, CFG, trip.brush_charges(wide))
@@ -339,6 +339,10 @@ def test_learner_floor_is_the_passive_race():
     assert raw[0] < passive[0] - 0.002  # the presses cost ground...
     assert t_wide[0] == pytest.approx(passive[0], abs=1e-15)  # ...which the floor gives back, no more
     assert t_wide[1:] == raw[1:]  # nobody else's tau moves
+    # lock(st, baseline) works the floors out and drops the passive races (Trip.lock in Luau)
+    again = learner_race({k: 1 for k in range(20, 120, 6)}, lock_with=[0.0] * 8)
+    assert again.shadows == {} and again.floors is not None
+    assert trip.learner_floors(again, [0.0] * 8) == trip.learner_floors(wide, [0.0] * 8)
     # not a learner: the presses count in full
     t_full, floors = taus(learner_race({k: 1 for k in range(20, 120, 6)}, learner=False))
     assert floors == [None] * 8 and t_full[0] == raw[0]

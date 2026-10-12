@@ -32,7 +32,7 @@ made before D-057).
 D-072 phase A (race realism, provisional): the blocks file (to the rail after the break), pack
 (running styles and drift on the skill target), pass (bots and idle Smart Steer riders move out to
 pass), doors (bots shut doors) and learner (no doors in a rider's first races, and its own presses can't lower its tau: a
-passive counterfactual race is forked at its first press).
+passive counterfactual race is forked at its first press that changes something).
 CONFIG runs them all; d072_off() / d057_config() switch them off (D-057's race exactly, records
 without the keys). Seven more uniforms per lane (after the two D-054 ones), a per-style baseline
 row (front, stalker, closer, rider) and fixed lanes per race (Hurdles: tau 0). The drift wave uses
@@ -174,6 +174,7 @@ D072_BLOCKS: Tuple[str, ...] = ("file", "pack", "pass", "doors")
 D072_UNIFORMS = 7  # per lane, after the two D-054 ones: style, drift (period, phase) x 2, pass, shut
 STYLES: Tuple[str, ...] = ("front", "stalker", "closer", "rider")  # baseline rows; riders run as stalkers
 LOCK_AT = ("farTurnEntry",)
+SHADOW_ANSWERS = ("accepted", "queued", "cancelled", "brush")  # the answers that fork a learner's passive race
 
 
 def d072_on(cfg: Dict) -> bool:
@@ -442,6 +443,7 @@ class TripState:
         self.presses: List[int] = []      # counted presses
         self.shadows: Dict[int, "TripState"] = {}  # learner lane -> its race without its own presses
         self.is_shadow = False
+        self.floors: Optional[List[Optional[float]]] = None  # learner floors, worked out at the lock (lock(st, baseline))
         self.pack_events: List[Tuple] = []  # (t, "out"|"pass"|"shut", horse, other, on a turn 0/1 or dir)
 
 
@@ -537,6 +539,7 @@ def new_state(posts: Sequence[int], q: Sequence[float], uniforms: Sequence[float
     st.pack_events = []
     st.shadows = {}
     st.is_shadow = False
+    st.floors = None
     smart, bots = cfg["smart"], cfg["bots"]
     fc = cfg["file"] if "file" in cfg else D072_OFF["file"]
     pk = cfg["pack"] if "pack" in cfg else D072_OFF["pack"]
@@ -1201,13 +1204,17 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
     n = st.n
     if len(live) != n:
         raise ValueError("one live chance per lane")
-    # D-072 learner floor: the first intent from a learner's lane forks its passive race (the state
-    # at the start of this tick, before any of its presses), which then runs on with every intent but
-    # that lane's. Existing shadows step first, in lane order.
+    # D-072 learner floor: a learner's first press that changes something (answered one of
+    # SHADOW_ANSWERS) forks its passive race: the state at the start of that tick, before any of its
+    # presses, which then runs on with every intent but that lane's. A tick with a learner's intent
+    # and no shadow yet takes a candidate copy first, kept only if one of its answers changes
+    # something. Existing shadows step first, in lane order; a new one steps at the end of the tick.
+    candidates: Dict[int, TripState] = {}
+    fresh: List[int] = []
     if not st.is_shadow:
         for lane_i, _d in intents:
-            if st.learner[lane_i] and lane_i not in st.shadows:
-                st.shadows[lane_i] = _fork(st)
+            if st.learner[lane_i] and lane_i not in st.shadows and lane_i not in candidates:
+                candidates[lane_i] = _fork(st)
         for k in sorted(st.shadows):
             step(st.shadows[k], live, [(a, b) for a, b in intents if a != k], t, dt)
     prev = list(st.off)  # where every horse was at the start of the tick (holds settle from here)
@@ -1259,6 +1266,9 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
             continue
         answer = accept_intent(st, lane_i, d, t)
         answers.append(answer)
+        if lane_i in candidates and answer in SHADOW_ANSWERS:
+            st.shadows[lane_i] = candidates.pop(lane_i)
+            fresh.append(lane_i)
         if answer == "accepted":
             tried[lane_i] = True
             _try_move(st, lane_i, st.want[lane_i], t, tucking, True)
@@ -1378,6 +1388,9 @@ def step(st: TripState, live: Sequence[float], intents: Sequence[Tuple[int, int]
         st.drafting[i] = tucked
         if tucked and st.draft[i] < cap:
             st.draft[i] = min(cap, st.draft[i] + rate * dte)
+    # D-072: shadows forked this tick take the tick now, without their own lane's intents.
+    for k in sorted(fresh):
+        step(st.shadows[k], live, [(a, b) for a, b in intents if a != k], t, dt)
     return answers
 
 
@@ -1393,14 +1406,19 @@ def _fork(st: TripState) -> TripState:
     return sh
 
 
-def lock(st: TripState) -> None:
+def lock(st: TripState, baseline: Optional[Sequence[float]] = None, row: Optional[Sequence[float]] = None) -> None:
     """The far-turn bell: book the far turn from each horse's lane position, freeze the trip.
     Waiting presses and any steadying after a brush clear; brush charges are fixed. Learners'
-    passive races lock too."""
+    passive races lock too. With baseline (the per-post row; row = the style row, used while D-072
+    is on), the learner floors are worked out now and the shadows dropped (Trip.lock in a race from
+    Trip.start): nothing keeps a copy of the race past the bell; learner_floors returns st.floors."""
     if st.locked:
         return
     for k in sorted(st.shadows):
         lock(st.shadows[k])
+    if baseline is not None and not st.is_shadow and st.shadows:
+        st.floors = learner_floors(st, baseline, row if d072_on(st.cfg) else None)
+        st.shadows = {}
     g = 0.0 if st.fixed else st.cfg["groundPerLaneTurn"]
     for i in range(st.n):
         st.ground[i] = st.ground[i] + g * (st.x[i] - 1)
@@ -1446,6 +1464,8 @@ def learner_floors(st: TripState, baseline: Sequence[float], row: Optional[Seque
     move its tau down by at most -tauFloor (0: never), and pressing never helps by itself (a press
     that changes nothing leaves the two races equal). baseline = the per-post row, row = the style
     row (None: no style term), as tau gets them."""
+    if st.floors is not None:
+        return list(st.floors)
     out: List[Optional[float]] = [None] * st.n
     for k in sorted(st.shadows):
         sh = st.shadows[k]

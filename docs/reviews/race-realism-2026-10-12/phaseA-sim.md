@@ -1,5 +1,33 @@
 # Race realism phase A (D-072): Python sims, interim (2026-10-12)
 
+**Update after the rulings (phaseA-rulings.md) and the code review.** The rulings and review fixes are in the Python model. The second `--write --jobs 3` was also stopped for low memory, so nothing below has been remeasured at full size. Changes since the tables below:
+- **Learner floor.** It is now the passive counterfactual: a forked race without the learner's own presses. A bounds or no-op press leaves τ exactly equal to the passive τ.
+- **Closing cap.** `pass.closingFeetPerSecond` 6 with `alongFeet` 8. Over 96 bot-field races (267 passes) the shortest completed pass kept the two horses alongside 2.1 s, with 0 overlaps.
+- **Retuned keys.** `weaveWindowSeconds` 8 and `introRaces` 0. The switch-back restores 7 and 3.
+- **Ruled gates in `TARGETS_D072`:**
+
+| Gate | Target |
+| --- | --- |
+| Post bias, kid among bots | ≤ 0.002 (1,000 report races) |
+| Post bias, all-Smart | ≤ 0.003, reported only |
+| Passive kid mean | 0 ± 0.003 |
+| Inward press | ≥ 55% within 3 s, ≥ 85% within 6 s |
+| Masher reversals | ≤ 8 a minute (8.5 fallback) |
+| Trip passes a race | 1–10 Sprint, 3–10 elsewhere |
+| Drawn overtakes (1 length clear, held 2 s) | 3–15 a race |
+| Pass alongside | ≥ 0.8 s |
+
+- The rail-rider target is retired. The press-when-lit rider is reported only.
+
+**The write's memory (2026-10-12).** `sims/steering.py` now does three things:
+- workers hand back pickled chunks;
+- report and grief records stay pickled until each is read;
+- the baseline is run and calibrated one cell at a time.
+
+The output is byte-identical to before: `trip_baseline.json`, `steering_report.json` and `TripBaseline.luau` all match on a 50/50-race scratch run (`--out`).
+
+Peaks at full size are about 25 MB per worker; the parent holds one cell's rows (under 20 MB). A third full write (`--jobs 2`) was still stopped by the session's low-memory reaper during the baseline, with about 1 GB free machine-wide, so the full-size tables are still to come.
+
 **Status: interim.** The full calibration (`python sims/steering.py --write`, 2,000 baseline races per cell and post, about 2 h) was stopped by the machine running low on memory. The live baseline, the stored report, `TripBaseline.luau` and the parity fixtures are therefore still D-057's. The figures below come from runs that did finish:
 - a medium calibration (300 baseline races per cell and post, 150 report races per cell);
 - paired `sims/realism.py` runs.

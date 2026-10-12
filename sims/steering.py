@@ -48,6 +48,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import pickle
 import random
 import sys
 import time
@@ -188,6 +190,44 @@ def profile_config(profile: str) -> Dict:
     if profile == "d054":
         return trip.d054_config()
     raise ValueError(f"unknown profile {profile!r}")
+
+
+def _peak_mb() -> float:
+    """This process's peak working set in MB (Windows; 0 elsewhere). For --mem only."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+        pmc = PMC()
+        pmc.cb = ctypes.sizeof(PMC)
+        k32 = ctypes.WinDLL("kernel32")
+        psapi = ctypes.WinDLL("psapi")
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        psapi.GetProcessMemoryInfo(k32.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb)
+        return pmc.PeakWorkingSetSize / 2 ** 20
+    except Exception:  # noqa: BLE001 - not Windows
+        return 0.0
+
+
+def _mem(label: str) -> None:
+    """--mem: print this process's peak working set to stderr (never into any output)."""
+    if os.environ.get("STEERING_MEM"):
+        print(f"[mem] pid {os.getpid()} {label}: peak {_peak_mb():.0f} MB", file=sys.stderr, flush=True)
+
+
+OUT_DIR: Optional[Path] = None  # --out: write the files here instead (a scratch run)
+
+
+def _out(path: Path) -> Path:
+    return path if OUT_DIR is None else OUT_DIR / path.name
 
 
 def baseline_path(profile: str) -> Path:
@@ -599,6 +639,7 @@ def _baseline_chunk(args) -> List[Dict]:
         alls = run_race(geo, setup, ["smart"] * LANES, cfg)
         out.append({"sweep": [r["trip"] for r in res], "allsmart": alls["trip"],
                     "styles": [r["style"] for r in res], "allsmart_styles": alls["style"]})
+    _mem("baseline chunk")
     return out
 
 
@@ -671,6 +712,7 @@ def _report_chunk(args) -> List[Dict]:
         allsmart = run_race(geo, setup, ["smart"] * LANES, cfg)
         rec["allsmart_tau"] = _tau(allsmart, row, cfg, srow)
         out.append(rec)
+    _mem("report chunk")
     return out
 
 
@@ -708,6 +750,7 @@ def _grief_chunk(args) -> List[Dict]:
                              "boxed": res["boxed"], "seconds": res["seconds"]}
             rec[kid_pol] = per
         out.append(rec)
+    _mem("grief chunk")
     return out
 
 
@@ -732,6 +775,7 @@ def _stress_chunk(args) -> Dict:
         res["min_gap"] = min(res["min_gap"], r["min_gap"])
         res["back_max"] = max(res["back_max"], r["back_max"])
         res["brushes"] += sum(r["brushes"])
+    _mem("stress chunk")
     return res
 
 
@@ -775,17 +819,64 @@ def _chunks(total: int, size: int) -> List[Tuple[int, int]]:
 
 # ---------------------------------------------------------------- baseline files
 
+# ---- memory (D-072 write): workers hand back each chunk pickled, and the parent keeps records
+# pickled until it reads them; the baseline is run and calibrated one cell at a time. The numbers
+# are the same as building every list in memory (pickle round-trips floats exactly, and every
+# record is read in the same order).
+
+def _packed(job: Tuple) -> bytes:
+    fn, args = job
+    return pickle.dumps(fn(args), protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class PickledRecs:
+    """A cell's records, kept as the workers' pickled chunks in chunk order; iterating unpickles one
+    chunk at a time."""
+
+    def __init__(self) -> None:
+        self.blobs: List[bytes] = []
+        self.n = 0
+
+    def add(self, blob: bytes, n: int) -> None:
+        self.blobs.append(blob)
+        self.n += n
+
+    def __iter__(self):
+        for blob in self.blobs:
+            yield from pickle.loads(blob)
+
+    def __len__(self) -> int:
+        return self.n
+
+
+def _gather(pool, fn, tasks: List[Tuple], sizes: List[int]) -> Dict[int, "PickledRecs"]:
+    """Runs fn over tasks ((cell, ...) each, sizes[k] records), in order, into one PickledRecs a cell."""
+    out: Dict[int, PickledRecs] = {}
+    for task, size, blob in zip(tasks, sizes, pool.imap(_packed, [(fn, t) for t in tasks])):
+        out.setdefault(task[0], PickledRecs()).add(blob, size)
+    return out
+
+
+class _BaselineCells:
+    """per_cell for summarize_baseline: a cell's rows are run when it is read (once per cell), so
+    only one cell's rows are ever in memory."""
+
+    def __init__(self, pool, races: int, cfg: Dict) -> None:
+        self.pool, self.races, self.cfg = pool, races, cfg
+
+    def __getitem__(self, cell: int) -> List[Dict]:
+        tasks = [(cell, a, b, self.cfg) for a, b in _chunks(self.races, 25)]
+        rows: List[Dict] = []
+        for blob in self.pool.imap(_packed, [(_baseline_chunk, t) for t in tasks]):
+            rows.extend(pickle.loads(blob))
+        return rows
+
+
 def generate_baseline(races: int, jobs: Optional[int], cfg: Dict = trip.CONFIG, mix: float = MIX_WEIGHT) -> Dict:
-    tasks = []
-    for cell in range(len(cells())):
-        for a, b in _chunks(races, 25):
-            tasks.append((cell, a, b, cfg))
     with Pool(jobs) as pool:
-        parts = pool.map(_baseline_chunk, tasks)
-    per_cell: Dict[int, List] = {}
-    for (cell, _a, _b, _cfg), part in zip(tasks, parts):
-        per_cell.setdefault(cell, []).extend(part)
-    return summarize_baseline(per_cell, races, cfg, mix)
+        data = summarize_baseline(_BaselineCells(pool, races, cfg), races, cfg, mix)
+    _mem("parent, after the baseline")
+    return data
 
 
 def raw_profiles(rows: List[Dict]) -> Tuple[List[float], List[float]]:
@@ -955,9 +1046,9 @@ def _num(v: float) -> str:
 
 
 def write_baseline(data: Dict, profile: str = "live") -> None:
-    baseline_path(profile).write_text(json.dumps(data, indent=1) + "\n")
+    _out(baseline_path(profile)).write_text(json.dumps(data, indent=1) + "\n")
     if profile == "live":
-        BASELINE_LUAU.write_text(render_luau(data))
+        _out(BASELINE_LUAU).write_text(render_luau(data))
 
 
 def load_baseline(profile: str = "live") -> Dict:
@@ -979,27 +1070,27 @@ def run_report(races: int, jobs: Optional[int], data: Dict, cfg: Dict = trip.CON
     table = data["baseline"]
     stable = data.get("styles")
     d057 = trip.d057_on(cfg)
-    tasks = []
+    tasks, sizes = [], []
     for cell in range(len(cells())):
         for a, b in _chunks(races, 10):
             tasks.append((cell, a, b, cfg, table, stable))
+            sizes.append(b - a)
     with Pool(jobs) as pool:
-        parts = pool.map(_report_chunk, tasks)
-        grief_parts, stress_parts = [], []
-        grief_tasks, stress_tasks = [], []
+        per_cell = _gather(pool, _report_chunk, tasks, sizes)
+        stress_parts = []
+        grief_cell: Dict[int, PickledRecs] = {}
+        stress_tasks = []
         if d057:
-            grief_tasks = [(cell, a, b, cfg, table, stable) for cell in range(len(cells())) for a, b in _chunks(grief_races, 10)]
+            grief_tasks, grief_sizes = [], []
+            for cell in range(len(cells())):
+                for a, b in _chunks(grief_races, 10):
+                    grief_tasks.append((cell, a, b, cfg, table, stable))
+                    grief_sizes.append(b - a)
             stress_tasks = [(cell, a, b, cfg) for cell in range(len(cells())) for a, b in _chunks(stress_races, 25)]
-            grief_parts = pool.map(_grief_chunk, grief_tasks)
+            grief_cell = _gather(pool, _grief_chunk, grief_tasks, grief_sizes)
             stress_parts = pool.map(_stress_chunk, stress_tasks)
-    per_cell: Dict[int, List[Dict]] = {}
-    for (cell, *_rest), part in zip(tasks, parts):
-        per_cell.setdefault(cell, []).extend(part)
     summary = summarize_report(per_cell, cfg)
     if d057:
-        grief_cell: Dict[int, List[Dict]] = {}
-        for (cell, *_rest), part in zip(grief_tasks, grief_parts):
-            grief_cell.setdefault(cell, []).extend(part)
         stress_cell: Dict[int, List[Dict]] = {}
         for (cell, *_rest), part in zip(stress_tasks, stress_parts):
             stress_cell.setdefault(cell, []).append(part)
@@ -1033,7 +1124,7 @@ def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict) -> Dict:
     pols_all = POLICIES_D057 if d057 else POLICIES
     rows = []
     for cell, (course, distance) in enumerate(cells()):
-        recs = per_cell[cell]
+        recs = list(per_cell[cell])
         r: Dict = {"course": course, "distance": distance, "races": len(recs)}
         for pol in pols_all:
             taus = [x[pol]["tau"] for x in recs]
@@ -1205,12 +1296,23 @@ def _summarize_d057_cell(r: Dict, recs: List[Dict]) -> None:
     r["smart_boxed_1s_races"] = mean([1.0 if b[0] >= 1.0 - 1e-9 else 0.0 for p in range(LANES) for b in boxed[p]])
 
 
+class _AllRecs:
+    """Every cell's records in cell order, read afresh on each pass (never all in memory)."""
+
+    def __init__(self, per_cell) -> None:
+        self.per_cell = per_cell
+
+    def __iter__(self):
+        for cell in range(len(cells())):
+            yield from self.per_cell[cell]
+
+
 def _summarize_d057(summary: Dict, per_cell: Dict[int, List[Dict]]) -> None:
     """Pooled over the cells: reach per intent, motion, boxed by post and policy, brushes."""
     rows = summary["rows"]
     summary["intent3s"] = sum(r["scripted_intent_ok"] for r in rows) / max(1, sum(r["scripted_intent_n"] for r in rows))
     summary["rail_intent3s"] = sum(r["rail_intent_ok"] for r in rows) / max(1, sum(r["rail_intent_n"] for r in rows))
-    allrecs = [x for cell in range(len(cells())) for x in per_cell[cell]]
+    allrecs = _AllRecs(per_cell)
     motion: Dict = {}
     vh, ah, yh = [0] * 16, [0] * 13, [0] * 12
     vmax = amax = yaw_max = lean_max = 0.0
@@ -1585,9 +1687,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--jobs", type=int, default=0, help="worker processes (default: all cores)")
     ap.add_argument("--mix", type=float, default=None, help="trial: weight of the kid-among-bots profile")
     ap.add_argument("--json", type=str, default="", help="also write the report numbers to this file")
+    ap.add_argument("--out", type=str, default="", help="with --write: write the files into this folder instead (scratch)")
+    ap.add_argument("--mem", action="store_true", help="print each process's peak memory to stderr")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                     help="try a config change (e.g. groundPerLaneTurn=0.011, smart.homeLane=2); nothing is written")
     args = ap.parse_args(argv)
+    global OUT_DIR
+    if args.out:
+        OUT_DIR = Path(args.out)
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+    if args.mem:
+        os.environ["STEERING_MEM"] = "1"  # inherited by the workers
     cfg = profile_config(args.profile)
     if args.set:
         cfg = json.loads(json.dumps(cfg))
@@ -1616,6 +1726,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("warning: the checked-in baseline was made with a different config; run with --write")
     summary = run_report(args.report_races, jobs, data, cfg, args.grief_races, args.stress_races)
     print(format_report(summary, data, cfg))
+    _mem("parent, after the report")
     print(f"({time.time() - t0:.0f} s)")
     stored = {"seed": REPORT_SEED, "races": args.report_races, "baselineSeed": data["seed"],
               "baselineRaces": data["races"], "mixWeight": data["mixWeight"], "config": trip.config_record(cfg),
@@ -1624,7 +1735,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         stored.update({"profile": args.profile, "griefSeed": GRIEF_SEED, "griefRaces": args.grief_races,
                        "stressSeed": STRESS_SEED, "stressRaces": args.stress_races, "probes": probe_races(cfg)})
     if args.write:
-        report_path(args.profile).write_text(json.dumps(stored, indent=1) + "\n")
+        _out(report_path(args.profile)).write_text(json.dumps(stored, indent=1) + "\n")
         print(f"wrote {report_path(args.profile).relative_to(ROOT)}")
     if args.json:
         Path(args.json).write_text(json.dumps(stored, indent=1))
