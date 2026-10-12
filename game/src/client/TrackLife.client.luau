@@ -5,6 +5,8 @@
 --     results card shows. Rows bounce a little out of step.
 --   Flags: each pennant flutters a few degrees of yaw about its pole.
 --   Both are still under Reduced Motion.
+--   Everything here ticks only while you're within spectate.keepStuds of a course, at trackLife.updateHz
+--   (phoneHz on phones).
 --   Big Board: a SurfaceGui (this client only) on the infield board shows the followed race's top 4
 --     (place, lane chip, horse name) from RaceState.order, the same order as the place badge,
 --     refreshed at bigBoard.refreshHz. No race: the board's own "GIDDY-UP!" shows. Never a win %,
@@ -256,13 +258,34 @@ end)
 
 -- The loop -----------------------------------------------------------------------------------
 if not L.enabled and not BOARD.live then return end
-local tickEvery = 1 / math.max(1, L.updateHz or 30)
+local function tickSeconds(): number
+	local hz = if RaceState.phone() then (L.phoneHz or L.updateHz or 30) else (L.updateHz or 30)
+	return 1 / math.max(1, hz)
+end
+local tickEvery = tickSeconds()
+local nearAcc, near = math.huge, false
+local KEEP = (GameConfig.spectate and GameConfig.spectate.keepStuds) or 300
+local TrackLayout = require(Shared:WaitForChild("TrackLayout"))
+-- Near any course? (checked once a second; at the barn or on the Trail nothing ticks)
+local function nearAnyCourse(): boolean
+	for id in TrackLayout.courses do
+		if RaceState.nearCourse(id, KEEP) then return true end
+	end
+	return false
+end
 local boardEvery = 1 / math.max(1, BOARD.refreshHz or 4)
 local acc, boardAcc = 0, 0
 local wasStill = false
 local state = { active = false, burstShowing = false, resultsOpen = false, leaderProgress = 0 }
 
 RunService.Heartbeat:Connect(function(dt)
+	nearAcc += dt
+	if nearAcc >= 1 then
+		nearAcc = 0
+		near = nearAnyCourse()
+		tickEvery = tickSeconds()
+	end
+	if not near then return end
 	boardAcc += dt
 	if boardAcc >= boardEvery then
 		boardAcc = 0

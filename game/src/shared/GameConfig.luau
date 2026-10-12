@@ -230,8 +230,8 @@ GameConfig.raceFx = {
 	-- strides a second the loop was rendered at (2 now: about 1.55x). Re-tune when the loop is re-rendered.
 	gallopLoopStridesPerSecond = 2,
 	-- First-race coaching (AAA Phase 2, D-067): a player's first coachRaces races (profile
-	-- totals.races below it) show the rule "Tap once every time the marker passes the green" for
-	-- coachHintPasses passes, the ghost thumb tapping over the green and "NOW!" as the marker
+	-- totals.races below it) show the rule "Tap once every time the marker passes the glow" for
+	-- coachHintPasses passes, the ghost thumb tapping over the glow and "NOW!" as the marker
 	-- enters it for coachPasses passes, and coachBurstHint as the Final Burst title comes up.
 	coachRaces = 1,
 	coachPasses = 4,
@@ -240,7 +240,7 @@ GameConfig.raceFx = {
 	coachBurstHint = "Big tap coming!",
 	judgeAtMarker = true,         -- every race: the tap's word also pops small at the marker, where you tapped
 	judgeSeconds = 0.6,
-	coachNowZone = 0.2,           -- "NOW!" while the marker is within this of the green's centre (-1..1 units; the green is 0.2 each side)
+	coachNowZone = 0.2,           -- "NOW!" while the marker is within this of the glow's centre (-1..1 units; the glow is 0.2 each side)
 }
 GameConfig.gateCountdownSeconds = 3 -- "3, 2, 1" over the gate, then "GO!" with the bell (D-055)
 -- Race screen (D-055).
@@ -480,11 +480,10 @@ GameConfig.firstMinute = {
 	hideGemPill = true,    -- no 💎 door until the tour's race step is done
 	-- AAA Phase 4 (D-069, Phase 2 should-fixes): the tour's ✕ ignores a second tap this soon after the
 	-- first (a quick double tap never skips); a toast that comes within raceReasonSeconds of a RACE! press
-	-- (raceReasonPickerSeconds when RACE! opened the picker) is never held, so the reason a race didn't
-	-- start always shows.
+	-- (or, when RACE! opened the picker, of the picker closing on its join) is never held, so the reason a
+	-- race didn't start always shows.
 	skipGuardSeconds = 0.6,
 	raceReasonSeconds = 4,
-	raceReasonPickerSeconds = 30,
 }
 -- One card at a time at the top centre (Ui.slot): the highest priority that wants the spot shows;
 -- toasts stack below whatever card is up. raceTime: the queue card's "Race time!" outranks the tour.
@@ -683,9 +682,9 @@ GameConfig.trackDressing = { enabled = true, bunting = true, flags = true, crowd
 	crowdTileU = 16, crowdTileV = 6 }
 -- Track life (client/TrackLife): the crowd bounces (calm in the lobby; cheering from the burst, or once
 -- the leader passes cheerFromProgress, until the card shows) and the flags flutter. Both stop under
--- Reduced Motion.
+-- Reduced Motion, and only tick while you're within spectate.keepStuds of a course (phoneHz on phones).
 GameConfig.trackLife = { enabled = true, crowdBounce = true, calmStuds = 0.12, calmHz = 1.5, cheerStuds = 0.3, cheerHz = 3,
-	cheerFromProgress = 0.8, flagFlutter = true, flutterDeg = 6, flutterHz = 0.8, updateHz = 30 }
+	cheerFromProgress = 0.8, flagFlutter = true, flutterDeg = 6, flutterHz = 0.8, updateHz = 30, phoneHz = 15 }
 -- The Big Board shows the followed race's top 4 (lane chip, number, horse name), refreshed at refreshHz;
 -- "GIDDY-UP!" when no race runs. Never a win %, purse or any number but places and lanes (rule 1, D-055).
 GameConfig.bigBoard = { live = true, rows = 4, refreshHz = 4 }
@@ -698,24 +697,27 @@ GameConfig.friendRace = { badge = true }
 -- The gate line-up (client/GateIntro): in the countdown, never in the lobby wait (D-061), and the
 -- countdown stays at gateCountdownSeconds. As you're seated the camera dollies in front of the gate
 -- from the outside lane to lane 1 at heightStuds, frontStuds out, looking at the horses' faces, over
--- dollySeconds; blends behind your horse over blendSeconds and hands back to the Follow camera
--- handBackBefore seconds before GO. Riders only, never spectators, never under Reduced Motion; a seat
+-- dollySeconds (eased); then handOff "cut" (default, the feel consult): a cutFadeSeconds Paper fade to the
+-- chase shot; "blend" (the switch-back) glides behind your horse over blendSeconds. The Follow camera is
+-- back by handBackBefore seconds before GO. Riders only, never spectators, never under Reduced Motion; a seat
 -- later than lateSeatSeconds into the countdown goes straight to the chase view.
 GameConfig.gateIntro = { enabled = true, dollySeconds = 1.6, blendSeconds = 0.4, handBackBefore = 1.0, lateSeatSeconds = 0.3,
-	heightStuds = 7, frontStuds = 16, chaseBackStuds = 14, chaseUpStuds = 5 }
+	handOff = "cut", cutFadeSeconds = 0.12, heightStuds = 7, frontStuds = 16, chaseBackStuds = 14, chaseUpStuds = 5 }
 -- The race HUD in the art direction's colours (client/RaceHudStyle): Paper panels with an Ink outline,
 -- Fredoka One labels, Builder Sans Bold numbers, the Gold count with an Ink outline, the slider on Slate
 -- with a Gold glow. enabled = false keeps the colours the code builds (Paper panels either way).
--- youMarker: in your own chase view the YOU marker is small and low (riderStuds, riderPx x riderPxTall),
--- hidden in first person (camera zoom under firstPersonZoom) and during the finish orbit; replays and
--- other views keep the big one.
+-- youMarker: riderShown = false (the UI/UX consult) hides it in your own chase view and the gate pass (the
+-- place badge says where you are); true shows it small and low there (riderStuds, riderPx x riderPxTall).
+-- Hidden in first person (camera zoom under firstPersonZoom) and during the finish orbit; replays and
+-- spectators keep the big one.
 GameConfig.raceHud = { enabled = true,
-	youMarker = { riderStuds = 7, riderPx = 56, riderPxTall = 72, otherStuds = 12, otherPx = 90, otherPxTall = 120, firstPersonZoom = 2 } }
+	youMarker = { riderShown = false, riderStuds = 7, riderPx = 56, riderPxTall = 72, otherStuds = 12, otherPx = 90, otherPxTall = 120, firstPersonZoom = 2 } }
 -- Audio. music (client/MusicBed): one beatless bed from Roblox's licensed music library (no upload; the
 -- last audio upload this window is kept for an emergency). id = 0: no music at all (David picks the
 -- track). Levels: lobby, race (your slider runs: far under the tap tick), spectate (watching a race),
 -- finish (the finish moment and the card); duckUnderVoice while an announcer line plays; fades over
--- fadeSeconds. The Sound setting mutes it with everything else.
+-- fadeSeconds. The Sound setting mutes it with everything else. If the chosen track has a steady beat, set
+-- race = 0 (kids must tap to the marker, never to a beat; CONSENSUS).
 GameConfig.audio = {
 	music = { id = 0, lobby = 0.35, race = 0.12, spectate = 0.08, finish = 0.4, fadeSeconds = 0.6, duckUnderVoice = 0.5 },
 }

@@ -20,7 +20,7 @@
 -- replay's side view, confetti for 1st, the ribbon stamp for 1st to 4th; skippable, the card up
 -- within finish.cardWithinSeconds of the line), the results card (ResultsCard, at the floors, with
 -- 🏁 Race again and "Best ride in the race!" for the top 3 only), first-race coaching (the rule, the
--- ghost thumb over the green, "NOW!") and every tap's word at the marker. The status line uses the
+-- ghost thumb over the glow, "NOW!") and every tap's word at the marker. The status line uses the
 -- picker's words ("🐇 Short", never "Sprint").
 -- AAA Phase 4 (D-069): the HUD in the art direction's colours (RaceHudStyle: Paper panels, Ink outlines, a
 -- Gold glow on Slate) and a smaller, lower YOU marker in your chase view; the gate line-up camera pass in
@@ -440,6 +440,11 @@ local function layout()
 	local height = if camera then camera.ViewportSize.Y else 720
 	local k = RaceState.hudScale()
 	boardScale.Scale, badgeScale.Scale = k, k
+	-- (D-069, the UI/UX consult) The board rows and "of 8" shrink with k, so their text is sized up to render
+	-- at ui.minTextPx or more (the race map's rule).
+	local small = math.max(16, math.ceil(GameConfig.ui.minTextPx / math.max(0.1, k)))
+	placeOf.TextSize = small
+	for _, row in rows do row.TextSize = small end
 	board.Position = UDim2.new(0, 12, 0, math.floor(90 * k))
 	placeBadge.Position = UDim2.new(1, -16, 0, math.floor(RaceState.MAP_TOP + (RaceState.MAP_HEIGHT + 10) * k))
 	if results.Visible then Card.layout() end -- (one or two columns: the screen may have turned)
@@ -1261,8 +1266,8 @@ RunService.RenderStepped:Connect(function(dt)
 			placeMarker(pace, PaceMeter.position(passes[1], passes[1].t0), passes[1].center, false)
 		end
 		-- First-race coaching (D-067): for the first coachPasses passes (and the countdown before
-		-- them) the ghost thumb points at the green and presses as the marker crosses it, with "NOW!"
-		-- on the green; the rule stays up for coachHintPasses passes.
+		-- them) the ghost thumb points at the glow and presses as the marker crosses it, with "NOW!"
+		-- on the glow; the rule stays up for coachHintPasses passes.
 		local coached = coach ~= nil and coach.race == cueRace
 		Coach.frame(coached, pace, passes, k or (if waiting then 1 else nil), k ~= nil, t, thumb, steerGui,
 			steer ~= nil and steer.tipUntil ~= nil and os.clock() < steer.tipUntil)
@@ -1387,7 +1392,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		weather = cond.weather, course = courseId }) else league
 	status.Text = line .. (if riding then "" else "  (watching)")
 	if COURSE_NAME[courseId] and not riding then status.Text = COURSE_NAME[courseId] .. " · " .. status.Text end
-	-- First-race coaching (D-067): the rule, the ghost thumb over the green and "NOW!".
+	-- First-race coaching (D-067): the rule, the ghost thumb over the glow and "NOW!".
 	local racesBefore = PlayerState.data and PlayerState.data.totals and PlayerState.data.totals.races
 	coach = if riding and FX.enabled and PlayerState.data and RaceFx.coached(racesBefore, FX) then { race = cueRace } else nil
 	feedback.Text = ""

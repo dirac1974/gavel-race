@@ -19,4 +19,14 @@ if git grep -nIiE 'Claude (Opus|Sonnet|Haiku|Fable|Mythos)' -- . ':!scripts/poli
   echo "::error::Specific Claude model named (CLAUDE.md hard rule 5). Write \"Claude\"."; fail=1
 fi
 
+# Commit messages too. bed9d9e and 67f503f slipped through before this check; history is never rewritten (rule 6).
+if git rev-parse -q --verify origin/main >/dev/null; then
+  if git log origin/main..HEAD --format='%H %B' \
+       | awk '/^[0-9a-f]{40} /{sha=$1} {print sha" "$0}' \
+       | grep -vE '^(bed9d9e|67f503f)' \
+       | grep -iE 'Claude (Opus|Sonnet|Haiku|Fable|Mythos)'; then
+    echo "::error::Specific Claude model named in a commit message (CLAUDE.md hard rule 5)."; fail=1
+  fi
+fi
+
 exit $fail

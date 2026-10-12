@@ -344,7 +344,9 @@ warmBar.MouseButton1Down:Connect(function()
 	warmWord.Text = QueueView.warmWord(score, now < PaceMeter.idealTime(p))
 	warmWord.TextColor3 = if score >= 80 then C.textGood else C.ink
 	if not reducedMotion() then Ui.pop(warmWord) end
-	if Sound then Sound.play("ui_pop") end
+	-- (D-069, the UI/UX consult) The race's own tap tick, pitched by the word, so practice sounds like the race.
+	local FX = GameConfig.raceFx
+	if Sound then Sound.play("tap_ok", FX.tickVolume, nil, (FX.tickSpeeds or {})[GameConfig.labelFor(score)] or 1) end
 end)
 
 -- Drawing ---------------------------------------------------------------------------

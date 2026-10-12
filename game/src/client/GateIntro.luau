@@ -3,9 +3,11 @@
 -- the countdown, never in the lobby wait (taking the camera then would pull kids out of grooming, D-061),
 -- and the countdown stays at gateCountdownSeconds. As you're seated (start - 3) the camera dollies in front
 -- of the gate from the outside lane to lane 1, heightStuds up, looking at the horses' faces, over
--- dollySeconds; it blends behind your horse over blendSeconds and hands back to the Follow camera
--- handBackBefore seconds before GO, so the chase view is live before the first pass ("3, 2, 1" shows
--- throughout). Riders only, never spectators, never under Reduced Motion; a late seat goes straight to
+-- dollySeconds (eased); then a cut (handOff = "cut", the feel consult: the old blend flew through the
+-- horses and whip-panned): a cutFadeSeconds Paper fade (clear, 0.4, clear) with the chase shot set at its
+-- peak, and the Follow camera is back. handOff = "blend" is the switch-back (a blendSeconds glide behind
+-- your horse). Either way the Follow camera is back by handBackBefore seconds before GO, so the chase view
+-- is live before the first pass ("3, 2, 1" shows throughout). Riders only, never spectators, never under Reduced Motion; a late seat goes straight to
 -- the chase view (RacePresent.gateRuns).
 -- The camera always comes back: the pass stops and hands back the moment the race changes, you leave the
 -- saddle, Reduced Motion turns on or anything else takes the camera, and a timer hands back regardless.
@@ -15,6 +17,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
@@ -32,16 +36,36 @@ local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
 
-local function still(): boolean
+-- Reduced Motion, read once and on change (the render step reads it every frame: no closure per frame).
+local stillNow = false
+local function readStill()
 	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
-	return ok and on == true
+	stillNow = ok and on == true
 end
+readStill()
+pcall(function() GuiService:GetPropertyChangedSignal("ReducedMotionEnabled"):Connect(readStill) end)
+
+-- The cut's Paper fade, over everything but the results card.
+local fadeGui = Instance.new("ScreenGui")
+fadeGui.Name = "GateFade"
+fadeGui.ResetOnSpawn = false
+fadeGui.IgnoreGuiInset = true
+fadeGui.DisplayOrder = 1
+fadeGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local fade = Instance.new("Frame")
+fade.Size = UDim2.fromScale(1, 1)
+fade.BackgroundColor3 = Color3.fromHex("FFF7E6") -- Paper
+fade.BackgroundTransparency = 1
+fade.BorderSizePixel = 0
+fade.Active = false
+fade.Parent = fadeGui
 
 local token = 0
 local owned = false -- the camera is Scriptable because of us
 
 local function stop()
 	token += 1
+	fade.BackgroundTransparency = 1
 	Gate.active = false
 	pcall(function() RunService:UnbindFromRenderStep(BIND) end)
 	local camera = workspace.CurrentCamera
@@ -88,7 +112,7 @@ end
 function Gate.run(start: number, courseId: string?, lane: number, alive: () -> boolean): boolean
 	stop()
 	local now = serverNow()
-	if not RacePresent.gateRuns(CFG, now, start, GameConfig.gateCountdownSeconds or 3, true, still()) then return false end
+	if not RacePresent.gateRuns(CFG, now, start, GameConfig.gateCountdownSeconds or 3, true, stillNow) then return false end
 	local camera = workspace.CurrentCamera
 	local outer, inner, mine = horsesFor(courseId, lane)
 	if not (camera and outer and inner and mine and Cam.on) then return false end
@@ -99,26 +123,38 @@ function Gate.run(start: number, courseId: string?, lane: number, alive: () -> b
 	Gate.active = true
 	local mineToken = token
 	local blendEye, blendAt = nil, nil
+	local cut = CFG.handOff ~= "blend"
+	local cutAt: number? = nil
+	local cutSeconds = CFG.cutFadeSeconds or 0.12
 	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 1, function()
 		if mineToken ~= token then return end
 		local cam = workspace.CurrentCamera
-		if not (cam and alive() and Cam.on and cam.CameraType == Enum.CameraType.Scriptable and not still() and mine.Parent) then
+		if not (cam and alive() and Cam.on and cam.CameraType == Enum.CameraType.Scriptable and not stillNow and mine.Parent) then
 			stop()
 			return
 		end
 		local phase, f = RacePresent.gateFrame(CFG, serverNow(), start)
-		if phase == "done" then
-			stop()
-			return
-		end
 		if phase == "dolly" then
-			local eye, at = fromEye:Lerp(toEye, f), fromAt:Lerp(toAt, f)
-			blendEye, blendAt = eye, at
-			cam.CFrame = CFrame.lookAt(eye, at)
+			blendEye, blendAt = fromEye:Lerp(toEye, f), fromAt:Lerp(toAt, f)
+			cam.CFrame = CFrame.lookAt(blendEye, blendAt)
+		elseif cut then
+			-- The cut: Paper fades up to its peak on the last dolly frame, the chase shot is set at the peak
+			-- and the Follow camera takes over as the Paper fades back out.
+			cutAt = cutAt or os.clock()
+			local e = os.clock() - (cutAt :: number)
+			fade.BackgroundTransparency = 1 - RacePresent.cutFade(e, cutSeconds)
+			if e >= cutSeconds / 2 or phase == "done" then
+				local cEye, cAt = chaseShot(mine)
+				cam.CFrame = CFrame.lookAt(cEye, cAt)
+				stop()
+				fade.BackgroundTransparency = 1 - RacePresent.cutFade(cutSeconds / 2, cutSeconds)
+				TweenService:Create(fade, TweenInfo.new(cutSeconds / 2), { BackgroundTransparency = 1 }):Play()
+			end
+		elseif phase == "done" then
+			stop()
 		else
 			local cEye, cAt = chaseShot(mine)
-			local eye, at = (blendEye or toEye):Lerp(cEye, f), (blendAt or toAt):Lerp(cAt, f)
-			cam.CFrame = CFrame.lookAt(eye, at)
+			cam.CFrame = CFrame.lookAt((blendEye or toEye):Lerp(cEye, f), (blendAt or toAt):Lerp(cAt, f))
 		end
 	end)
 	-- Whatever happens, the camera is back by the hand-back time.

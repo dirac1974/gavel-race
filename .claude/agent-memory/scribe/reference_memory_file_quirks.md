@@ -10,3 +10,5 @@ metadata:
 - AAA review run (2026-10-11): sources in `docs/reviews/aaa-2026-10-11/` (CONSENSUS.md = phase plan, D-066..D-069). Each phase gets a code review + four consult files; their must-fix items, N1 "build calls", and unfixed should-fixes must be logged in D-NNN ("Still open") and REVIEW_QUEUE before commit. Verify which fixes landed by grepping GameConfig/client code, not from the review text.
 - Phases overlap: Phase 3 code sat in the tree while recording Phase 2; record only the phase asked for.
 - CHANGELOG had missed commits before (ee4615c, bed9d9e); check `git log` against it each time.
+- Same endings held at Phase 4 (2026-10-11): all CRLF except STATUS (LF). Phases 1–3 + Phase 4 first pass landed as ONE commit (67f503f) though CHANGELOG has a line per phase.
+- Never copy a model name from a commit trailer into docs (rule 5); bed9d9e/67f503f carry one and are exempt in policy_guard.sh. The AAA run is wrapped up (D-066..D-069); next is David's Studio playtest.

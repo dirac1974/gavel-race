@@ -5,9 +5,10 @@
 -- Ink text on them (your own row in the darker orange that passes 4.5:1 on Paper), Fredoka One for
 -- words, Builder Sans Bold for numbers, the Gold "3, 2, 1" with an Ink outline, the slider on Slate with
 -- a Gold glow, the Riding bar on Slate.
--- The YOU marker (youMarker): in your own chase view it is small and low (riderStuds, riderPx), so it
--- keeps off the middle of the screen; it hides in first person and while the finish orbit plays
--- (FinishMoment marks it OrbitHidden); replays and every other view keep the big one.
+-- The YOU marker (youMarker): in your own chase view and the gate pass before it, hidden by default
+-- (youMarker.riderShown = false: the place badge says it, and it sat in the sightline); with riderShown it
+-- is small and low there (riderStuds, riderPx). It hides in first person and while the finish orbit plays
+-- (FinishMoment marks it OrbitHidden); replays and spectators keep the big one.
 -- Drawn only. STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -18,6 +19,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local RacePresent = require(Shared:WaitForChild("RacePresent"))
 local Cam = require(script.Parent:WaitForChild("RaceCamera"))
+local Gate = require(script.Parent:WaitForChild("GateIntro"))
 
 local CFG = GameConfig.raceHud or { enabled = true }
 local player = Players.LocalPlayer
@@ -176,7 +178,7 @@ RunService.RenderStepped:Connect(function()
 	local camera = workspace.CurrentCamera
 	if not camera then return end
 	local zoom = (camera.CFrame.Position - camera.Focus.Position).Magnitude
-	local shown, studs, w, h = RacePresent.youMarker(CFG.youMarker, chaseView(camera), zoom, false)
+	local shown, studs, w, h = RacePresent.youMarker(CFG.youMarker, chaseView(camera) or Gate.active, zoom, false)
 	if bb.Enabled ~= shown then bb.Enabled = shown end
 	if bb.StudsOffsetWorldSpace.Y ~= studs then bb.StudsOffsetWorldSpace = Vector3.new(0, studs, 0) end
 	if bb.Size.X.Offset ~= w or bb.Size.Y.Offset ~= h then bb.Size = UDim2.fromOffset(w, h) end

@@ -3,9 +3,9 @@
 -- AssetService resolves each to its image id as ReplicatedStorage attribute UiSheet_<sheet>.
 local ids: { [string]: number } = {
 	bunting_strip = 118499327130794,
-	confetti_square = 136953913559600,
+	confetti_square = 94195307096733,
 	crowd_strip = 73979376587458,
-	flag_pennant = 116445865328474,
+	flag_pennant = 71088943701367,
 	ui_atlas_1 = 138919800817033,
 	ui_atlas_2 = 94337225467876,
 	ui_atlas_clarity_1 = 134193368841769,

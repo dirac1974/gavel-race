@@ -312,6 +312,21 @@ RaceState.ResultsShown.Event:Connect(function(shown: boolean)
 	coinOwed = false
 end)
 
+-- (D-069, code review N8) RACE! that opens the picker: the toast-hold bypass opens only as the picker
+-- closes (its join, or a cancel), for raceReasonSeconds, so other toasts in the first minute still wait.
+local pickerWatch: RBXScriptConnection? = nil
+local function pickerJoinWatch()
+	if pickerWatch then pickerWatch:Disconnect() end
+	local picker = Players.LocalPlayer.PlayerGui:FindFirstChild("RacePicker")
+	if not (picker and picker:IsA("ScreenGui")) then return end
+	pickerWatch = picker:GetPropertyChangedSignal("Enabled"):Connect(function()
+		if picker.Enabled then return end
+		Ui.racePressed(FM.raceReasonSeconds or 4)
+		if pickerWatch then pickerWatch:Disconnect() end
+		pickerWatch = nil
+	end)
+end
+
 local function pressRace()
 	-- (D-069, N2) Any answer to this press shows even while the first minute holds toasts.
 	Ui.racePressed(FM.raceReasonSeconds or 4)
@@ -330,7 +345,7 @@ local function pressRace()
 		if Sound then Sound.play("horse_nicker") end
 		return
 	end
-	Ui.racePressed(FM.raceReasonPickerSeconds or 30) -- (the join comes from the picker, a little later)
+	pickerJoinWatch() -- (N8) the reason window opens when the picker closes on its join, not now
 	OpenRacePicker:Fire() -- pick a course and a horse (D-036)
 end
 raceBtn.Activated:Connect(pressRace)

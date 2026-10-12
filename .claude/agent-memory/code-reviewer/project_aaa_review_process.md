@@ -13,4 +13,6 @@ The AAA review build (docs/reviews/aaa-2026-10-11/CONSENSUS.md) runs in 4 phases
 
 Useful check (Phase 2): pytest does not compile client scripts, so compile every `game/src/**/*.luau` with a Lune script using `require("@lune/luau").compile` — catches syntax errors and the 200-local/register limit (RaceController was at 195/200 top-level locals after Phase 2). Also check every consumer of a remote whose firing pattern changed (Phase 2's post-lock preview re-fired `LiveChances` and broke FanClient's cheer-close rule).
 
+Phase 4 lesson: the session's injected commit attribution put "Claude <model name>" in the Co-Authored-By trailer (bed9d9e, 67f503f), breaking hard rule 5; policy_guard uses `git grep` so it never sees commit messages. Always check `git log --format=%B` trailers in reviews; never ask for history rewrite (rule 6), only fix forward.
+
 Phase 3 lesson: "🔀 More choices" (RacePicker) is only reachable from the queue card, i.e. while the player is already in line. Any new picker action that passes a course to `JoinRace` must survive `joinQueue`'s early returns (same key → keep course; alone in line → card follows the pick). Phase 3's Race-with-friend broke on exactly that. Also, `pytest` now includes `tests/test_compile_all.py`, but still run the Lune compile when client files change.

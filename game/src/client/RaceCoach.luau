@@ -5,8 +5,8 @@
 --   sinking and fading over judgeSeconds (Reduced Motion: it fades in place). The big word still
 --   shows in the middle.
 --   Coaching (a player's first raceFx.coachRaces races): for the first coachPasses passes (and the
---   countdown before them) the ghost thumb (the steering tip's, reused) points at the green and
---   presses as the marker crosses it, with "NOW!" on the green (within coachNowZone of its centre).
+--   countdown before them) the ghost thumb (the steering tip's, reused) points at the glow and
+--   presses as the marker crosses it, with "NOW!" on the glow (within coachNowZone of its centre).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

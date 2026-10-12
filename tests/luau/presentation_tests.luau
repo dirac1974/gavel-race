@@ -73,8 +73,16 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(mono, "the pass moves one way, eased, within 0..1")
 	local gate = code("game/src/client/GateIntro.luau")
 	check(not has(gate, "FieldOfView") and not has(gate, "CameraSubject"), "GateIntro never touches the FOV (RaceCamera owns it) or the subject")
-	check(has(gate, "RacePresent.gateRuns(CFG, now, start, GameConfig.gateCountdownSeconds or 3, true, still())"),
-		"GateIntro asks gateRuns with Reduced Motion")
+	check(has(gate, "RacePresent.gateRuns(CFG, now, start, GameConfig.gateCountdownSeconds or 3, true, stillNow)")
+		and has(gate, "GetPropertyChangedSignal(\"ReducedMotionEnabled\"):Connect(readStill)") and not has(gate, "still()"),
+		"GateIntro asks gateRuns with Reduced Motion, cached on its change signal (no closure per frame)")
+	-- The hand-off is a cut through a Paper fade (the feel consult), "blend" the switch-back.
+	check(G.handOff == "cut" and G.cutFadeSeconds == 0.12, "gateIntro.handOff = \"cut\" over a 0.12 s fade")
+	check(RacePresent.cutFade(0, 0.12) == 0 and close(RacePresent.cutFade(0.06, 0.12), 0.4, 1e-9)
+		and RacePresent.cutFade(0.12, 0.12) == 0 and close(RacePresent.cutFade(0.03, 0.12), 0.2, 1e-9)
+		and close(RacePresent.cutFade(0.09, 0.12), 0.2, 1e-9), "the Paper fade goes clear, 0.4, clear")
+	check(has(gate, "Color3.fromHex(\"FFF7E6\")") and has(gate, "local cut = CFG.handOff ~= \"blend\"")
+		and has(gate, "cam.CFrame = CFrame.lookAt(cEye, cAt)"), "the cut sets the chase shot at the fade's peak")
 	check(has(gate, "camera.CameraType = if Cam.on then Enum.CameraType.Follow else Enum.CameraType.Custom")
 		and has(gate, "if mineToken == token then stop() end"), "the camera is always handed back, on a timer too")
 	local rc = code("game/src/client/RaceController.client.luau")
@@ -94,13 +102,17 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(contrast("1D2433", "FFF7E6") >= 4.5 and contrast("8F4700", "FFF7E6") >= 4.5, "board and badge text pass 4.5:1 on Paper")
 	check(has(rc, "Color3.fromHex(\"8F4700\") else Color3.fromHex(\"1D2433\")"), "board rows: Ink, yours dark orange")
 	local Y = GameConfig.raceHud.youMarker
-	local s1, st1, w1, h1 = RacePresent.youMarker(Y, true, 14, false)
-	check(s1 and st1 == 7 and w1 == 56 and h1 == 72, "the chase view: 7 studs up, 56 x 72 px")
-	check(not (RacePresent.youMarker(Y, true, 1, false)), "hidden in first person")
-	check(not (RacePresent.youMarker(Y, true, 14, true)), "hidden during the finish orbit")
+	check(Y.riderShown == false and not (RacePresent.youMarker(Y, true, 14, false)),
+		"riderShown = false: no YOU marker in your own chase view (the place badge says it)")
+	local Yon = table.clone(Y)
+	Yon.riderShown = true
+	local s1, st1, w1, h1 = RacePresent.youMarker(Yon, true, 14, false)
+	check(s1 and st1 == 7 and w1 == 56 and h1 == 72, "riderShown: the chase view's is 7 studs up, 56 x 72 px")
+	check(not (RacePresent.youMarker(Yon, true, 1, false)), "hidden in first person")
+	check(has(style, "chaseView(camera) or Gate.active"), "the gate pass counts as your own view (no pop at GO)")
+	check(not (RacePresent.youMarker(Yon, true, 14, true)) and not (RacePresent.youMarker(Y, false, 14, true)), "hidden during the finish orbit")
 	local s2, st2, w2 = RacePresent.youMarker(Y, false, 30, false)
 	check(s2 and st2 == 12 and w2 == 90, "replays and other views keep 12 studs and 90 px")
-	check(56 >= GameConfig.ui.minTouchPx, "the small marker is still at least a tap-target wide")
 	check(has(code("game/src/client/FinishMoment.luau"), "SetAttribute(\"OrbitHidden\", true)") and has(style, "GetAttribute(\"OrbitHidden\")"),
 		"the orbit's hidden marker stays hidden until the moment clears")
 
@@ -160,7 +172,11 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local hud = code("game/src/client/Hud.client.luau")
 	check(has(ui, "if held and os.clock() > holdBypassUntil then") and has(hud, "Ui.racePressed(FM.raceReasonSeconds or 4)"),
 		"N2: a toast right after RACE! is never held (the reason always shows)")
-	check(GameConfig.firstMinute.raceReasonSeconds >= 3, "the reason window is at least 3 s")
+	check(GameConfig.firstMinute.raceReasonSeconds >= 3 and GameConfig.firstMinute.raceReasonPickerSeconds == nil
+		and has(hud, "pickerJoinWatch()") and not has(hud, "raceReasonPickerSeconds"),
+		"the reason window is at least 3 s, and the picker's opens only as the picker closes (N8)")
+	check(has(code("game/src/client/QueueCard.client.luau"), "Sound.play(\"tap_ok\", FX.tickVolume, nil,")
+, "the warm-up plays the race's tap tick")
 	local gu = code("game/src/client/GrownUps.client.luau")
 	check(has(gu, "os.clock() - skipAsked < (FM.skipGuardSeconds or 0.6) then return end") and GameConfig.firstMinute.skipGuardSeconds == 0.6,
 		"the tour's ✕ ignores a second tap within 0.6 s")

@@ -1417,20 +1417,17 @@ def crowd_strip() -> str:
 
 
 def confetti_square() -> str:
-    """64 x 64 particle: a white paper square with a soft fold, so ParticleEmitter.Color tints it."""
-    return (
-        f'<rect x="8" y="8" width="48" height="48" rx="6" fill="{WHITE}"/>'
-        f'<path d="M8 50 L50 8 L56 8 Q56 8 56 14 L56 50 Q56 56 50 56 L14 56 Q8 56 8 50 Z" fill="#D9D9D9" opacity="0.55"/>'
-    )
+    """64 x 64 particle: a pure white paper square, so ParticleEmitter.Color tints it to the full colour."""
+    return f'<rect x="8" y="8" width="48" height="48" rx="6" fill="{WHITE}"/>'
 
 
 def flag_pennant() -> str:
-    """256 x 128 pennant: the hoist is the left edge (x = 0). Drawn on a Beam that faces the camera, so it may show
-    upside down from some views: the design is the same flipped top to bottom (the horseshoe opens toward the tip)."""
+    """256 x 128 pennant: the hoist is the left edge (x = 0), drawn on a Beam that faces the camera. The horseshoe
+    stands upright, opening up (AAA Phase 4 feel consult); if Studio shows the Beam flipped, use trackDressing.buntingFlip."""
     return (
         solid(ORANGE, '<path d="M10 12 L246 64 L10 116 Z"/>', outline=10)
         + f'<path d="M10 12 L46 20 L46 108 L10 116 Z" fill="{GOLD}" stroke="{INK}" stroke-width="5" stroke-linejoin="round"/>'
-        + f'<g transform="rotate(90 96 64)">{horseshoe(96, 64, 0.8, PAPER, w=12, outline=6)}</g>'
+        + f'<g transform="rotate(180 100 64)">{horseshoe(100, 64, 0.8, PAPER, w=12, outline=6)}</g>'
     )
 
 

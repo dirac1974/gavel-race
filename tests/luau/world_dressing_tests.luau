@@ -81,7 +81,14 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		if side then check(fields["Right" .. side] == field, `{motor} and Right{side} take the same pose`) end
 	end
 	check(fields.LeftShoulder == "shoulder" and fields.LeftElbow == "elbow" and fields.Root == "pelvis", "the joints the plan names")
+	check(JockeyPose.lutIndex(0, -1, 1, JockeyPose.PUMP_STEPS) == JockeyPose.PUMP_STEPS / 2 + 1
+		and JockeyPose.lutIndex(-5, -1, 1, 32) == 1 and JockeyPose.lutIndex(5, -1, 1, 32) == 33
+		and JockeyPose.lutIndex(0, 0, 1, JockeyPose.LIFT_STEPS) == 1, "pump lookup: still pose at the middle, ends clamped")
 	local jsrc = fs.readFile("game/src/client/JockeyPose.luau")
+	check(string.find(jsrc, "humanoid.SeatPart", 1, true) ~= nil, "the crouch drops the frame a rider leaves the saddle (N2)")
+	local loop = string.match(jsrc, "PreSimulation:Connect(.*)$") or ""
+	check(string.find(loop, "CFrame.new", 1, true) == nil and string.find(loop, "CFrame.Angles", 1, true) == nil,
+		"no CFrame is made per frame (N3)")
 	check(string.find(jsrc, "RigType ~= Enum.HumanoidRigType.R15", 1, true) ~= nil, "R6 rigs keep the sit")
 	check(string.find(jsrc, "PreSimulation", 1, true) ~= nil, "posed in PreSimulation (after the Animator)")
 
@@ -131,7 +138,23 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(with({ crowd = false }).textures == 0, "crowd = false")
 	local tight = with({ maxBeams = 20, maxParts = 10 })
 	check(tight.beams <= 20 and tight.parts <= 10, `a tighter budget is kept ({tight.parts} parts, {tight.beams} Beams)`)
+	local zero = with({ roofSpacing = 0, railSpacing = 0, flagSpacing = 0 })
+	check(zero.beams <= D.maxBeams and zero.parts <= D.maxParts and #zero.roof > 0, "a zero spacing can't loop forever (N10)")
+	-- A gap in the rail bunting wherever a post is skipped at the finish line (N9): the Beam count matches.
+	local railBeams = math.max(0, #plan.rail - 1)
+	for k = 2, #plan.rail do
+		if plan.rail[k].gap then railBeams -= 1 end
+	end
+	check(plan.beams == math.max(0, #plan.roof - 1) + railBeams + #plan.spireLinks + #plan.roofFlags + #plan.spireFlags,
+		"the Beam count leaves out the finish-line gap")
+	local onLine = with({ railFromFeet = 660, railPastFeet = 200, railSpacing = 20 }) -- a station lands right on the line
+	local gaps = 0
+	for _, p in onLine.rail do
+		if p.gap then gaps += 1 end
+	end
+	check(gaps == 1, "no post on the line, and no bunting across it")
 	local dsrc = fs.readFile("game/src/server/TrackDressing.luau")
+	check(string.find(dsrc, "t.OffsetStudsU = (k * 5.3) % D.crowdTileU", 1, true) ~= nil, "each riser's crowd starts elsewhere (no grid)")
 	check(string.find(dsrc, "a.Parent = parent\n\ta.WorldCFrame", 1, true) ~= nil, "bunting attachments: parent first, then place")
 	check(string.find(dsrc, "WorldArt.whenReady", 1, true) ~= nil and string.find(dsrc, "b.Color = fallback", 1, true) ~= nil,
 		"plain colours until the images load")

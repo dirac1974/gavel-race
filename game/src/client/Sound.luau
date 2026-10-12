@@ -158,11 +158,9 @@ function Sound.recent(name: string, seconds: number): boolean
 	return t ~= nil and os.clock() - t <= seconds
 end
 
-function Sound.speaking(): boolean
+function Sound.speaking(): boolean -- (every Heartbeat from MusicBed: no closure)
 	local v = voice
-	if not v then return false end
-	local ok, playing = pcall(function() return v.IsPlaying end)
-	return ok and playing == true
+	return v ~= nil and v.IsPlaying == true
 end
 
 -- (AAA Phase 4, D-069) The music bed: one looping Sound for a library track id, started at volume 0 in

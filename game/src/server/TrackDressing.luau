@@ -23,7 +23,7 @@ TrackDressing.POLE_HEX = "FBFBF5"
 TrackDressing.FLAG_LENGTH, TrackDressing.FLAG_HEIGHT = 7, 3.5
 TrackDressing.ROOF_POLE, TrackDressing.SPIRE_POLE = 12, 8
 
-export type Point = { x: number, y: number, z: number }
+export type Point = { x: number, y: number, z: number, gap: boolean? } -- gap: no bunting from the post before
 export type Geometry = {
 	roofEdgeX: number, roofTopY: number, roofUnderY: number, z0: number, z1: number,
 	finials: { Point }, tiers: number, -- finial tops of the Twin Spires; StandTier parts (each gets a Texture)
@@ -40,6 +40,7 @@ end
 
 -- Evenly spaced stations from a to b (both ends included), about `step` apart.
 local function stations(a: number, b: number, step: number): { number }
+	step = math.max(step, 1) -- a zero (or negative) spacing in config can't loop forever
 	local n = math.max(1, math.ceil(math.abs(b - a) / step - 1e-9))
 	local out = table.create(n + 1)
 	for k = 0, n do out[k + 1] = a + (b - a) * k / n end
@@ -55,10 +56,16 @@ function TrackDressing.plan(geom: Geometry, D, layout, cfg): Plan
 		local r = layout.outerRadius(cfg) + D.railPostOffset
 		local from, to = cfg.finishFromTop - D.railFromFeet, cfg.finishFromTop + D.railPastFeet
 		local _, _, lineZ = layout.finishLine(cfg)
+		local gap = false
 		for _, d in stations(from, to, D.railSpacing) do
 			local x, z = layout.atDistance(cfg, r, d)
-			if math.abs(z - lineZ) > 3 or math.abs(x - r - cfg.centerX) > 1 then -- never a post on the finish line
-				table.insert(out.rail, pt(x, 0, z))
+			if math.abs(z - lineZ) > 3 or math.abs(x - r - cfg.centerX) > 1 then
+				local post = pt(x, 0, z)
+				if gap then post.gap = true end -- no bunting across the finish line
+				gap = false
+				table.insert(out.rail, post)
+			else
+				gap = #out.rail > 0 -- never a post on the finish line, and a gap in the bunting there
 			end
 		end
 		for _, f in geom.finials do
@@ -83,7 +90,11 @@ function TrackDressing.plan(geom: Geometry, D, layout, cfg): Plan
 	-- Budget: trim the least-seen pieces first (roof flags, then the far rail bunting) if over a cap.
 	local function count()
 		out.parts = #out.rail + #out.roofFlags + #out.spireFlags -- one post or pole each; the flags are Beams
-		out.beams = math.max(0, #out.roof - 1) + math.max(0, #out.rail - 1) + #out.spireLinks + #out.roofFlags + #out.spireFlags
+		local railBeams = math.max(0, #out.rail - 1)
+		for k = 2, #out.rail do
+			if out.rail[k].gap then railBeams -= 1 end
+		end
+		out.beams = math.max(0, #out.roof - 1) + railBeams + #out.spireLinks + #out.roofFlags + #out.spireFlags
 	end
 	count()
 	while (out.parts > D.maxParts or out.beams > D.maxBeams) and #out.roofFlags > 0 do
@@ -203,6 +214,7 @@ function TrackDressing.build(venue: Folder): Plan?
 	-- Homestretch rail: posts, with bunting from post top to post top.
 	prev = nil
 	for _, p in plan.rail do
+		if p.gap then prev = nil end
 		local part = post(v3(p), D.railPostStuds, "BuntingPost")
 		local a = hang(part, v3(p) + Vector3.new(0, D.railPostStuds - 0.2, 0))
 		if prev then beam(prev, a, D.sag * 0.6) end
@@ -261,13 +273,14 @@ function TrackDressing.build(venue: Folder): Plan?
 	end)
 	if D.crowd then
 		WorldArt.whenReady("crowd_strip", function(image)
-			for _, tier in tiers do
+			for k, tier in tiers do
 				if not tier.Parent then continue end
 				local t = Instance.new("Texture")
 				t.Name = "Crowd"
 				t.Texture = image
 				t.Face = Enum.NormalId.Left -- -X: the grandstand faces the track
 				t.StudsPerTileU, t.StudsPerTileV = D.crowdTileU, D.crowdTileV
+				t.OffsetStudsU = (k * 5.3) % D.crowdTileU -- each riser starts the fans elsewhere: a crowd, not a grid
 				t:SetAttribute("Row", math.max(0, math.floor(tier.Size.Y / D.crowdTileV + 0.5) - 1))
 				t.Parent = tier
 				CollectionService:AddTag(t, TrackDressing.TAG_CROWD)

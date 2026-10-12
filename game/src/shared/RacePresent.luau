@@ -56,7 +56,17 @@ function RacePresent.gateFrame(cfg: GateCfg, now: number, start: number): (strin
 	return "dolly", ease((now - dollyFrom) / math.max(0.01, blendFrom - dollyFrom))
 end
 
+-- The gate pass's cut (handOff = "cut"): the Paper's opacity `elapsed` seconds into a fade of `seconds`,
+-- clear to 0.4 at the middle (where the chase shot is set) and back to clear.
+function RacePresent.cutFade(elapsed: number, seconds: number): number
+	local half = math.max(0.005, num(seconds, 0.12) / 2)
+	local e = num(elapsed, 0)
+	if e <= 0 or e >= 2 * half then return 0 end
+	return 0.4 * (if e <= half then e / half else (2 * half - e) / half)
+end
+
 export type YouCfg = {
+	riderShown: boolean?,
 	riderStuds: number?,
 	riderPx: number?,
 	riderPxTall: number?,
@@ -67,13 +77,14 @@ export type YouCfg = {
 }
 
 -- The YOU marker: (shown, studs above the horse, width px, height px). `chase`: your own chase view
--- (the Follow camera while you ride). `zoom`: the camera's distance to its focus. `orbit`: the finish
+-- (the Follow camera while you ride, or the gate pass before it). riderShown = false (the UI/UX consult:
+-- it sat in the sightline and repeats the place badge) hides it there; replays and spectators keep it. `zoom`: the camera's distance to its focus. `orbit`: the finish
 -- moment's orbit is on.
 function RacePresent.youMarker(cfg: YouCfg?, chase: boolean, zoom: number, orbit: boolean): (boolean, number, number, number)
 	local c: YouCfg = cfg or {}
 	if orbit then return false, num(c.otherStuds, 12), num(c.otherPx, 90), num(c.otherPxTall, 120) end
 	if chase then
-		local shown = num(zoom, 99) >= num(c.firstPersonZoom, 2)
+		local shown = c.riderShown ~= false and num(zoom, 99) >= num(c.firstPersonZoom, 2)
 		return shown, num(c.riderStuds, 7), num(c.riderPx, 56), num(c.riderPxTall, 72)
 	end
 	return true, num(c.otherStuds, 12), num(c.otherPx, 90), num(c.otherPxTall, 120)

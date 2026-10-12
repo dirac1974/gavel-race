@@ -71,8 +71,17 @@ function JockeyPose.armDeg(p: Pose): (number, number)
 	return upper, upper + p.elbow
 end
 
+-- The pump is drawn from small lookup tables (no CFrame made per frame): the rise depends on lift only,
+-- the waist and shoulders on the pump only. Index 1..steps+1 for v from lo to hi, nearest step.
+JockeyPose.LIFT_STEPS, JockeyPose.PUMP_STEPS = 16, 32
+function JockeyPose.lutIndex(v: number, lo: number, hi: number, steps: number): number
+	local f = math.clamp((v - lo) / (hi - lo), 0, 1)
+	return math.floor(f * steps + 0.5) + 1
+end
+
 -- Roblox side ----------------------------------------------------------------------------------
-type Rider = { horse: Instance, rider: Instance, motors: { Motor6D }, fields: { string } }
+type Rider = { horse: Instance, rider: Instance, humanoid: Humanoid, motors: { Motor6D }, fields: { string },
+	released: boolean }
 
 -- The rider's posable joints, and whether that answer is final (an R6 rig, or every joint found; a
 -- character still streaming in is asked again on the next refresh).
@@ -90,7 +99,8 @@ local function motorsOf(rider: Instance): (Rider?, boolean)
 		end
 	end
 	if #motors == 0 then return nil, false end
-	return { horse = rider, rider = rider, motors = motors, fields = fields }, #motors == #JockeyPose.JOINTS
+	return { horse = rider, rider = rider, humanoid = humanoid, motors = motors, fields = fields, released = false },
+		#motors == #JockeyPose.JOINTS
 end
 
 -- deps: HorseLegs, RaceState, TrackLayout (shared modules), config (GameConfig.jockeyPose),
@@ -108,11 +118,26 @@ function JockeyPose.start(deps)
 		fixed[field] = CFrame.Angles(rad((base :: any)[field]), 0, 0)
 	end
 
+	-- The pumping joints' lookup tables (the still pose is lift 0, pump 0: pelvisLut[1], waistLut[mid]).
+	local LS, PS = JockeyPose.LIFT_STEPS, JockeyPose.PUMP_STEPS
+	local pelvisLut, waistLut, shoulderLut = {}, {}, {}
+	local scratch = JockeyPose.newPose()
+	for i = 0, LS do
+		JockeyPose.solve(cfg, i / LS, 0, scratch)
+		pelvisLut[i + 1] = CFrame.new(0, scratch.rise, 0) * CFrame.Angles(rad(scratch.pelvis), 0, 0)
+	end
+	for j = 0, PS do
+		JockeyPose.solve(cfg, 0, -(-1 + 2 * j / PS), scratch) -- nose = -pump
+		waistLut[j + 1] = CFrame.Angles(rad(scratch.waist), 0, 0)
+		shoulderLut[j + 1] = CFrame.Angles(rad(scratch.shoulder), 0, 0)
+	end
+
 	local riders: { Rider } = {}
 	local known: { [Instance]: Rider | false } = setmetatable({}, { __mode = "k" }) :: any
-	local pose = JockeyPose.newPose()
 
 	local function release(r: Rider)
+		if r.released then return end
+		r.released = true
 		for _, m in r.motors do
 			if m.Parent then m.Transform = CFrame.identity end
 		end
@@ -144,6 +169,7 @@ function JockeyPose.start(deps)
 				end
 				if r then
 					r.horse = horse
+					r.released = false
 					table.insert(list, r)
 				end
 			end
@@ -165,15 +191,21 @@ function JockeyPose.start(deps)
 		if #riders == 0 then return end
 		local still = deps.reducedMotion()
 		for _, r in riders do
+			-- Off the horse (hopped off, Leave, respawn): drop the crouch this frame, not at the next refresh.
+			local seat = r.humanoid.SeatPart
+			if seat == nil or seat.Parent ~= r.horse then
+				release(r)
+				continue
+			end
+			r.released = false
 			local lift, nose = 0, 0
 			if not still then
 				local s = HorseLegs.stateOf(r.horse)
 				if s then lift, nose = HorseLegs.bodyBob(s) end
 			end
-			JockeyPose.solve(cfg, lift, nose, pose)
-			local pelvisCf = CFrame.new(0, pose.rise, 0) * CFrame.Angles(rad(pose.pelvis), 0, 0)
-			local waistCf = CFrame.Angles(rad(pose.waist), 0, 0)
-			local shoulderCf = CFrame.Angles(rad(pose.shoulder), 0, 0)
+			local pump = JockeyPose.lutIndex(-nose, -1, 1, PS)
+			local pelvisCf = pelvisLut[JockeyPose.lutIndex(lift, 0, 1, LS)]
+			local waistCf, shoulderCf = waistLut[pump], shoulderLut[pump]
 			for i, m in r.motors do
 				local f = r.fields[i]
 				m.Transform = if f == "pelvis" then pelvisCf elseif f == "waist" then waistCf

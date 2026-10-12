@@ -29,12 +29,12 @@
   "uploadedAt": "2026-10-05T06:50:16Z"
  },
  "confetti_square": {
-  "assetId": 136953913559600,
+  "assetId": 94195307096733,
   "file": "assets/ui/png/confetti_square.png",
   "kind": "Decal",
   "moderation": "Approved",
-  "sha256": "24c78c8f45e3ff89e1f10e337dc67a77e25c7ba6f546c3f58019303be55a12cc",
-  "uploadedAt": "2026-10-12T00:35:14Z"
+  "sha256": "dd4e1711162e8aee1f26286f634a454629252b57b9a639a5b2b767e7da363e4b",
+  "uploadedAt": "2026-10-12T01:03:57Z"
  },
  "crowd_strip": {
   "assetId": 73979376587458,
@@ -66,12 +66,12 @@
   "uploadedAt": "2026-10-05T03:45:10Z"
  },
  "flag_pennant": {
-  "assetId": 116445865328474,
+  "assetId": 71088943701367,
   "file": "assets/ui/png/flag_pennant.png",
   "kind": "Decal",
   "moderation": "Approved",
-  "sha256": "39a453724a5a74f6b6861ad1e7895476b6ae1be19b40b6c4113e2f523db43854",
-  "uploadedAt": "2026-10-12T00:37:50Z"
+  "sha256": "d002d321768678de95ff27b12c857e767ec860d4ea64ed775b00f3e90fd2e7fc",
+  "uploadedAt": "2026-10-12T01:03:59Z"
  },
  "foal_stand_bay": {
   "assetId": 135635594367079,
@@ -535,7 +535,7 @@
   "assetId": 87356614588667,
   "file": "assets/audio/sound_sheet.wav",
   "kind": "Audio",
-  "moderation": "Reviewing",
+  "moderation": "Approved",
   "sha256": "ab321ca8443a9dbc27f6391db3597371fb1cb68a0bca5e0d2aceedfcd120f894",
   "uploadedAt": "2026-10-11T23:25:34Z"
  },

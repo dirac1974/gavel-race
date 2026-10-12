@@ -282,3 +282,57 @@ def test_lint_catches_small_things(tmp_path):
                  encoding="utf-8")
     bad = lint(f, ui)
     assert len(bad) == 6, bad
+
+
+def hud_scale_floor() -> float:
+    src = (CLIENT / "RaceState.luau").read_text(encoding="utf-8")
+    m = re.search(r"function RaceState\.hudScale\(\).*?math\.clamp\([^,]+,\s*([\d.]+),\s*1\)", src, re.S)
+    assert m, "RaceState.hudScale's floor not found"
+    return float(m.group(1))
+
+
+def hud_scaled_small_text(src: str, floor: float, min_text: int) -> list[str]:
+    """Labels inside a frame shrunk by RaceState.hudScale() (a UIScale set to k = hudScale()) whose literal
+    TextSize times the smallest scale renders under ui.minTextPx, and that layout never sizes up with the
+    race map's rule (TextSize = math.max(16, math.ceil(GameConfig.ui.minTextPx / k)))."""
+    code = strip_comments(src)
+    scale_parent = dict(re.findall(r"(\w+)\.Parent\s*=\s*(\w+)", code))
+    scaled: set[str] = set()
+    for m in re.finditer(r"local (\w+) = RaceState\.hudScale\(\)", code):
+        k = m.group(1)
+        for line in code[m.end():].split("\n")[:12]:
+            lhs = re.match(r"\s*([\w.,\s]+?)\s*=\s*([\w,\s]+)$", line)
+            if lhs and all(v.strip() == k for v in lhs.group(2).split(",")):
+                for target in lhs.group(1).split(","):
+                    var = target.strip().removesuffix(".Scale")
+                    if var in scale_parent:
+                        scaled.add(scale_parent[var])
+    for m in re.finditer(r"(\w+)\.Scale\s*=\s*RaceState\.hudScale\(\)", code):
+        if m.group(1) in scale_parent:
+            scaled.add(scale_parent[m.group(1)])
+    rule = re.search(r"local (\w+) = math\.max\(\d+, math\.ceil\(GameConfig\.ui\.minTextPx / [^)]*\)\)\)?", code)
+    sized_up: set[str] = set()
+    if rule:
+        sized_up = set(re.findall(r"(\w+)\.TextSize\s*=\s*" + rule.group(1) + r"\b", code))
+    bad = []
+    for m in re.finditer(r"local (\w+)\s*=\s*label\((\w+),", code):
+        name, parent = m.group(1), m.group(2)
+        if parent not in scaled:
+            continue
+        args = calls(code[m.start():], "label")[0]
+        size = int(args[4]) if len(args) > 4 and args[4].isdigit() else 18
+        if size * floor < min_text and name not in sized_up:
+            bad.append(f"{name} in {parent}: {size} px x hudScale {floor} = {size * floor:.1f} px < {min_text}")
+    return bad
+
+
+def test_hud_scaled_text_stays_at_the_floor():
+    ui = ui_config()
+    floor = hud_scale_floor()
+    src = (CLIENT / "RaceController.client.luau").read_text(encoding="utf-8")
+    assert hud_scaled_small_text(src, floor, ui["minTextPx"]) == []
+    # The lint catches a scaled label left at its literal size.
+    broken = src.replace("placeOf.TextSize = small", "placeOf.ZIndex = 7")
+    assert any(b.startswith("placeOf in placeBadge") for b in hud_scaled_small_text(broken, floor, ui["minTextPx"]))
+    broken_rows = src.replace("for _, row in rows do row.TextSize = small end", "")
+    assert any(b.startswith("row in board") for b in hud_scaled_small_text(broken_rows, floor, ui["minTextPx"]))
