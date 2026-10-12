@@ -134,3 +134,46 @@ end)
 gateBtn.Activated:Connect(function()
 	gameRemotes:WaitForChild("GateToggle"):FireServer()
 end)
+
+-- A friend's new build (D-070): when you walk into a friend's yard that built something in the last
+-- greenCash.newBuildHours, it sparkles once (once per build per visit to this server). No counts.
+do
+	local WorldLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WorldLayout"))
+	local okFx, BuildFx = pcall(require, script.Parent:WaitForChild("BuildFx", 10))
+	local sparkled: { [string]: boolean } = {}
+	local inside: number? = nil
+	task.spawn(function()
+		local world = workspace:WaitForChild("World", 60)
+		local plots = world and world:WaitForChild("Plots", 60)
+		while plots and okFx do
+			task.wait(0.5)
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			local here: number? = nil
+			if root then
+				for i = 1, WorldLayout.PLOT_COUNT do
+					local r = WorldLayout.plotRect(i)
+					if root.Position.X >= r[1] and root.Position.X <= r[3] and root.Position.Z >= r[2] and root.Position.Z <= r[4] then
+						here = i
+						break
+					end
+				end
+			end
+			if here ~= inside then
+				inside = here
+				local plot = here and plots:FindFirstChild("Plot" .. here)
+				local id = plot and plot:GetAttribute("FreshBuildId")
+				if plot and typeof(id) == "string" and letIn(plot) and not sparkled[tostring(plot:GetAttribute("OwnerId")) .. ":" .. id] then
+					sparkled[tostring(plot:GetAttribute("OwnerId")) .. ":" .. id] = true
+					local barn = plot:FindFirstChild("Barn")
+					local build = barn and barn:FindFirstChild("Build_" .. id)
+					local at = build and build:GetAttribute("BuildAt")
+					if typeof(at) ~= "Vector3" then
+						local x, z = WorldLayout.plotPoint(here :: number, 80, 0)
+						at = Vector3.new(x, 10, z) -- a look on the barn itself (paint, trim, doors)
+					end
+					BuildFx.sparkle(at :: Vector3, 20)
+				end
+			end
+		end
+	end)
+end

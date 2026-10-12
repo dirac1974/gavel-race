@@ -62,12 +62,13 @@ function Visits.canVisit(a: Access): (boolean, string?)
 	return true, nil
 end
 
-export type Owner = { userId: number, name: string, visits: string?, gateClosed: boolean?, hasBarn: boolean }
+export type Owner = { userId: number, name: string, visits: string?, gateClosed: boolean?, hasBarn: boolean, fresh: boolean? }
 
 -- The Friends' barns list for `viewer`: friends with a barn whose setting lets them in, closed
 -- gates included (shown greyed, "Gate closed"), sorted by name, at most cfg.listMax. A
--- non-friend or a "Nobody" barn is never on it.
-function Visits.list(viewer: number, owners: { Owner }, isFriend: (number, number) -> boolean, cfg: Config): { { userId: number, name: string, closed: boolean } }
+-- non-friend or a "Nobody" barn is never on it. fresh (D-070): the barn has a Barn Builder build
+-- under greenCash.newBuildHours old (a ✨ by the name; no counts, no comparing barns).
+function Visits.list(viewer: number, owners: { Owner }, isFriend: (number, number) -> boolean, cfg: Config): { { userId: number, name: string, closed: boolean, fresh: boolean } }
 	local out = {}
 	if not cfg.enabled or not cfg.mapList then return out end
 	for _, o in owners do
@@ -75,7 +76,7 @@ function Visits.list(viewer: number, owners: { Owner }, isFriend: (number, numbe
 			local friends = isFriend(viewer, o.userId)
 			local ok, why = Visits.canVisit({ friends = friends, visits = o.visits, gateClosed = o.gateClosed })
 			if ok or why == "closed" then
-				table.insert(out, { userId = o.userId, name = o.name, closed = not ok })
+				table.insert(out, { userId = o.userId, name = o.name, closed = not ok, fresh = o.fresh == true })
 			end
 		end
 	end

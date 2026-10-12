@@ -104,6 +104,32 @@ Ui.icon(cashCard, "cash", "💵", UDim2.fromOffset(36, 36), UDim2.new(0, 8, 0.5,
 local cashText = Ui.text(cashCard, "0", 26, { Size = UDim2.new(0.5, -50, 1, 0), Position = UDim2.new(0, 48, 0, 0) })
 cashText.TextXAlignment = Enum.TextXAlignment.Left
 cashText.TextColor3 = C.textGood
+-- The wish (D-070): the Barn Builder item you're saving for, as its icon and a bar filling with your
+-- Green Cash (no %, no words). On a phone the cash card sits in ☰ More, so the bar shows there too.
+-- Never on the results card (the dock hides there).
+local Style = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Style"))
+local GC = GameConfig.greenCash or {}
+local wishRow = Instance.new("Frame")
+wishRow.Name = "Wish"
+wishRow.BackgroundTransparency = 1
+wishRow.Position = UDim2.new(0, 48, 0, 36)
+wishRow.Visible = false
+wishRow.Parent = cashCard
+local wishIcon = Ui.text(wishRow, "", 16, { Size = UDim2.fromOffset(20, 16), Position = UDim2.fromOffset(0, -1), TextScaled = true })
+local wishBar = Instance.new("Frame")
+wishBar.BackgroundColor3 = C.cream
+wishBar.BorderSizePixel = 0
+wishBar.Position = UDim2.new(0, 24, 0, 3)
+wishBar.Size = UDim2.new(1, -26, 0, 10)
+wishBar.Parent = wishRow
+Ui.corner(wishBar, 5)
+Ui.stroke(wishBar, 1)
+local wishFill = Instance.new("Frame")
+wishFill.BackgroundColor3 = C.cash
+wishFill.BorderSizePixel = 0
+wishFill.Size = UDim2.fromScale(0, 1)
+wishFill.Parent = wishBar
+Ui.corner(wishFill, 5)
 -- Diamonds: tap to open the Tack & Paint shop (never opens by itself, D-050). On touch it's a
 -- pill at the top right (ui.minTouchPx tall), below the Roblox top bar: no glow, pulse, badge or
 -- sound (D-056). The ⚙️ sits under it on touch (GrownUps, touchLayout.gearBelowGem).
@@ -118,6 +144,12 @@ for _, b in { cardGem, pillGem } do
 end
 local function gemOnPill(): boolean
 	return touch and LAYOUT.gemPlacement == "topRight"
+end
+-- The cash number's size: the card's full height, or the top part when the wish bar shows below it.
+local function sizeCash()
+	local w = if gemOnPill() then UDim.new(1, -56) else UDim.new(0.5, -50)
+	cashText.Size = UDim2.new(w, if wishRow.Visible then UDim.new(0, 36) else UDim.new(1, 0))
+	wishRow.Size = UDim2.new(w, UDim.new(0, 16))
 end
 
 -- Active horse
@@ -272,6 +304,17 @@ end
 local function render(data)
 	if not data then return end
 	cashText.Text = tostring(data.cash)
+	local wish, fill = Style.wishProgress(data)
+	local showWish = wish ~= nil and GC.enabled ~= false and GC.wishChip ~= false
+	if showWish then
+		wishIcon.Text = wish.emoji
+		wishFill.Size = UDim2.fromScale(fill, 1)
+		wishFill.BackgroundColor3 = if fill >= 1 then C.gold else C.cash
+	end
+	if wishRow.Visible ~= showWish then
+		wishRow.Visible = showWish
+		sizeCash()
+	end
 	cardGem.Text = "💎 " .. tostring(data.diamonds or 0)
 	pillGem.Text = cardGem.Text
 	local h = PlayerState.activeHorse()
@@ -460,7 +503,7 @@ local function applyTouch(on: boolean)
 	dock.Position = if on then UDim2.new(0, 12, 1, -14) else UDim2.new(0.5, 0, 1, -14)
 	horseHit.Visible = not on
 	horsesSlot.Visible = on
-	cashText.Size = if gemOnPill() then UDim2.new(1, -56, 1, 0) else UDim2.new(0.5, -50, 1, 0)
+	sizeCash()
 	fitDock()
 end
 applyTouch(touch)

@@ -32,6 +32,7 @@ local TripBaseline = require(Shared:WaitForChild("TripBaseline"))
 local ResultsText = require(Shared:WaitForChild("ResultsText"))
 local PacePreview = require(Shared:WaitForChild("PacePreview")) -- (D-067) when the post-lock preview runs
 local PREVIEW_AFTER_LOCK = GameConfig.pacePreviewAfterLock
+local TapPreview = require(Shared:WaitForChild("TapPreview")) -- (D-071) the draw-only pre-lock preview
 local Profile = require(Shared:WaitForChild("Profile"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
@@ -89,6 +90,12 @@ local PersonalBest = makeRemote("PersonalBest")   -- server -> one: distance, ri
 local RaceOffsets = Instance.new("UnreliableRemoteEvent")
 RaceOffsets.Name = "RaceOffsets"                  -- server -> all: feet ahead of the pace per lane (never the luck), [lane positions, server time,] course
 RaceOffsets.Parent = remotes
+-- (D-071) To the rider only, never to spectators: their taps' message over their horse, and how far
+-- lane room holds their drawn horse back (the pressure cue and the chip on their own screen).
+local TapNote = makeRemote("TapNote")             -- server -> one rider: "up" or "away", course
+local TapHeld = Instance.new("UnreliableRemoteEvent")
+TapHeld.Name = "TapHeld"                          -- server -> one rider: feet held back by lane room, course
+TapHeld.Parent = remotes
 local BurstSparkle = makeRemote("BurstSparkle")   -- server -> all: lane ids with a Great+ burst, course
 local JoinRace = makeRemote("JoinRace")           -- client -> server: want (bool), course id?, horse id?
 local QueueStatus = makeRemote("QueueStatus")     -- server -> one: in line?, riders in line, seconds (or nil), course
@@ -806,6 +813,38 @@ local function runRace(c, players: { Player })
 	end
 	c.scene:addJockeys(isBot) -- Roblox-style jockeys on the bot horses
 
+	-- Tap preview (D-071, provisional; GameConfig.tapPreview): before the lock each rider's drawn horse
+	-- leads Trip's by what their taps in the open checkpoint have earned so far (TapPreview). Drawn
+	-- only, and only in races with a human: nothing is made or computed for an all-bot race. With
+	-- steering off (no trip) the open checkpoint's shown chances refresh at each pass end instead
+	-- (PacePreview.beforeLock). enabled = false: neither, today's race exactly.
+	local tapCfg = GameConfig.tapPreview
+	local tapOn = TapPreview.enabled(tapCfg)
+	local tp = nil
+	local tapRiders = {} -- { i = lane, uid, p = Player, hs = the held feet's send state } per human lane
+	if tapOn then
+		for i, lane in session.lanes do
+			local uid = if lane.isBot then nil else tonumber(lane.id)
+			local p = uid and Players:GetPlayerByUserId(uid)
+			if p then
+				table.insert(tapRiders, { i = i, uid = uid, p = p, hs = TapPreview.newHeldSend() })
+			end
+		end
+	end
+	if trip and #tapRiders > 0 then
+		tp = TapPreview.new(#session.lanes, tapCfg, trip.lead, GameConfig.steering.gapRampSeconds, GameConfig.steering.laneBand)
+		for i, lane in session.lanes do TapPreview.setRider(tp, i, not lane.isBot) end
+	end
+	local tapWholeRace = trip == nil and #tapRiders > 0 -- (steering off)
+	-- (tapPartial, tapClean and tapDone are made once a race and reused; previewOwn and PaceMeter.score
+	-- still allocate at each pass end, one or two a second)
+	local tapPartial, tapClean, tapDone = {}, {}, {}
+	local NO_TAPS = {}
+	-- A pass counts as finished once its late taps are in: a tap's claimed time is kept for up to
+	-- maxTapRewindSeconds of latency, so a Perfect at the pass's end can still be on its way (D-071).
+	-- (Layer off: 0, the D-067 previews as before.)
+	local TAP_GRACE = if tapOn then GameConfig.maxTapRewindSeconds or 0 else 0
+
 	local preLast, postLast = tStart, postStart
 	for _, p in passes do
 		if p.t0 < burstOpen then preLast = math.max(preLast, p.t1) else postLast = math.max(postLast, p.t1) end
@@ -831,9 +870,12 @@ local function runRace(c, players: { Player })
 	-- tick or two can use the new chances a tick early or late. That is fair: live chances are the
 	-- same for every horse, it moves only when their skill gaps grow (by a tick), and tau is
 	-- measured against that same field.
+	local tapLockAt: number? = nil -- (D-071) when the lock came: the after-lock previews count from it
+	local previewStretch: (seg: number, own: boolean?) -> () -- (below; the lock refreshes the shown chances with it, D-071)
 	local function advanceTrip(t: number)
 		if not trip or trip.locked or cur.aborted then return end
 		if Trip.advance(trip, session.live, t - tStart) then
+			tapLockAt = now()
 			session:setTrip(Trip.raceTau(trip))
 			shownLive = table.clone(session.live)
 			TripLocked:FireAllClients(c.id)
@@ -860,6 +902,15 @@ local function runRace(c, players: { Player })
 			-- The chances shown pick tau up at once (when the lock comes before checkpoint 1, as it
 			-- can in a Sprint, the checkpoint's own update carries it).
 			if session.closed > 0 then LiveChances:FireAllClients(session.closed, shownLive, c.id) end
+			-- (D-071) Once at the lock, the open checkpoint's preview (as each second after it): the shown
+			-- offsets rise to where the tap preview drew the horses while it holds, so its residual is
+			-- absorbed rather than eased away.
+			-- (Only while the checkpoint's passes still run, as each second after it.)
+			if tp and cur.seg and PacePreview.afterLock(PREVIEW_AFTER_LOCK, true, cur.seg, session.closed, false) then
+				local segPasses = session:pacePasses(cur.seg)
+				local lastEnd = if #segPasses > 0 then segPasses[#segPasses].t1 else -math.huge
+				if now() < lastEnd then previewStretch(cur.seg) end
+			end
 		end
 	end
 	task.spawn(function()
@@ -918,11 +969,35 @@ local function runRace(c, players: { Player })
 			end
 		end
 		local scratchOwn = {}
+		-- (D-071) Each rider's own word from the tap preview, to them alone: the message over their
+		-- horse (TapPreview.message, before the lock), and how far lane room holds their drawn horse
+		-- back (TapPreview.held; 0 after the lock), unreliable, when TapPreview.heldSendDue says
+		-- (tapPreview.heldSend: on a 1 ft change at most every 0.5 s, at once across the cue's thresholds
+		-- or down to 0, and resent each second while above 0 so a lost packet can't strand it). Nothing
+		-- here allocates.
+		local function tapNotes(stamp: number)
+			local rt = stamp - tStart
+			for _, r in tapRiders do
+				if r.p.Parent then
+					local kind = TapPreview.message(tp, r.i, rt)
+					if kind then TapNote:FireClient(r.p, kind, c.id) end
+					if TapPreview.heldSendDue(r.hs, TapPreview.held(tp, r.i), stamp, tapCfg) then
+						TapHeld:FireClient(r.p, r.hs.last, c.id)
+					end
+				end
+			end
+		end
 		local function send(stamp: number, frameDt: number)
+			debug.profilebegin("RaceSend")
 			sendBrushes()
 			local w = RaceShape.blendWeight(stamp, tFar, postEnd, GameConfig.raceShape.blendPower)
 			local offsets, lanes = Trip.frame(trip, session, shownLive, w, GameConfig.raceShape, frameDt, stamp - tStart)
 			lastStamp = stamp
+			if tp then -- (D-071) the drawn preview on Trip's offsets: tp.d, the same table each call, sent below at once
+				offsets = TapPreview.step(tp, offsets, if trip.locked then trip.shown else trip.x,
+					if trip.locked then trip.shownTgt else trip.tgt, stamp - tStart, trip.locked)
+				tapNotes(stamp)
+			end
 			-- Each rider with the buttons (and nobody else) hears about their own lane when it changes,
 			-- up to the lock (Trip.riderLane): the lane taken, where it ends, the last press answered
 			-- (their screen's look cue and, with D-054's linear glide, its prediction: SteerPredict),
@@ -958,6 +1033,7 @@ local function runRace(c, players: { Player })
 			else
 				RaceOffsets:FireAllClients(offsets, stamp, c.id)
 			end
+			debug.profileend()
 		end
 		while alive() do
 			local t = now()
@@ -980,11 +1056,11 @@ local function runRace(c, players: { Player })
 			task.wait(1 / GameConfig.steering.sendHz)
 		end
 	end)
-	local function previewStretch(seg: number)
-		-- Riders' provisional stretch-drive scores over the passes finished so far.
+	previewStretch = function(seg: number, own: boolean?)
+		-- Riders' provisional stretch-drive scores over the passes finished so far (late taps in).
 		local done = {}
 		for _, p in session:pacePasses(seg) do
-			if p.t1 <= now() then table.insert(done, p) end
+			if p.t1 + TAP_GRACE <= now() then table.insert(done, p) end
 		end
 		if #done == 0 then return end
 		local partial = {}
@@ -993,8 +1069,33 @@ local function runRace(c, players: { Player })
 				partial[i] = (PaceMeter.score(done, cur.taps[tonumber(lane.id)] or {}, GameConfig.pace.bounceSeconds))
 			end
 		end
-		shownLive = session:previewLive(seg, partial)
+		-- own (D-071, steering off before the lock): every other lane keeps its pace, so only the riders'
+		-- own taps move the shown chances and the field's scores arrive at the close (as the layer's).
+		shownLive = if own then session:previewOwn(seg, partial) else session:previewLive(seg, partial)
 		LiveChances:FireAllClients(seg, shownLive, c.id, true) -- (D-067) a preview, not a checkpoint closing
+	end
+	-- (D-071) A pass end in the open checkpoint before the lock: the riders' scores so far and the
+	-- share of their passes tapped exactly once, and the chances if it closed now with every other lane
+	-- keeping its pace (previewOwn: only a rider's own taps move their horse) go to the tap preview.
+	-- With steering off, the shown chances refresh instead (PacePreview.beforeLock).
+	local function tapPassEnd(seg: number, segPasses)
+		if tp then
+			if trip.locked or seg ~= session.closed + 1 then return end
+			table.clear(tapDone)
+			local t = now()
+			for _, p in segPasses do
+				if p.t1 + TAP_GRACE <= t then table.insert(tapDone, p) end
+			end
+			local n = #tapDone
+			if n == 0 then return end
+			for _, r in tapRiders do
+				local score, _, single = PaceMeter.score(tapDone, cur.taps[r.uid] or NO_TAPS, GameConfig.pace.bounceSeconds)
+				tapPartial[r.i], tapClean[r.i] = score, single / n
+			end
+			TapPreview.setPreview(tp, session.live, session:previewOwn(seg, tapPartial), n, tapPartial, tapClean)
+		elseif tapWholeRace and PacePreview.beforeLock(tapCfg, false, seg, session.closed, false) then
+			previewStretch(seg, true)
+		end
 	end
 
 	local errors: { [number]: { number } } = {}
@@ -1014,6 +1115,40 @@ local function runRace(c, players: { Player })
 				while now() < lastEnd do
 					task.wait(GameConfig.stretchPreviewSeconds)
 					previewStretch(seg)
+				end
+			elseif tp or tapWholeRace then
+				-- (D-071) Wake at each pass end once its late taps are in (the tap preview, or with steering
+				-- off the shown chances), and after the lock each second as below (D-067), counted from the
+				-- lock (which refreshes them itself).
+				local afterOn = trip ~= nil and PREVIEW_AFTER_LOCK ~= nil and PREVIEW_AFTER_LOCK.enabled ~= false
+				local every = if afterOn then PREVIEW_AFTER_LOCK.seconds or 1 else 1
+				local k, nextAfter, sawLock = 0, math.huge, false
+				while now() < lastEnd and alive() do
+					if afterOn and trip.locked and not sawLock then
+						sawLock = true
+						nextAfter = (tapLockAt or now()) + every
+					end
+					local wake = lastEnd
+					if segPasses[k + 1] then wake = math.min(wake, segPasses[k + 1].t1 + TAP_GRACE) end
+					if sawLock then wake = math.min(wake, nextAfter) end
+					task.wait(math.max(0.05, wake - now()))
+					local t = now()
+					if afterOn and trip.locked and not sawLock then
+						sawLock = true
+						nextAfter = (tapLockAt or t) + every
+					end
+					local ended = false
+					while segPasses[k + 1] and segPasses[k + 1].t1 + TAP_GRACE <= t do
+						k += 1
+						ended = true
+					end
+					if ended then tapPassEnd(seg, segPasses) end
+					if sawLock and t >= nextAfter then
+						nextAfter = t + every
+						if PacePreview.afterLock(PREVIEW_AFTER_LOCK, trip.locked, seg, session.closed, false) and t < lastEnd then
+							previewStretch(seg)
+						end
+					end
 				end
 			elseif trip and PREVIEW_AFTER_LOCK and PREVIEW_AFTER_LOCK.enabled ~= false then
 				-- After the far-turn lock (AAA Phase 2, D-067): the open checkpoint's chances refresh each
@@ -1061,6 +1196,7 @@ local function runRace(c, players: { Player })
 		end
 		fans("beforeClose", c.id, seg) -- the crowd's tiny boost joins this segment's close
 		shownLive = session:closeSegment(seg)
+		if tp then TapPreview.closed(tp) end -- (D-071) the next checkpoint starts at 0 passes
 		LiveChances:FireAllClients(seg, shownLive, c.id)
 	end
 	cur.seg = nil

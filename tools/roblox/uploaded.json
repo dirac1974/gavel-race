@@ -318,6 +318,13 @@
   "sha256": "f5822d37e79af98ec25f45b94e98917da1deaed549a9472664b6128ab3a04092",
   "uploadedAt": "2026-10-05T03:44:56Z"
  },
+ "horse_silhouette": {
+  "assetId": 109669079822890,
+  "file": "assets/ui/png/horse_silhouette.png",
+  "kind": "Decal",
+  "sha256": "b293484b99985fefbe57696cf3f1247f05867883ad4b3be330df384de530f4ce",
+  "uploadedAt": "2026-10-12T02:02:43Z"
+ },
  "horse_stand_appaloosa": {
   "assetId": 129767839310948,
   "file": "Models/generated/horse_stand_appaloosa/horse_stand_appaloosa_hoofed.glb",

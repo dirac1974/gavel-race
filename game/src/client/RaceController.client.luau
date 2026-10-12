@@ -632,10 +632,14 @@ local function tap()
 		if score < HUD.earlyLateBelow then
 			labelText = if t < PaceMeter.idealTime(pass) then "Early" else "Late" -- says what to fix
 		end
-		feedback.Text = labelText
-		showResultIcon(labelText)
-		popFeedback()
-		Coach.judge(labelText, PaceMeter.position(pass, t)) -- (D-067) the word at the marker too
+		-- (D-071) While "Moving up!" shows over your horse, only Perfect, Early and Late say a word.
+		local quiet = RaceState.tapMessageUp and labelText ~= "Perfect" and labelText ~= "Early" and labelText ~= "Late"
+		feedback.Text = if quiet then "" else labelText
+		if not quiet then
+			showResultIcon(labelText)
+			popFeedback()
+			Coach.judge(labelText, PaceMeter.position(pass, t)) -- (D-067) the word at the marker too
+		end
 		if not (coach and coach.race == cueRace and k <= (FX.coachHintPasses or 0)) then hint.Text = "" end -- (a coached race holds the rule)
 		-- The tap tick (D-066): every counted tap, pitched by its score (Sound.play's 4th argument is
 		-- the PlaybackSpeed). With the tick off, Great and Perfect chime as before.
@@ -1041,6 +1045,9 @@ local function updateSteer(t: number, dt: number)
 	-- Boxed in (D-057 N4): the arrows from the server's word on your own lane, and "No room yet".
 	local raceNow = t - s.start
 	local inArrow, outArrow = SteerHud.arrows(s.hud, s.lane, raceNow, STEER, SHUD, s.shown)
+	if s.roomRing and os.clock() < (s.roomRingUntil or 0) then -- (D-071) "Room this way!": that button's ring, briefly
+		if s.roomRing < 0 then inArrow.ring = 1 else outArrow.ring = 1 end
+	end
 	paintArrow(inBtn, inArrow)
 	paintArrow(outBtn, outArrow)
 	if SteerChips.noRoom(s.chips, s.lane, raceNow, SHUD) then showChip("No room yet") end
@@ -1497,6 +1504,8 @@ remotes.RaceStarted.OnClientEvent:Connect(function(league, laneList, start, cond
 		bb.Size = UDim2.fromOffset(90, 120)
 		bb.StudsOffsetWorldSpace = Vector3.new(0, 12, 0)
 		bb.AlwaysOnTop = true
+		-- (D-071) Parented to the horse Model, a BillboardGui needs an Adornee to render: its main part.
+		bb.Adornee = (horse:IsA("Model") and horse.PrimaryPart) or horse:FindFirstChildWhichIsA("BasePart", true)
 		local img = Instance.new("ImageLabel")
 		img.Size = UDim2.fromScale(1, 0.75)
 		img.BackgroundTransparency = 1
@@ -2014,3 +2023,22 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	end
 	riding = false
 end)
+
+-- The tap preview on your own screen (D-071): the message over your horse, the held cue and chip
+-- (TapCue; no new top-level locals here).
+require(script.Parent:WaitForChild("TapCue")).attach({
+	steer = function() return steer end,
+	myLane = function() return myLaneIndex end,
+	chip = function(text: string) showChip(text) end,
+	chipBusy = function(): boolean return steerChip.Visible end,
+	coachBusy = function(): boolean
+		return coach ~= nil and coach.race == cueRace and (thumb.Visible or hint.Text == FX.coachHint or hint.Text == FX.coachBurstHint)
+	end,
+	badge = placeText,
+	hintLine = function(text: string, seconds: number)
+		hint.Text = text
+		task.delay(seconds, function()
+			if hint.Text == text then hint.Text = "" end
+		end)
+	end,
+})

@@ -354,11 +354,60 @@ GameConfig.finish = {
 -- the trip's tau is already fixed at the lock and nothing before the lock changes; the result and
 -- the scores come from the checkpoints as before. Needs steering (no lock without it).
 GameConfig.pacePreviewAfterLock = { enabled = true, seconds = 1, throughCheckpoint = 2 }
+-- D-071 (provisional): the draw-only pre-lock preview (shared/TapPreview). Before the lock a rider's
+-- drawn offset leads Trip's by lead * leadFeetPerShare * (preview - live) * ramp * n / (n + shrinkPasses),
+-- from pass minPasses of the open checkpoint (previewBots: bots too), at most capFeet ahead and
+-- capBackFeet behind, moving at most maxSpeed ft/s and maxAccel ft/s^2 on top of Trip's own motion.
+-- Lane room: laneGapFeet clear of horses in or gliding into its lane, never inside hardGapFeet once
+-- within hardLaneBand lanes, eased back or on at most pullPerSecond; a horse in the next lane stays
+-- within joinSlackFeet of where Trip puts it once they are joinClearFeet apart (steering.clearFeet),
+-- so a lane change never meets a horse drawn too close. At a close or the lock the drawn horse holds
+-- while Trip's catches up (for fadeSeconds after the lock), then the residual eases out.
+-- Never reads luck; decides nothing. steeringOffWholeRace: with steering off the shown chances
+-- preview at every pass end instead (PacePreview.beforeLock). The message ("Giddy-up! Moving up!",
+-- TapPreview.message; never "away"/"lead"/"win" before luck can reorder the field) shows on a messageFeet gain over the field's mean while the
+-- rider's own taps score at least messageMinScore over messageMinPasses passes, at most every messageEverySeconds, never on a loss.
+-- enabled = false is the race before D-071 exactly. Tuned in docs/reviews/aaa-2026-10-11/tapgap-results.md.
+GameConfig.tapPreview = { enabled = true, lead = 1.2, minPasses = 2, shrinkPasses = 2, capFeet = 12, capBackFeet = 6,
+	maxSpeed = 10, maxAccel = 20, laneGapFeet = 10, hardGapFeet = 7.5, hardLaneBand = 0.55, pullPerSecond = 19,
+	joinClearFeet = 8, joinSlackFeet = -4, settleFeetPerSecond = 2, fadeSeconds = 1, previewBots = false, steeringOffWholeRace = true,
+	messageEnabled = true, messageFeet = 8, messageEverySeconds = 4, messageMinScore = 60, messageMinPasses = 6, messageMinClean = 0.8,
+	-- (D-071 rulings) Held by lane room (TapPreview.held, TapPreview.stepCue): a pressure cue on your own
+	-- screen at minFeet for minSeconds; the chip at chipMinFeet for chipMinSeconds, "Room this way! ◀/▶" at most
+	-- every chipEverySeconds (buttons), "Keep tapping! Room soon." once a race (Smart Steer). Copy: TapMessage.
+	heldCue = { minFeet = 4, minSeconds = 1.0, chipMinFeet = 6, chipMinSeconds = 1.5, chipEverySeconds = 10 },
+	-- (review N6) TapHeld sends (TapPreview.heldSendDue): a 1 ft change, at least 0.5 s apart, a resend
+	-- each second while held; dropping to 0 or crossing a cue threshold goes at once.
+	heldSend = { feet = 1, minGapSeconds = 0.5, resendSeconds = 1 },
+	-- (feel review) a drawn lead given back at a close or the lock eases back at most this fast
+	pullBackFeetPerSecond = 6 }
+-- The tap preview on the rider's own screen (D-071, provisional; client/TapCue, shared/TapMessage).
+-- enabled = false hides the message, the pressure cue and the held chip (the server still sends).
+-- The message ("Giddy-up! Moving up!", gains only, never "pulling away") is silent, over your saddle at
+-- studsAbove for messageSeconds (text minTextPx..maxTextPx; on the hint line in first person; the YOU
+-- marker steps aside meanwhile); it waits up to waitSeconds behind a steering chip or coaching, else is
+-- dropped, and never shows in the Final Burst or after the lock. The place badge pops by badgePopScale
+-- with it (not under Reduced Motion). The pressure cue (tapPreview.heldCue) multiplies your horse's bob
+-- by bobScale, leans it forward leanDeg and adds pressureDust puffs a stride (none under Reduced
+-- Motion). The held chip ("Room this way! ◀/▶") lights that button's ring for ringSeconds. (When the
+-- server sends TapHeld: tapPreview.heldSend, TapPreview.heldSendDue.)
+GameConfig.tapCue = { enabled = true, messageSeconds = 1.6, waitSeconds = 2.5, studsAbove = 6.5, badgePopScale = 1.15,
+	minTextPx = 14, maxTextPx = 24, bobScale = 1.3, leanDeg = 2, pressureDust = 1, ringSeconds = 1.5 }
 -- The "Next thing" pill (D-064, stage 3): one suggestion above the dock from Advice.nextThing, with
 -- GO; Pip gives a hint when the same suggestion has been up this long and you haven't moved.
 -- raceFirstUntilRaces (AAA Phase 2, D-067): until a player has run this many races, the pill puts
 -- "Race with Comet!" before feeding, brushing and jobs (0 = the stage 3 order).
 GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6, raceFirstUntilRaces = 3 }
+-- Green Cash sink (D-070, provisional): Barn Builder at Feed & Seed (BarnCatalog, Green Cash only).
+-- enabled = false hides the counter and its pill (owned things stay in the yard). wishChip: the wished
+-- item's icon and bar on the cash card. pillAfterRaceSeconds: no "You can build" pill or shelf note this
+-- long after your race (DiamondProducts.afterRaceSeconds too). pillShowSeconds: the pill counts as shown
+-- for an item after this long on screen (or its GO), then never again for that item. returnHours: a
+-- build can be returned for all its Green Cash. buildFx: the drop-in (false or Reduced Motion: a fade).
+-- newBuildHours: ✨ by your name on Friends' barns. buyGapSeconds: the server's gap between two buys.
+-- pendingBuildSeconds: a build waits this long for you to walk home to see it, then just shows.
+GameConfig.greenCash = { enabled = true, wishChip = true, pillAfterRaceSeconds = 120, pillShowSeconds = 45, returnHours = 24,
+	buildFx = true, newBuildHours = 48, buyGapSeconds = 1, shelfNote = true, pendingBuildSeconds = 900 }
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
 -- Visiting friends' barns (D-060, D-042): only Roblox friends in this server, never a count.
@@ -628,18 +677,19 @@ GameConfig.scoreLabels = {
 	{ min = 0, label = "Miss" },
 }
 
+-- B (D-070, provisional): flattened from 20/50/120/300/750 so Barn Builder stays in reach (sims/economy.py --greencash).
 GameConfig.leagues = {
 	Rookie = { name = "Rookie", T = 22, B = 20, sweepSeconds = 2.4, windowSeconds = 4.0, targetDrift = 0, twoTargetFinal = false,
 		distances = { "Sprint", "Mile" }, -- shorter races for new players (D-027)
 		strideIntervalLo = 0.60, strideIntervalHi = 0.60, strideDrift = 0, leadChange = false },
-	Bronze = { name = "Bronze", T = 18, B = 50, sweepSeconds = 2.0, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
+	Bronze = { name = "Bronze", T = 18, B = 30, sweepSeconds = 2.0, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
 		distances = { "Sprint", "Mile", "Classic" }, -- Bronze adds the Classic; Silver and up run every distance (D-046)
 		strideIntervalLo = 0.55, strideIntervalHi = 0.60, strideDrift = 0.02, leadChange = false },
-	Silver = { name = "Silver", T = 18, B = 120, sweepSeconds = 1.6, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
+	Silver = { name = "Silver", T = 18, B = 45, sweepSeconds = 1.6, windowSeconds = 3.0, targetDrift = 0, twoTargetFinal = false,
 		strideIntervalLo = 0.50, strideIntervalHi = 0.56, strideDrift = 0.03, leadChange = false },
-	Gold = { name = "Gold", T = 14.4, B = 300, sweepSeconds = 1.3, windowSeconds = 3.0, targetDrift = 0.3, twoTargetFinal = false,
+	Gold = { name = "Gold", T = 14.4, B = 65, sweepSeconds = 1.3, windowSeconds = 3.0, targetDrift = 0.3, twoTargetFinal = false,
 		strideIntervalLo = 0.46, strideIntervalHi = 0.52, strideDrift = 0.03, leadChange = false },
-	Champion = { name = "Champion", T = 12, B = 750, sweepSeconds = 1.1, windowSeconds = 3.0, targetDrift = 0.3, twoTargetFinal = true,
+	Champion = { name = "Champion", T = 12, B = 85, sweepSeconds = 1.1, windowSeconds = 3.0, targetDrift = 0.3, twoTargetFinal = true,
 		strideIntervalLo = 0.42, strideIntervalHi = 0.48, strideDrift = 0.03, leadChange = true },
 } :: { [string]: League }
 

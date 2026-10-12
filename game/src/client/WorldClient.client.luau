@@ -220,7 +220,9 @@ local function drawFriends(list)
 			img.Parent = b
 			Ui.corner(img, 42)
 			face(f.userId, img)
-			Ui.text(b, f.name, 18, { Position = UDim2.new(0, 4, 0, 98), Size = UDim2.new(1, -8, 0, 26), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
+			-- ✨ (D-070): something new built at that barn in the last two days; never a count
+			Ui.text(b, if f.fresh == true then "✨ " .. f.name else f.name, 18,
+				{ Position = UDim2.new(0, 4, 0, 98), Size = UDim2.new(1, -8, 0, 26), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
 			local go = Ui.text(b, if f.closed then "🔒 Gate closed" else "🏡 Visit ▶", 18, { Position = UDim2.new(0, 4, 0, 128), Size = UDim2.new(1, -8, 0, 30) })
 			go.TextColor3 = if f.closed then C.plum else C.ink
 			if f.closed then

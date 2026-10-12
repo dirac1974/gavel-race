@@ -19,6 +19,10 @@
 -- owner can ride one from there (the Ride prompt on it, CallHorse with its id).
 -- The Rosette Wall (D-062, stage 8): rosettes, Cups and Legend plaques from StableStar.wall,
 -- rebuilt with the barn when the wall changes.
+-- Barn Builder (D-070): what the stable built with Green Cash (BarnDecor), each at its fixed spot:
+-- barn paint, trim and stall-door colours, a wall frame, the painted front fence, yard pieces, the
+-- roof weathervane. A variant of a free prop takes that prop's place. The plot's FreshBuildId names
+-- a build under greenCash.newBuildHours old (a sparkle on Friends' barns when a friend arrives).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -38,6 +42,7 @@ local VisitAccess = require(script.Parent:WaitForChild("VisitAccess"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local Spa = require(Shared:WaitForChild("Spa"))
 local StableStar = require(Shared:WaitForChild("StableStar"))
+local BarnDecor = require(script.Parent:WaitForChild("BarnDecor")) -- Barn Builder pieces (D-070)
 
 local Travel = Profiles.remote("Travel")            -- client -> server: map destination key
 local FriendBarns = Profiles.remote("FriendBarns")  -- client -> server: ask; server -> client: { {userId, name, closed} }
@@ -429,6 +434,7 @@ local function rosetteWall(barn: Instance, wallCF: CFrame, data)
 		local y = ((WALL_ROWS - 1) / 2 - row) * (height / WALL_ROWS)
 		wallItem(barn, it, panelCF * CFrame.new(x, y, -0.12), cell)
 	end
+	return panelCF, width, height
 end
 
 local function buildBarn(i: number, owner: Player, data)
@@ -439,6 +445,10 @@ local function buildBarn(i: number, owner: Player, data)
 	local roofC = Color3.fromHex(paint and paint.color2 or "7B2D26")
 	local trimC = Color3.fromHex(paint and paint.color3 or "FBFBF5")
 	local plateC = Color3.fromHex(plate and plate.color or "FBFBF5")
+	-- Barn Builder looks (D-070): gold-painted trim, stall-door paint (else the trim colour)
+	local trimItem, doorsItem = Style.worn(data, "trim"), Style.worn(data, "doors")
+	if trimItem and trimItem.color then trimC = Color3.fromHex(trimItem.color) end
+	local doorC = if doorsItem and doorsItem.color then Color3.fromHex(doorsItem.color) else trimC
 	local starSet = Style.hasSet(data, "star")
 	local shell = plotModels[i]
 	local old = shell:FindFirstChild("Barn")
@@ -454,17 +464,17 @@ local function buildBarn(i: number, owner: Player, data)
 	local mid = plotCF(i, (front + back) / 2, 0)
 	-- Back and side walls, roof; the front is open stall bays with half doors.
 	part({ Name = "BackWall", Size = Vector3.new(width, BARN_H, 1.2), Color = wallC, Material = Enum.Material.WoodPlanks,
-		CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H / 2, BARN_D / 2) }, barn) -- local +Z is away from the lane
+		CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H / 2, BARN_D / 2) }, barn):SetAttribute("Paint", "walls") -- local +Z is away from the lane
 	for _, s in { -1, 1 } do
 		part({ Name = "SideWall", Size = Vector3.new(1.2, BARN_H, BARN_D), Color = wallC, Material = Enum.Material.WoodPlanks,
-			CFrame = mid * CFrame.new(s * width / 2, GROUND_Y + BARN_H / 2, 0) }, barn)
+			CFrame = mid * CFrame.new(s * width / 2, GROUND_Y + BARN_H / 2, 0) }, barn):SetAttribute("Paint", "walls")
 	end
 	local roofH = 7
 	for _, s in { -1, 1 } do
 		wedge({ Name = "Roof", Size = Vector3.new(width + 3, roofH, BARN_D / 2 + 2), Color = roofC,
-			CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H + roofH / 2, s * (BARN_D / 4 + 1)) * CFrame.Angles(0, if s > 0 then math.pi else 0, 0) }, barn)
+			CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H + roofH / 2, s * (BARN_D / 4 + 1)) * CFrame.Angles(0, if s > 0 then math.pi else 0, 0) }, barn):SetAttribute("Paint", "roof")
 	end
-	part({ Name = "Trim", Size = Vector3.new(width + 0.8, 1, BARN_D + 0.8), Color = trimC, CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H, 0) }, barn)
+	part({ Name = "Trim", Size = Vector3.new(width + 0.8, 1, BARN_D + 0.8), Color = trimC, CFrame = mid * CFrame.new(0, GROUND_Y + BARN_H, 0) }, barn):SetAttribute("Paint", "trim")
 	part({ Name = "Floor", Size = Vector3.new(width, 0.3, BARN_D), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
 		CFrame = mid * CFrame.new(0, GROUND_Y + 0.15, 0) }, barn)
 	-- Stall bays.
@@ -476,8 +486,8 @@ local function buildBarn(i: number, owner: Player, data)
 				CFrame = plotCF(i, (front + back) / 2, across - stallW / 2, GROUND_Y + (BARN_H - 2) / 2) }, barn)
 		end
 		-- Dutch half door (lower half), crossed brace.
-		part({ Name = "Stall" .. k, Size = Vector3.new(stallW - 2, 4.4, 0.6), Color = trimC, -- the chores prompt hangs here
-			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn)
+		part({ Name = "Stall" .. k, Size = Vector3.new(stallW - 2, 4.4, 0.6), Color = doorC, -- the chores prompt hangs here
+			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, 0) }, barn):SetAttribute("Paint", "doors")
 		part({ Name = "Brace", Size = Vector3.new(0.5, 6, 0.3), Color = wallC,
 			CFrame = bay * CFrame.new(0, GROUND_Y + 2.2, -0.4) * CFrame.Angles(0, 0, math.rad(55)) }, barn)
 		local h = Profile.stallHorse(data, k)
@@ -502,18 +512,23 @@ local function buildBarn(i: number, owner: Player, data)
 			local _, nameLabel = WorldScene.sign(barn, (bay * CFrame.new(0, GROUND_Y + BARN_H - 2.5, 0.2)).Position,
 				bay.LookVector, h.name, if h.id == data.activeHorse then "🏇" elseif starSet then "🌟" else nil, stallW - 3, 2.2, plateC)
 			nameLabel.Name = "HorseName"
+			local plateBoard = nameLabel:FindFirstAncestorWhichIsA("BasePart")
+			if plateBoard then plateBoard:SetAttribute("Paint", "plates") end
 			rosettes(barn, bay, h)
 		end
 	end
 	-- Props: hay and a water trough in front of the barn, inside the plot whatever the barn's size.
 	local propA, propB = WorldLayout.PLOT_FRONT / 2 - 10, -(WorldLayout.PLOT_FRONT / 2 - 10)
-	local hay = WorldScene.placeModel(barn, "hay_bale", plotCF(i, front - 6, propA, GROUND_Y))
+	local hay = BarnDecor.swapped(data, "hay") or WorldScene.placeModel(barn, "hay_bale", plotCF(i, front - 6, propA, GROUND_Y))
 	if not hay then
 		part({ Name = "HayBale", Size = Vector3.new(4, 3, 3), Color = Color3.fromHex("E8C76A"), Material = Enum.Material.Fabric,
 			CFrame = plotCF(i, front - 6, propA, GROUND_Y + 1.5) }, barn)
 	end
-	local trough = WorldScene.placeModel(barn, "water_trough", plotCF(i, front - 6, propB, GROUND_Y))
-	if trough then
+	local troughSwapped = BarnDecor.swapped(data, "trough")
+	local trough = not troughSwapped and WorldScene.placeModel(barn, "water_trough", plotCF(i, front - 6, propB, GROUND_Y))
+	if troughSwapped then
+		-- (Barn Builder's painted trough stands here instead)
+	elseif trough then
 		local cf, size = trough:GetBoundingBox()
 		part({ Name = "Water", Size = Vector3.new(size.X * 0.8, 0.2, size.Z * 0.6), Color = C.water, Material = Enum.Material.Glass,
 			Transparency = 0.25, CanCollide = false, CFrame = cf * CFrame.new(0, size.Y * 0.32, 0) }, barn)
@@ -548,11 +563,30 @@ local function buildBarn(i: number, owner: Player, data)
 	end
 	-- Barnyard bits from the uploaded art (skipped until it loads): a horseshoe over the barn,
 	-- a feed bucket and brush by the first stall, a wheelbarrow and pitchfork round the side,
-	-- and the post box at the gate (friends' carrot gifts, D-042).
-	WorldScene.placeModel(barn, "horseshoe_decor", plotCF(i, front - 0.8, 0, GROUND_Y + BARN_H + 1.5))
-	WorldScene.placeModel(barn, "feed_bucket", plotCF(i, front - 3, -width / 2 + 6, GROUND_Y))
+	-- and the post box at the gate (friends' carrot gifts, D-042). A Barn Builder variant takes its
+	-- free prop's place (D-070).
+	if not BarnDecor.swapped(data, "horseshoe") then
+		WorldScene.placeModel(barn, "horseshoe_decor", plotCF(i, front - 0.8, 0, GROUND_Y + BARN_H + 1.5))
+	end
+	if not BarnDecor.swapped(data, "bucket") then
+		WorldScene.placeModel(barn, "feed_bucket", plotCF(i, front - 3, -width / 2 + 6, GROUND_Y))
+	end
 	WorldScene.placeModel(barn, "grooming_brush", plotCF(i, front - 3, -width / 2 + 9, GROUND_Y))
-	WorldScene.placeModel(barn, "wheelbarrow", plotCF(i, front - 14, propA - 6, GROUND_Y))
+	if not BarnDecor.swapped(data, "barrow") then
+		WorldScene.placeModel(barn, "wheelbarrow", plotCF(i, front - 14, propA - 6, GROUND_Y))
+	end
+	-- Barn Builder (D-070): yard pieces at their fixed spots, the painted front fence.
+	local at = { i = i, cf = function(a: number, c: number, y: number?) return plotCF(i, a, c, y) end, ground = GROUND_Y,
+		front = front, width = width, barnH = BARN_H, barnD = BARN_D, roofH = roofH, mid = mid, propA = propA, propB = propB,
+		roofC = roofC, trimC = trimC }
+	for _, it in Style.yard(data) do
+		if it.build then
+			local ok, err = pcall(BarnDecor.yard, barn, it, at)
+			if not ok then warn("[StableService] Barn Builder " .. it.id .. ": " .. tostring(err)) end
+		end
+	end
+	local fenceItem = Style.worn(data, "fence")
+	if fenceItem then BarnDecor.fence(barn, i, fenceItem, GROUND_Y, GATE_W) end
 	WorldScene.placeModel(barn, "pitchfork", plotCF(i, front - 14, propA - 11, GROUND_Y))
 	-- The post box shows carrots on the days friends dropped some (D-060), and a box part holds
 	-- the visitors' "Drop a carrot" prompt (VisitClient) whether or not the art has loaded.
@@ -583,12 +617,16 @@ local function buildBarn(i: number, owner: Player, data)
 			Material = Enum.Material.Metal, CanCollide = false, CFrame = bellCF * CFrame.new(0, 4.6, -0.8) }, barn)
 	end
 	-- The Rosette Wall (D-060, D-062): what visitors see, with the stable's rosettes, Cups and plaques.
-	rosetteWall(barn, plotCF(i, 52, 12, GROUND_Y), data)
+	local panelCF, panelW, panelH = rosetteWall(barn, plotCF(i, 52, 12, GROUND_Y), data)
+	local frameItem = Style.worn(data, "frame")
+	if frameItem then BarnDecor.frame(barn, frameItem, panelCF, panelW, panelH) end
 	-- The photo board (D-063 Photo Finish): its prompt opens Roblox's own capture and share
 	-- prompts on the client (ComeBackClient); nothing is uploaded by the game.
 	if (GameConfig.comeback or {}).photo ~= false then
 		local photoCF = plotCF(i, 54, -4, GROUND_Y)
-		if not WorldScene.placeModel(barn, "photo_frame_stand", photoCF) then
+		if BarnDecor.swapped(data, "photo") then
+			-- (Barn Builder's flower photo board stands here instead; the prompt below still works)
+		elseif not WorldScene.placeModel(barn, "photo_frame_stand", photoCF) then
 			part({ Name = "PhotoFrame", Size = Vector3.new(8, 6, 0.6), Color = Color3.fromHex("BFD7FF"), CFrame = photoCF * CFrame.new(0, 4.5, 0) }, barn)
 		end
 		local photoSpot = part({ Name = "PhotoSpot", Size = Vector3.new(4, 4, 4), Transparency = 1, CanCollide = false, CanQuery = false,
@@ -797,8 +835,8 @@ local function signature(data, now: number, player: Player?): string
 	for _, h in data.horses do
 		table.insert(parts, tostring(h.stall) .. (if h.legend then "L" .. (if riding == h.id then "r" else "") else ""))
 	end
-	-- the look from the shop
-	for _, slot in { "paint", "plate" } do
+	-- the look from the shop (and Barn Builder's, D-070)
+	for _, slot in { "paint", "plate", "trim", "doors", "frame", "fence" } do
 		local it = Style.worn(data, slot)
 		table.insert(parts, it and it.id or "")
 	end
@@ -828,6 +866,7 @@ local function refresh(player: Player)
 	local label = shell:FindFirstChild("OwnerLabel", true)
 	if label then label.Text = "🏡 " .. player.DisplayName .. "'s Stable" end
 	local now = os.time()
+	shell:SetAttribute("FreshBuildId", BarnDecor.freshId(data, now))
 	local sig = signature(data, now, player)
 	if signatures[i] ~= sig then
 		signatures[i] = sig
@@ -852,6 +891,7 @@ local function clearPlot(i: number)
 	shell:SetAttribute("OwnerId", nil)
 	shell:SetAttribute("Visits", nil)
 	shell:SetAttribute("GateClosed", nil)
+	shell:SetAttribute("FreshBuildId", nil)
 	local bar = shell:FindFirstChild("GateBar")
 	if bar then bar:Destroy() end
 	local label = shell:FindFirstChild("OwnerLabel", true)
@@ -900,8 +940,29 @@ end
 Profiles.Loaded.Event:Connect(function(player: Player)
 	if assign(player) then refresh(player) end
 end)
+-- Coalesced (code review N6): at most one barn refresh per player every REFRESH_GAP seconds from
+-- profile changes, so tapping Place it / Put away fast can't rebuild a full Barn Builder yard each tap.
+-- The first change shows at once; changes inside the gap land together at its end.
+local REFRESH_GAP = 0.75
+local lastRefresh: { [Player]: number } = {}
+local refreshQueued: { [Player]: boolean } = {}
 Profiles.Changed.Event:Connect(function(player: Player)
-	refresh(player)
+	if refreshQueued[player] then return end
+	local wait = (lastRefresh[player] or -math.huge) + REFRESH_GAP - os.clock()
+	if wait <= 0 then
+		lastRefresh[player] = os.clock()
+		refresh(player)
+		return
+	end
+	refreshQueued[player] = true
+	task.delay(wait, function()
+		refreshQueued[player] = nil
+		lastRefresh[player] = os.clock()
+		if player.Parent then refresh(player) end
+	end)
+end)
+Players.PlayerRemoving:Connect(function(player: Player)
+	lastRefresh[player], refreshQueued[player] = nil, nil
 end)
 
 -- The horse is back in its stall the moment you get off or its race ends.
@@ -958,7 +1019,7 @@ local function barnOwners(): { Visits.Owner }
 		local data = Profiles.get(player)
 		if data then
 			table.insert(out, { userId = player.UserId, name = player.DisplayName, visits = data.settings.visits,
-				gateClosed = VisitAccess.gateClosed(player), hasBarn = #data.horses > 0 })
+				gateClosed = VisitAccess.gateClosed(player), hasBarn = #data.horses > 0, fresh = BarnDecor.freshId(data, os.time()) ~= nil })
 		end
 	end
 	return out
@@ -1100,7 +1161,8 @@ end)
 for i = 1, WorldLayout.PLOT_COUNT do plotModels[i] = buildShell(i) end
 Rides.start()
 
--- Crops grow and care resets at rollover while nobody touches anything: check every 20 s.
+-- Crops grow and care resets at rollover while nobody touches anything: check every 20 s. (This also
+-- lets a plot's FreshBuildId run out after greenCash.newBuildHours with no other change, D-070.)
 task.spawn(function()
 	while true do
 		task.wait(20)

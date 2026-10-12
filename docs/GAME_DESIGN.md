@@ -67,9 +67,11 @@ Feeding and pre-race meals · feed garden that grows offline · grooming mini-ga
 
 **Green Cash** (earned only): race purses and place prizes, quests, login calendar (pauses if missed, never resets), chores and selling surplus, small offline stable income capped at 8 hours. Sinks: food, training facilities, stable expansion, breeding fees, NPC horse market, tack, Hall of Fame retirement.
 
-**Diamonds** (Robux, small amounts earnable): cosmetics, time skips, stall and stable skins, quest rerolls, Exhibition entry to a higher league (XP and ribbon, no cash), Derby Pass premium track. Never win chance, Rating, gavel, or cash-league qualification. No Green Cash for sale, no cash multipliers, no paid random items at launch, no purchase prompts during or right after a race.
+**Diamonds** (Robux, small amounts earnable): cosmetics, stall and stable skins, quest rerolls, Exhibition entry to a higher league (XP and ribbon, no cash), Derby Pass premium track. Never win chance, Rating, gavel, or cash-league qualification. No Green Cash for sale, no cash multipliers, no paid random items at launch, no purchase prompts during or right after a race.
 
-League base purse B: Rookie 20, Bronze 50, Silver 120, Gold 300, Champion 750. Pace targets: Bronze ~3 hours, Silver ~3 days, Gold ~3 weeks; non-payers can reach Champion.
+Time skips: none for now (D-050). If ever added, decor builds only (D-044) — never Energy, training, garden, foals or the race queue.
+
+League base purse B: Rookie 20, Bronze 30, Silver 45, Gold 65, Champion 85 (D-070, provisional; was 20/50/120/300/750). Green Cash buys Barn Builder cosmetics by highest league reached (`docs/reviews/aaa-2026-10-11/greencash-sim.md`). Pace targets: Bronze ~3 hours, Silver ~3 days, Gold ~3 weeks; non-payers can reach Champion.
 
 ## Energy (D-015)
 
@@ -84,10 +86,10 @@ Scoring is the same in every league; the gavel gets harder through meter speed a
 | League | B | Points to unlock Stakes | Gavel meter (full sweep) | Unlocks |
 | --- | --- | --- | --- | --- |
 | Rookie | 20 | 100 | 2.4 s, 4 s windows | Garden, grooming, first pet |
-| Bronze | 50 | 200 | 2.0 s | Breeding, Tactics |
-| Silver | 120 | 450 | 1.6 s | Pool, hill course, clubs |
-| Gold | 300 | 900 | 1.3 s, drifting target | Rare NPC bloodlines, weather variants |
-| Champion | 750 | top league | 1.1 s, drifting target, two half-size targets in the final window | Hall of Fame, seasonal trophies |
+| Bronze | 30 | 200 | 2.0 s | Breeding, Tactics |
+| Silver | 45 | 450 | 1.6 s | Pool, hill course, clubs |
+| Gold | 65 | 900 | 1.3 s, drifting target | Rare NPC bloodlines, weather variants |
+| Champion | 85 | top league | 1.1 s, drifting target, two half-size targets in the final window | Hall of Fame, seasonal trophies |
 
 Values live in `game/src/shared/GameConfig.luau`. Points to unlock, bot anchors and league ceilings were retuned together in AAA Phase 3 (D-068, `docs/reviews/aaa-2026-10-11/phase3-sim.md`): a casual kid opens each Cup in about 20 / 40 / 90 / 180 races.
 

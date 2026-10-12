@@ -42,10 +42,17 @@ end
 -- nudge, the nudge eases back at the same rate; only if it would still be more than
 -- nudgeSlackFeet past `room` is it pulled in at once (clearFeet less the slack still leaves a gap
 -- between two horses, so one is never drawn through another).
-function RaceFx.stepNudge(drawn: number, goal: number, room: number, dt: number, fx: any): number
+-- baseFall (D-071, optional): how far your horse's received offset fell back this frame. Given it,
+-- the nudge eases out no faster than keeps your horse and its nudge together falling back at most
+-- nudgeMaxBackFeetPerSecond (a horse ahead cutting in still pulls it in past the slack at once).
+function RaceFx.stepNudge(drawn: number, goal: number, room: number, dt: number, fx: any, baseFall: number?): number
 	local step = fx.nudgeFeetPerSecond * math.max(0, dt)
 	local limit = math.max(0, room)
 	local nextFeet = drawn + math.clamp(math.min(goal, limit) - drawn, -step, step)
+	if baseFall ~= nil then
+		local most = math.max(0, (fx.nudgeMaxBackFeetPerSecond or 19) * math.max(0, dt) - math.max(0, baseFall))
+		nextFeet = math.max(nextFeet, drawn - most)
+	end
 	return math.clamp(nextFeet, 0, limit + (fx.nudgeSlackFeet or 0))
 end
 

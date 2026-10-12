@@ -64,6 +64,8 @@ task.spawn(function()
 	end)
 end)
 Ui.text(panel, "🎨 Tack & Paint", 30, { Position = UDim2.new(0, 0, 0, 10), Size = UDim2.new(1, 0, 0, 36) })
+-- One currency per shop (D-070): Tack & Paint is 💎 only; Barn Builder at Feed & Seed is 💵 only.
+Ui.text(panel, "💎 Tack & Paint looks. 🔨 Barn Builder uses 💵.", 16, { Position = UDim2.new(0, 90, 0, 46), Size = UDim2.new(1, -180, 0, 24) }).TextColor3 = C.plum
 local balance = Ui.text(panel, "", 22, { Position = UDim2.new(0, 18, 0, 14), Size = UDim2.new(0, 200, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
 balance.TextColor3 = Color3.fromHex("2E5AAC")
 local closeBtn = Ui.closeButton(panel, UDim2.new(1, -74, 0, 8))
@@ -273,7 +275,7 @@ render = function()
 		if cat.id == tab then for _, s in cat.slots do slots[s] = true end end
 	end
 	local order = 0
-	for _, it in Style.ITEMS do
+	for _, it in Style.shopItems("tack") do -- never a Barn Builder (💵) item (D-070)
 		if slots[it.slot] and shown(it) then
 			order += 1
 			itemCard(it, order)

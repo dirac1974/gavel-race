@@ -19,7 +19,7 @@ The casual kid profile is 3 sessions × 10 races a week with new-kid riding. On 
 - Gold enters at 22%, not 25%, because the horse gains about +9 Rating during a six-week stay.
 - Open issues to revisit:
   - Champion win rate drifts to about 54% at the plateau, since there's no ceiling.
-  - Faster access to big purses gives about 1.7× more Green Cash by week 12, which makes purse flattening urgent.
+  - Faster access to big purses gave about 1.7× more Green Cash by week 12. D-070 resolved this by flattening the purses; see [[greencash-d070]].
   - Engaged players race ahead of their training: 17% entry win rate at Champion. `Training.raceGain` is the candidate fix.
 - The systems consult added a light-profile gate: 1 session × 10 races plus 2 rides, so the cap every week. It passed: no horse arrived over a ceiling, and ceiling-opened Cups were won 31–34% of the time. Widening the gap to Bronze 56 / Silver 61 was worse because it closed 51% of light horses' Bronze races. Keep the gate test.
 - κ stays at 1.0. A perfect rider already earns about 1.5× per race.

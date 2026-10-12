@@ -21,7 +21,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
 local Style = require(Shared:WaitForChild("Style"))
 
-local PATTERN_TEXT = { stars = "⭐ ⭐ ⭐", checks = "🏁", lightning = "⚡", goldtrim = "", plain = "", dots = "• • •", star = "⭐" }
+local PATTERN_TEXT = { stars = "⭐ ⭐ ⭐", checks = "🏁", lightning = "⚡", goldtrim = "", plain = "", dots = "• • •", star = "⭐",
+	hearts = "❤️ ❤️ ❤️", daisies = "🌼 🌼 🌼", rainbow = "🌈" } -- (the last three: Barn Builder cloths, D-070)
 
 -- A saddle cloth in your shop colours. It's the horse model's own Cloth piece, cut to fit its
 -- back by tools/meshy/split_legs.py and tinted here; a horse without one shows no cloth (a

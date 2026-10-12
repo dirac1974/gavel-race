@@ -471,6 +471,7 @@ end
 -- tap or the one before it, whichever is higher (a quick second tap carries on, never snaps
 -- back), followed at most raceFx.nudgeFeetPerSecond and kept clear of the horse ahead in your lane.
 local nudgeDrawn, nudgeLast, nudgePrev = 0, -math.huge, -math.huge
+local TAP_PREVIEW = GameConfig.tapPreview ~= nil and GameConfig.tapPreview.enabled == true
 local aheadScratch = {}
 local function myNudge(race, t: number, dt: number, ramp: number): number
 	local at = RaceState.nudgeAt or -math.huge
@@ -480,7 +481,12 @@ local function myNudge(race, t: number, dt: number, ramp: number): number
 	table.clear(aheadScratch)
 	for i = 1, race.lanes do aheadScratch[i] = race.offset[i] * ramp end
 	local room = RaceFx.nudgeRoom(race.myLane, aheadScratch, race.lane, STEER.laneBand, FX.nudgeClearFeet)
-	nudgeDrawn = RaceFx.stepNudge(nudgeDrawn, goal, room, dt, FX)
+	-- (D-071) With the tap preview on, how far your horse's received offset fell back this frame caps
+	-- the nudge's own ease-out, so the two together never fall back faster than nudgeMaxBackFeetPerSecond.
+	local own = race.offset[race.myLane] * ramp
+	local baseFall = if TAP_PREVIEW and race.nudgeBase then math.max(0, race.nudgeBase - own) else nil
+	race.nudgeBase = own
+	nudgeDrawn = RaceFx.stepNudge(nudgeDrawn, goal, room, dt, FX, baseFall)
 	return nudgeDrawn
 end
 
@@ -512,7 +518,8 @@ local function myDust(horse: Model?, phaseBefore: number?, gaitBefore: string?)
 	if not (fx and fx.dust and phaseBefore) then return end
 	local phase, gait = HorseLegs.phaseOf(horse)
 	if phase and gait and gait == gaitBefore and HorseLegs.crossedPlant(gait, phaseBefore, phase) then
-		fx.dust:Emit(FX.dustPerStride)
+		-- (D-071) held back by lane room for a while (TapCue): an extra puff, the pressure cue
+		fx.dust:Emit(FX.dustPerStride + (if RaceState.tapPressure then (GameConfig.tapCue and GameConfig.tapCue.pressureDust) or 1 else 0))
 	end
 end
 
@@ -601,6 +608,7 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 				else BOB_STUDS * speed * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi))
 			local shown = p
 			local mine = isFocus and i == race.myLane
+			if mine and RaceState.tapPressure then bob *= (GameConfig.tapCue and GameConfig.tapCue.bobScale) or 1.3 end -- (D-071 pressure cue)
 			if mine then
 				local nudge = myNudge(race, t, dt, ramp)
 				if nudge > 0 then shown = p + nudge / race.len1 end
@@ -626,6 +634,9 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 				model = horseModel(courseId, i)
 				if model then phaseBefore, gaitBefore = HorseLegs.phaseOf(model) end
 				surgeDeg = mySurge(model, t)
+				-- (D-071 pressure cue) a small forward lean while lane room holds your horse back (off under
+				-- Reduced Motion: TapCue never sets tapPressure then)
+				if RaceState.tapPressure then surgeDeg += (GameConfig.tapCue and GameConfig.tapCue.leanDeg) or 2 end
 			end
 			place(i, shown, bob, race.plan, courseId, nil, race.lane[i], yaw, roll, leanFeet, nod, surgeDeg)
 			if mine then myDust(model, phaseBefore, gaitBefore) end

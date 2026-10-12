@@ -6,6 +6,7 @@ local ids: { [string]: number } = {
 	confetti_square = 94195307096733,
 	crowd_strip = 73979376587458,
 	flag_pennant = 71088943701367,
+	horse_silhouette = 109669079822890,
 	ui_atlas_1 = 138919800817033,
 	ui_atlas_2 = 94337225467876,
 	ui_atlas_clarity_1 = 134193368841769,

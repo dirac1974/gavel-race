@@ -1,0 +1,2 @@
+- [Tap preview D-071 findings](project_tap_preview_d071.md) — own-pace preview, lane-room limits, boxed riders, D-070/D-071 clash
+- [Python CRLF on Windows](feedback_windows_python_crlf.md) — scripted edits must use newline='' or Edit tool

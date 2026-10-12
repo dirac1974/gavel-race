@@ -39,6 +39,18 @@
 --     of the press patterns. With the eased glide rider 1's horse is posed as RaceView poses it
 --     (SteerPose with the look cue), and the report counts how often the look cue swings the body
 --     from one side to the other, and how far the body ever turns beyond its drift.
+--   (D-071) taps = one pace-tap profile per rider ("perfect", "average", "fixed60", "switch",
+--     "masher", "streaky"): the slider's passes are scheduled as RaceService does (before the
+--     posts), riders tap from their own generator, their checkpoints are scored at each close
+--     (the Final Burst by profile), the shown chances refresh after the lock as RaceService does
+--     (PacePreview.afterLock, the stretch drive) and also once at the lock, and every rider's own
+--     screen draws its 5 ft tap nudge (RaceFx) on top of the received offsets. tapPreview = the
+--     draw-only preview layer (TapPreview) on the sent offsets. stats.tp has its numbers.
+--     league (default "Silver"), equal (equal Ratings), switchAt (default 15 s: "switch" taps a
+--     steady 60 until then, then every pass Perfect), digest (stats.digest: Trip's state every tick,
+--     tau, live at each close, the order, the prizes and the sent lanes, as JSON), permuteLuck = a
+--     seed: the secret luck shuffled after the gate (stats.tp.drawnBeforeLock records the drawn
+--     offsets up to the lock).
 local RaceMath = require("../../src/RaceMath")
 local GameConfig = require("../../game/src/shared/GameConfig")
 local ThemePack = require("../../game/src/shared/ThemePack")
@@ -55,6 +67,9 @@ local baselineD054: any = nil -- the D-054 table (the switch-back regenerates Tr
 local SteerPredict = require("../../game/src/shared/SteerPredict")
 local SteerPose = require("../../game/src/shared/SteerPose")
 local Playback = require("../../game/src/shared/Playback")
+local TapPreview = require("../../game/src/shared/TapPreview")
+local PacePreview = require("../../game/src/shared/PacePreview")
+local RaceFx = require("../../game/src/shared/RaceFx")
 
 local SIDE, LENGTH = 0.5, 6 -- overlap: closer than this sideways (lanes) and lengthwise (feet)
 local FRAME = 1 / 60
@@ -87,7 +102,48 @@ export type Stats = { before: number, first5: number, after: number, lastTwo: nu
 	reversals: { [string]: { count: number, seconds: number, minGap: number } }, accelBefore: number, accelAfter: number,
 	brushes: number, boxedTicks: number, riderTicks: number, afterMoves: number, lateMoves: number, lateHalfSteps: number,
 	afterReversals: number, afterReversalsWithin: number, afterMinGap: number, crossOrderOk: boolean, crossOrder: { number },
-	brushStyles: { [string]: { riders: number, brushRaces: number, chargedRaces: number, brushes: number } }, strangerCharged: number }
+	brushStyles: { [string]: { riders: number, brushRaces: number, chargedRaces: number, brushes: number } }, strangerCharged: number,
+	tp: any?, digest: string? }
+
+-- (D-071) A rider's pace taps by profile, one generator for all riders (the race's draws unchanged).
+local function profileTaps(profile: string, passes: { any }, tapRng: any, switchAt: number): { number }
+	local taps = {}
+	local function at(p: any, dpos: number)
+		local ideal = PaceMeter.idealTime(p)
+		local off = dpos * (p.t1 - p.t0) / 2
+		local t = ideal + off
+		if t >= p.t1 - 1e-3 then t = ideal - off end
+		table.insert(taps, math.clamp(t, p.t0 + 1e-3, p.t1 - 1e-3))
+	end
+	for k, p in passes do
+		if profile == "perfect" then
+			at(p, 0.03 * tapRng:NextNumber())
+		elseif profile == "average" then
+			at(p, 0.2 + 0.4 * tapRng:NextNumber())
+		elseif profile == "fixed60" then
+			at(p, 0.4)
+		elseif profile == "switch" then
+			at(p, if p.t0 >= switchAt then 0 else 0.4)
+		elseif profile == "streaky" then
+			if math.floor((k - 1) / 5) % 2 == 0 then at(p, 0.03 * tapRng:NextNumber()) end
+		elseif profile == "masher" then -- 4 taps a second at random through the pass
+			local t = p.t0 - math.log(1 - tapRng:NextNumber()) / 4
+			while t < p.t1 do
+				table.insert(taps, t)
+				t += -math.log(1 - tapRng:NextNumber()) / 4
+			end
+		end
+	end
+	table.sort(taps)
+	return taps
+end
+local BURST_BY_PROFILE = { perfect = 92, average = 65, fixed60 = 60, switch = 92, masher = 15, streaky = 70 }
+local RISE_N, FALL_N = GameConfig.raceView.nudgeRiseSeconds, GameConfig.raceView.nudgeFallSeconds
+local NUDGE_PEAK = FALL_N / (RISE_N + FALL_N) * (RISE_N / (RISE_N + FALL_N)) ^ (RISE_N / FALL_N)
+local function nudgeFeet(age: number): number -- RaceView's tap nudge curve
+	if age < 0 or age > 6 * FALL_N then return 0 end
+	return GameConfig.tapNudgeFeet * (1 - math.exp(-age / RISE_N)) * math.exp(-age / FALL_N) / NUDGE_PEAK
+end
 
 return function(courseId: string, distanceName: string, seed: number, config: any?, opts: any?): Stats
 	local d057 = opts ~= nil and opts.d057 == true
@@ -115,14 +171,36 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local styles = (opts and opts.styles)
 		or (if eased and predict then { "own", "masher", "ditherer", "casual" } elseif eased then { "masher", "ditherer", "casual" } else {})
 	local style = {}
-	for r = 1, (opts and opts.riders) or #styles do
+	for r = 1, (opts and opts.riders) or (if opts and opts.taps then #opts.taps else #styles) do
 		table.insert(humans, { id = "rider" .. r, name = "Rider " .. r, rating = 50, isBot = false })
 		riders["rider" .. r] = if opts and opts.manual then "manual" else "smart"
-		style["rider" .. r] = styles[r] or "random"
+		style["rider" .. r] = styles[r] or (if opts and opts.taps then "casual" else "random")
 	end
-	local lanes = RaceSession.fillWithBots(humans, cfgGame.lanes, cfgGame, ThemePack, rng)
-	local session = RaceSession.new({ deps = deps, config = cfgGame, leagueName = "Silver", lanes = lanes, rng = rng })
-	local league = cfgGame.leagues.Silver
+	local tapProfiles: { string }? = opts and opts.taps
+	if tapProfiles then
+		for r = #humans + 1, #(tapProfiles :: { string }) do -- one rider per tap profile
+			table.insert(humans, { id = "rider" .. r, name = "Rider " .. r, rating = 50, isBot = false })
+			riders["rider" .. r] = if opts and opts.manual then "manual" else "smart"
+			style["rider" .. r] = styles[r] or "casual"
+		end
+	end
+	local leagueName = (opts and opts.league) or "Silver"
+	if opts and opts.riderRating then -- (D-071) e.g. a league's anchor: a rider on an equal horse
+		for _, h in humans do h.rating = opts.riderRating end
+	end
+	-- (D-071) botAnchor: bots rated the league's anchor ± botRatingSpread, as RaceService fills them
+	local lanes = RaceSession.fillWithBots(humans, cfgGame.lanes, cfgGame, ThemePack, rng,
+		if opts and opts.botAnchor then { league = (opts and opts.league) or "Silver" } else nil)
+	if opts and opts.equal then RaceSession.equalizeRatings(lanes) end
+	local session = RaceSession.new({ deps = deps, config = cfgGame, leagueName = leagueName, lanes = lanes, rng = rng })
+	local league = cfgGame.leagues[leagueName]
+	if opts and opts.permuteLuck then -- (D-071) a different secret luck, every other draw the same
+		local prng = makeRng(opts.permuteLuck)
+		for i = #session.luck, 2, -1 do
+			local j = 1 + math.floor(prng:NextNumber() * i)
+			session.luck[i], session.luck[j] = session.luck[j], session.luck[i]
+		end
+	end
 	-- RaceService's timeline (race time: 0 at the gate).
 	local speed = cfgGame.raceSpeedStudsPerSecond
 	local tFinish = plan.lengths[1] / speed
@@ -134,6 +212,12 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	local mid = preEnd / 2
 	local tFar = tFinish - (track.finishFromTop + math.pi * TrackLayout.laneRadius(track, 1)) / speed
 	local closes = { mid + 0.35, preEnd + 0.35, burstClose + 0.35, postEnd + 0.35 }
+	local postStart = burstClose + cfgGame.stretchGapSeconds
+	if tapProfiles then -- RaceService's schedule, before the posts
+		local longestPass = league.sweepSeconds / 2 * (1 + cfgGame.pace.speedDrift)
+		session:paceSchedule({ { 0, preEnd - longestPass }, { postStart, postEnd - postStart - longestPass } },
+			{ { 0, mid }, { mid, preEnd }, { postStart, postEnd } })
+	end
 	session:assignPosts(RaceSession.postOrder(cfgGame, #session.lanes, rng))
 	local baseline = TripBaseline
 	if d054 then -- the switch-back's own baseline (tests/fixtures/trip_baseline_d054.json)
@@ -142,6 +226,74 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	local trip = Trip.start(cfgGame, session, track, plan, baseline[courseId][distanceName], rng, TrackLayout, riders)
 	assert(trip, "steering is on")
+	-- (D-071) Pace taps, the preview layer and its numbers.
+	local tapsOf: { [string]: { number } }, goodOf: { [string]: { number } }, profileOf: { [string]: string } = {}, {}, {}
+	local tp: any = nil
+	local tpStats: any = nil
+	local digest: any = nil
+	if tapProfiles then
+		local tapRng = makeRng(seed * 53 + 11)
+		local switchAt = (opts and opts.switchAt) or 15
+		for r, profile in tapProfiles :: { string } do
+			local id = "rider" .. r
+			profileOf[id] = profile
+			tapsOf[id] = profileTaps(profile, session.passes, tapRng, switchAt)
+			local good = {} -- Great or Perfect taps (one counted tap in a pass): the own-screen nudge
+			local counted = PaceMeter.debounce(tapsOf[id], cfgGame.pace.bounceSeconds)
+			for _, t in counted do
+				local kk = PaceMeter.passIndex(session.passes, t)
+				if kk then
+					local p = session.passes[kk]
+					local count = 0
+					for _, u in counted do if u >= p.t0 and u < p.t1 then count += 1 end end
+					if count == 1 and PaceMeter.tapScore(p, t) >= 80 then table.insert(good, t) end
+				end
+			end
+			goodOf[id] = good
+		end
+		if opts and opts.tapPreview then
+			tp = TapPreview.new(#session.lanes, cfgGame.tapPreview, trip.lead, steer.gapRampSeconds, steer.laneBand)
+			for i, l in session.lanes do TapPreview.setRider(tp, i, not l.isBot) end
+		end
+		tpStats = { residualMax = 0, residualSpeedMax = 0, residualAccelMax = 0, drawnBackMax = 0,
+			lockResidualSeconds = 0, extraDrop = {}, firstDrawn = 0, firstDrawnPlace = 0, gainMax = {}, gainMin = {},
+			messages = {}, messageLoss = 0, ownOverlaps = 0, ownJerks = 0, series = {}, hardClamps = 0,
+			drawnBeforeLock = {}, residualAtLock = 0, profiles = profileOf, freeSpeedMax = 0, freeAccelMax = 0,
+			messageGapMin = math.huge, taps = tapsOf, laneOf = {}, cues = {}, messageKeys = {}, pullBackSpeed = 0 }
+		if opts and opts.digest then digest = { ticks = {}, closes = {} } end
+	end
+	-- Riders' provisional scores over the open checkpoint's finished passes, the passes, and each
+	-- rider's share of them tapped exactly once (RaceService computes the same at a pass end).
+	local function partialFor(seg: number, T: number): ({ [number]: number }, number, { [number]: number })
+		local done = {}
+		for _, p in session:pacePasses(seg) do
+			if p.t1 <= T + 1e-9 then table.insert(done, p) end
+		end
+		local partial, clean = {}, {}
+		if #done == 0 then return partial, 0, clean end
+		for i, l in session.lanes do
+			if not l.isBot then
+				local score, _, single = PaceMeter.score(done, tapsOf[l.id] or {}, cfgGame.pace.bounceSeconds)
+				partial[i], clean[i] = score, single / #done
+			end
+		end
+		return partial, #done, clean
+	end
+	local passEnds = 0 -- passes whose end has been seen
+	local nextShownPreview = math.huge
+	local lastE, lastU = table.create(#session.lanes, 0), table.create(#session.lanes, 0)
+	local lastRoomed, lastRoomed2 = table.create(#session.lanes, false), table.create(#session.lanes, false)
+	local lastDrawn: { number }? = nil
+	local events = {} -- pull-back windows: { at, kind, drawn0, base0, extra, roomed }
+	local lockSettled = false
+	local cueScratch = {}
+	-- Each rider's own screen: its tap nudge (RaceView) drawn on the received offsets.
+	local nudges = {}
+	if tapProfiles then
+		for _, h in humans do
+			nudges[h.id] = { lane = session:laneIndex(h.id) :: number, drawn = 0, last = -math.huge, prev = -math.huge, ptr = 1 }
+		end
+	end
 	-- Riders press at random, 0.4 to 2 s apart, more often in than out (their own generator, so the
 	-- race's draws are unchanged). With predict, rider 1 presses from its screen instead.
 	local pressRng = makeRng(seed * 31 + 7)
@@ -243,8 +395,33 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		if T < tFinish then
 			-- Server tick.
 			while seg <= #closes and closes[seg] <= T do
+				if tapProfiles then
+					for _, l in session.lanes do
+						if not l.isBot then
+							if session:kind(seg) == "pace" then
+								session:scorePace(l.id, seg, tapsOf[l.id] or {})
+							else
+								l.scores[seg] = BURST_BY_PROFILE[profileOf[l.id]] or 60
+							end
+						end
+					end
+				end
 				shownLive = session:closeSegment(seg)
+				if tp then TapPreview.closed(tp) end
+				if digest then table.insert(digest.closes, table.clone(session.live)) end
+				if tpStats and not trip.locked and seg <= 2 then table.insert(events, { at = T, kind = "close" }) end
 				seg += 1
+				if tapProfiles and trip.locked then nextShownPreview = T + 1 end
+			end
+			-- (D-071) Pass ends: the open checkpoint's preview chances for the layer, before the lock.
+			if tapProfiles then
+				local seen = passEnds
+				while passEnds < #session.passes and session.passes[passEnds + 1].t1 <= T + 1e-9 do passEnds += 1 end
+				local open = session.closed + 1
+				if tp and passEnds > seen and not trip.locked and open <= #cfgGame.segments and session:kind(open) == "pace" then
+					local partial, done, clean = partialFor(open, T)
+					if done > 0 then TapPreview.setPreview(tp, session.live, session:previewOwn(open, partial), done, partial, clean) end
+				end
 			end
 			while #outbox > 0 and outbox[1].at <= T + 1e-9 do -- rider 1's presses that have arrived
 				local p = table.remove(outbox, 1)
@@ -258,6 +435,8 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 						Trip.submit(trip, session, h.id, if pressRng:NextNumber() < 0.6 then -1 else 1, seqs[h.id], T)
 						nextPress[h.id] = T + 0.4 + 1.6 * pressRng:NextNumber()
 					end
+				elseif style[h.id] == "still" then -- (D-071) never presses: Smart Steer rides
+					continue
 				elseif T < trip.lockT then
 					local i = riderLane[h.id]
 					local d = 0
@@ -288,6 +467,22 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 			if not trip.locked and Trip.advance(trip, session.live, T) then
 				session:setTrip(Trip.raceTau(trip))
 				shownLive = table.clone(session.live)
+				if tapProfiles then nextShownPreview = T end -- (D-071) refresh the shown chances at the lock too
+			end
+			-- After the lock the shown chances refresh each second (RaceService: PacePreview.afterLock and
+			-- the stretch drive), from the open checkpoint's finished passes.
+			if tapProfiles and trip.locked and T >= nextShownPreview - 1e-9 then
+				nextShownPreview = T + (cfgGame.pacePreviewAfterLock.seconds or 1)
+				local open = session.closed + 1
+				if open <= #cfgGame.segments and session:kind(open) == "pace" then
+					local stretch = open > 1 and cfgGame.segments[open - 1] == "burst"
+					local segPasses = session:pacePasses(open)
+					local lastEnd = if #segPasses > 0 then segPasses[#segPasses].t1 else 0
+					if T < lastEnd and (stretch or PacePreview.afterLock(cfgGame.pacePreviewAfterLock, true, open, session.closed, false)) then
+						local partial, done = partialFor(open, T)
+						if done > 0 then shownLive = session:previewLive(open, partial) end
+					end
+				end
 			end
 			if not wasLocked then -- each rider's lane-change starts and boxed-in time, up to the lock
 				for _, h in humans do
@@ -311,6 +506,136 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 			local w = RaceShape.blendWeight(T, tFar, postEnd, cfgGame.raceShape.blendPower)
 			local offsets, sentLanes = Trip.frame(trip, session, shownLive, w, cfgGame.raceShape, T - lastFrame, T)
 			lastFrame = T
+			if tpStats then -- (D-071) the layer on the sent offsets, and its numbers
+				local base = offsets
+				local laneX = if trip.locked then trip.shown else trip.x
+				local laneTgt = if trip.locked then trip.shownTgt else trip.tgt
+				if tp then
+					offsets = table.clone(TapPreview.step(tp, base, laneX, laneTgt, T, trip.locked))
+				end
+				local s = tpStats
+				for i = 1, n do
+					local e = offsets[i] - base[i]
+					s.residualMax = math.max(s.residualMax, math.abs(e))
+					if k > 0 then
+						local spd = (e - lastE[i]) / serverDt
+						s.residualSpeedMax = math.max(s.residualSpeedMax, math.abs(spd))
+						s.residualAccelMax = math.max(s.residualAccelMax, math.abs(spd - lastU[i]) / serverDt)
+						-- The layer's own limits, on samples where lane room didn't move it (this one or the last)
+						if tp and not tp.roomed[i] and not tp.slowed[i] and not lastRoomed[i] then
+							s.freeSpeedMax = math.max(s.freeSpeedMax, math.abs(spd))
+							if not lastRoomed2[i] then s.freeAccelMax = math.max(s.freeAccelMax, math.abs(spd - lastU[i]) / serverDt) end
+						end
+						if lastDrawn then s.drawnBackMax = math.max(s.drawnBackMax, ((lastDrawn :: { number })[i] - offsets[i]) / serverDt) end
+						lastU[i] = spd
+					end
+					lastE[i] = e
+					lastRoomed2[i] = lastRoomed[i]
+					lastRoomed[i] = tp ~= nil and (tp.roomed[i] or tp.slowed[i])
+				end
+				lastDrawn = table.clone(offsets)
+				if not trip.locked then table.insert(s.drawnBeforeLock, table.clone(offsets)) end
+				if trip.locked and s.firstDrawn == 0 then -- drawn 1st at the lock (the trust check)
+					local best = 1
+					for i = 2, n do if offsets[i] > offsets[best] then best = i end end
+					s.firstDrawn = best
+					for i = 1, n do s.residualAtLock = math.max(s.residualAtLock, math.abs(offsets[i] - base[i])) end
+					table.insert(events, { at = T, kind = "lock" })
+				end
+				if trip.locked and not lockSettled then
+					local most = 0
+					for i = 1, n do most = math.max(most, math.abs(offsets[i] - base[i])) end
+					if most < 1e-3 then
+						lockSettled = true
+						s.lockResidualSeconds = math.max(0, T - trip.lockT)
+					end
+				end
+				for _, ev in events do -- pull-back windows: 3 s from each close before the lock, and the lock
+					if T >= ev.at - 1e-9 and T <= ev.at + 3 + 1e-9 then
+						-- extra[i] = how far the drawn horse fell back beyond Trip's own fall, tick by tick
+						if not ev.drawn0 then
+							ev.drawn0, ev.base0, ev.extra = table.clone(offsets), table.clone(base), table.create(n, 0)
+						end
+						for i = 1, n do
+							local fellDrawn = math.max(0, ev.drawn0[i] - offsets[i])
+							local fellBase = math.max(0, ev.base0[i] - base[i])
+							ev.extra[i] += math.max(0, fellDrawn - fellBase)
+							-- (feel review) how fast a drawn lead is given back, away from lane room
+							if tp and not tp.roomed[i] and T > ev.at + 1e-9 then
+								s.pullBackSpeed = math.max(s.pullBackSpeed, math.max(0, fellDrawn - fellBase) / serverDt)
+							end
+						end
+						ev.drawn0, ev.base0 = table.clone(offsets), table.clone(base)
+						if tp then
+							ev.roomed = ev.roomed or {}
+							for i = 1, n do if tp.roomed[i] then ev.roomed[i] = true end end
+						end
+					end
+				end
+				for _, h in humans do
+					local i = session:laneIndex(h.id) :: number
+					local profile = profileOf[h.id] or "none"
+					local e = offsets[i] - base[i]
+					if not trip.locked then
+						s.gainMax[profile] = math.max(s.gainMax[profile] or -math.huge, e)
+						s.gainMin[profile] = math.min(s.gainMin[profile] or math.huge, e)
+					end
+					-- (D-071 rulings) boxed share: of the samples where its taps have heldCue.minFeet or more
+					-- to show, how many lane room holds back by that much
+					if tp and not trip.locked and tp.aimFeet[i] >= cfgGame.tapPreview.heldCue.minFeet then
+						s.aimSamples = (s.aimSamples or 0) + 1
+						if TapPreview.held(tp, i) >= cfgGame.tapPreview.heldCue.minFeet then s.heldSamples = (s.heldSamples or 0) + 1 end
+					end
+					-- (D-071 ruling 2) The held cue, as the rider's screen runs it: TapPreview.stepCue on the value
+					-- the server last sent (TapPreview.heldSendDue), once with the steering buttons (the "gap" chip,
+					-- when SteerLane shows a side free) and once as a rider without them (the "taps" chip).
+					if tp and not trip.locked then
+						local hc = cfgGame.tapPreview.heldCue
+						local held = TapPreview.held(tp, i)
+						local c = s.cues[h.id]
+						if not c then
+							c = { smart = TapPreview.newCue(), manual = TapPreview.newCue(), send = TapPreview.newHeldSend(), run4 = 0,
+								run6 = 0, eligible4 = false, pressure = false, eligibleGap = false, gap = false, chips = 0, texts = {}, sends = 0 }
+							s.cues[h.id] = c
+						end
+						Trip.riderLane(trip, i, cueScratch, T)
+						local sideRoom = cueScratch.inSide == "free" or cueScratch.outSide == "free"
+						c.run4 = if held >= hc.minFeet then c.run4 + serverDt else 0
+						c.run6 = if held >= hc.chipMinFeet then c.run6 + serverDt else 0
+						if c.run4 >= hc.minSeconds - 1e-9 then c.eligible4 = true end
+						if c.run6 >= hc.chipMinSeconds - 1e-9 and sideRoom then c.eligibleGap = true end
+						if TapPreview.heldSendDue(c.send, held, T, cfgGame.tapPreview) then c.sends += 1 end
+						local seen = c.send.last -- what the rider's screen has
+						local pressure, gapChip = TapPreview.stepCue(c.manual, cfgGame.tapPreview, seen, serverDt, T, false, false, sideRoom)
+						local _, chip = TapPreview.stepCue(c.smart, cfgGame.tapPreview, seen, serverDt, T, false, true, sideRoom)
+						if pressure then c.pressure = true end
+						if gapChip == "gap" then c.gap = true end
+						for _, ch in { chip, gapChip } do
+							if ch then
+								c.chips += 1
+								table.insert(c.texts, if ch == "gap" then "Find a gap! ◀ ▶" else "Your taps still count!")
+							end
+						end
+					end
+					if h.id == "rider1" then table.insert(s.series, { T, e, if tp then TapPreview.held(tp, i) else 0 }) end
+					if tp and not trip.locked then
+						local m = TapPreview.message(tp, i, T)
+						if m then
+							if s.lastMessage and s.lastMessage[i] then s.messageGapMin = math.min(s.messageGapMin, T - s.lastMessage[i]) end
+							s.lastMessage = s.lastMessage or {}
+							s.lastMessage[i] = T
+							s.messages[profile] = (s.messages[profile] or 0) + 1
+							s.messageKeys[m] = true
+							if e <= 0 then s.messageLoss += 1 end
+						end
+					end
+				end
+				if tp then s.hardClamps = tp.hardClamps end
+			end
+			if digest then
+				table.insert(digest.ticks, { T, table.clone(trip.off), table.clone(trip.x), table.clone(trip.tgt),
+					table.clone(session.live), table.clone(session.tau), if sentLanes then table.clone(sentLanes) else false, trip.locked })
+			end
 			-- RaceService skips unchanged lanes, which leaves the client's lane targets as they are, so
 			-- sending them every tick is the same.
 			table.insert(inbox, { at = arrival(T), kind = "offsets", offsets = offsets, lanes = sentLanes, T = T })
@@ -434,6 +759,29 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 				for j = i + 1, n do
 					if math.abs(lane[i] - lane[j]) < SIDE and math.abs(offset[i] - offset[j]) < LENGTH then
 						hits += 1
+					end
+				end
+			end
+			if tpStats then -- (D-071) each rider's own screen: its tap nudge on top of the received offsets
+				for id, nd in nudges do
+					local good = goodOf[id]
+					while nd.ptr <= #good and good[nd.ptr] <= tc + 1e-9 do
+						nd.prev, nd.last = nd.last, good[nd.ptr]
+						nd.ptr += 1
+					end
+					local goal = math.max(nudgeFeet(tc - nd.last), nudgeFeet(tc - nd.prev))
+					local room = RaceFx.nudgeRoom(nd.lane, offset, lane, steer.laneBand, cfgGame.raceFx.nudgeClearFeet)
+					-- (opts.nudgeFallCap: RaceView passes its horse's fall this frame, RaceFx.stepNudge's baseFall)
+					local baseFall = if opts and opts.nudgeFallCap and nd.lastBase then math.max(0, nd.lastBase - offset[nd.lane]) else nil
+					nd.lastBase = offset[nd.lane]
+					nd.drawn = RaceFx.stepNudge(nd.drawn, goal, room, FRAME, cfgGame.raceFx, baseFall)
+					local mineAt = offset[nd.lane] + nd.drawn
+					if tc > 1 and nd.seen and (nd.seen - mineAt) / FRAME > JERK then tpStats.ownJerks += 1 end
+					nd.seen = mineAt
+					for j = 1, n do
+						if j ~= nd.lane and math.abs(lane[nd.lane] - lane[j]) < SIDE and math.abs(mineAt - offset[j]) < LENGTH then
+							tpStats.ownOverlaps += 1
+						end
 					end
 				end
 			end
@@ -584,6 +932,35 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 		if crossing[p] ~= result[p] or crossAt[crossing[p]] == math.huge then stats.crossOrderOk = false end
 	end
 	stats.lineOrder, stats.result = line, result
+	if tpStats then
+		local place = table.create(n, 0)
+		for p = 1, n do place[result[p]] = p end
+		tpStats.firstDrawnPlace = if tpStats.firstDrawn > 0 then place[tpStats.firstDrawn] else 0
+		tpStats.places = place
+		for _, h in humans do tpStats.laneOf[profileOf[h.id] or h.id] = session:laneIndex(h.id) end
+		local byProfile = {}
+		for id, c in tpStats.cues do byProfile[profileOf[id] or id] = c end
+		tpStats.cues = byProfile
+		-- Pull-back: how much further each rider's drawn horse fell back in a window than Trip's own did.
+		for _, ev in events do
+			if ev.drawn0 then
+				for _, h in humans do
+					local i = session:laneIndex(h.id) :: number
+					local extra = ev.extra[i]
+					local key = (profileOf[h.id] or "none") .. ":" .. ev.kind .. (if ev.roomed and ev.roomed[i] then "(room)" else "")
+					tpStats.extraDrop[key] = math.max(tpStats.extraDrop[key] or 0, extra)
+				end
+			end
+		end
+		stats.tp = tpStats
+	end
+	if digest then
+		local fin = session:finish()
+		digest.order = fin.order
+		digest.prizes = fin.prizes
+		digest.tau = table.clone(session.tau)
+		stats.digest = serde.encode("json", digest)
+	end
 	stats.halfSteps = trip.halfSteps or 0
 	stats.brushes = #trip.events
 	-- Brushes by rider style (D-057 N5), and the mover-pays check: a horse charged for a brush it

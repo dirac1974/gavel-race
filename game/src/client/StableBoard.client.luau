@@ -388,6 +388,32 @@ Ui.text(pipBubble, "🐴 " .. Advice.PIP_HINT, 18, { Size = UDim2.new(0, 0, 1, 0
 local current = nil
 local inLine = false
 local shownAt, hinted = 0, false
+-- Barn Builder's "You can build" (D-070): Advice gates it on this context; it counts as shown for an
+-- item after greenCash.pillShowSeconds on screen or its GO, then the server remembers (WishTold).
+local GC = GameConfig.greenCash or {}
+local buildShown, toldFor = 0, nil
+local function buildCtx(d): any
+	local ended = player:GetAttribute("LastRaceEnd")
+	return {
+		sinceRace = if typeof(ended) == "number" then workspace:GetServerTimeNow() - ended else nil,
+		busy = inLine or RaceState.shopClosed(0),
+		resultsOpen = RaceState.resultsOpen,
+		raceAgain = RaceState.resultsOpen, -- Race again lives on your results card
+		touring = d ~= nil and #(d.horses or {}) > 0 and Tour.current(d.flags or {}) ~= nil,
+	}
+end
+local function tellBuilt(key: string?)
+	local id = key and string.match(key, "^build:(.+)$")
+	if id and toldFor ~= id then
+		toldFor = id
+		gameRemotes:WaitForChild("WishTold"):FireServer(id)
+	end
+	local shelf = key and string.match(key, "^shelf:(.+)$") -- "New shelf at Barn Builder!" (once)
+	if shelf and toldFor ~= key then
+		toldFor = key
+		gameRemotes:WaitForChild("ShelfSeen"):FireServer()
+	end
+end
 local function placePill()
 	local cam = workspace.CurrentCamera
 	local touch = Ui.touchLayout()
@@ -414,13 +440,14 @@ local function renderPill()
 		current = nil
 		return
 	end
-	local nxt = Advice.nextThing(d, workspace:GetServerTimeNow())
+	local nxt = Advice.nextThing(d, workspace:GetServerTimeNow(), buildCtx(d))
 	if inLine then -- waiting for a race (AAA Phase 2): say so, whatever else is next
 		nxt = { key = "inline", emoji = "🏁", icon = "flag_ready", text = "You're in line! Race soon.", go = nil }
 	end
 	if not current or current.key ~= nxt.key then
 		shownAt, hinted = os.clock(), false
 		pipBubble.Visible = false
+		buildShown = 0
 	end
 	current = nxt
 	pillIcon:Destroy()
@@ -439,6 +466,7 @@ pillGo.Activated:Connect(function()
 	if not current or not current.go then return end
 	pipBubble.Visible = false
 	local go = current.go
+	tellBuilt(current.key) -- (D-070) GO on "You can build" counts as shown
 	if go == "board" then
 		-- open on the first tab with a prize waiting
 		local jobs = (PlayerState.data and PlayerState.data.jobs) or {}
@@ -479,6 +507,10 @@ RunService.Heartbeat:Connect(function()
 	local now = os.clock()
 	if now < nextCheck then return end
 	nextCheck = now + 0.5
+	if string.sub(current.key, 1, 6) == "build:" or string.sub(current.key, 1, 6) == "shelf:" then
+		buildShown += 0.5
+		if buildShown >= (GC.pillShowSeconds or 45) then tellBuilt(current.key) end
+	end
 	if now - lastPillAt > 5 then -- time-based suggestions (crops ready) show without a data change
 		lastPillAt = now
 		renderPill()
