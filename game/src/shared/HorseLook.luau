@@ -13,6 +13,7 @@
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 local Ageing = if script then require(script.Parent.Ageing) :: any else require("./Ageing")
 local Legs = if script then require(script.Parent.Legs) :: any else require("./Legs")
+local HorseLegs = if script then require(script.Parent.HorseLegs) :: any else require("./HorseLegs")
 
 local HorseLook = {}
 
@@ -190,8 +191,10 @@ end
 
 -- A foal's shape on a horse model already placed where it stands (D-080, the feel vote F2): the
 -- whole model scaled by foal.body, then legs stretched to legY (relative to the body) from the hip
--- down; a one-piece model gets a gentler stretch upward instead. The hooves stay on the ground it
--- stood on. Call before welding or seating anything to the model.
+-- down; a one-piece model gets a gentler stretch upward instead (foalLook.onePieceStretch; 0 = uniform).
+-- The hooves stay on the ground it stood on, and the legs' rest pose is re-recorded at the new size
+-- (HorseLegs.markRest + forget), so running legs never splay. Call before welding or seating anything
+-- to the model; a model shaped again (a growth step) is a fresh clone, re-recorded the same way.
 function HorseLook.shapeFoal(model: Instance?, foal: any?)
 	if not model or not foal or not model:IsA("Model") then return end
 	local ok, err = pcall(function()
@@ -213,7 +216,7 @@ function HorseLook.shapeFoal(model: Instance?, foal: any?)
 			end
 		else
 			-- one piece: stretch everything upward a little from the hooves (long-legged, not squashed)
-			local k = 1 + (stretch - 1) * 0.35
+			local k = 1 + (stretch - 1) * (GameConfig.foalLook.onePieceStretch or 0) -- 0 = a uniform small foal
 			local cf, size = model:GetBoundingBox()
 			local bottom = cf.Position.Y - size.Y / 2
 			for _, d in model:GetDescendants() do
@@ -226,6 +229,10 @@ function HorseLook.shapeFoal(model: Instance?, foal: any?)
 		end
 		local cf1, size1 = model:GetBoundingBox()
 		model:PivotTo(model:GetPivot() + Vector3.new(0, ground - (cf1.Position.Y - size1.Y / 2), 0))
+		-- (the feel consult's must-fix) the running legs place each leg from its LegRest, recorded at
+		-- adult size: record it again at this size and drop any cached pose, so legs stay under the body
+		HorseLegs.markRest(model)
+		HorseLegs.forget(model)
 	end)
 	if not ok then warn("[HorseLook] foal: " .. tostring(err)) end
 end

@@ -269,7 +269,7 @@ def horse_block(p: dict, h: dict, busy: dict | None = None, cfg: dict = BREEDING
 def pair_block(p: dict, id_a: str, id_b: str, busy: dict | None = None, cfg: dict = BREEDING) -> str | None:
     """Why these two can't be parents now, or None. Checks the stable before the horses."""
     if not cfg["enabled"]:
-        return "The Foaling Barn is closed today"
+        return "The Foal Barn is closed today"
     st = _state(p)
     if len(st["pending"]) >= cfg["maxWaiting"]:
         return "A foal is on the way!"

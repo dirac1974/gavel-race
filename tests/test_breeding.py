@@ -307,7 +307,7 @@ def test_fee_by_higher_league_and_never_profitable():
 
 def test_eligibility_and_rest_counted_in_owner_races():
     p = _profile()
-    assert br.pair_block(p, "h1", "h2", None, br.BREEDING) == "The Foaling Barn is closed today"
+    assert br.pair_block(p, "h1", "h2", None, br.BREEDING) == "The Foal Barn is closed today"
     assert br.pair_block(p, "h1", "h2", None, ON) is None
     assert br.horse_block(p, br.find(p, "h3"), None, ON) == "Needs 30 races"
     assert br.horse_block(p, br.find(p, "h5"), None, ON) == "Lent"

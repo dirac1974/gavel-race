@@ -300,7 +300,11 @@ function Profile.repairBreeding(p: any)
 		if typeof(par) == "table" and typeof(par[1]) == "string" and typeof(par[2]) == "string" and pot and st
 			and table.find(Horse.COATS, e.coat) and num(e.atRaces) and num(e.day) and #pending < Profile.MAX_PENDING_FOALS then
 			table.insert(pending, { parents = { par[1], par[2] }, fee = math.floor(num(e.fee) or 0), potential = pot, stats = st,
-				coat = e.coat, atRaces = math.floor(num(e.atRaces) :: number), day = math.floor(num(e.day) :: number) })
+				coat = e.coat, atRaces = math.floor(num(e.atRaces) :: number), day = math.floor(num(e.day) :: number),
+				-- (BreedingService) the parents' coats at the roll and the Surprise flag, kept as stored
+				coats = if typeof(e.coats) == "table" and table.find(Horse.COATS, e.coats[1]) and table.find(Horse.COATS, e.coats[2])
+					then { e.coats[1], e.coats[2] } else nil,
+				surprise = if e.surprise == true then true else nil })
 		end
 	end
 	local nextAt = num(b.nextAt)

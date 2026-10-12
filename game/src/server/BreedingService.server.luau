@@ -60,7 +60,7 @@ local function atBarn(player: Player): boolean
 	local hrp = c and c:FindFirstChild("HumanoidRootPart")
 	if not hrp then return false end
 	local cx, cz = p.x, p.z - p.d / 2
-	return (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(cx, 0, cz)).Magnitude <= p.w
+	return (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(cx, 0, cz)).Magnitude <= p.w / 2 + 10
 end
 
 local function okId(x: any): boolean
@@ -83,13 +83,17 @@ Preview.OnServerEvent:Connect(function(player: Player, idA: any, idB: any)
 	if not data then return end
 	local info = Breeding.preview(data, idA, idB, CFG)
 	PreviewResult:FireClient(player, {
-		idA = idA, idB = idB, family = info and info.family, fee = info and info.fee,
+		idA = idA, idB = idB, family = info and info.family, fee = info and info.fee, coats = info and info.coats,
 		block = Breeding.pairBlock(data, idA, idB, busyState(player), CFG),
 	})
 end)
 
 Confirm.OnServerEvent:Connect(function(player: Player, idA: any, idB: any)
-	if not CFG.enabled or busy(player, 2, "confirm") or not okId(idA) or not okId(idB) then return end
+	if not CFG.enabled or not okId(idA) or not okId(idB) then return end
+	if busy(player, 2, "confirm") then
+		ConfirmResult:FireClient(player, { ok = false, text = "One moment" }) -- (the button never sticks on "…")
+		return
+	end
 	local data = Profiles.get(player)
 	if not data then return end
 	if not atBarn(player) then
@@ -97,7 +101,14 @@ Confirm.OnServerEvent:Connect(function(player: Player, idA: any, idB: any)
 		return
 	end
 	-- Breeding.confirm checks everything again (pair, wait, room, cash) and rolls once, here only.
-	local ok, msg = Breeding.confirm(data, idA, idB, os.time(), Random.new(), busyState(player), CFG)
+	local a, b = Breeding.find(data, idA), Breeding.find(data, idB)
+	local ok, msg, pend = Breeding.confirm(data, idA, idB, os.time(), Random.new(), busyState(player), CFG)
+	if ok and pend and a and b then
+		-- the parents' coats at the roll, and whether the rolled coat is a Surprise (code review S4): right
+		-- on the arrival card even if a parent has left by then
+		pend.coats = { a.coat, b.coat }
+		pend.surprise = pend.coat ~= a.coat and pend.coat ~= b.coat
+	end
 	ConfirmResult:FireClient(player, { ok = ok, text = if ok then "💞 A foal is on the way!" else msg })
 	if ok then Profiles.changed(player) end
 end)
@@ -115,11 +126,16 @@ Arrive.OnServerEvent:Connect(function(player: Player, first: any, second: any)
 		Arrived:FireClient(player, { text = "Come to the Foal Barn first" })
 		return
 	end
+	local bs = busyState(player)
+	if bs.racing or bs.inLine or bs.trainingRide then
+		Arrived:FireClient(player, { text = "After your race!" })
+		return
+	end
 	if not Foals.ready(data, os.time()) then
 		Arrived:FireClient(player, { text = "Your foal isn't here yet" })
 		return
 	end
-	if #data.horses >= Market.MAX_HORSES then
+	if #data.horses >= CFG.stableCap then -- (= Market.MAX_HORSES; tests pin them equal)
 		Arrived:FireClient(player, { text = "Make room first" })
 		return
 	end

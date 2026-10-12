@@ -905,7 +905,8 @@ GameConfig.horseLook = { veteranLook = true, wrapsInRace = true, legendRosette =
 -- young nicker on at most 1 hop in nickerEvery. Client only, never in a race or a training ride.
 GameConfig.foalLook = { enabled = true, body = 0.70, legY = 0.92, growRaces = 30, raceMinScale = 0.94,
 	tagAlongRaces = 10, followStuds = 6, sideStuds = 2, catchUp = 4, hopStuds = 0.6, hopEvery = { 8, 14 }, nickerEvery = 3,
-	nickerSpeed = 1.45, parentSpeed = 0.9 }
+	nickerSpeed = 1.45, parentSpeed = 0.9,
+	onePieceStretch = 0.35 } -- one-piece stand models: share of the leg stretch applied upward (0 = a uniform small foal)
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
 -- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in

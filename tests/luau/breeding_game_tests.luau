@@ -90,8 +90,20 @@ end
 return function(check: (boolean, string) -> (), _close: (number, number, number) -> boolean)
 	local B = GameConfig.breeding
 	-- Switched on together (D-068, D-080) -------------------------------------------------------------
-	check(B.enabled == true and GameConfig.career.suggest == true, "breeding.enabled and career.suggest are on together")
+	check(B.enabled == GameConfig.career.suggest, "breeding.enabled and career.suggest go together (on or off)")
 	check(GameConfig.studioTest.breedReady == false, "studioTest.breedReady is off by default")
+	-- Off: everything closed, nothing changes (whatever the live switch says)
+	local wasEnabled = B.enabled
+	B.enabled = false
+	do
+		local p = stable()
+		local ok, why = Breeding.confirm(p, "h1", "h2", T0, rng({ 0.5 }))
+		check(not ok and why == "The Foal Barn is closed today" and p.cash == 1000 and Breeding.pending(p) == nil, "breeding off: closed, nothing taken")
+		check(string.find(fs.readFile("game/src/client/WorldClient.client.luau"), "tiles.foalBarn.button.Visible = GameConfig.breeding.enabled", 1, true) ~= nil,
+			"breeding off hides the Map tile")
+	end
+	-- On for the rest of this suite, then back to the live value
+	B.enabled = true
 
 	-- The flow -----------------------------------------------------------------------------------------
 	do
@@ -275,4 +287,115 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		check(has(book, "\"Two horses can start a family\"") and has(book, "id = \"family\""), "the Horse Book Family page and its empty state")
 		check(has(code("game/src/client/GrownUps.client.luau"), "💞 Foals:"), "the grown-ups page explains breeding")
 	end
+	-- The foal's running legs (the feel consult's must-fix): after shapeFoal the legs' rest pose is
+	-- re-recorded at foal size, so every leg's top stays on its (scaled) hip and the hooves on the ground
+	do
+		local roblox = require("@lune/roblox")
+		local RCF, RV3 = roblox.CFrame, roblox.Vector3
+		local HorseLegs = require("../../game/src/shared/HorseLegs")
+		for _, fn in { HorseLook.shapeFoal, HorseLegs.markRest, HorseLegs.prepare } do
+			local env = getfenv(fn)
+			env.CFrame, env.Vector3 = RCF, RV3
+		end
+		local function part(name: string, size: any, pos: any): any
+			local attrs = {}
+			local pt = { Name = name, Size = size, CFrame = RCF.new(pos.X, pos.Y, pos.Z), Anchored = true }
+			function pt.IsA(_self, c) return c == "BasePart" end
+			function pt.SetAttribute(_self, k, v) attrs[k] = v end
+			function pt.GetAttribute(_self, k) return attrs[k] end
+			function pt.FindFirstChild() return nil end
+			return pt
+		end
+		local parts = {
+			part("Body", RV3.new(2, 3.2, 6.5), RV3.new(0, 3.6, 0)),
+			part("LegFL", RV3.new(0.6, 2.2, 0.6), RV3.new(-0.6, 1.1, -2.4)), part("LegFR", RV3.new(0.6, 2.2, 0.6), RV3.new(0.6, 1.1, -2.4)),
+			part("LegBL", RV3.new(0.6, 2.2, 0.6), RV3.new(-0.6, 1.1, 2.4)), part("LegBR", RV3.new(0.6, 2.2, 0.6), RV3.new(0.6, 1.1, 2.4)),
+		}
+		local scale, pivot = 1, RCF.new(0, 0, 0)
+		local model: any = {}
+		function model.IsA(_self, c) return c == "Model" end
+		function model.GetDescendants() return parts end
+		function model.FindFirstChild(_self, n)
+			for _, pt in parts do if pt.Name == n then return pt end end
+			return nil
+		end
+		function model.GetScale() return scale end
+		function model.GetPivot() return pivot end
+		function model.PivotTo(_self, cf)
+			local d = cf.Position - pivot.Position
+			for _, pt in parts do pt.CFrame = pt.CFrame + d end
+			pivot = cf
+		end
+		function model.GetBoundingBox()
+			local lo, hi = RV3.new(math.huge, math.huge, math.huge), RV3.new(-math.huge, -math.huge, -math.huge)
+			for _, pt in parts do
+				local p, h = pt.CFrame.Position, pt.Size / 2
+				lo = RV3.new(math.min(lo.X, p.X - h.X), math.min(lo.Y, p.Y - h.Y), math.min(lo.Z, p.Z - h.Z))
+				hi = RV3.new(math.max(hi.X, p.X + h.X), math.max(hi.Y, p.Y + h.Y), math.max(hi.Z, p.Z + h.Z))
+			end
+			return RCF.new((lo + hi) / 2), hi - lo
+		end
+		function model.ScaleTo(_self, s)
+			local k = s / scale
+			for _, pt in parts do
+				local p = pivot.Position + (pt.CFrame.Position - pivot.Position) * k
+				pt.CFrame = RCF.new(p.X, p.Y, p.Z)
+				pt.Size = pt.Size * k
+			end
+			scale = s
+		end
+		HorseLegs.markRest(model) -- AssetService does this once, at adult size
+		local body = parts[1]
+		local hipRel = {}
+		for i = 2, 5 do
+			local leg = parts[i]
+			local top = leg.CFrame * RCF.new(0, leg.Size.Y / 2, 0)
+			hipRel[leg.Name] = body.CFrame:ToObjectSpace(top).Position
+		end
+		check(HorseLegs.prepare(model) ~= nil and HorseLegs.stateOf(model) ~= nil, "the legs' pose state was built at adult size")
+		local f = HorseLook.foal({ origin = "bred", record = { races = 0 } })
+		HorseLook.shapeFoal(model, f)
+		check(HorseLegs.stateOf(model) == nil, "shapeFoal drops the cached adult pose (HorseLegs.forget)")
+		local worst, lowest = 0, math.huge
+		for i = 2, 5 do
+			local leg = parts[i]
+			local rest = body.CFrame * (leg:GetAttribute("LegRest") :: any)
+			local top = (rest * RCF.new(0, leg.Size.Y / 2, 0)).Position
+			local want = (body.CFrame * RCF.new(hipRel[leg.Name] * f.body)).Position
+			worst = math.max(worst, (top - want).Magnitude)
+			lowest = math.min(lowest, rest.Position.Y - leg.Size.Y / 2)
+		end
+		check(worst <= 0.05, `after shapeFoal every leg's rest top sits on its hip (off by {worst})`)
+		check(math.abs(lowest) <= 0.05, `hooves on the ground at rest (lowest {lowest})`)
+		check(math.abs(parts[2].Size.Y - 2.2 * f.legY) <= 1e-6, "legs x legY tall")
+		check(GameConfig.foalLook.onePieceStretch == 0.35, "foalLook.onePieceStretch: the one-piece fallback switch (0 = uniform)")
+		local race = fs.readFile("game/src/server/TrackScene.luau")
+		check(string.find(race, "HorseLegs.markRest(horse)", 1, true) ~= nil and string.find(race, "HorseLegs.forget(horse)", 1, true) ~= nil,
+			"a foal's race scale re-records the legs' rest too")
+	end
+
+	-- The Surprise flag and each coat's own chance --------------------------------------------------------
+	do
+		local p = stable()
+		Breeding.confirm(p, "h1", "h2", T0, rng({ 0.5, 0.5, 0.5, 0.5, 0.99 }))
+		local pend = Breeding.pending(p)
+		pend.coats, pend.surprise = { "bay", "grey" }, true -- as BreedingService stores them at confirm
+		local loaded = Profile.migrate(deepCopy(p), T0)
+		local lp = Breeding.pending(loaded)
+		check(lp.surprise == true and lp.coats[1] == "bay" and lp.coats[2] == "grey", "the Surprise flag and the parents' coats survive a load")
+		local svc = code("game/src/server/BreedingService.server.luau") .. code("game/src/server/Foals.luau")
+		check(has(svc, "pend.surprise = ") and has(svc, "out.pending.surprise = pend.surprise"), "Surprise is decided at the roll, on the server")
+		local client = code("game/src/client/BreedingClient.client.luau")
+		check(has(client, "p.surprise == true") and has(client, "cc.surprise.chance / #cc.surprise.coats"), "the card shows each Surprise coat with its own chance")
+		check(not has(client, "Both's"), "\"Both parents' coat\"")
+		local cc = Breeding.coatChances("bay", "grey")
+		local sum = 0
+		for _, pr in cc.parents do sum += pr[2] end
+		for _ in cc.surprise.coats do sum += cc.surprise.chance / #cc.surprise.coats end
+		check(math.abs(sum - 1) < 1e-9, "the rows add up to 100%")
+		check(has(code("game/src/server/Foals.luau"), "FoalHere:FireClient(") and not has(code("game/src/server/Foals.luau"), "Profiles.notify("),
+			"\"Your foal is here!\" goes to the client's queue, not a straight toast")
+		check(has(client, "foalHere and not busy()"), "the client shows it only once the race and its results are done")
+	end
+	B.enabled = wasEnabled
 end

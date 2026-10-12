@@ -10,7 +10,7 @@
 --   Waiting: "Arrives in 5 races or tomorrow". Counted in races, never a clock.
 --   Meeting (the feel vote F1, F5): the parent stands in the paddock; the foal steps out from behind its
 --     flank, turns to it and nuzzles twice; hearts rise; the foal's nicker at 1.45, the parent answers
---     at 0.9. No confetti, nothing birth-like; a Surprise coat gets one line and no bigger party.
+--     at 0.9. No confetti, no newborn scene; a Surprise coat gets one line and no bigger party.
 --     Reduced Motion: a fade-in beside the parent, the hearts kept. Any tap skips after 1 s.
 --   Naming copies the Starter's step 2: word chips, "🔀 New words", "That's the name!".
 -- STATUS: written without Studio access; verify in Studio before relying on it.
@@ -219,23 +219,26 @@ local function renderPick()
 end
 
 -- Step 2: Your foal --------------------------------------------------------------------------------
-local function chanceRow(parent: Instance, y: number, coats: { string }, label: string, chance: number, surprise: boolean)
+-- A chance as the card shows it: whole numbers plain ("45%"), others to one place ("2.5%").
+local function pct(chance: number): string
+	local x = math.floor(chance * 1000 + 0.5) / 10
+	return if x == math.floor(x) then string.format("%d%%", x) else string.format("%.1f%%", x)
+end
+
+local ROW = 30
+local function chanceRow(parent: Instance, y: number, coat: string, label: string, chance: number, surprise: boolean)
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, -16, 0, 40)
+	row.Size = UDim2.new(1, -16, 0, ROW)
 	row.Position = UDim2.new(0, 8, 0, y)
 	row.Parent = parent
-	if surprise then
-		Ui.text(row, SURPRISE, 24, { Position = UDim2.fromOffset(0, 2), Size = UDim2.fromOffset(28, 36) })
-	else
-		swatch(row, coats[1], 28, UDim2.new(0, 0, 0.5, -14))
-	end
-	local l = Ui.text(row, label, TEXT, { Position = UDim2.new(0, 36, 0, 0), Size = UDim2.new(1, -230, 1, 0),
-		TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true })
+	swatch(row, coat, 24, UDim2.new(0, 0, 0.5, -12))
+	local l = Ui.text(row, label, TEXT, { Position = UDim2.new(0, 32, 0, 0), Size = UDim2.new(1, -224, 1, 0),
+		TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false })
 	l.TextTruncate = Enum.TextTruncate.AtEnd
 	local bar = Instance.new("Frame")
 	bar.Size = UDim2.fromOffset(120, 12)
-	bar.Position = UDim2.new(1, -184, 0.5, -6)
+	bar.Position = UDim2.new(1, -190, 0.5, -6)
 	bar.BackgroundColor3 = C.white
 	Ui.corner(bar, 6)
 	Ui.stroke(bar, 2)
@@ -245,7 +248,7 @@ local function chanceRow(parent: Instance, y: number, coats: { string }, label: 
 	fill.BackgroundColor3 = if surprise then C.sky else C.green
 	Ui.corner(fill, 6)
 	fill.Parent = bar
-	Ui.text(row, string.format("%d%%", math.floor(chance * 100 + 0.5)), 18, { Position = UDim2.new(1, -56, 0, 0), Size = UDim2.new(0, 56, 1, 0),
+	Ui.text(row, pct(chance), 18, { Position = UDim2.new(1, -64, 0, 0), Size = UDim2.new(0, 64, 1, 0),
 		TextXAlignment = Enum.TextXAlignment.Right })
 end
 
@@ -259,22 +262,32 @@ local function renderFoal()
 	-- family line and fee (the server's preview; the coat chances are the same shared rule)
 	local fam = preview and preview.family
 	line(if fam then "Family " .. string.rep("🌱", fam) else "Family …", 0, 22)
-	local box = Ui.card(body, UDim2.new(1, -16, 0, 160), UDim2.new(0, 8, 0, 38), C.cream)
+	-- Coat chances: one row per coat the foal can have, each with its own chance (rule 2: every coat and
+	-- its chance). The server's preview table when it has come (the same shared rule as the roll).
+	local cc = (preview and preview.coats) or Breeding.coatChances(a.coat, b.coat)
+	local rows = {}
+	for _, pr in cc.parents or {} do
+		local owner = if pr[1] == a.coat and pr[1] == b.coat then "Both parents'" elseif pr[1] == a.coat then a.name .. "'s" else b.name .. "'s"
+		table.insert(rows, { coat = pr[1], label = owner .. " coat", chance = pr[2], surprise = false })
+	end
+	local each = if #(cc.surprise and cc.surprise.coats or {}) > 0 then cc.surprise.chance / #cc.surprise.coats else 0
+	for _, c in (cc.surprise and cc.surprise.coats) or {} do
+		table.insert(rows, { coat = c, label = SURPRISE .. " Surprise: " .. coatWord(c), chance = each, surprise = true })
+	end
+	local boxH = 28 + #rows * (ROW + 2) + 8
+	local box = Ui.card(body, UDim2.new(1, -16, 0, math.min(boxH, 224)), UDim2.new(0, 8, 0, 38), C.cream)
 	Ui.text(box, "Coat chances", TEXT, { Position = UDim2.new(0, 12, 0, 4), Size = UDim2.new(1, -24, 0, 22),
 		TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
-	local cc = Breeding.coatChances(a.coat, b.coat)
-	local y = 28
-	for _, pr in cc.parents do
-		local owner = if pr[1] == a.coat and pr[1] == b.coat then "Both" elseif pr[1] == a.coat then a.name else b.name
-		chanceRow(box, y, { pr[1] }, string.format("%s's coat", owner), pr[2], false)
-		y += 42
-	end
-	if (cc.surprise.chance or 0) > 0 and #cc.surprise.coats > 0 then
-		local names = {}
-		for _, c in cc.surprise.coats do table.insert(names, coatWord(c)) end
-		local last = table.remove(names)
-		local list = if #names > 0 then table.concat(names, ", ") .. " or " .. last else last
-		chanceRow(box, y, cc.surprise.coats, "Surprise: " .. list, cc.surprise.chance, true)
+	local holder = Instance.new("ScrollingFrame") -- scrolls only past 6 rows
+	holder.BackgroundTransparency = 1
+	holder.BorderSizePixel = 0
+	holder.Size = UDim2.new(1, 0, 1, -30)
+	holder.Position = UDim2.new(0, 0, 0, 28)
+	holder.CanvasSize = UDim2.fromOffset(0, #rows * (ROW + 2))
+	holder.ScrollBarThickness = 6
+	holder.Parent = box
+	for k, r in rows do
+		chanceRow(holder, (k - 1) * (ROW + 2), r.coat, r.label, r.chance, r.surprise)
 	end
 	local fee = (preview and preview.fee) or Breeding.fee(a.league, b.league)
 	local feeL = Ui.text(body, if fee then string.format("Fee 💵 %d", fee) else "", 22, { Position = UDim2.new(0, 8, 1, -TAP + 8),
@@ -542,7 +555,7 @@ end
 playArrival = function(p: any)
 	local stage = stagePart()
 	local coat = p.coat or (p.coats and p.coats[1]) or "bay"
-	local surprise = p.coats ~= nil and coat ~= p.coats[1] and coat ~= p.coats[2]
+	local surprise = p.surprise == true -- the server's flag, stored at the roll (right even after a parent left)
 	if not stage then
 		naming(p, surprise)
 		return
@@ -780,6 +793,8 @@ fgui.Enabled = false
 local banner = Ui.button(fgui, "", UDim2.fromOffset(460, 72), UDim2.new(0.5, -230, 0.22, 0), C.gold, 26)
 banner.TextWrapped = true
 local queue = {}
+local foalHere = false -- "💞 Your foal is here!" waits until you're out of the race and its results card
+remote("FoalHere").OnClientEvent:Connect(function() foalHere = true end)
 banner.Activated:Connect(function() fgui.Enabled = false end)
 remote("FoalFirstRace").OnClientEvent:Connect(function(info)
 	if typeof(info) == "table" and typeof(info.parent) == "string" then table.insert(queue, info) end
@@ -787,6 +802,11 @@ end)
 task.spawn(function()
 	while true do
 		task.wait(0.5)
+		local sinceRace = os.time() - (tonumber(player:GetAttribute("LastRaceEnd")) or 0)
+		if foalHere and not busy() and not fgui.Enabled and sinceRace >= GameConfig.runInSeconds + 3 then
+			foalHere = false
+			Ui.toast("💞 Your foal is here!", "heart", EMOJI)
+		end
 		if #queue > 0 and not fgui.Enabled and not busy() then
 			local info = table.remove(queue, 1)
 			banner.Text = string.format("🍼 %s's foal!", info.parent)

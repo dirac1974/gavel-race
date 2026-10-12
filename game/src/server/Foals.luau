@@ -20,6 +20,7 @@ local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Foals = {}
 
 local FirstRace = Profiles.remote("FoalFirstRace") -- server -> owner: { foal, parent } once, on a bred horse's first counted race
+local FoalHere = Profiles.remote("FoalHere") -- server -> owner: a foal is waiting (the client toasts it once the results card is closed)
 
 local function cfg(): any
 	return GameConfig.breeding
@@ -58,14 +59,18 @@ function Foals.view(data: any, busy: any?, now: number): any
 		out.pending = {
 			parents = { pend.parents[1], pend.parents[2] },
 			names = { nameOf(data, pend.parents[1]), nameOf(data, pend.parents[2]) },
-			coats = { coatOf(data, pend.parents[1]), coatOf(data, pend.parents[2]) },
+			coats = if typeof(pend.coats) == "table" then { pend.coats[1], pend.coats[2] }
+				else { coatOf(data, pend.parents[1]), coatOf(data, pend.parents[2]) },
 			racesLeft = math.max(0, pend.atRaces - Breeding.ownerRaces(data)),
 			newDay = c.foalAfterNewDay == true,
 		}
 		out.ready = Foals.ready(data, now)
 		-- the coat was rolled at confirm; the client learns it only when the foal is here to meet (the arrival
 		-- scene shows it as simply what the foal is: no reveal, no spin)
-		if out.ready then out.pending.coat = pend.coat end
+		if out.ready then
+			out.pending.coat = pend.coat
+			out.pending.surprise = pend.surprise == true -- stored at the roll
+		end
 	end
 	out.stableBlock = if pend then nil else Foals.stableBlock(data, busy)
 	for _, h in data.horses do
@@ -101,7 +106,8 @@ local function announce(player: Player, data: any, delay: number)
 	if not Foals.ready(data, os.time()) then return end
 	told[player] = key(pend)
 	task.delay(delay, function()
-		if player.Parent then Profiles.notify(player, "💞 Your foal is here!", "heart") end
+		-- not Profiles.notify: the Hud toasts a Notice at once, even over the results card (code review S2)
+		if player.Parent then FoalHere:FireClient(player) end
 	end)
 end
 
@@ -109,7 +115,7 @@ end
 function Foals.afterRace(player: Player, data: any, horseId: string?, before: number?)
 	if not cfg().enabled then return end
 	local ok, err = pcall(function()
-		announce(player, data, GameConfig.runInSeconds + 4)
+		announce(player, data, 1)
 		local h = horseId and Breeding.find(data, horseId)
 		if h and h.origin == "bred" and before == 0 and typeof(h.parents) == "table" then
 			local info = { foal = h.name, parent = nameOf(data, h.parents[1]) }

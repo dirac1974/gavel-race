@@ -481,6 +481,8 @@ function Course:build(plan, coats: { string? }?, shines: { [number]: boolean }?,
 			pcall(function() horse:ScaleTo(horse:GetScale() * raceScale) end)
 			local cf1, size1 = horse:GetBoundingBox()
 			horse:PivotTo(horse:GetPivot() + Vector3.new(0, (cf0.Position.Y - size0.Y / 2) - (cf1.Position.Y - size1.Y / 2), 0))
+			HorseLegs.markRest(horse) -- the legs' rest pose at this size (attributes don't scale)
+			HorseLegs.forget(horse)
 		end
 		badge(i).Parent = horse
 		-- The saddle is anchored inside the model, so pivoting the horse moves it, and a

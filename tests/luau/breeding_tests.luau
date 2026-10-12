@@ -161,7 +161,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(GameConfig.breeding.enabled == GameConfig.career.suggest, "GameConfig.breeding.enabled goes with career.suggest")
 	local off = table.clone(GameConfig.breeding)
 	off.enabled = false
-	check(Breeding.pairBlock(profile(pots, {}), "h1", "h2", nil, off) == "The Foaling Barn is closed today", "enabled = false is closed")
+	check(Breeding.pairBlock(profile(pots, {}), "h1", "h2", nil, off) == "The Foal Barn is closed today", "enabled = false is closed")
 	for league, fee in GameConfig.breeding.fee do
 		check(Breeding.sellValue(fee, 1e6, 1e6) < fee, `breeding: selling a {league} foal returns less than its fee`)
 	end

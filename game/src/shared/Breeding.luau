@@ -242,7 +242,7 @@ end
 -- Why these two can't be parents now, or nil. The stable first, then the horses.
 function Breeding.pairBlock(p: any, idA: string, idB: string, busy: any?, cfg: any?): string?
 	local c = cfgOf(cfg)
-	if not c.enabled then return "The Foaling Barn is closed today" end
+	if not c.enabled then return "The Foal Barn is closed today" end
 	local st = state(p)
 	if #st.pending >= c.maxWaiting then return "A foal is on the way!" end
 	local left = Breeding.nextFoalIn(p)

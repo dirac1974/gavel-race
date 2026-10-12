@@ -170,6 +170,12 @@ function HorseLegs.markRest(model: Instance)
 	end
 end
 
+-- Drop the cached pose state for a model (D-080): after its legs were resized (a foal's shape, a race
+-- scale) the next apply rebuilds toHip and hipToLeg from the new LegRest.
+function HorseLegs.forget(model: Instance?)
+	if model then states[model] = nil end
+end
+
 local function restOf(body: BasePart, leg: BasePart): CFrame
 	local rest = leg:GetAttribute("LegRest")
 	return if typeof(rest) == "CFrame" then body.CFrame * rest else leg.CFrame
@@ -195,6 +201,11 @@ local function setup(model: Instance)
 	end
 	states[model] = s
 	return s
+end
+
+-- Build (or return) the pose state now without posing (tests; a caller that wants toHip ready).
+function HorseLegs.prepare(model: Instance): any
+	return states[model] or setup(model)
 end
 
 -- Forget horses that have left the game (every few hundred calls).

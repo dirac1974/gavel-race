@@ -73,6 +73,7 @@ end
 
 local companion: Model? = nil
 local companionFor: string? = nil
+local companionKey = "" -- the foal's size step (HorseLook.foalKey): a growth step builds it again at the new size
 local lift = 0 -- the companion's pivot height over its hooves
 
 local function build(h): Model?
@@ -119,10 +120,11 @@ RunService.Heartbeat:Connect(function(dt)
 		drop()
 		return
 	end
-	if companionFor ~= h.id then
+	if companionFor ~= h.id or companionKey ~= HorseLook.foalKey(h) then
 		drop()
 		companion = build(h)
 		companionFor = h.id
+		companionKey = HorseLook.foalKey(h)
 		if not companion then return end
 		lastPos = nil
 	end
