@@ -64,7 +64,11 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(GameConfig.steering.scale >= 0 and GameConfig.steering.scale <= 1, "the steering scale is between 0 (cosmetic) and 1")
 	local race = Trip.raceParams(GameConfig)
 	check(deepEqual(race, data.race, 0), "Trip.raceParams(GameConfig) mirrors RACE in src/trip.py")
-	check(deepEqual(TripBaseline, baselineJson.baseline, 1e-15), "TripBaseline.luau is trip_baseline.json's baseline")
+	local postRows = table.clone(TripBaseline) :: any
+	postRows.styles = nil
+	check(deepEqual(postRows, baselineJson.baseline, 1e-15), "TripBaseline.luau is trip_baseline.json's baseline")
+	check(deepEqual((TripBaseline :: any).styles, baselineJson.styles, 1e-15),
+		"TripBaseline.styles is trip_baseline.json's per-style rows (D-072; both absent before it)")
 
 	-- Parity with src/trip.py: every scripted run, tick by tick. Lune's JSON reader can land a
 	-- number one ulp off, which an exact boundary (two horses exactly holdGap apart) turns into a
@@ -109,7 +113,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 				byTick[tick] = byTick[tick] or {}
 				table.insert(byTick[tick], { intent[2], intent[3] })
 			end
-			local st = Trip.new(run.posts, q, uniforms, geo, cfg, run.kinds, race)
+			local st = Trip.new(run.posts, q, uniforms, geo, cfg, run.kinds, race, run.learners, run.fixedLanes == true)
 			local answers = {}
 			local snapIndex = 1
 			for tick = 0, run.ticks - 1 do
@@ -150,7 +154,15 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 				lockOk = false
 			end
 			local tr = Trip.tripValues(st)
-			local tau = Trip.tau(tr, run.posts, fx.baseline[run.course][run.distance], cfg, Trip.brushCharges(st))
+			local tau
+			if Trip.d072On(cfg) then -- (D-072) the per-style row and the learner floor, as trip_run does
+				local srow = (fx.styles and fx.styles[run.course][run.distance]) or table.create(#Trip.STYLES, 0)
+				local row = fx.baseline[run.course][run.distance]
+				tau = Trip.tau(tr, run.posts, row, cfg, Trip.brushCharges(st),
+					Trip.styleBaseline(st, srow), Trip.learnerFloors(st, row, srow), run.fixedLanes == true)
+			else
+				tau = Trip.tau(tr, run.posts, fx.baseline[run.course][run.distance], cfg, Trip.brushCharges(st))
+			end
 			for i = 1, st.n do
 				if not (close(tr[i], run.trip[i], 1e-9) and close(tau[i], run.tau[i], 1e-9)
 					and close(st.ground[i], run.ground[i], 1e-9) and close(st.draft[i], run.draft[i], 1e-9)
@@ -175,6 +187,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local backRecord = table.clone(back)
 	backRecord.drawPosts, backRecord.requestsPerSecond, backRecord.scale = nil, nil, nil
 	for _, key in D057_KEYS do backRecord[key] = nil end
+	for key in Trip.D072_OFF do backRecord[key] = nil end -- (D-072 off: config_record leaves its keys out)
 	local d054Cfg = table.clone(d054.cfg)
 	d054Cfg.scale = nil
 	check(deepEqual(backRecord, d054Cfg, 0), "Trip.d054Config(GameConfig.steering) is trip.d054_config()")
@@ -186,19 +199,19 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	do
 		local track = TrackLayout.courses.dirt
 		local plan = TrackLayout.plan(track, TrackLayout.distances.Classic)
-		local st = Trip.new({ 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, data.race)
+		local st = Trip.new({ 3, 4 }, { 0.5, 0.5 }, table.create(18, 0.5), TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, data.race)
 		check(not pcall(Trip.acceptIntent, st, 0, -1, 0), "lane 0 is refused")
 		check(not pcall(Trip.acceptIntent, st, 3, -1, 0), "a lane past the field is refused")
 		check(not pcall(Trip.step, st, { 0.5, 0.5 }, { { 2.5, -1 } }, 0, dt), "a fractional lane index is refused")
-		check(not pcall(Trip.new, { 0, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, full, nil, data.race), "post 0 is refused")
+		check(not pcall(Trip.new, { 0, 4 }, { 0.5, 0.5 }, table.create(18, 0.5), st.geo, full, nil, data.race), "post 0 is refused")
 		check(not pcall(Trip.tau, { 0, 0 }, { 1, 9 }, table.create(8, 0), full), "post 9 is refused by tau")
 		local old = table.clone(full)
 		for _, key in D057_KEYS do old[key] = nil end
-		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, old, nil, data.race),
+		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, table.create(18, 0.5), st.geo, old, nil, data.race),
 			"a config without the D-057 keys is refused (Python raises too)")
 		local bad = table.clone(full)
 		bad.glide = "curvy"
-		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, st.geo, bad, nil, data.race), "an unknown glide is refused")
+		check(not pcall(Trip.new, { 3, 4 }, { 0.5, 0.5 }, table.create(18, 0.5), st.geo, bad, nil, data.race), "an unknown glide is refused")
 	end
 
 	-- RaceMath.liveChances with an extra exponent (crowd boost + trip).
@@ -335,11 +348,13 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 
 		local onRng = makeRng(5)
 		local st = Trip.start(GameConfig, s, track, plan, TripBaseline.turf.Mile, onRng, TrackLayout)
-		check(st ~= nil and onRng.calls == 16, "steering on: two uniforms per lane, nothing else drawn")
+		local perLane = 2 + (if Trip.d072On(GameConfig.steering) then Trip.D072_UNIFORMS else 0)
+		check(st ~= nil and onRng.calls == 8 * perLane, `steering on: {perLane} uniforms per lane (two, and D-072's seven), nothing else drawn`)
 		local everyoneSmart = true
+		local riderHome = if GameConfig.steering.file.enabled then GameConfig.steering.file.homeLane else GameConfig.steering.smart.homeLane
 		for i, lane in s.lanes do
 			if not st.smart[i] then everyoneSmart = false end
-			if not lane.isBot and (st.home[i] ~= GameConfig.steering.smart.homeLane or st.turnLead[i] ~= GameConfig.steering.smart.turnLeadSeconds) then
+			if not lane.isBot and (st.home[i] ~= riderHome or st.turnLead[i] ~= GameConfig.steering.smart.turnLeadSeconds) then
 				everyoneSmart = false
 			end
 		end
@@ -415,7 +430,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	do -- make room: a horse closing on another in its lane moves out
 		local track = TrackLayout.courses.dirt
 		local plan = TrackLayout.plan(track, TrackLayout.distances.Sprint)
-		local st = Trip.new({ 2, 2 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, race)
+		local st = Trip.new({ 2, 2 }, { 0.5, 0.5 }, table.create(18, 0.5), TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, race)
 		Trip.lock(st)
 		st.view = { 10, -10 } -- the second horse 20 ft behind the first in lane 2, but its place is ahead
 		local lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 10)
@@ -424,7 +439,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		check(st.view[2] > 0, "...and goes on toward its place")
 		lanes = Trip.cosmetic(st, { 10, 30 }, 0.1, 11)
 		check(lanes[2] == 3, "make-room lanes don't jump back")
-		local held = Trip.new({ 1, 1 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, race)
+		local held = Trip.new({ 1, 1 }, { 0.5, 0.5 }, table.create(18, 0.5), TrackLayout.phaseA(track, plan), full, { "manual", "manual" }, race)
 		Trip.lock(held)
 		held.view = { 0, -10 }
 		held.shown, held.shownTgt = { 1, 1 }, { 1, 1 }

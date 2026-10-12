@@ -188,7 +188,7 @@ local function trainingGroundTests(check: (boolean, string) -> (), close: (numbe
 		check(gymOk, gkey .. ": gymkhana pieces inside the arena and on the route; logs clear of the gate-to-gate walkway")
 		check(counts.mud == TCfg.grit.mud and counts.log == TCfg.grit.logs and counts.pole == TCfg.grit.poles and close(points, 100, 1e-9),
 			gkey .. ": 4 puddles, 3 logs, 4 poles worth 100 points")
-		check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, 42 * 42 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
+		check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, GameConfig.riding.hop.jumpPower ^ 2 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
 		check(TCfg.grit.airborne < TC.RIDE_HOP - 1, "a hop clears the log-height test")
 		local slowOk = true
 		local aPole: any, aMud: any = nil, nil

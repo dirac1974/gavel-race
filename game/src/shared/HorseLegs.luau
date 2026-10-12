@@ -114,11 +114,18 @@ function HorseLegs.step(s, dist: number, dt: number, speed: number)
 	s.mix = math.min(1, s.mix + dt * HorseLegs.MIX_RATE)
 end
 
+-- The airborne pose (D-074): forelegs folded up and forward, hind legs trailing back (degrees,
+-- + = foot forward). A pose state's `tuck` (0..1, set by `apply`) blends every leg toward it.
+HorseLegs.AIR_POSE = { LegFL = 50, LegFR = 44, LegBL = -38, LegBR = -32 }
+
 -- Swing of one leg in a pose state (degrees).
 function HorseLegs.poseAngle(s, leg: string): number
 	local cur = HorseLegs.angle(s.gait, leg, s.phase)
 	local old = if s.prev and s.mix < 1 then HorseLegs.angle(s.prev, leg, s.phase) else cur
-	return (old + (cur - old) * s.mix) * s.blend
+	local a = (old + (cur - old) * s.mix) * s.blend
+	local t = s.tuck or 0
+	if t > 0 then a += ((HorseLegs.AIR_POSE[leg] or 0) - a) * t end
+	return a
 end
 
 function HorseLegs.newState()
@@ -242,8 +249,9 @@ end
 
 -- Pose a horse for this frame: `dist` studs travelled since the last call, over `dt` seconds.
 -- `timeScale` (replays in slow motion) is how fast the clock runs, so the gait matches the
--- race's real speed.
-function HorseLegs.apply(model: Instance, dist: number, dt: number, timeScale: number?)
+-- race's real speed. `tuck` (0..1, ride horses in a hop, D-074) folds the legs into the air pose
+-- and stops the stride cycling by as much.
+function HorseLegs.apply(model: Instance, dist: number, dt: number, timeScale: number?, tuck: number?)
 	sweep()
 	local s = states[model] or setup(model)
 	if not s then return end
@@ -252,7 +260,9 @@ function HorseLegs.apply(model: Instance, dist: number, dt: number, timeScale: n
 		return
 	end
 	local clock = dt * (timeScale or 1)
-	HorseLegs.step(s, dist, dt, if clock > 0 then dist / clock else 0)
+	local t = math.clamp(tuck or 0, 0, 1)
+	s.tuck = t
+	HorseLegs.step(s, dist * (1 - t), dt, if clock > 0 then dist / clock else 0)
 	pose(s)
 end
 

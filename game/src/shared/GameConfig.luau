@@ -86,7 +86,8 @@ GameConfig.steering = {
 	lockBellSeconds = 3,
 	smart = { homeLane = 2, turnLeadSeconds = 8, resumeSeconds = 5 },
 	bots = { turnLeadMin = 4, turnLeadMax = 12, railShare = 0.25, wideShare = 0.20 },
-	introRaces = 3,
+	introRaces = 0,                -- D-072 (provisional): the ◀ ▶ buttons from race 1, with the learner floor
+	                               -- below (UI/UX staging: steerHud.tipRace, pipsRace); 3 is the switch-back
 	stars = { 0.015, -0.005 },     -- trip three-star and two-star thresholds
 	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
 	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
@@ -101,7 +102,7 @@ GameConfig.steering = {
 	chainWindow = 0.3,             -- a same-way change may start this close (lanes) to landing (D-054 0)
 	reverseGapSeconds = 0.5,       -- a change the other way starts this long after landing (D-054 0)
 	weaveGapSeconds = 2.5,         -- ...or this long, for a second reversal within the window (D-054 0)
-	weaveWindowSeconds = 7,        -- (debate 012: 5; 7 since the N1 review)
+	weaveWindowSeconds = 8,        -- (debate 012: 5; 7 since the N1 review; 8 since D-072 ruling 4, 7 in the switch-back)
 	pressBounceSeconds = 0.2,      -- a press the same way this soon after the last counts once (D-054 0)
 	glideReserveFeet = 6,          -- a horse gliding into a lane keeps this much more room (D-054 0)
 	blockedPress = "wait",         -- "wait" (D-057) or "d054": a press into a lane with no room
@@ -121,13 +122,50 @@ GameConfig.steering = {
 	brushCheckFeet = 4,            -- the payer steadies this far back (Trip's offsets)...
 	brushRecoverPerSecond = 2,     -- ...and comes back at this rate
 	steadySeconds = 1,             -- the mover can't steer for this long after a brush
+	-- D-072 phase A (race realism, provisional; src/trip.py's CONFIG is the same). Each block switches off
+	-- on its own; all off (Trip.d072Off, trip.D072_OFF) is D-057's race exactly. Per race, Hurdles runs
+	-- fixed lanes (Trip.new's fixedLanes: nobody changes lane, tau = 0). Sim: docs/reviews/race-realism-2026-10-12/phaseA-sim.md.
+	file = { enabled = true,       -- file to the rail after the break
+		homeLane = 1,              -- Smart Steer riders' home lane (smart.homeLane while off)
+		railShare = 0.5, secondShare = 0.35, -- bots' home lane 1, 2, the rest (0.15) lane 3
+		fromSeconds = 2, bySeconds = 12, -- Smart Steer and bots head in whenever there's room in this window
+		riderRoomFeet = 6 },       -- a Smart Steer rider heads in only with this much clear run ahead (boxed share)
+	pack = { enabled = true,       -- running styles and drift (extra feet on the skill target)
+		frontShare = 0.3, closerShare = 0.3, -- bots only; riders are stalkers
+		frontFeet = 14, closerFeet = -14, -- ramped in from the gate, faded to 0 at the lock
+		driftFeet = { 3.5, 2 },    -- two waves (Trip.wave, a C1 parabolic sine): amplitudes...
+		driftPeriod1 = { 11, 17 }, driftPeriod2 = { 5, 7 }, -- ...and period ranges, seconds
+		driftMaxFeetPerSecond = 1.5, -- each horse's drift moves at most this fast (3 ft/s between two)
+		driftFadeSeconds = 4 },    -- drift fades out over the last this-many seconds to the lock
+	pass = { enabled = true,       -- bots and idle Smart Steer riders move out to pass
+		triggerFeet = 6,           -- a bot held at least this far behind its target by a horse ahead in its lane...
+		riderTriggerFeet = 0,      -- ...a Smart Steer rider this far (0: looks for room behind any horse)...
+		aheadFeet = 12,            -- ...at most this far ahead...
+		triggerSeconds = 0.8,      -- ...for this long
+		straightChance = 1, turnChance = 0.25, -- each horse's pre-drawn tendency, straight / turn
+		riderTurnChance = 0.25,    -- a Smart Steer rider's, on a turn
+		returnClearFeet = 10,      -- heads back in once this far clear of the horse passed...
+		giveUpSeconds = 8,         -- ...or after this long out
+		maxPasses = 4,             -- moves out at most this many times a race
+		closingFeetPerSecond = 6,  -- while alongside the horse it passes, gains on it no faster than this...
+		alongFeet = 8 },           -- ...alongside = within this many feet lengthwise (every pass side by side ~0.8 s+)
+	doors = { enabled = true,      -- a bot can shut the door on a horse moving into its lane
+		shutChance = 0.3,          -- bots whose pre-drawn shut is under this...
+		reachFeet = 16,            -- ...within this many feet lengthwise, in the lane being moved to...
+		shutSeconds = 1.5,         -- ...hold their line this long...
+		gapSeconds = 5 },          -- ...and can't shut again for this long after
+	learner = { races = 3, tauFloor = 0 }, -- first races: no shut doors; own presses never lower tau (vs its passive race)
+	lockAt = "farTurnEntry",       -- the outcome lock (only value); lanes move draw-only after it
 }
 -- The steering controls on screen (D-054 S3; RaceController). Chips and tips only show to riders
 -- who have the buttons (from their introRaces + 1-th race).
 GameConfig.steerHud = {
 	buttonPx = 104,          -- ◀ In / Out ▶ size on big screens...
 	minButtonPx = 88,        -- ...never smaller (phones)
-	tipSeconds = 5,          -- the ghost-thumb tip on the first race with the buttons
+	tipSeconds = 5,          -- the ghost-thumb tip (once)...
+	tipRace = 2,             -- ...from this counted race (D-072 staging: race 1 shows the buttons only)
+	padHaloPx = 16,          -- (D-072 consult) a see-through halo this wide round the pad takes stray touches
+	pipsRace = 3,            -- the move pips from this race (D-072 hook for phase B; nothing draws them yet)
 	chipSeconds = 1.8,       -- "Saved ground!", "Tucked in!", the turn tip and "Lanes locked!"
 	railLane = 1.5,          -- "Saved ground!": through a turn on the rail (mean lane under this)...
 	belowField = 0.25,       -- ...or at least this many lanes inside the field's mean
@@ -165,6 +203,13 @@ GameConfig.steerView = {
 	brushNodDeg = 2,         -- a small nod, both horses
 	brushVolume = 0.5,       -- bump_soft at half volume, at the mover's horse (silent until uploaded)
 	brushLateSeconds = 1 / 30, -- a brush first drawn later than this into it starts from the beginning then
+	-- Shut doors (D-072, votes-feel R3): the bot that shuts the door turns toward the mover, drawn only.
+	shutYawDeg = 6,          -- this far toward the mover (D-072 consult: 3 didn't read)...
+	shutEaseSeconds = 0.25,  -- ...eased in and out over this long, held for steering.doors.shutSeconds
+	shutLeanFeet = 0.6,      -- ...leaning this far toward it, drawn only (a brush leans 1)
+	shutPumpScale = 1.5,     -- ...its jockey pumping this much harder while it holds the door
+	shutVolume = 0.4,        -- bump_soft at the shutting bot...
+	shutSoundSpeed = 0.9,    -- ...pitched down a little
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.
@@ -428,6 +473,22 @@ GameConfig.riding = {
 	hopButton = true,   -- touch: a Hop button at Roblox's own jump spot while you ride
 	bobAmp = 0.15,      -- body bob, in step with the legs (hooves stay on the ground)
 	legLength = 2.45,   -- hip to hoof, for the hoof-lift correction
+	-- The forward hop (D-074, race realism; HorseJump): free riding and training rides. A hop always
+	-- goes forward: at least forwardMin, else the speed along the facing + forwardBoost, never over
+	-- forwardCap (set below from training.maxSpeed) nor, on a training course, over the course's own
+	-- pace, and never forward at all where the course says so (TC.hopCap: the Gate Break stall), so a
+	-- hop never beats the course or makes an early go. Peak = jumpPower² /
+	-- (2 × 196.2) = 3.68 studs (TC.RIDE_HOP); airtime 2 × 38 / 196.2 = 0.39 s.
+	-- In the air the legs stop cycling and fold (tuckLegs), the body pitches pitchUpDeg nose-up while
+	-- rising and pitchDownDeg nose-down falling, and squashes to landSquash of squashHeight for
+	-- landSeconds on landing, with a soft thud (bump_soft at thudSpeed) and a dust puff (pitch,
+	-- squash and dust off under Reduced Motion; the folded legs and the thud stay). Other players'
+	-- horses count as airborne past remoteAirVy studs/s up or down when their state lags.
+	-- While a hop flies, WalkSpeed is the hop's own speed, so the Humanoid's air control holds it.
+	hop = { jumpPower = 38, forwardMin = 14, forwardBoost = 4, movingFrom = 2, forwardCap = 51, cooldownSeconds = 0.6,
+		holdSeconds = 1.2, tuckLegs = true, airDelaySeconds = 0.06, tuckRate = 10, untuckRate = 6,
+		pitchUpDeg = 9, pitchDownDeg = 7, pitchRate = 20, landSquash = 0.96, squashHeight = 4, landSeconds = 0.08,
+		thudVolume = 0.6, thudSpeed = 0.8, dustPuff = 8, remoteAirVy = 6 },
 }
 GameConfig.fans = {
 	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
@@ -665,6 +726,8 @@ GameConfig.training = {
 		points = { mud = 7.5, log = 12, pole = 8.5 }, layoutPin = 0 },
 	ghostHz = 4, ghostMaxPoints = 480, ghostQuantum = 0.5, -- 480 points at 4 Hz = 120 s, a whole ride
 }
+-- A hop's forward push stays under the training ride's speed check (D-074).
+GameConfig.riding.hop.forwardCap = GameConfig.training.maxSpeed - 2
 
 -- Prize ribbons for the UI (D-016). Never use racing-wager terms in UI text. -- policy-ok
 GameConfig.ribbons = { "Blue", "Red", "Yellow", "White" }

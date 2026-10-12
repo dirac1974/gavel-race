@@ -120,7 +120,8 @@ def test_d057_config_turns_on_every_rule_and_records_it():
     assert (CFG["brushAlongFeet"], CFG["brushGraceSeconds"], CFG["brushRepeatSeconds"]) == (8.0, 0.3, 2.0)
     assert CFG["brushPresses"] == 3  # N5 review: a press again never brushes (N1's rule, 2, is a fixture override)
     assert (CFG["brushCheckFeet"], CFG["brushRecoverPerSecond"], CFG["steadySeconds"]) == (4.0, 2.0, 1.0)
-    assert trip.config_record(CFG) == CFG  # anything switched on records the whole config
+    # anything switched on records the whole config (D-072, off here, is left out)
+    assert trip.config_record(CFG) == {k: v for k, v in CFG.items() if k not in trip.D072_KEYS}
     assert trip.d057_config(trip.d054_config()) == CFG  # brushes on top of any base
     with pytest.raises(ValueError):
         field([1], [1.0], cfg=cfg57(glide="curvy"))
@@ -533,7 +534,9 @@ def test_game_config_runs_d057_in_full():
     for key, value in trip.D057.items():
         assert LIVE[key] == value, key
     assert LIVE["brush"] == "repeat" and LIVE["brushPays"] == "mover"
-    assert trip.d057_on(LIVE) and trip.d057_config() == LIVE == trip.d057_config(trip.d054_config())
+    # Since D-072 phase A the game runs D-072 on top of D-057 in full; d057_config() is its switch-back.
+    assert trip.d057_on(LIVE) and trip.d057_config() == trip.d072_off(LIVE) == trip.d057_config(trip.d054_config())
+    assert trip.d072_config() == LIVE and trip.d072_on(LIVE)
     back = trip.d054_config()
     assert all(back[k] == trip.D057_OFF[k] for k in trip.D057_KEYS)
     assert (trip.D057_OFF["glide"], trip.D057_OFF["chainWindow"], trip.D057_OFF["reverseGapSeconds"],
@@ -550,7 +553,9 @@ def test_game_baseline_files_are_current():
     assert data["calibrationPasses"] == steering.CALIBRATION_PASSES
     assert steering.BASELINE_LUAU.read_text() == steering.render_luau(data)
     for course, distance in (("dirt", "Sprint"), ("turf", "Mile"), ("dirt", "Marathon")):
-        assert steering.probe_cell(course, distance, LIVE) == data["probe"]["baseline"][course][distance]
+        base, styles = steering.probe_cell_styles(course, distance, LIVE)
+        assert base == data["probe"]["baseline"][course][distance]
+        assert styles == data["probe"]["styles"][course][distance]  # D-072: the style row too
 
 
 @pytest.fixture(scope="module")

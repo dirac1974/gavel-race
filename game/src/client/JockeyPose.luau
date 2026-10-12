@@ -74,6 +74,9 @@ end
 -- The pump is drawn from small lookup tables (no CFrame made per frame): the rise depends on lift only,
 -- the waist and shoulders on the pump only. Index 1..steps+1 for v from lo to hi, nearest step.
 JockeyPose.LIFT_STEPS, JockeyPose.PUMP_STEPS = 16, 32
+-- (D-072 consult) the pump tables reach PUMP_MAX: a bot holding a shut door pumps up to 1.5 times
+-- harder (RaceState.pumpScale), at the same step size.
+JockeyPose.PUMP_MAX = 1.5
 function JockeyPose.lutIndex(v: number, lo: number, hi: number, steps: number): number
 	local f = math.clamp((v - lo) / (hi - lo), 0, 1)
 	return math.floor(f * steps + 0.5) + 1
@@ -119,7 +122,9 @@ function JockeyPose.start(deps)
 	end
 
 	-- The pumping joints' lookup tables (the still pose is lift 0, pump 0: pelvisLut[1], waistLut[mid]).
-	local LS, PS = JockeyPose.LIFT_STEPS, JockeyPose.PUMP_STEPS
+	local LS = JockeyPose.LIFT_STEPS
+	local PMAX = JockeyPose.PUMP_MAX
+	local PS = math.ceil(JockeyPose.PUMP_STEPS * PMAX) -- (over -PMAX..PMAX, the same step as -1..1 at PUMP_STEPS)
 	local pelvisLut, waistLut, shoulderLut = {}, {}, {}
 	local scratch = JockeyPose.newPose()
 	for i = 0, LS do
@@ -127,7 +132,7 @@ function JockeyPose.start(deps)
 		pelvisLut[i + 1] = CFrame.new(0, scratch.rise, 0) * CFrame.Angles(rad(scratch.pelvis), 0, 0)
 	end
 	for j = 0, PS do
-		JockeyPose.solve(cfg, 0, -(-1 + 2 * j / PS), scratch) -- nose = -pump
+		JockeyPose.solve(cfg, 0, -PMAX * (-1 + 2 * j / PS), scratch) -- nose = -pump
 		waistLut[j + 1] = CFrame.Angles(rad(scratch.waist), 0, 0)
 		shoulderLut[j + 1] = CFrame.Angles(rad(scratch.shoulder), 0, 0)
 	end
@@ -203,7 +208,8 @@ function JockeyPose.start(deps)
 				local s = HorseLegs.stateOf(r.horse)
 				if s then lift, nose = HorseLegs.bodyBob(s) end
 			end
-			local pump = JockeyPose.lutIndex(-nose, -1, 1, PS)
+			local scale = (RaceState.pumpScale and RaceState.pumpScale[r.horse]) or 1
+			local pump = JockeyPose.lutIndex(-nose * scale, -PMAX, PMAX, PS)
 			local pelvisCf = pelvisLut[JockeyPose.lutIndex(lift, 0, 1, LS)]
 			local waistCf, shoulderCf = waistLut[pump], shoulderLut[pump]
 			for i, m in r.motors do

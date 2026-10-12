@@ -233,8 +233,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		and string.find(rc, "mover ~= myLaneIndex then return end", 1, true) ~= nil
 		and string.find(rc, "RaceState.BrushDrawn.Event:Connect(function(courseId, mover, _at)", 1, true) ~= nil
 		and string.find(rc, "showChip(\"Bump! Press once, then wait for a gap\", SHUD.tipSeconds)", 1, true) ~= nil
-		and string.find(rc, "showChip(\"No room yet\")", 1, true) ~= nil,
-		"only the mover's rider gets a chip, as the brush is drawn, and only with the buttons: the one-time tip, then \"No room yet\"")
+		and string.find(rc, "showChip(\"No room yet!\")", 1, true) ~= nil,
+		"only the mover's rider gets a chip, as the brush is drawn, and only with the buttons: the one-time tip, then \"No room yet!\"")
 	check(string.find(replay, "SteerPose.brush(t - e.t, GameConfig.steerView, e.mover == i, e.dir)", 1, true) ~= nil,
 		"replays play the recorded brush's lean and nod, no text")
 	local grownUps = fs.readFile("game/src/client/GrownUps.client.luau")

@@ -89,7 +89,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	-- D-054's answers (the switch-back config); D-057's own rules are checked against the Python
 	-- model in trip_d057_tests.luau.
 	local function fresh(posts: { number }, cfg: any?): any
-		local u = table.create(2 * #posts, 0.5)
+		local u = table.create(9 * #posts, 0.5) -- (nine a lane with D-072 on)
 		return Trip.new(posts, table.create(#posts, 1 / #posts), u, geo, cfg or STEER54, table.create(#posts, "manual"), race)
 	end
 	local eased = fresh({ 4, 7 }, STEER)
@@ -180,15 +180,22 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 				local dir = if k % 2 == 0 then 1 else -1
 				for n, at in { 0.21, 0.91, 1.61 } do Trip.submit(tr, ss, "1", dir, n, at) end
 				local resumeAt = 1.7 + STEER.smart.resumeSeconds
-				local last, t = tr.x[i], 0
+				-- (D-072: Smart Steer moves a rider out only to pass, an "out" pack event, and back in after)
+				local last, lastTgt, t = tr.x[i], tr.tgt[i], 0
 				while not tr.locked do
+					local before = #tr.packEvents
 					Trip.advance(tr, ss.live, t)
+					local passOut = false
+					for e = before + 1, #tr.packEvents do
+						local ev = tr.packEvents[e]
+						if ev[2] == "out" and ev[3] == i then passOut = true end
+					end
 					if t > resumeAt + EPS then
 						checkedTicks += 1
-						if tr.x[i] > last + EPS then outward += 1 end
+						if tr.tgt[i] > lastTgt and not passOut then outward += 1 end
 						if tr.x[i] < last - EPS then inward += 1 end
 					end
-					last = tr.x[i]
+					last, lastTgt = tr.x[i], tr.tgt[i]
 					t += tr.dt
 				end
 				-- Rider 2 with Smart Steer off: never presses here, so never moves; then, pressing,
@@ -232,7 +239,8 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 			end
 		end
 	end
-	check(checkedTicks > 1000 and outward == 0, `Smart Steer resumes after a rider's presses and never moves them outward ({checkedTicks} ticks)`)
+	check(checkedTicks > 1000 and outward == 0,
+		`Smart Steer resumes after a rider's presses and never moves them outward but to pass (D-072) ({checkedTicks} ticks)`)
 	check(inward > 0, "...and does head in again after the pause")
 	check(stayed, "Smart Steer off: a rider who never presses keeps their lane to the lock")
 	check(manualMoves > 0 and manualMoves <= manualAnswers, `Smart Steer off: lanes change only on presses ({manualMoves} changes from {manualAnswers} taken presses)`)
@@ -257,7 +265,9 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	check(fourthOff.shown and fourthOff.kind == "manual" and not fourthOff.smart, "...with Smart Steer turned off, the rider steers alone")
 	check(not fourthSeen.tip, "...and the tip shows once")
 	local missing, empty = Trip.riderControls(nil, STEER), Trip.riderControls({}, STEER)
-	check(not missing.shown and missing.kind == "intro" and missing.smart and not empty.shown and empty.kind == "intro",
+	-- (D-072: with introRaces 0 a first race has the buttons; a missing profile still rides "intro")
+	check(not missing.shown and missing.kind == "intro" and missing.smart and empty.shown == (STEER.introRaces == 0)
+		and empty.kind == (if STEER.introRaces == 0 then "smart" else "intro"),
 		"a missing or empty profile counts as a first race")
 	local sa, sb = session(91), session(91)
 	local ta = Trip.start(GameConfig, sa, track, plan, TripBaseline.dirt.Mile, makeRng(92), TrackLayout, { ["1"] = "intro" })

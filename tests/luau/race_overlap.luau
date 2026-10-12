@@ -963,6 +963,11 @@ return function(courseId: string, distanceName: string, seed: number, config: an
 	end
 	stats.halfSteps = trip.halfSteps or 0
 	stats.brushes = #trip.events
+	local shuts = 0 -- (D-072) shut doors and passes this race (the doors-on overlap check reads them)
+	for _, e in trip.packEvents or {} do
+		if e[2] == "shut" then shuts += 1 end
+	end
+	;(stats :: any).shuts = shuts
 	-- Brushes by rider style (D-057 N5), and the mover-pays check: a horse charged for a brush it
 	-- never made (it was only ever the one bumped) would count in strangerCharged.
 	local moved = {}

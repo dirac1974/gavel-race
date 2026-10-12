@@ -36,4 +36,24 @@ function RaceInput.flick(armed: boolean, x: number): (number?, boolean)
 	return nil, armed
 end
 
+-- A steering key pressed while you sit in a race saddle (D-072, race realism): the key is always
+-- sunk (never the default camera), from the saddle until you get off. "steer" = you have the
+-- buttons and the lock hasn't come; "hint" = Smart Steer is steering for you (a rider's first races):
+-- one chip a race, no SteerRequest; "sink" = nothing else (before the gate, after the lock, the
+-- chip already shown, results, and any race where nobody steers: steering off, fixed lanes).
+RaceInput.SMART_HINT = "Smart Steer is steering for you"
+
+-- Is Smart Steer riding for you in this race? Only when the server sent your steering controls
+-- (SteerControls: the race has steering) and they hide the buttons with Smart Steer on (a rider's
+-- intro races). No controls (steering off, a fixed-lane race such as Hurdles) is never Smart Steer.
+function RaceInput.smartSteering(controlsArrived: boolean, shown: boolean, smart: boolean): boolean
+	return controlsArrived and not shown and smart
+end
+
+function RaceInput.saddleKey(racing: boolean, shown: boolean, locked: boolean, hinted: boolean, smartSteering: boolean): string
+	if not racing or locked then return "sink" end
+	if shown then return "steer" end
+	return if smartSteering and not hinted then "hint" else "sink"
+end
+
 return RaceInput

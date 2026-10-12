@@ -20,6 +20,17 @@
 -- fractional while gliding. Lanes are indexed 1..n here (0..n-1 in Python); posts and lane
 -- positions are 1-based in both.
 --
+-- D-072 phase A (race realism, provisional; src/trip.py's D-072 blocks): file (to the rail after
+-- the break), pack (running styles and drift on the skill target), pass (bots and idle Smart Steer
+-- riders move out to pass), doors (bots shut doors) and learner (no doors and a tau floor in a
+-- rider's first races), each in its own GameConfig.steering block; Trip.d072Off is the switch-back
+-- (D-057's race exactly). Seven more uniforms per lane (lane i's at 2n + 7(i - 1) + 1..7: style,
+-- period1, phase1, period2, phase2, pass, shut), a per-style baseline row (TripBaseline.styles:
+-- front, stalker, closer, rider), fixed lanes per race (Hurdles: tau 0, presses answer "fixed")
+-- and pack events ({ t, "out" | "pass" | "shut", horse, other, flag }) for the screen. The drift
+-- wave uses floor, not sin (Trip.wave), so Luau and CPython stay bit-identical.
+-- tests/luau/trip_d072_tests.luau replays tests/fixtures/trip_d072.json.
+--
 -- The race helpers at the bottom (start, submit, advance, raceTau, frame, cosmetic) are what
 -- RaceService calls; they are Luau only.
 
@@ -51,21 +62,78 @@ Trip.D057_OFF = {
 	brushMaxCharged = 3, brushCheckFeet = 4, brushRecoverPerSecond = 2, steadySeconds = 1,
 }
 
+-- D-072's blocks switched off (src/trip.py's D072_OFF, a literal): with every block off a race is
+-- D-057's exactly.
+Trip.D072_OFF = {
+	file = { enabled = false, homeLane = 1, railShare = 0.5, secondShare = 0.35, fromSeconds = 2, bySeconds = 12,
+		riderRoomFeet = 6 },
+	pack = { enabled = false, frontShare = 0.3, closerShare = 0.3, frontFeet = 14, closerFeet = -14,
+		driftFeet = { 3.5, 2 }, driftPeriod1 = { 11, 17 }, driftPeriod2 = { 5, 7 }, driftMaxFeetPerSecond = 1.5,
+		driftFadeSeconds = 4 },
+	pass = { enabled = false, triggerFeet = 6, riderTriggerFeet = 0, aheadFeet = 12, triggerSeconds = 0.8,
+		straightChance = 1, turnChance = 0.25, riderTurnChance = 0.25, returnClearFeet = 10, giveUpSeconds = 8, maxPasses = 4,
+		closingFeetPerSecond = 6, alongFeet = 8 },
+	doors = { enabled = false, shutChance = 0.3, reachFeet = 16, shutSeconds = 1.5, gapSeconds = 5 },
+	learner = { races = 3, tauFloor = 0 },
+	lockAt = "farTurnEntry",
+}
+-- Keys that existed before D-072 and that D-072 retuned, with their D-057 values (trip.D072_RETUNED):
+-- the switch-back restores them, so D-057's race stays exactly as it was.
+Trip.D072_RETUNED = { introRaces = 3, weaveWindowSeconds = 7 }
+Trip.D072_BLOCKS = { "file", "pack", "pass", "doors" }
+Trip.D072_UNIFORMS = 7 -- per lane, after the two D-054 ones
+Trip.STYLES = { "front", "stalker", "closer", "rider" } -- st.style holds 0..3 (Python's indices)
+
+local function deepCopy(v: any): any
+	if type(v) ~= "table" then return v end
+	local out = {}
+	for k, x in v do out[k] = deepCopy(x) end
+	return out
+end
+Trip.deepCopy = deepCopy
+
 local function copySteering(steering: any): any
-	local cfg = table.clone(steering)
-	cfg.smart, cfg.bots, cfg.stars = table.clone(steering.smart), table.clone(steering.bots), table.clone(steering.stars)
+	return deepCopy(steering)
+end
+
+-- Any D-072 block switched on.
+function Trip.d072On(cfg: any): boolean
+	for _, b in Trip.D072_BLOCKS do
+		local block = cfg[b]
+		if type(block) == "table" and block.enabled then return true end
+	end
+	return false
+end
+
+-- A copy of steering with every D-072 block off: D-057's race (trip.d072_off).
+function Trip.d072Off(steering: any): any
+	local cfg = copySteering(steering)
+	for key, value in Trip.D072_OFF do cfg[key] = deepCopy(value) end
+	for key, value in Trip.D072_RETUNED do cfg[key] = value end
 	return cfg
 end
 
+-- D-057 in full, brushes on, every D-072 block off: the game before D-072 (trip.d057_config).
 function Trip.d057Config(steering: any): any
-	local cfg = copySteering(steering)
+	local cfg = Trip.d072Off(steering)
 	for key, value in Trip.D057 do cfg[key] = value end
 	return cfg
 end
 
+-- Every D-057 key at its D-054 value and every D-072 block off: the switch-back (trip.d054_config).
 function Trip.d054Config(steering: any): any
-	local cfg = copySteering(steering)
+	local cfg = Trip.d072Off(steering)
 	for key, value in Trip.D057_OFF do cfg[key] = value end
+	return cfg
+end
+
+-- D-057 in full with steering's own D-072 blocks (trip.d072_config: the game since D-072).
+function Trip.d072Config(steering: any): any
+	local cfg = Trip.d057Config(steering)
+	for key in Trip.D072_OFF do
+		if steering[key] ~= nil then cfg[key] = deepCopy(steering[key]) end
+	end
+	for key in Trip.D072_RETUNED do cfg[key] = steering[key] end
 	return cfg
 end
 
@@ -115,11 +183,21 @@ end
 -- (Smart Steer with variety, the default), "smart" (a rider with Smart Steer on) or "manual".
 -- race = { speed, leadFeetPerShare, lanes, viewEasePerSecond, maxGapFeetPerSecond,
 -- catchUpMarginSeconds } (Trip.raceParams builds it from GameConfig).
-function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: any, cfg: any, kinds: { string }?, race: any): any
+-- D-072: with any D-072 block on, D072_UNIFORMS more uniforms per lane follow the 2n (lane i's at
+-- 2n + 7(i - 1) + 1..7). learners[i]: a rider in its first learner.races races (no shut doors, the
+-- tau floor). fixedLanes (Hurdles): every horse holds its post lane all race, presses answer
+-- "fixed", no ground or draft accrues and Trip.tau(..., fixed = true) is 0.
+function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: any, cfg: any, kinds: { string }?, race: any,
+	learners: { boolean }?, fixedLanes: boolean?): any
 	local n = #posts
 	local lanes = race.lanes
-	if #q ~= n or #uniforms < 2 * n or (kinds ~= nil and #kinds ~= n) then
-		error("posts, q, uniforms (two per lane) and kinds must cover every lane", 2)
+	local on72 = Trip.d072On(cfg)
+	local need = 2 * n + (if on72 then Trip.D072_UNIFORMS * n else 0)
+	if #q ~= n or #uniforms < need or (kinds ~= nil and #kinds ~= n) or (learners ~= nil and #learners ~= n) then
+		error("posts, q, uniforms (two per lane, nine with D-072), kinds and learners must cover every lane", 2)
+	end
+	if (cfg.lockAt or "farTurnEntry") ~= "farTurnEntry" then
+		error("lockAt is farTurnEntry", 2)
 	end
 	for _, p in posts do
 		if type(p) ~= "number" or p % 1 ~= 0 or p < 1 or p > lanes then
@@ -163,11 +241,36 @@ function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: a
 		samePresses = table.create(n, 0),          -- presses that way since then, that one included (brushPresses)
 		tucking = table.create(n, false),          -- a tuck-back is under way this tick (SteerLane, N4)
 		events = {},                               -- { t, "brush", mover, other, dir }, in order
+		-- D-072 (all at rest with every block off)
+		tLock = geo.lockS / race.speed,            -- seconds from the gate to the lock
+		fixed = fixedLanes == true,                -- fixed lanes (Hurdles): nobody changes lane, tau = 0
+		bot = table.create(n, false),              -- a bot (only bots shut doors and have a running style)
+		learner = table.create(n, false),          -- a rider in its first learner.races races
+		style = table.create(n, 1),                -- 0 front, 1 stalker, 2 closer (bots), 3 rider (Trip.STYLES)
+		styleFeet = table.create(n, 0),
+		drift = table.create(n, 0),                -- feet, rate-limited follow of the two waves
+		driftWave = table.create(n),               -- { period1, phase1, period2, phase2 }
+		passU = table.create(n, 1),                -- pre-drawn passing tendency
+		shutU = table.create(n, 1),                -- pre-drawn door shutting
+		blockSince = table.create(n, LONG_AGO),    -- since when held behind a horse ahead (pass trigger)
+		passFrom = table.create(n, 0),             -- the horse being passed (0: not passing)
+		passAt = table.create(n, LONG_AGO),        -- when the move out started
+		passes = table.create(n, 0),               -- moves out started this race
+		returning = table.create(n, false),        -- cleared a horse: heads back in whenever there's room
+		doorUntil = table.create(n, LONG_AGO),     -- a shut door holds this horse's move until then...
+		doorLane = table.create(n, 0),             -- ...into this lane
+		shutReady = table.create(n, LONG_AGO),     -- a bot can shut a door again from then
+		presses = table.create(n, 0),              -- counted presses (reported)
+		packEvents = {},                           -- { t, "out" | "pass" | "shut", horse, other, flag }, in order
+		shadows = {},                              -- learner lane -> its race without its own presses (Trip.fork)
+		isShadow = false,
 	}
 	for i = 1, n do
 		st.x[i] = posts[i]
 		st.tgt[i] = posts[i]
 		st.alongSince[i] = { NOT_ALONG, NOT_ALONG }
+		st.driftWave[i] = { 1, 0, 1, 0 }
+		if learners ~= nil then st.learner[i] = learners[i] == true end
 	end
 	-- After the lock (Luau only; never part of the trip): offsets, lanes and sideways speeds on
 	-- screen, and the make-room look-ahead (closing at up to twice the gap cap, a glide plus a
@@ -179,13 +282,25 @@ function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: a
 	st.shownDir, st.shownRevAt, st.shownArrived = table.create(n, 0), table.create(n, LONG_AGO), table.create(n, LONG_AGO)
 	st.lookahead = cfg.holdGap + 2 * race.maxGapFeetPerSecond * (Trip.glideSeconds(cfg, 1) + 0.2)
 	local smart, bots = cfg.smart, cfg.bots
+	local fc = cfg.file or Trip.D072_OFF.file
+	local pk = cfg.pack or Trip.D072_OFF.pack
 	for i = 1, n do
 		local uRail, uLead = uniforms[2 * i - 1], uniforms[2 * i]
 		local kind = if kinds ~= nil then kinds[i] else "bot"
 		if not KINDS[kind] then error("unknown kind " .. tostring(kind), 2) end
 		if kind == "bot" then
 			st.smart[i] = true
-			if uRail < bots.railShare then
+			st.bot[i] = true
+			if fc.enabled then
+				-- D-072: file to the rail, bots spread over lanes 1-3
+				if uRail < fc.railShare then
+					st.home[i] = 1
+				elseif uRail < fc.railShare + fc.secondShare then
+					st.home[i] = 2
+				else
+					st.home[i] = 3
+				end
+			elseif uRail < bots.railShare then
 				st.home[i] = 1
 			elseif uRail >= 1 - bots.wideShare then
 				st.home[i] = smart.homeLane + 1
@@ -195,8 +310,27 @@ function Trip.new(posts: { number }, q: { number }, uniforms: { number }, geo: a
 			st.turnLead[i] = bots.turnLeadMin + (bots.turnLeadMax - bots.turnLeadMin) * uLead
 		else
 			st.smart[i] = kind == "smart"
-			st.home[i] = smart.homeLane
+			st.home[i] = if fc.enabled then fc.homeLane else smart.homeLane
 			st.turnLead[i] = smart.turnLeadSeconds
+			if on72 then st.style[i] = 3 end -- a rider: runs as a stalker, its own baseline entry
+		end
+		if on72 then
+			local k = 2 * n + Trip.D072_UNIFORMS * (i - 1) + 1
+			local uStyle = uniforms[k]
+			if kind == "bot" and pk.enabled then
+				if uStyle < pk.frontShare then
+					st.style[i] = 0
+					st.styleFeet[i] = pk.frontFeet
+				elseif uStyle >= 1 - pk.closerShare then
+					st.style[i] = 2
+					st.styleFeet[i] = pk.closerFeet
+				end
+			end
+			local p1, p2 = pk.driftPeriod1, pk.driftPeriod2
+			st.driftWave[i] = { p1[1] + (p1[2] - p1[1]) * uniforms[k + 1], uniforms[k + 2],
+				p2[1] + (p2[2] - p2[1]) * uniforms[k + 3], uniforms[k + 4] }
+			st.passU[i] = uniforms[k + 5]
+			st.shutU[i] = uniforms[k + 6]
 		end
 	end
 	return st
@@ -229,6 +363,7 @@ function Trip.acceptIntent(st: any, i: number, d: any, t: number): string
 	st.lastPressAt[i] = t
 	st.lastPressDir[i] = d
 	st.manualAt[i] = t
+	st.presses[i] += 1 -- D-072: counted presses (reported)
 	if t < st.steadyUntil[i] - EPS then return "steady" end
 	if st.want[i] == d then st.samePresses[i] += 1 end -- pressed again while that press waits
 	local other = brushTarget(st, i, d, t)
@@ -438,6 +573,85 @@ local function waitForRoom(st: any, i: number, d: number, t: number, p: number, 
 	end
 end
 
+local function startChange(st: any, i: number, lane: number, d: number, t: number)
+	st.tgt[i] = lane
+	st.lastChange[i] = t
+	if st.lastDir[i] ~= 0 and d ~= st.lastDir[i] then st.lastRevAt[i] = t end
+	st.lastDir[i] = d
+	st.smartBlockAt[i] = LONG_AGO
+end
+
+-- Shut doors (D-072) ---------------------------------------------------------------------------
+
+-- Whether a door is shut on horse i's move into `lane` (whose slot is clear). A door already shut
+-- on that lane holds until doorUntil. Otherwise the nearest bot in that lane (by laneBand, or
+-- gliding into it) within doors.reachFeet lengthwise, whose pre-drawn shut is under shutChance and
+-- who may shut again (shutReady), shuts it now: the move waits shutSeconds and the bot can't shut
+-- again for shutSeconds + gapSeconds. Never on a learner, never by a rider (humans don't draw
+-- shut), never by the mover itself; ties to the lower index.
+local function doorShut(st: any, i: number, lane: number, d: number, t: number): boolean
+	local dc = st.cfg.doors or Trip.D072_OFF.doors
+	if not dc.enabled then return false end
+	if t < st.doorUntil[i] - EPS and st.doorLane[i] == lane then return true end
+	if st.learner[i] then return false end
+	local band = st.cfg.laneBand
+	local best, bestGap = 0, 0
+	for j = 1, st.n do
+		if j ~= i and st.bot[j] and st.shutU[j] < dc.shutChance and t >= st.shutReady[j] - EPS
+			and (math.abs(st.x[j] - lane) < band or st.tgt[j] == lane) then
+			local g = math.abs(st.off[j] - st.off[i])
+			if g < dc.reachFeet and (best < 1 or g < bestGap) then
+				best, bestGap = j, g
+			end
+		end
+	end
+	if best < 1 then return false end
+	st.doorUntil[i] = t + dc.shutSeconds
+	st.doorLane[i] = lane
+	st.shutReady[best] = t + dc.shutSeconds + dc.gapSeconds
+	table.insert(st.packEvents, { t, "shut", best, i, d })
+	return true
+end
+
+-- A rider's press held by a shut door follows D-057's wait rules (an outward press drops after
+-- gapWaitSeconds, an inward one after gapWaitInSeconds, 0 = waits; with blockedPress "d054" an
+-- outward press cancels after outwardWaitSeconds). Smart Steer and bots just try again.
+local function doorWait(st: any, i: number, d: number, t: number, manual: boolean)
+	if not manual then return end
+	local cfg = st.cfg
+	if cfg.blockedPress == "wait" then
+		local limit = if d < 0 then cfg.gapWaitInSeconds else cfg.gapWaitSeconds
+		if limit > 0 and t - st.wantAt[i] >= limit - EPS then st.want[i] = 0 end
+	elseif d > 0 and t - st.wantAt[i] >= cfg.outwardWaitSeconds - EPS then
+		st.want[i] = 0
+	end
+end
+
+-- Luau only (the rider's arrows, never the model): whether a move by horse i into `lane` now would
+-- meet a shut door: one already shut on that lane, or a bot doorShut would pick (no side effects).
+-- A lit arrow is a promise (votes-feel R4): the arrow greys while a door would shut.
+function Trip.doorWouldShut(st: any, i: number, lane: number, t: number): boolean
+	local dc = st.cfg.doors
+	if dc == nil or not dc.enabled then return false end
+	if t < st.doorUntil[i] - EPS and st.doorLane[i] == lane then return true end
+	if st.learner[i] then return false end
+	local band = st.cfg.laneBand
+	for j = 1, st.n do
+		if j ~= i and st.bot[j] and st.shutU[j] < dc.shutChance and t >= st.shutReady[j] - EPS
+			and (math.abs(st.x[j] - lane) < band or st.tgt[j] == lane) and math.abs(st.off[j] - st.off[i]) < dc.reachFeet then
+			return true
+		end
+	end
+	return false
+end
+
+-- The lane a shut door holds horse i out of at time t, or 0 (the shut-door look).
+function Trip.doorShutOn(st: any, i: number, t: number): number
+	checkLane(st, i)
+	if t < st.doorUntil[i] - EPS then return st.doorLane[i] end
+	return 0
+end
+
 local function tryMove(st: any, i: number, d: number, t: number, tucking: { boolean }, manual: boolean): boolean
 	local cfg = st.cfg
 	local lane = st.tgt[i] + d
@@ -446,12 +660,12 @@ local function tryMove(st: any, i: number, d: number, t: number, tucking: { bool
 		return false
 	end
 	local p, blocked = slot(st, i, lane)
+	if not blocked and doorShut(st, i, lane, d, t) then
+		doorWait(st, i, d, t, manual)
+		return false
+	end
 	if not blocked then
-		st.tgt[i] = lane
-		st.lastChange[i] = t
-		if st.lastDir[i] ~= 0 and d ~= st.lastDir[i] then st.lastRevAt[i] = t end
-		st.lastDir[i] = d
-		st.smartBlockAt[i] = LONG_AGO
+		startChange(st, i, lane, d, t)
 		if manual then st.want[i] = 0 end
 		return true
 	end
@@ -638,6 +852,158 @@ local function glideEased(st: any, t: number, dt: number)
 	end
 end
 
+-- The pack (D-072) ---------------------------------------------------------------------------
+
+-- A period-1 wave in -1..1 built from parabolas (C1: smooth, no kinks; only +, -, *, floor, so
+-- Luau and CPython agree bit for bit, where sin might not): 16 f (1/2 - f) on the first half of
+-- each period, its mirror on the second.
+function Trip.wave(u: number): number
+	local f = u - math.floor(u)
+	if f < 0.5 then return 16 * f * (0.5 - f) end
+	return -16 * (f - 0.5) * (1 - f)
+end
+
+-- Each horse's drift: two waves (amplitudes driftFeet, its own periods and phases), ramped in from
+-- the gate with the skill gaps and faded out over driftFadeSeconds before the lock, followed at no
+-- more than driftMaxFeetPerSecond (so two horses' drift moves them apart at most twice that).
+local function packStep(st: any, t: number, dt: number, ramp: number)
+	local pk = st.cfg.pack
+	local a1, a2 = pk.driftFeet[1], pk.driftFeet[2]
+	local fade = 1
+	if pk.driftFadeSeconds > 0 then
+		fade = math.min(1, math.max(0, (st.tLock - t) / pk.driftFadeSeconds))
+	end
+	local env = ramp * fade
+	local lim = pk.driftMaxFeetPerSecond * dt
+	for i = 1, st.n do
+		local w = st.driftWave[i]
+		local goal = env * (a1 * Trip.wave(t / w[1] + w[2]) + a2 * Trip.wave(t / w[3] + w[4]))
+		st.drift[i] = st.drift[i] + math.min(lim, math.max(-lim, goal - st.drift[i]))
+	end
+end
+
+-- Horse i's pack term (feet on its skill target): its running style, ramped in from the gate and
+-- faded linearly to 0 at the lock, plus its drift.
+function Trip.packFeet(st: any, i: number, t: number, ramp: number): number
+	local fade = 0
+	if st.tLock > 0 then fade = math.max(0, 1 - t / st.tLock) end
+	return st.styleFeet[i] * ramp * fade + st.drift[i]
+end
+
+-- D-072 feel: while horse i passes horse j (passFrom) and started the tick alongside it
+-- (|prev_i - prev_j| < pass.alongFeet), i's lead over j grows by at most closingFeetPerSecond * dt
+-- this tick. Lanes in index order; each i reads j's offset after this tick's move.
+local function closingCap(st: any, prev: { number }, dt: number)
+	local pc = st.cfg.pass
+	local cap = pc.closingFeetPerSecond * dt
+	local along = pc.alongFeet
+	for i = 1, st.n do
+		local j = st.passFrom[i]
+		if j >= 1 then
+			local rel = prev[i] - prev[j]
+			if -along < rel and rel < along then
+				st.off[i] = math.min(st.off[i], st.off[j] + rel + cap)
+			end
+		end
+	end
+end
+
+-- A copy of the race so far (every table copied; config, geometry and race shared), with no
+-- shadows of its own: a learner's passive race (trip._fork).
+local SHARED_KEYS = { cfg = true, race = true, geo = true, shadows = true, baselineRow = true, styleRow = true }
+-- The answers that change a learner's race (a shadow is forked on the first of them).
+local SHADOW_ANSWERS = { accepted = true, queued = true, cancelled = true, brush = true }
+Trip.SHADOW_ANSWERS = SHADOW_ANSWERS
+function Trip.fork(st: any): any
+	local sh = {}
+	for key, value in st do
+		sh[key] = if type(value) == "table" and not SHARED_KEYS[key] then deepCopy(value) else value
+	end
+	sh.shadows = {}
+	sh.isShadow = true
+	return sh
+end
+
+-- The nearest horse ahead of horse i in its lane (by laneBand) within `feet`, or 0; ties to the
+-- lower index.
+local function blocker(st: any, i: number, feet: number): number
+	local band = st.cfg.laneBand
+	local best, bestA = 0, 0
+	for j = 1, st.n do
+		if j ~= i and math.abs(st.x[j] - st.x[i]) < band then
+			local a = st.off[j] - st.off[i]
+			if a > 0 and a <= feet and (best < 1 or a < bestA) then
+				best, bestA = j, a
+			end
+		end
+	end
+	return best
+end
+
+-- A horse in `lane` (by laneBand, or gliding into it) from level with horse i to holdGap + room
+-- ahead of it (a rider looking for room won't head in behind it).
+local function crowded(st: any, i: number, lane: number, room: number): boolean
+	local band, lim = st.cfg.laneBand, st.cfg.holdGap + room
+	for j = 1, st.n do
+		if j ~= i and (math.abs(st.x[j] - lane) < band or st.tgt[j] == lane) then
+			local a = st.off[j] - st.off[i]
+			if a >= 0 and a <= lim then return true end
+		end
+	end
+	return false
+end
+
+-- D-072 passing for a horse Smart Steer rides (a bot, or a rider who hasn't pressed for
+-- resumeSeconds), at rest in its lane. Returns true when the horse stays where it is this tick (it
+-- just moved out, or it is still getting by the horse it passes); false lets Smart Steer's inward
+-- rules run. Passing: once returnClearFeet clear of the horse passed (a "pass" event), or after
+-- giveUpSeconds, it is returning. Held: a horse ahead in its lane within pass.aheadFeet and its
+-- target (skill less any brush steadying) at least triggerFeet (a rider: riderTriggerFeet) ahead
+-- of where it is, for triggerSeconds; then, if its own tendency allows it here, it has passes left
+-- and the outside slot is clear (and no door shuts), it moves out one lane (an "out" event).
+local function passStep(st: any, i: number, t: number, inTurn: boolean, gapsOn: boolean): boolean
+	local pc = st.cfg.pass
+	if st.passFrom[i] >= 1 then
+		local j = st.passFrom[i]
+		if st.off[i] - st.off[j] >= pc.returnClearFeet - EPS then
+			table.insert(st.packEvents, { t, "pass", i, j, if inTurn then 1 else 0 })
+			st.passFrom[i] = 0
+			st.returning[i] = true
+			return false
+		end
+		if t - st.passAt[i] >= pc.giveUpSeconds - EPS then
+			st.passFrom[i] = 0
+			st.returning[i] = true
+			return false
+		end
+		return true
+	end
+	local j = blocker(st, i, pc.aheadFeet)
+	local held = st.skill[i] - st.check[i] - st.off[i]
+	local trigger = if st.bot[i] then pc.triggerFeet else pc.riderTriggerFeet
+	if j < 1 or held < trigger - EPS then
+		st.blockSince[i] = LONG_AGO
+		return false
+	end
+	if st.blockSince[i] == LONG_AGO then st.blockSince[i] = t end
+	if t - st.blockSince[i] < pc.triggerSeconds - EPS then return false end
+	local chance = pc.straightChance
+	if inTurn then chance = if st.bot[i] then pc.turnChance else pc.riderTurnChance end
+	if st.passes[i] >= pc.maxPasses or st.passU[i] >= chance or st.tgt[i] >= st.lanes then return false end
+	if gapsOn and reverseWait(st, i, 1, t) then return false end
+	local lane = st.tgt[i] + 1
+	local _, blocked = slot(st, i, lane)
+	if blocked or doorShut(st, i, lane, 1, t) then return false end
+	startChange(st, i, lane, 1, t)
+	st.passFrom[i] = j
+	st.passAt[i] = t
+	st.passes[i] += 1
+	st.blockSince[i] = LONG_AGO
+	st.returning[i] = false
+	table.insert(st.packEvents, { t, "out", i, j, if inTurn then 1 else 0 })
+	return true
+end
+
 -- One server tick at race time t (seconds since the gate) lasting dt. intents = this tick's
 -- { lane, dir } requests in arrival order; returns acceptIntent's answer for each.
 function Trip.step(st: any, live: { number }, intents: { { number } }, t: number, dt: number): { string }
@@ -650,6 +1016,34 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	local cfg, race = st.cfg, st.race
 	local n = st.n
 	if #live ~= n then error("one live chance per lane", 2) end
+	-- D-072 learner floor: a learner's first press that changes something (answered "accepted",
+	-- "queued", "cancelled" or "brush"; SHADOW_ANSWERS) forks its passive race: the state at the start
+	-- of that tick, before any of its presses, which then runs on with every intent but that lane's.
+	-- A tick with a learner's intent and no shadow yet takes a candidate copy first, kept only if one
+	-- of its answers changes something (bounds, rate, steady, bounce: no shadow, no cost after).
+	-- Existing shadows step first, in lane order; a new one steps at the end of the tick (shadows never
+	-- read the main race, so the order changes nothing).
+	local candidates: { [number]: any }? = nil
+	local fresh: { number }? = nil -- lanes whose shadow was forked this tick
+	if not st.isShadow then
+		for _, intent in intents do
+			local li = intent[1]
+			if st.learner[li] and st.shadows[li] == nil and (candidates == nil or candidates[li] == nil) then
+				candidates = candidates or {}
+				candidates[li] = Trip.fork(st)
+			end
+		end
+		for k = 1, n do
+			local sh = st.shadows[k]
+			if sh then
+				local others = {}
+				for _, intent in intents do
+					if intent[1] ~= k then table.insert(others, intent) end
+				end
+				Trip.step(sh, live, others, t, dt)
+			end
+		end
+	end
 	local prev = table.clone(st.off) -- where every horse was at the start of the tick (holds settle from here)
 	-- 1. Skill targets (gaps ramp in from the gate), minus any tuck-back and brush steadying;
 	--    offsets move toward them as the race view moves gaps (eased, capped unless catching up by
@@ -661,8 +1055,11 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	local toLine = st.geo.length / st.speed - t
 	local allowed = race.maxGapFeetPerSecond * dt
 	local margin = race.catchUpMarginSeconds
+	local packOn = cfg.pack ~= nil and cfg.pack.enabled
+	if packOn then packStep(st, t, dt, ramp) end
 	for i = 1, n do
 		st.skill[i] = st.lead * (live[i] - fair) * ramp
+		if packOn then st.skill[i] = st.skill[i] + Trip.packFeet(st, i, t, ramp) end
 		local gap = st.skill[i] - st.tuck[i] - st.check[i] - st.off[i]
 		local limit
 		if toLine <= margin then
@@ -674,6 +1071,11 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	end
 	-- 2. Hold: nobody overlaps the horse ahead in its lane. Then who is alongside whom (brushes).
 	hold(st, order(st), prev, dt)
+	-- D-072: a horse passing another gains on it no faster than closingFeetPerSecond while the two are
+	-- alongside (within alongFeet), so every pass shows them side by side. After the hold, so a horse
+	-- passed while held back by the one ahead of it counts too; the hold after the glide settles
+	-- anything behind the passer.
+	if cfg.pass ~= nil and cfg.pass.enabled then closingCap(st, prev, dt) end
 	local ord = order(st)
 	if cfg.brush ~= "off" then trackAlongside(st, t) end
 	-- 3. Lane changes: this tick's requests in arrival order, then everyone else leader first,
@@ -684,8 +1086,18 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	local answers = table.create(#intents)
 	for _, intent in intents do
 		local lane, d = intent[1], intent[2]
+		if st.fixed then
+			table.insert(answers, "fixed")
+			continue
+		end
 		local answer = Trip.acceptIntent(st, lane, d, t)
 		table.insert(answers, answer)
+		if candidates ~= nil and candidates[lane] ~= nil and SHADOW_ANSWERS[answer] then
+			st.shadows[lane] = candidates[lane]
+			candidates[lane] = nil
+			fresh = fresh or {}
+			table.insert(fresh, lane)
+		end
 		if answer == "accepted" then
 			tried[lane] = true
 			tryMove(st, lane, st.want[lane], t, tucking, true)
@@ -696,8 +1108,14 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	local resume = cfg.smart.resumeSeconds
 	local chain = cfg.chainWindow
 	local gapsOn = cfg.reverseGapSeconds > 0 or cfg.weaveGapSeconds > 0
+	local passOn = cfg.pass ~= nil and cfg.pass.enabled
+	local fileOn = cfg.file ~= nil and cfg.file.enabled
+	local fileFrom = if fileOn then cfg.file.fromSeconds else 0
+	local fileBy = if fileOn then cfg.file.bySeconds else 0
+	local fileRoom = if fileOn then cfg.file.riderRoomFeet else 0
 	local smartWaiting = table.create(n, false)
 	for a = 1, n do
+		if st.fixed then break end
 		local i = ord[a]
 		if tried[i] then continue end
 		local moving = st.x[i] ~= st.tgt[i]
@@ -721,11 +1139,28 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 				continue
 			end
 			tryMove(st, i, d, t, tucking, true)
-		elseif st.smart[i] and t - st.manualAt[i] >= resume - EPS and st.tgt[i] > st.home[i] then
-			-- Smart Steer: heads in before and through turns, never out, never for a draft.
+		elseif st.smart[i] and t - st.manualAt[i] >= resume - EPS then
+			-- D-072: Smart Steer and bots move out to pass (at rest in their lane) and stay out while
+			-- getting by.
+			if passOn and not moving and passStep(st, i, t, inTurn, gapsOn) then continue end
+			if st.tgt[i] <= st.home[i] then
+				st.returning[i] = false
+				continue
+			end
+			-- Smart Steer: heads in before and through turns, never out, never for a draft. D-072: also
+			-- in the filing window after the break, and whenever there's room after a pass.
 			if moving and mdir ~= -1 then continue end
-			if not (inTurn or toTurn <= st.turnLead[i] * st.speed + EPS) then continue end
+			local window = inTurn or toTurn <= st.turnLead[i] * st.speed + EPS
+			if fileOn and fileFrom - EPS <= t and t <= fileBy + EPS then window = true end
+			if not window and not st.returning[i] then continue end
 			if gapsOn and reverseWait(st, i, -1, t) then continue end
+			-- a rider looks for room: never heads in behind a horse just ahead
+			if fileRoom > 0 and not st.bot[i] and crowded(st, i, st.tgt[i] - 1, fileRoom) then continue end
+			if not window then
+				-- returning from a pass: only into a clear slot (never tucks back behind the horse passed)
+				local _, blocked = slot(st, i, st.tgt[i] - 1)
+				if blocked then continue end
+			end
 			if not tryMove(st, i, -1, t, tucking, false) then smartWaiting[i] = true end
 		end
 	end
@@ -763,7 +1198,7 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 		local ov = math.min(s1, turn[2]) - math.max(s0, turn[1])
 		if ov > 0 then f = f + ov / st.geo.turnLength end
 	end
-	if f > 0 then
+	if f > 0 and not st.fixed then
 		f = f * cfg.groundPerLaneTurn
 		for i = 1, n do
 			st.ground[i] = st.ground[i] + f * (st.x[i] - 1)
@@ -774,7 +1209,7 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 	local cap, rate = cfg.draftCap, cfg.draftPerSecond
 	for i = 1, n do
 		local tucked = false
-		if dte > 0 then
+		if dte > 0 and not st.fixed then
 			for j = 1, n do
 				if j ~= i and math.abs(st.x[j] - st.x[i]) < band then
 					local ahead = st.off[j] - st.off[i]
@@ -790,6 +1225,20 @@ function Trip.step(st: any, live: { number }, intents: { { number } }, t: number
 			st.draft[i] = math.min(cap, st.draft[i] + rate * dte)
 		end
 	end
+	-- (D-072) shadows forked this tick take the tick now, without their own lane's intents.
+	if fresh ~= nil then
+		table.sort(fresh)
+		for _, k in fresh do
+			local sh = st.shadows[k]
+			do
+				local others = {}
+				for _, intent in intents do
+					if intent[1] ~= k then table.insert(others, intent) end
+				end
+				Trip.step(sh, live, others, t, dt)
+			end
+		end
+	end
 	return answers
 end
 
@@ -797,7 +1246,16 @@ end
 -- presses and any steadying after a brush clear; brush charges are fixed.
 function Trip.lock(st: any)
 	if st.locked then return end
-	local g = st.cfg.groundPerLaneTurn
+	for k = 1, st.n do -- learners' passive races lock too
+		if st.shadows[k] then Trip.lock(st.shadows[k]) end
+	end
+	-- (Luau, a race's trip from Trip.start) the floors are worked out now and the shadows dropped, so
+	-- nothing keeps a copy of the race past the bell; Trip.raceTau reads st.floors.
+	if st.baselineRow ~= nil and not st.isShadow and next(st.shadows) ~= nil then
+		st.floors = Trip.learnerFloors(st, st.baselineRow, if Trip.d072On(st.cfg) then st.styleRow else nil)
+		st.shadows = {}
+	end
+	local g = if st.fixed then 0 else st.cfg.groundPerLaneTurn
 	for i = 1, st.n do
 		st.ground[i] = st.ground[i] + g * (st.x[i] - 1)
 		st.want[i] = 0
@@ -822,29 +1280,78 @@ function Trip.tripValues(st: any): { number }
 	return out
 end
 
--- tau_i = clamp(scale * (trip_i - baseline[post_i] - field mean of the same) - scale * brush_i,
--- floor, ceiling). baseline = the per-post row for this course and distance (TripBaseline). brush
--- = Trip.brushCharges (D-057): the mover's own cost, after the field mean (a brush never moves
--- anyone else's tau) and inside the clamp; nil or zeros change nothing.
-function Trip.tau(trip: { number }, posts: { number }, baseline: { number }, cfg: any, brushCost: { number }?): { number }
+-- The per-style baseline (front, stalker, closer, rider) for a course and distance (D-072), from
+-- TripBaseline.styles; nil when the table has none (then every style counts 0).
+function Trip.styleRow(baseline: any, course: string, distance: string): { number }?
+	local styles = type(baseline) == "table" and baseline.styles or nil
+	local byCourse = styles and styles[course]
+	return byCourse and byCourse[distance] or nil
+end
+
+-- Each lane's per-style baseline (D-072): row[style]. A rider (Smart Steer or not) takes the rider
+-- entry, so a passive kid among bots nets 0 however riders and bots file in.
+function Trip.styleBaseline(st: any, row: { number }): { number }
+	if #row ~= #Trip.STYLES then error("one value per running style", 2) end
+	local out = table.create(st.n)
+	for i = 1, st.n do out[i] = row[st.style[i] + 1] end
+	return out
+end
+
+-- D-072: each lane's tau floor, or nil. A learner who pressed (its passive race was forked) gets the
+-- tau it would have had without its own presses, plus learner.tauFloor: its presses can move its tau
+-- down by at most -tauFloor (0: never), and pressing never helps by itself. baseline = the per-post
+-- row, row = the style row (nil: no style term), as tau gets them. A table with holes (nil = no
+-- floor); Trip.tau reads it by lane.
+function Trip.learnerFloors(st: any, baseline: { number }, row: { number }?): { [number]: number }
+	local out = {}
+	for k = 1, st.n do
+		local sh = st.shadows[k]
+		if sh then
+			local style = if row ~= nil then Trip.styleBaseline(sh, row) else nil
+			out[k] = Trip.tau(Trip.tripValues(sh), sh.posts, baseline, sh.cfg, Trip.brushCharges(sh), style, nil, sh.fixed)[k]
+				+ st.cfg.learner.tauFloor
+		end
+	end
+	return out
+end
+
+-- tau_i = clamp(scale * (trip_i - baseline[post_i] - style_i - field mean of the same)
+-- - scale * brush_i, floor, ceiling). baseline = the per-post row for this course and distance
+-- (TripBaseline). brush = Trip.brushCharges (D-057): the mover's own cost, after the field mean (a
+-- brush never moves anyone else's tau) and inside the clamp; nil or zeros change nothing.
+-- style = Trip.styleBaseline (D-072): each lane's per-style baseline, subtracted with the post's.
+-- learn = Trip.learnerFloors (D-072): a lane with a value has tau at least that (after the brush
+-- term, inside the clamp); nil leaves it. fixed = a fixed-lanes race (Hurdles): all 0.
+function Trip.tau(trip: { number }, posts: { number }, baseline: { number }, cfg: any, brushCost: { number }?,
+	style: { number }?, learn: { [number]: number }?, fixed: boolean?): { number }
 	local n = #trip
 	if #posts ~= n then error("one post per lane", 2) end
 	if brushCost ~= nil and #brushCost ~= n then error("one brush charge per lane", 2) end
+	if style ~= nil and #style ~= n then error("one style baseline per lane", 2) end
+	if learn ~= nil then
+		for k in learn do
+			if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then error("one learner floor per lane", 2) end
+		end
+	end
 	for _, p in posts do
 		if type(p) ~= "number" or p % 1 ~= 0 or p < 1 or p > #baseline then
 			error(string.format("post %s out of range 1..%d", tostring(p), #baseline), 2)
 		end
 	end
 	local out = table.create(n, 0)
-	if not cfg.enabled then return out end
+	if not cfg.enabled or fixed == true then return out end
 	local adj = table.create(n)
 	for i = 1, n do adj[i] = trip[i] - baseline[posts[i]] end
+	if style ~= nil then
+		for i = 1, n do adj[i] = adj[i] - style[i] end
+	end
 	local total = 0
 	for i = 1, n do total = total + adj[i] end
 	local mean = total / n
 	for i = 1, n do
 		local v = cfg.scale * (adj[i] - mean)
 		if brushCost ~= nil then v = v - cfg.scale * brushCost[i] end
+		if learn ~= nil and learn[i] ~= nil then v = math.max(v, learn[i]) end
 		out[i] = math.min(cfg.ceiling, math.max(cfg.floor, v))
 	end
 	return out
@@ -873,13 +1380,17 @@ function Trip.raceParams(config: any): any
 end
 
 -- How a rider rides this race (S3). The ◀ ▶ buttons show from their introRaces + 1-th race that
--- counts (data.totals.races, the races before this one; Practice doesn't count), the first time
--- with the ghost-thumb tip (data.flags.steerTip once shown). kind: "intro" (no buttons yet: Smart
--- Steer whatever Settings says, and tau 0, since they can't affect their trip), "smart" (buttons,
--- Smart Steer on) or "manual" (buttons, Smart Steer turned off: lanes change only on presses).
--- A missing profile counts as a first race. bumpTip (D-057 N5): the one-time tip on the rider's
--- first brush is still to come (data.flags.bumpTip once it has come; never with brushes off).
-function Trip.riderControls(data: any?, steer: any): { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string }
+-- counts (data.totals.races, the races before this one; Practice doesn't count). kind: "intro" (no
+-- buttons yet: Smart Steer whatever Settings says, and tau 0, since they can't affect their trip),
+-- "smart" (buttons, Smart Steer on) or "manual" (buttons, Smart Steer turned off: lanes change only
+-- on presses). A missing profile counts as a first race. bumpTip (D-057 N5): the one-time tip on the
+-- rider's first brush is still to come (data.flags.bumpTip once it has come; never with brushes off).
+-- D-072 staged onboarding (UI/UX vote; introRaces 0 goes with the learner floor): race 1 shows the
+-- buttons only; the ghost-thumb tip comes from race hud.tipRace (2; data.flags.steerTip once shown);
+-- pips (phase B's move pips, a hook: nothing reads it yet) from race hud.pipsRace (3). learner: the
+-- rider's counted races are under steer.learner.races (no shut doors, tau floor; D-072).
+function Trip.riderControls(data: any?, steer: any, hud: any?): { shown: boolean, smart: boolean, tip: boolean,
+	bumpTip: boolean, kind: string, pips: boolean, learner: boolean, races: number }
 	local races = if data ~= nil and type(data.totals) == "table" then tonumber(data.totals.races) or 0 else 0
 	local shown = data ~= nil and races >= steer.introRaces
 	local off = shown and type(data.settings) == "table" and data.settings.smartSteer == false
@@ -887,35 +1398,50 @@ function Trip.riderControls(data: any?, steer: any): { shown: boolean, smart: bo
 	local flags = if data ~= nil and type(data.flags) == "table" then data.flags else nil
 	local seen = flags ~= nil and flags.steerTip == true
 	local bumpSeen = flags ~= nil and flags.bumpTip == true
-	return { shown = shown, smart = kind ~= "manual", tip = shown and not seen,
-		bumpTip = shown and not bumpSeen and steer.brush ~= "off", kind = kind }
+	local tipFrom = math.max(steer.introRaces, ((hud and hud.tipRace) or 1) - 1)
+	local pipsFrom = math.max(steer.introRaces, ((hud and hud.pipsRace) or 1) - 1)
+	local learnerRaces = if type(steer.learner) == "table" then steer.learner.races else 0
+	return { shown = shown, smart = kind ~= "manual", tip = shown and races >= tipFrom and not seen,
+		bumpTip = shown and not bumpSeen and steer.brush ~= "off", kind = kind, pips = shown and races >= pipsFrom,
+		learner = races < learnerRaces, races = races }
 end
 
 -- A race's trip, built after the posts are drawn (lane index = post), or nil when steering is
 -- off (GameConfig.steering.enabled = false: today's race exactly, nothing drawn). Draws two
--- uniforms per lane from the race's generator, after every other gate draw. Bots use Smart Steer
--- with variety. riders = lane id -> Trip.riderControls kind; a rider not listed rides "smart".
+-- uniforms per lane from the race's generator, after every other gate draw, and with any D-072
+-- block on seven more per lane after those. Bots use Smart Steer with variety. riders = lane id ->
+-- Trip.riderControls kind; a rider not listed rides "smart". opts (D-072): learners = lane id ->
+-- true for a rider in its first learner.races races; fixedLanes = true for a fixed-lanes race
+-- (Hurdles, later; false by default); styleRow = this course and distance's per-style baseline
+-- (Trip.styleRow; nil counts every style 0).
 function Trip.start(config: any, session: any, track: any, plan: any, baselineRow: { number }, rng: Rng, TrackLayout: any,
-	riders: { [string]: string }?): any
+	riders: { [string]: string }?, opts: any?): any
 	local steer = config.steering
 	if not steer or not steer.enabled then return nil end
 	local n = #session.lanes
-	local uniforms = table.create(2 * n)
-	for k = 1, 2 * n do uniforms[k] = rng:NextNumber() end
-	local posts, kinds, riderKind = table.create(n), table.create(n), {}
+	local on72 = Trip.d072On(steer)
+	local count = 2 * n + (if on72 then Trip.D072_UNIFORMS * n else 0)
+	local uniforms = table.create(count)
+	for k = 1, count do uniforms[k] = rng:NextNumber() end
+	local learnerIds = (opts and opts.learners) or {}
+	local posts, kinds, riderKind, learners = table.create(n), table.create(n), {}, table.create(n, false)
 	for i, lane in session.lanes do
 		posts[i] = i
 		local kind = if lane.isBot then "bot" else (riders and riders[lane.id]) or "smart"
-		if not lane.isBot then riderKind[i] = kind end
+		if not lane.isBot then
+			riderKind[i] = kind
+			learners[i] = learnerIds[lane.id] == true
+		end
 		kinds[i] = if kind == "intro" then "smart" else kind
 	end
 	local race = Trip.raceParams(config)
 	local geo = TrackLayout.phaseA(track, plan)
-	local st = Trip.new(posts, session.q, uniforms, geo, steer, kinds, race)
+	local st = Trip.new(posts, session.q, uniforms, geo, steer, kinds, race, learners, opts ~= nil and opts.fixedLanes == true)
 	st.tick = 0                    -- the next fixed tick to step
 	st.dt = 1 / steer.tickHz
 	st.lockT = Trip.lockTime(geo, race)
 	st.baselineRow = baselineRow
+	st.styleRow = opts and opts.styleRow -- (D-072) nil: every style counts 0
 	st.shown = table.clone(st.x)     -- lanes on screen after the lock (cosmetic, see Trip.cosmetic)
 	st.shownTgt = table.clone(st.tgt)
 	st.shownV = table.create(n, 0)   -- their sideways speeds (the eased glide, D-057)
@@ -948,10 +1474,13 @@ end
 -- starts once the horse may move); waitAt reports when that hold ends instead, so it stays steady
 -- (no resend every tick, no flickering ring) and a wait never looks shorter than it was.
 -- Fills `out` (no allocation) and returns it.
-local function riderSide(st: any, i: number, d: number): string
+local function riderSide(st: any, i: number, d: number, t: number): string
 	local lane = st.tgt[i] + d
 	if lane < 1 or lane > st.lanes then return "edge" end
-	return Trip.sideState(st, i, d)
+	local side = Trip.sideState(st, i, d)
+	-- (D-072) a clear slot with a door that would shut holds the press (no move, no tuck-back): grey
+	if side == "free" and Trip.doorWouldShut(st, i, lane, t) then return "blocked" end
+	return side
 end
 
 function Trip.riderLane(st: any, i: number, out: any, t: number): any
@@ -968,7 +1497,7 @@ function Trip.riderLane(st: any, i: number, out: any, t: number): any
 		out.waitAt = at
 	end
 	out.tucking = st.tucking[i] == true
-	out.inSide, out.outSide = riderSide(st, i, -1), riderSide(st, i, 1)
+	out.inSide, out.outSide = riderSide(st, i, -1, t), riderSide(st, i, 1, t)
 	out.t = t
 	return out
 end
@@ -979,11 +1508,13 @@ end
 -- that passes waits for the next fixed tick, which applies the waiting requests in arrival order
 -- through Trip.step (acceptIntent: the request gap, the queue, the track's edges; every press
 -- there pauses Smart Steer for resumeSeconds). t = race time of arrival; a press before the gate
--- (during the countdown) is refused. Returns "sent", or why not: "notRacing", "locked", "invalid",
--- "early", "spam". The rider's screen learns each answer from st.ack (SteerLane).
+-- (during the countdown) is refused. Returns "sent", or why not: "notRacing", "fixed" (a fixed-lanes
+-- race, D-072: nothing is queued), "locked", "invalid", "early", "spam". The rider's screen learns each
+-- answer from st.ack (SteerLane).
 function Trip.submit(st: any, session: any, userId: string, d: any, seq: any, t: number): string
 	local i = session:laneIndex(userId)
 	if i == nil or session.lanes[i].isBot then return "notRacing" end
+	if st.fixed then return "fixed" end
 	if st.locked or t >= st.lockT - EPS then return "locked" end
 	if d ~= 1 and d ~= -1 then return "invalid" end
 	if type(seq) ~= "number" or seq ~= seq or seq <= st.seq[i] then return "invalid" end
@@ -1059,10 +1590,16 @@ function Trip.advance(st: any, live: { number }, t: number): boolean
 end
 
 -- tau for this race at the lock, with each mover's brush cost (D-057; all zero while brushes
--- are off). Riders still without buttons ("intro") get 0 after the clamp: they couldn't affect
--- their trip. Everyone else (bots included) keeps theirs.
+-- are off), and (D-072) each lane's style baseline, a learner's floor and 0 in a fixed-lanes race.
+-- Riders still without buttons ("intro") get 0 after the clamp: they couldn't affect their trip.
+-- Everyone else (bots included) keeps theirs.
 function Trip.raceTau(st: any): { number }
-	local tau = Trip.tau(Trip.tripValues(st), st.posts, st.baselineRow, st.cfg, Trip.brushCharges(st))
+	local style, learn = nil, nil
+	if Trip.d072On(st.cfg) then -- (D-072) the per-style row and the learner floor, as the fixtures do
+		style = if st.styleRow then Trip.styleBaseline(st, st.styleRow) else nil
+		learn = st.floors or Trip.learnerFloors(st, st.baselineRow, st.styleRow)
+	end
+	local tau = Trip.tau(Trip.tripValues(st), st.posts, st.baselineRow, st.cfg, Trip.brushCharges(st), style, learn, st.fixed)
 	for i, kind in st.riderKind do
 		if kind == "intro" then tau[i] = 0 end
 	end
@@ -1169,6 +1706,9 @@ function Trip.cosmetic(st: any, targets: { number }, dt: number, t: number, plan
 	local cfg, n = st.cfg, st.n
 	local band = cfg.laneBand
 	Trip.viewStep(st, targets, dt, st.geo.length / st.speed - t)
+	-- (D-072) A fixed-lanes race keeps every horse in its post lane to the line: the offsets ease and
+	-- hold as above, and no lane ever makes room.
+	if st.fixed then return table.clone(st.shown) end
 	local view, x, tgt = st.view, st.shown, st.shownTgt
 	local eased = cfg.glide == "eased"
 	local aim = if eased and plan ~= nil then plan else targets

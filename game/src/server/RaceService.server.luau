@@ -83,6 +83,7 @@ local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, first-brush tip (D-057 N5), course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
 local SteerBrush = makeRemote("SteerBrush")       -- server -> all: a brush (mover, other, dir, server time, course), D-057 N5
+local PackEvent = makeRemote("PackEvent")         -- server -> all: a pack event ("out" | "pass" | "shut", horse, other, flag, server time, course), D-072
 local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, the state's race time, course (D-054 S3, D-057 N4)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 local PersonalBest = makeRemote("PersonalBest")   -- server -> one: distance, ride score, earlier best, course ("New best!", D-063)
@@ -324,7 +325,8 @@ end)
 
 -- Steering (D-054 S3): a rider's lane-change press. Trip.submit checks it as it arrives (in this
 -- race, before the lock, dir -1 or 1, seq rising, not spam) and the next 10 Hz tick applies it.
--- Riders whose buttons are hidden (their first introRaces races) can't steer.
+-- Riders whose buttons are hidden (their first introRaces races; 0 since D-072) can't steer, nor can
+-- anyone in a fixed-lanes race (Hurdles, D-072: no SteerControls are sent).
 SteerRequest.OnServerEvent:Connect(function(player: Player, dir: any, seq: any)
 	local c = riding[player]
 	local cur = c and c.current
@@ -759,23 +761,33 @@ local function runRace(c, players: { Player })
 	-- which their presses pause; a rider who turned it off in Settings and has the buttons steers
 	-- alone. While the buttons are hidden everyone has Smart Steer (no kid is left at their post
 	-- with no way to move) and their tau is 0 (they can't affect their trip).
+	-- D-072: a rider in their first learner.races counted races is a learner (no shut doors, their
+	-- own presses never push tau below learner.tauFloor), and each style's baseline joins the post's
+	-- (TripBaseline.styles). A fixed-lanes race (card.fixedLanes, false by default; Hurdles later)
+	-- keeps every horse in its post lane with tau 0, and nobody gets the buttons.
 	local trip = nil
-	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string } } = {}
+	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string, pips: boolean,
+		learner: boolean, races: number } } = {}
 	local steers: { [Player]: boolean } = {}
+	local fixedLanes = card.fixedLanes == true
 	if GameConfig.steering.enabled then
 		local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
 		if not tripRow then
 			warn(string.format("[RaceService] no trip baseline for %s %s; posts count as equal", c.id, tostring(cond.distance)))
 			tripRow = table.create(GameConfig.lanes, 0)
 		end
-		local riders = {}
+		local riders, learners = {}, {}
 		for _, p in players do
-			local ctl = Trip.riderControls(Profiles.get(p), GameConfig.steering)
-			controls[p] = ctl
-			if ctl.shown then steers[p] = true end
+			local ctl = Trip.riderControls(Profiles.get(p), GameConfig.steering, GameConfig.steerHud)
+			if not fixedLanes then
+				controls[p] = ctl
+				if ctl.shown then steers[p] = true end
+			end
 			riders[tostring(p.UserId)] = ctl.kind
+			learners[tostring(p.UserId)] = ctl.learner
 		end
-		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout, riders)
+		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout, riders,
+			{ learners = learners, fixedLanes = fixedLanes, styleRow = Trip.styleRow(TripBaseline, c.id, cond.distance) })
 	end
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
@@ -874,7 +886,10 @@ local function runRace(c, players: { Player })
 	local previewStretch: (seg: number, own: boolean?) -> () -- (below; the lock refreshes the shown chances with it, D-071)
 	local function advanceTrip(t: number)
 		if not trip or trip.locked or cur.aborted then return end
-		if Trip.advance(trip, session.live, t - tStart) then
+		debug.profilebegin("TripStep") -- (D-072 consult) the trip's ticks, learners' shadows included
+		local lockedNow = Trip.advance(trip, session.live, t - tStart)
+		debug.profileend()
+		if lockedNow then
 			tapLockAt = now()
 			session:setTrip(Trip.raceTau(trip))
 			shownLive = table.clone(session.live)
@@ -896,9 +911,11 @@ local function runRace(c, players: { Player })
 			end
 			for answer, count in trip.answers do table.insert(answers, answer .. " " .. count) end
 			table.sort(answers)
-			print(string.format("[Trip] %s %s locked at %.1f s: %s; requests: %s; held by the reverse or weave gap %d, waits dropped %d",
+			local pack = { out = 0, pass = 0, shut = 0 } -- (D-072) the field's passes and shut doors
+			for _, e in trip.packEvents do pack[e[2]] = (pack[e[2]] or 0) + 1 end
+			print(string.format("[Trip] %s %s locked at %.1f s: %s; requests: %s; held by the reverse or weave gap %d, waits dropped %d; pack: out %d, passes %d, doors shut %d%s",
 				c.id, cond.distance, trip.lockT, table.concat(parts, ", "), if #answers > 0 then table.concat(answers, ", ") else "none",
-				trip.gapHeld or 0, trip.waitDropped or 0))
+				trip.gapHeld or 0, trip.waitDropped or 0, pack.out, pack.pass, pack.shut, if trip.fixed then " (fixed lanes)" else ""))
 			-- The chances shown pick tau up at once (when the lock comes before checkpoint 1, as it
 			-- can in a Sprint, the checkpoint's own update carries it).
 			if session.closed > 0 then LiveChances:FireAllClients(session.closed, shownLive, c.id) end
@@ -937,7 +954,7 @@ local function runRace(c, players: { Player })
 		local lastStamp = tStart
 		local sentLanes, lanesAt, resend = nil, -math.huge, 0
 		local sentOwn: { [Player]: any } = {}
-		local sentBrushes = 0
+		local sentBrushes, sentPack = 0, 0
 		-- Brushes (D-057 N5) go to every screen following the course, before that tick's SteerLane,
 		-- stamped with the server time they happened: the mover leans and nods, the other nods, a
 		-- soft tick at the mover's horse, and the mover's chip. Bots and Smart Steer never brush;
@@ -957,7 +974,19 @@ local function runRace(c, players: { Player })
 				Profiles.changed(p)
 			end
 		end
+		-- (D-072) Pack events go to every screen following the course the same way, stamped as the
+		-- samples are: "out" (a horse moves out to pass another), "pass" (it is clear and heads back in)
+		-- and "shut" (a bot shuts the door on a horse moving into its lane: RaceView turns the bot toward
+		-- it, and the rider whose press it held hears it). Drawn only; none after the lock.
+		local function sendPack()
+			while sentPack < #trip.packEvents do
+				sentPack += 1
+				local e = trip.packEvents[sentPack]
+				PackEvent:FireAllClients(e[2], e[3], e[4], e[5], tStart + e[1] + trip.dt, c.id)
+			end
+		end
 		local function sendBrushes()
+			sendPack()
 			while sentBrushes < #trip.events do
 				sentBrushes += 1
 				local e = trip.events[sentBrushes]

@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
 local Style = require(Shared:WaitForChild("Style"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 
 local PATTERN_TEXT = { stars = "⭐ ⭐ ⭐", checks = "🏁", lightning = "⚡", goldtrim = "", plain = "", dots = "• • •", star = "⭐",
 	hearts = "❤️ ❤️ ❤️", daisies = "🌼 🌼 🌼", rainbow = "🌈" } -- (the last three: Barn Builder cloths, D-070)
@@ -251,7 +252,7 @@ local function build(player: Player, h, at: CFrame): Model
 	humanoid.HipHeight = HIP
 	humanoid.WalkSpeed = Rides.WALK
 	humanoid.UseJumpPower = true
-	humanoid.JumpPower = 42
+	humanoid.JumpPower = GameConfig.riding.hop.jumpPower -- (D-072) 38: a 3.7-stud forward hop (HorseJump)
 	humanoid.AutoRotate = true
 	humanoid.MaxSlopeAngle = 60
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
