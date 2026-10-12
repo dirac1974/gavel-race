@@ -49,3 +49,24 @@
 
 - Update the thresholds above so `tap_preview_report` exits 0 only when they all pass, and add it to CI.
 - Log the threshold changes in D-071 and REVIEW_QUEUE.
+
+## Ruling 2 (boxed share, after the realistic-field re-run)
+
+**Option A: accept for this build.** The 53% boxed share is real, and it comes from Smart Steer's lane-2 columns, not from the layer. Lowering it needs a race-decision change, and that doesn't belong in a draw-only layer.
+
+**New gate** (replaces "≤ 40%" in `tap_preview_report` and the tests). In the realistic Rookie Mile run:
+1. The boxed share is ≤ 55%. This is a no-regression gate; today's value is 53%.
+2. In 100% of races where held ≥ 4 ft for ≥ 1 s, the pressure cue fires.
+3. With buttons and side room, the chip fires in ≥ 80% of races where held ≥ 6 ft for ≥ 1.5 s.
+4. A masher triggers 0 chips. No chip text contains "boxed".
+5. The other 10 gates are unchanged.
+
+**Follow-up (REVIEW_QUEUE and STATUS, after the playtest): Smart Steer "find room" study.**
+- **Rule under study:** a rider's Smart Steer moves out one lane when its preview is held ≥ 6 ft for ≥ 2 s and the outside lane has room. Bots are unchanged.
+- **Gates:**
+  - every D-054 τ target and every D-057 target per cell;
+  - per-post bias ≤ 0.002;
+  - overlap report 0 / 0;
+  - boxed share ≤ 40%;
+  - rider reversals ≤ D-057 limits.
+- **Approval:** this is a recalibration, so it needs David's approval.

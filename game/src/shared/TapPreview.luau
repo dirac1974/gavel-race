@@ -37,7 +37,7 @@ export type State = {
 	e: { number }, u: { number }, d: { number }, pb: { number }, ord: { number },
 	started: boolean, locked: boolean, lockAt: number, lastT: number,
 	msgLow: { number }, msgAt: { number }, msgReady: boolean, score: { number }, clean: { number },
-	on: { boolean }, roomed: { boolean }, held: { boolean }, upper: { number }, hardClamps: number,
+	on: { boolean }, roomed: { boolean }, slowed: { boolean }, heldFeet: { number }, aimFeet: { number }, upper: { number }, hardClamps: number,
 }
 
 -- A preview layer for n lanes. lead = Trip's feet per unit of chance share (st.lead, from
@@ -52,7 +52,9 @@ function TapPreview.new(n: number, cfg: any, lead: number, rampSeconds: number, 
 		msgLow = table.create(n, 0), msgAt = table.create(n, -math.huge), msgReady = false, hardClamps = 0, -- lane-room moves so far (reports)
 		on = table.create(n, (cfg and cfg.previewBots) ~= false),
 		upper = table.create(n, 0),
-		held = table.create(n, false), -- the drawn speed limit held this lane back on the last step
+		slowed = table.create(n, false), -- the drawn speed limit slowed this lane on the last step
+		heldFeet = table.create(n, 0), -- how far lane room keeps this lane behind its goal (TapPreview.held)
+		aimFeet = table.create(n, 0), -- that goal (feet ahead of Trip, before lane room)
 		score = table.create(n, -1), -- each rider's provisional score in the open checkpoint (-1: none yet)
 		clean = table.create(n, 0), -- ...and the share of its passes tapped exactly once
 		roomed = table.create(n, false), -- lane room held this lane's goal or pulled it back on the last step
@@ -173,6 +175,7 @@ function TapPreview.step(state: State, base: { number }, x: { number }, tgt: { n
 			if db < 0 then g = math.min(g, stay) elseif db > moving then g = math.min(g, ei) end
 		end
 		g = math.clamp(g, -back, cap)
+		local aim = g -- (the goal before lane room: TapPreview.held measures against it)
 		-- Lane room (residual units): never less than the base leaves itself.
 		local upper, lower, upperHard = math.huge, -math.huge, math.huge
 		for b = 1, a - 1 do
@@ -208,7 +211,11 @@ function TapPreview.step(state: State, base: { number }, x: { number }, tgt: { n
 		-- Follow the goal within the speed and acceleration limits, braking to stop on it.
 		local want = g - ei
 		-- (the fastest speed that can still stop on the goal one sample later: v dt + v^2 / 2a = want)
-		local mag = math.min(vmax, amax * (math.sqrt(dt * dt + 2 * math.abs(want) / amax) - dt))
+		-- (feel review) The drawn horse falls back on Trip's (a lead given back at a close or the lock, a
+		-- preview that came down, a masher's drift) at most pullBackFeetPerSecond; pullPerSecond is only
+		-- for clearing a horse that cuts in (lane room, below).
+		local vcap = if want < 0 then math.min(vmax, cfg.pullBackFeetPerSecond or vmax) else vmax
+		local mag = math.min(vcap, amax * (math.sqrt(dt * dt + 2 * math.abs(want) / amax) - dt))
 		local vgoal = if want > 0 then mag elseif want < 0 then -mag else 0
 		local un = u[i] + math.clamp(vgoal - u[i], -amax * dt, amax * dt)
 		local en = ei + un * dt
@@ -221,13 +228,13 @@ function TapPreview.step(state: State, base: { number }, x: { number }, tgt: { n
 		local lim, pullStep = vmax * dt, pull * dt
 		local hi = math.max(lim, math.min(pullStep, db + lim), db)
 		local lo = math.min(-lim, math.max(-pullStep, db - lim), db)
-		state.held[i] = false
+		state.slowed[i] = false
 		if step > hi then
 			en = was + hi - bi
-			state.held[i] = true
+			state.slowed[i] = true
 		elseif step < lo then
 			en = was + lo - bi
-			state.held[i] = true
+			state.slowed[i] = true
 		end
 		-- Lane room at up to pullPerSecond (back from the horse ahead, or a drawn-back horse up from the
 		-- one behind), never inside hardGapFeet; then the caps.
@@ -249,6 +256,8 @@ function TapPreview.step(state: State, base: { number }, x: { number }, tgt: { n
 			state.roomed[i] = true
 		end
 		u[i] = if pushed then 0 else (en - ei) / dt
+		state.heldFeet[i] = if state.roomed[i] and not state.locked then math.max(0, aim - en) else 0
+		state.aimFeet[i] = aim
 		e[i] = en
 		d[i] = bi + en
 		pb[i] = bi
@@ -266,7 +275,8 @@ function TapPreview.step(state: State, base: { number }, x: { number }, tgt: { n
 end
 
 -- The rider's message above their horse (D-071; RaceController shows it as a BillboardGui):
--- "up" ("Giddy-up! Moving up!") or "away" ("Pulling away!", when drawn 1st), or nil. Only before
+-- "up" ("Giddy-up! Moving up!", TapPreview.MESSAGES) or nil: never anything about leading or
+-- winning before the lock (systems review; the one key is "up" even when drawn 1st). Only before
 -- the lock, only while the lane's taps are earning ground (its preview goal and drawn lead over
 -- Trip both positive) and are good taps (over at least messageMinPasses passes, a provisional score of
 -- messageMinScore or more with messageMinClean of them tapped exactly once: a masher's doubled
@@ -281,17 +291,94 @@ function TapPreview.message(state: State, i: number, t: number): string?
 	if state.gain[i] <= 0 or state.e[i] <= 0 or state.score[i] < (cfg.messageMinScore or 60)
 		or state.passes < (cfg.messageMinPasses or 6) or state.clean[i] < (cfg.messageMinClean or 0.8) then return nil end
 	local d, n = state.d, state.n
-	local mean, top = 0, true
-	for j = 1, n do
-		mean += d[j]
-		if j ~= i and d[j] >= d[i] then top = false end
-	end
+	local mean = 0
+	for j = 1, n do mean += d[j] end
 	mean /= n
 	local lead = d[i] - mean
 	if lead - state.msgLow[i] < (cfg.messageFeet or 8) then return nil end
 	state.msgAt[i] = t
 	state.msgLow[i] = lead
-	return if top then "away" else "up"
+	return "up"
+end
+
+-- The message's words by key (the client shows them; nothing about leading or winning).
+TapPreview.MESSAGES = { up = "Giddy-up! Moving up!" }
+
+-- (D-071 rulings) How far lane room keeps lane i's drawn horse behind where its taps would put it
+-- (feet; 0 when nothing holds it, and after the lock). RaceService sends it to the rider (TapHeld).
+function TapPreview.held(state: State, i: number): number
+	return state.heldFeet[i] or 0
+end
+
+-- The held cue (D-071 rulings; tapPreview.heldCue), one per rider, on the rider's own screen.
+export type Cue = { over: number, overChip: number, chipAt: number, tapsShown: boolean }
+
+function TapPreview.newCue(): Cue
+	return { over = 0, overChip = 0, chipAt = -math.huge, tapsShown = false }
+end
+
+-- One frame of the cue: held = the rider's latest TapHeld feet, dt = frame seconds, now = race time,
+-- locked = lanes locked, smart = no steering buttons are shown to the rider (Smart Steer rides for
+-- them: Trip.riderControls kind "intro"), sideRoom = SteerLane says a side has room. Returns pressure (bob x1.3 and a dust puff
+-- a stride: held >= minFeet for minSeconds; the caller skips it under Reduced Motion) and the chip:
+-- "gap" ("Room this way! ◀/▶" via TapMessage.chip, riders with the buttons, a side with room, at most every
+-- chipEverySeconds), "taps" ("Keep tapping! Room soon.", riders without buttons, once a race) or nil, when
+-- held >= chipMinFeet for chipMinSeconds. Never after the lock. Allocates nothing.
+function TapPreview.stepCue(cue: Cue, cfg: any, held: number, dt: number, now: number, locked: boolean,
+	smart: boolean, sideRoom: boolean): (boolean, string?)
+	local hc = cfg and cfg.heldCue
+	if not TapPreview.enabled(cfg) or type(hc) ~= "table" or locked then
+		cue.over, cue.overChip = 0, 0
+		return false, nil
+	end
+	cue.over = if held >= hc.minFeet then cue.over + dt else 0
+	cue.overChip = if held >= hc.chipMinFeet then cue.overChip + dt else 0
+	local pressure = cue.over >= hc.minSeconds - 1e-9
+	local chip: string? = nil
+	if cue.overChip >= hc.chipMinSeconds - 1e-9 then
+		if smart then
+			if not cue.tapsShown then
+				cue.tapsShown = true
+				chip = "taps"
+			end
+		elseif sideRoom and now - cue.chipAt >= hc.chipEverySeconds - 1e-9 then
+			cue.chipAt = now
+			chip = "gap"
+		end
+	end
+	return pressure, chip
+end
+
+-- (review N6) When the server sends a rider's held value (TapHeld). One HeldSend per rider:
+-- last = the value last sent (rounded to 0.1 ft: send state.last when due), lastT = when.
+export type HeldSend = { last: number, lastT: number }
+
+function TapPreview.newHeldSend(): HeldSend
+	return { last = 0, lastT = -math.huge }
+end
+
+-- Is a TapHeld send due at race time t for this held value? cfg = GameConfig.tapPreview. The value
+-- is rounded to 0.1 ft. Due at once (whatever the gap) when it drops to 0 from above 0, or crosses
+-- heldCue.minFeet or heldCue.chipMinFeet either way; otherwise only heldSend.minGapSeconds (0.5)
+-- after the last send, and then when it moved heldSend.feet (1) or more, or when it is above 0 and
+-- heldSend.resendSeconds (1) have passed (a lost unreliable packet is repaired). When due, records
+-- it (state.last, state.lastT). Allocates nothing.
+function TapPreview.heldSendDue(state: HeldSend, held: number, t: number, cfg: any): boolean
+	local hc, hs = cfg.heldCue, cfg.heldSend
+	local v = math.floor(math.max(0, held) * 10 + 0.5) / 10
+	local last = state.last
+	local due = false
+	if v == 0 and last > 0 then
+		due = true
+	elseif (v >= hc.minFeet) ~= (last >= hc.minFeet) or (v >= hc.chipMinFeet) ~= (last >= hc.chipMinFeet) then
+		due = true
+	elseif t - state.lastT >= hs.minGapSeconds - 1e-9 then
+		due = math.abs(v - last) >= hs.feet - 1e-9 or (v > 0 and t - state.lastT >= hs.resendSeconds - 1e-9)
+	end
+	if due then
+		state.last, state.lastT = v, t
+	end
+	return due
 end
 
 -- The residual still drawn on lane i (feet ahead of the base; 0 with the layer off).

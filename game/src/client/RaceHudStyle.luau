@@ -179,6 +179,7 @@ RunService.RenderStepped:Connect(function()
 	if not camera then return end
 	local zoom = (camera.CFrame.Position - camera.Focus.Position).Magnitude
 	local shown, studs, w, h = RacePresent.youMarker(CFG.youMarker, chaseView(camera) or Gate.active, zoom, false)
+	if bb:GetAttribute("TapHidden") then shown = false end -- (D-071) "Moving up!" over your horse has the moment
 	if bb.Enabled ~= shown then bb.Enabled = shown end
 	if bb.StudsOffsetWorldSpace.Y ~= studs then bb.StudsOffsetWorldSpace = Vector3.new(0, studs, 0) end
 	if bb.Size.X.Offset ~= w or bb.Size.Y.Offset ~= h then bb.Size = UDim2.fromOffset(w, h) end

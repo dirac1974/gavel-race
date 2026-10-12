@@ -364,14 +364,35 @@ GameConfig.pacePreviewAfterLock = { enabled = true, seconds = 1, throughCheckpoi
 -- so a lane change never meets a horse drawn too close. At a close or the lock the drawn horse holds
 -- while Trip's catches up (for fadeSeconds after the lock), then the residual eases out.
 -- Never reads luck; decides nothing. steeringOffWholeRace: with steering off the shown chances
--- preview at every pass end instead (PacePreview.beforeLock). The message ("Giddy-up! Moving up!" /
--- "Pulling away!", TapPreview.message) shows on a messageFeet gain over the field's mean while the
+-- preview at every pass end instead (PacePreview.beforeLock). The message ("Giddy-up! Moving up!",
+-- TapPreview.message; never "away"/"lead"/"win" before luck can reorder the field) shows on a messageFeet gain over the field's mean while the
 -- rider's own taps score at least messageMinScore over messageMinPasses passes, at most every messageEverySeconds, never on a loss.
 -- enabled = false is the race before D-071 exactly. Tuned in docs/reviews/aaa-2026-10-11/tapgap-results.md.
 GameConfig.tapPreview = { enabled = true, lead = 1.2, minPasses = 2, shrinkPasses = 2, capFeet = 12, capBackFeet = 6,
 	maxSpeed = 10, maxAccel = 20, laneGapFeet = 10, hardGapFeet = 7.5, hardLaneBand = 0.55, pullPerSecond = 19,
 	joinClearFeet = 8, joinSlackFeet = -4, settleFeetPerSecond = 2, fadeSeconds = 1, previewBots = false, steeringOffWholeRace = true,
-	messageEnabled = true, messageFeet = 8, messageEverySeconds = 4, messageMinScore = 60, messageMinPasses = 6, messageMinClean = 0.8 }
+	messageEnabled = true, messageFeet = 8, messageEverySeconds = 4, messageMinScore = 60, messageMinPasses = 6, messageMinClean = 0.8,
+	-- (D-071 rulings) Held by lane room (TapPreview.held, TapPreview.stepCue): a pressure cue on your own
+	-- screen at minFeet for minSeconds; the chip at chipMinFeet for chipMinSeconds, "Room this way! ◀/▶" at most
+	-- every chipEverySeconds (buttons), "Keep tapping! Room soon." once a race (Smart Steer). Copy: TapMessage.
+	heldCue = { minFeet = 4, minSeconds = 1.0, chipMinFeet = 6, chipMinSeconds = 1.5, chipEverySeconds = 10 },
+	-- (review N6) TapHeld sends (TapPreview.heldSendDue): a 1 ft change, at least 0.5 s apart, a resend
+	-- each second while held; dropping to 0 or crossing a cue threshold goes at once.
+	heldSend = { feet = 1, minGapSeconds = 0.5, resendSeconds = 1 },
+	-- (feel review) a drawn lead given back at a close or the lock eases back at most this fast
+	pullBackFeetPerSecond = 6 }
+-- The tap preview on the rider's own screen (D-071, provisional; client/TapCue, shared/TapMessage).
+-- enabled = false hides the message, the pressure cue and the held chip (the server still sends).
+-- The message ("Giddy-up! Moving up!", gains only, never "pulling away") is silent, over your saddle at
+-- studsAbove for messageSeconds (text minTextPx..maxTextPx; on the hint line in first person; the YOU
+-- marker steps aside meanwhile); it waits up to waitSeconds behind a steering chip or coaching, else is
+-- dropped, and never shows in the Final Burst or after the lock. The place badge pops by badgePopScale
+-- with it (not under Reduced Motion). The pressure cue (tapPreview.heldCue) multiplies your horse's bob
+-- by bobScale, leans it forward leanDeg and adds pressureDust puffs a stride (none under Reduced
+-- Motion). The held chip ("Room this way! ◀/▶") lights that button's ring for ringSeconds. (When the
+-- server sends TapHeld: tapPreview.heldSend, TapPreview.heldSendDue.)
+GameConfig.tapCue = { enabled = true, messageSeconds = 1.6, waitSeconds = 2.5, studsAbove = 6.5, badgePopScale = 1.15,
+	minTextPx = 14, maxTextPx = 24, bobScale = 1.3, leanDeg = 2, pressureDust = 1, ringSeconds = 1.5 }
 -- The "Next thing" pill (D-064, stage 3): one suggestion above the dock from Advice.nextThing, with
 -- GO; Pip gives a hint when the same suggestion has been up this long and you haven't moved.
 -- raceFirstUntilRaces (AAA Phase 2, D-067): until a player has run this many races, the pill puts

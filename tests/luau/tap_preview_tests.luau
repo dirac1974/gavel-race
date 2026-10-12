@@ -70,7 +70,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	local profiles = { "perfect", "average", "masher", "streaky" }
 	local races, same, sameOrder = 0, 0, 0
 	local overlaps, jerks, own, orderBad, residual, freeSpeed, freeAccel, backMax, lockGone = 0, 0, 0, 0, 0, 0, 0, 0, 0
-	local mashMessages, lossMessages, msgGap, messages = 0, 0, math.huge, 0
+	local mashMessages, lossMessages, msgGap, messages, otherKeys = 0, 0, math.huge, 0, 0
 	local trust = { on = { first = 0, fourth = 0 }, off = { first = 0, fourth = 0 } }
 	for _, course in { "dirt", "turf" } do
 		for _, distance in { "Sprint", "Mile", "Classic", "Marathon" } do
@@ -99,6 +99,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 				lossMessages += s.messageLoss
 				msgGap = math.min(msgGap, s.messageGapMin)
 				for _, v in s.messages do messages += v end
+				for key in s.messageKeys do if key ~= "up" then otherKeys += 1 end end
 				for mode, st in { on = s, off = off.tp :: any } do
 					if st.firstDrawn > 0 then
 						trust[mode].first += 1
@@ -118,10 +119,11 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(freeSpeed <= TP.maxSpeed + 1e-6 and freeAccel <= TP.maxAccel + 0.25,
 		`(c) away from lane room the residual keeps maxSpeed and maxAccel ({freeSpeed} ft/s, {freeAccel} ft/s^2)`)
 	-- After the lock: held for fadeSeconds while the shown offsets catch up, then eased out at the limits.
-	local fadeBound = TP.fadeSeconds + TP.capFeet / TP.maxSpeed + TP.maxSpeed / TP.maxAccel + 0.1
+	local fadeBound = TP.fadeSeconds + TP.capFeet / TP.pullBackFeetPerSecond + TP.pullBackFeetPerSecond / TP.maxAccel + 0.1
 	check(lockGone <= fadeBound, `(c) the residual is gone {lockGone} s after the lock (at most {fadeBound})`)
 	check(messages > 0 and mashMessages == 0 and lossMessages == 0 and msgGap >= TP.messageEverySeconds - 1e-9,
 		`messages: {messages}, none for a masher ({mashMessages}) or on a loss ({lossMessages}), at least {msgGap} s apart`)
+	check(otherKeys == 0, `messages: every one is "up", even drawn 1st ({otherKeys} others)`)
 	local function pct(t: any): number return 100 * t.fourth / math.max(t.first, 1) end
 	check(pct(trust.on) - pct(trust.off) <= 3, string.format("(f) drawn 1st at the lock, finished 4th or worse: on %.1f%%, off %.1f%%",
 		pct(trust.on), pct(trust.off)))
@@ -181,7 +183,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 					if row[1] > t3 and row[1] <= t3 + 5 + 1e-9 then
 						g5 = math.max(g5, row[2])
 						if row[1] <= t3 + 2 + 1e-9 then g2 = math.max(g2, row[2]) end
-						if row[3] then held = true end
+						if row[3] >= 1 then held = true end -- (TapPreview.held: lane room held it back 1 ft or more)
 					end
 				end
 				all += 1
@@ -355,5 +357,119 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		end
 		local grown = collectgarbage("count") - before
 		check(grown < 1, `(g) 5,000 steps grow the heap by {grown} KB (< 1)`)
+	end
+
+	-- (D-071 rulings) TapPreview.held: how far lane room keeps a rider behind its goal. A rider with
+	-- 12 ft of taps to show, sitting 10 ft behind a horse in its lane, is held by about 12 ft; with the
+	-- lane clear, or after the lock, held is 0. The cue: pressure at minFeet for minSeconds, the chip
+	-- at chipMinFeet for chipMinSeconds ("gap" with a side free, at most every chipEverySeconds;
+	-- "taps" once a race for Smart Steer), never after the lock; stepCue allocates nothing.
+	do
+		local n = 2
+		local function run(sameLane: boolean, lockAt: number): (number, number)
+			local st = TapPreview.new(n, TP, 320, 8, STEER.laneBand)
+			TapPreview.setRider(st, 1, false)
+			TapPreview.setRider(st, 2, true)
+			local base = { 0, -10 }
+			local x = { 2, if sameLane then 2 else 4 }
+			TapPreview.setPreview(st, { 0.5, 0.5 }, { 0.47, 0.53 }, 40) -- lane 2's taps: 320 * 1.2 * 0.03 * 40/42 = 11 ft
+			local heldBefore, heldAfter = 0, 0
+			for k = 1, 60 do
+				local t = 10 + k / 10
+				TapPreview.step(st, base, x, x, t, t >= lockAt)
+				if t < lockAt then heldBefore = TapPreview.held(st, 2) else heldAfter = math.max(heldAfter, TapPreview.held(st, 2)) end
+			end
+			return heldBefore, heldAfter
+		end
+		local boxedHeld = run(true, math.huge)
+		local clearHeld = run(false, math.huge)
+		local _, afterLock = run(true, 13)
+		check(boxedHeld > 10 and boxedHeld < 12, `held: boxed behind a horse in its lane, held {boxedHeld} ft (about its 11 ft goal)`)
+		check(clearHeld == 0 and afterLock == 0, `held: 0 with the lane clear ({clearHeld}) and after the lock ({afterLock})`)
+		check(TapPreview.held(TapPreview.new(3, TP, 320, 8, STEER.laneBand), 2) == 0, "held: 0 before any step")
+
+		local HC = TP.heldCue
+		check(HC.minFeet == 4 and HC.minSeconds == 1 and HC.chipMinFeet == 6 and HC.chipMinSeconds == 1.5 and HC.chipEverySeconds == 10,
+			"heldCue: 4 ft for 1 s, chip 6 ft for 1.5 s, at most every 10 s")
+		local cue = TapPreview.newCue()
+		local firstPressure, gapChips, chipTimes = nil, 0, {}
+		for k = 1, 300 do -- 5 s held 7 ft, then 1 s clear, then held again; a side has room; buttons
+			local t = k / 60
+			local held = if t > 5 and t <= 6 then 0 else 7
+			local pressure, chip = TapPreview.stepCue(cue, TP, held, 1 / 60, t, false, false, true)
+			if pressure and not firstPressure then firstPressure = t end
+			if chip == "gap" then
+				gapChips += 1
+				table.insert(chipTimes, t)
+			end
+		end
+		check(firstPressure ~= nil and math.abs((firstPressure :: number) - 1) < 0.05, `cue: pressure after 1 s held ({firstPressure})`)
+		check(gapChips == 1 and math.abs(chipTimes[1] - 1.5) < 0.05, `cue: "Find a gap!" once, after 1.5 s at 6 ft, not again within 10 s ({gapChips})`)
+		local quiet = TapPreview.newCue()
+		local small, noRoom, locked = false, false, false
+		for k = 1, 300 do
+			local t = k / 60
+			local p1, c1 = TapPreview.stepCue(quiet, TP, 3.9, 1 / 60, t, false, false, true)
+			if p1 or c1 then small = true end
+		end
+		local blocked = TapPreview.newCue()
+		for k = 1, 300 do
+			local _, c2 = TapPreview.stepCue(blocked, TP, 9, 1 / 60, k / 60, false, false, false)
+			if c2 then noRoom = true end
+		end
+		local after = TapPreview.newCue()
+		for k = 1, 300 do
+			local p3, c3 = TapPreview.stepCue(after, TP, 9, 1 / 60, k / 60, true, false, true)
+			if p3 or c3 then locked = true end
+		end
+		check(not small and not noRoom and not locked, "cue: nothing under 4 ft, no gap chip without a side free, nothing after the lock")
+		local smart = TapPreview.newCue()
+		local tapsChips, gapForSmart = 0, 0
+		for k = 1, 1800 do
+			local _, c = TapPreview.stepCue(smart, TP, 9, 1 / 60, k / 60, false, true, true)
+			if c == "taps" then tapsChips += 1 end
+			if c == "gap" then gapForSmart += 1 end
+		end
+		check(gapForSmart == 0, `cue: riders without buttons never get the gap chip ({gapForSmart})`)
+		check(tapsChips == 1, `cue: "Your taps still count!" once a race for riders without buttons ({tapsChips})`)
+
+		-- (review N6) heldSendDue: rounded to 0.1 ft; a 1 ft change at least 0.5 s apart; a resend each
+		-- second while held; dropping to 0 or crossing 4 or 6 ft goes at once; allocates nothing.
+		local hs = TapPreview.newHeldSend()
+		local function due(held: number, t: number): boolean return TapPreview.heldSendDue(hs, held, t, TP) end
+		local okSend = not due(0, 0) and not due(0.04, 0.1)                        -- 0 (rounded) is never news
+		okSend = okSend and due(2.04, 0.2) and hs.last == 2 and hs.lastT == 0.2     -- first value, rounded
+		okSend = okSend and not due(3.5, 0.4)                                       -- 1 ft+ but under 0.5 s
+		okSend = okSend and due(3.5, 0.7) and hs.last == 3.5                        -- 1 ft+, 0.5 s on
+		okSend = okSend and due(4.1, 0.75) and hs.last == 4.1                       -- crosses 4 ft: at once
+		okSend = okSend and not due(4.6, 1.3) and not due(4.6, 1.74)                -- under 1 ft, under 1 s
+		okSend = okSend and due(4.6, 1.75)                                          -- resend after 1 s
+		okSend = okSend and due(6.0, 1.8) and due(5.9, 1.85)                        -- 6 ft crossed up, then down
+		okSend = okSend and due(0, 1.86) and hs.last == 0                           -- drop to 0: at once
+		okSend = okSend and not due(0, 5)                                           -- no resend at 0
+		check(okSend, "heldSendDue: rounding, 1 ft at 0.5 s, 1 s resend, 0 and the 4 and 6 ft crossings at once")
+		local srcSend = fs.readFile("game/src/shared/TapPreview.luau")
+		local fromSend = string.find(srcSend, "function TapPreview.heldSendDue", 1, true) :: number
+		local startSend = (string.find(srcSend, "\n", fromSend, true) :: number) + 1
+		local endSend = string.find(srcSend, "\nend\r?\n", startSend) :: number
+		local bodySend = string.gsub(string.sub(srcSend, startSend, endSend), "%-%-[^\n]*", "")
+		check(#bodySend > 200 and not string.find(bodySend, "{", 1, true) and not string.find(bodySend, "table.", 1, true),
+			"heldSendDue allocates nothing")
+
+		-- (systems review) The message is only ever "up", and no key or words say away, lead or win.
+		local words = true
+		for key, text in TapPreview.MESSAGES do
+			for _, w in { "away", "lead", "win" } do
+				if string.find(string.lower(key .. " " .. text), w, 1, true) then words = false end
+			end
+		end
+		check(words and TapPreview.MESSAGES.up ~= nil, "messages: no key or words with away, lead or win")
+		local src = fs.readFile("game/src/shared/TapPreview.luau")
+		local from = string.find(src, "function TapPreview.stepCue", 1, true) :: number
+		local bodyStart = (string.find(src, "\n", from, true) :: number) + 1
+		local bodyEnd = string.find(src, "\nend\r?\n", bodyStart) :: number
+		local body = string.gsub(string.sub(src, bodyStart, bodyEnd), "%-%-[^\n]*", "")
+		local found = string.find(body, "{", 1, true) or string.find(body, "table.", 1, true) or string.find(body, "function", 1, true)
+		check(#body > 300 and not found, "stepCue allocates nothing")
 	end
 end

@@ -27,6 +27,7 @@ RaceState.ResultsShown = Instance.new("BindableEvent") -- arg: true when your re
 RaceState.resultsOpen = false   -- a results card is on screen (the Hud keeps the dock away)
 RaceState.holdFocus = false     -- it's your own card: a new race on that course doesn't take the HUD
 RaceState.burstShowing = false  -- the Final Burst bar is up (the race map steps aside)
+RaceState.tapPressure = false   -- (D-071) your horse is held back by lane room: a harder bob and dust (TapCue, RaceView)
 RaceState.myHome = false        -- your horse is past the line and pulling up (hoofbeats stop)
 RaceState.watchHidden = false   -- watching: the HUD is hidden (busy, or walked out of range)
 RaceState.cheeredLane = nil     -- watching: the lane you cheered for (FanClient)...
