@@ -21,7 +21,7 @@ python sims/economy.py --solo                # solo win rate vs league-anchored 
 python sims/economy.py --silver --players 300 --seed 2   # Silver Cup races-to-open by threshold (D-062 stage 8)
 ```
 
-`--solo`: one rider against seven bots rated `BOT_RATING_ANCHOR` ± 6 (mirrors `GameConfig.botRatingAnchor`; `tests/test_sims.py` checks they agree), bots scoring as in `GameConfig`, kids at slider 60 / 70 / 80 and Final Burst 50 / 60 / 70 (new / average / skilled). The D-061 gate is a fresh starter (Rating 46.1) with an average kid winning 20–35% of solo Rookie races. The debate's anchors (50 / 63 / 73 / 83 / 90) gave 12.2%; the tuned ones (32 / 46 / 56 / 69 / 80) give, with 20,000 races a cell:
+`--solo`: one rider against seven bots rated `BOT_RATING_ANCHOR` ± 6 (the D-061 anchors, kept as history: since D-068 `GameConfig.botRatingAnchor` holds `economy.PHASE3["anchors"]` 32 / 35 / 38 / 48 / 56, and `--ladder phase3` is the current sim), bots scoring as in `GameConfig`, kids at slider 60 / 70 / 80 and Final Burst 50 / 60 / 70 (new / average / skilled). The D-061 gate is a fresh starter (Rating 46.1) with an average kid winning 20–35% of solo Rookie races. The debate's anchors (50 / 63 / 73 / 83 / 90) gave 12.2%; the tuned ones (32 / 46 / 56 / 69 / 80) give, with 20,000 races a cell:
 
 | League | Horse | New | Average | Skilled |
 | --- | --- | --- | --- | --- |

@@ -19,3 +19,6 @@ Models/
 
 # Earlier takes of re-rolled sounds (tools/audio/generate_audio.py keeps them locally)
 assets/audio/takes/
+
+# Per-clip previews of the synthesized stand-in sheet (tools/audio/synth_sheet.py rebuilds them)
+assets/audio/synth_preview/

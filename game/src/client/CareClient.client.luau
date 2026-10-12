@@ -47,25 +47,16 @@ dim.BackgroundColor3 = C.ink
 dim.BackgroundTransparency = 0.5
 dim.Parent = gui
 local card = Ui.card(gui, UDim2.fromOffset(560, 380), UDim2.fromScale(0.5, 0.5), C.paper)
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-local cardScale = Instance.new("UIScale")
-cardScale.Parent = card
-local function rescale()
-	local cam = workspace.CurrentCamera
-	if cam then cardScale.Scale = math.min(1, (cam.ViewportSize.X - 24) / 560, (cam.ViewportSize.Y - 24) / 380) end
-end
-rescale()
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
+-- Floors (AAA Phase 2): smallest text 18, smallest button 64, so the card may shrink to 0.875 and
+-- the 400 px grooming card still fits a 375 px phone without scrolling (a swipe brushes, never scrolls).
+local slideIn = Ui.fitPanel(card, 560, 380, nil, 18, 64)
 local title = Ui.text(card, "", 32, { Position = UDim2.new(0, 0, 0, 14), Size = UDim2.new(1, 0, 0, 38) })
 local body = Instance.new("Frame")
 body.BackgroundTransparency = 1
-body.Size = UDim2.new(1, -32, 1, -70)
-body.Position = UDim2.new(0, 16, 0, 60)
+body.Size = UDim2.new(1, -32, 1, -90)
+body.Position = UDim2.new(0, 16, 0, 80) -- under the 64 px ✕
 body.Parent = card
-local closeBtn = Ui.button(card, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 12), C.white, 22)
+local closeBtn = Ui.closeButton(card)
 local onClose = nil
 local function closeCard()
 	gui.Enabled = false
@@ -84,10 +75,8 @@ local function openCard(text: string, height: number?)
 	end
 	body:ClearAllChildren()
 	title.Text = text
-	card.Size = UDim2.fromOffset(560, height or 380)
 	gui.Enabled = true
-	card.Position = UDim2.fromScale(0.5, 0.55)
-	TweenService:Create(card, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	slideIn(height or 380)
 end
 
 -- Grooming game: brush the dusty spots away -------------------------------------------
@@ -276,31 +265,31 @@ end
 
 -- Feed & Seed shop --------------------------------------------------------------------
 local function shopCard()
-	openCard("Feed & Seed", 420)
+	openCard("Feed & Seed", 480)
 	local cash = Ui.text(body, "", 22, { Size = UDim2.new(1, 0, 0, 28) })
-	cash.TextColor3 = C.cash
+	cash.TextColor3 = C.textGood
 	local grid = Instance.new("Frame")
 	grid.BackgroundTransparency = 1
-	grid.Size = UDim2.new(1, 0, 0, 250)
+	grid.Size = UDim2.new(1, 0, 0, 280)
 	grid.Position = UDim2.new(0, 0, 0, 34)
 	grid.Parent = body
 	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.new(1 / 3, -10, 0, 118)
+	layout.CellSize = UDim2.new(1 / 3, -10, 0, 132)
 	layout.CellPadding = UDim2.fromOffset(12, 10)
 	layout.Parent = grid
 	local labels = {}
 	for _, row in Care.SHOP do
 		local cell = Ui.card(grid, UDim2.new(), UDim2.new(), C.cream)
 		Ui.text(cell, ITEM_EMOJI[row.item] .. " " .. row.label, 18, { Position = UDim2.new(0, 0, 0, 6), Size = UDim2.new(1, 0, 0, 24) })
-		local have = Ui.text(cell, "", 15, { Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 18) })
+		local have = Ui.text(cell, "", 18, { Position = UDim2.new(0, 0, 0, 30), Size = UDim2.new(1, 0, 0, 22) })
 		have.TextColor3 = C.plum
 		labels[row.item] = have
-		local b1 = Ui.button(cell, "💵 " .. row.price, UDim2.new(0.46, 0, 0, 44), UDim2.new(0.03, 0, 1, -52), C.gold, 18)
-		local b5 = Ui.button(cell, "×5", UDim2.new(0.42, 0, 0, 44), UDim2.new(0.55, 0, 1, -52), C.white, 18)
+		local b1 = Ui.button(cell, "💵 " .. row.price, UDim2.new(0.46, 0, 0, 64), UDim2.new(0.03, 0, 1, -72), C.gold, 18)
+		local b5 = Ui.button(cell, "×5", UDim2.new(0.42, 0, 0, 64), UDim2.new(0.55, 0, 1, -72), C.white, 18)
 		b1.Activated:Connect(function() remote("Shop"):FireServer("buy", row.item, 1) end)
 		b5.Activated:Connect(function() remote("Shop"):FireServer("buy", row.item, 5) end)
 	end
-	local sell = Ui.button(body, "Sell crops", UDim2.fromOffset(170, 44), UDim2.new(0.5, -85, 1, -50), C.teal, 20)
+	local sell = Ui.button(body, "Sell crops", UDim2.fromOffset(170, 64), UDim2.new(0.5, -85, 1, -66), C.teal, 20)
 	sell.Activated:Connect(function()
 		remote("Shop"):FireServer("sellAll", "crops", 5) -- keeps 5 of each for treats
 	end)

@@ -25,6 +25,7 @@ import gavel_race_v2 as m  # noqa: E402
 import race_rating as rr  # noqa: E402
 import stride as st  # noqa: E402
 import pace_meter as pm  # noqa: E402
+import burst_meter as bm  # noqa: E402
 import trip  # noqa: E402
 
 TRIP_RUNS = 200
@@ -127,7 +128,25 @@ def race_math_data() -> dict:
                            "single": single, "bounceTaps": btaps, "bounceScore": bmean, "bounceErrors": berrs,
                            "bounceSingle": bsingle})
     return {"cases": cases, "windows": windows, "ratings": ratings_cases, "stride": stride_cases,
-            "pace": pace_cases, "extraCases": extra_cases()}
+            "pace": pace_cases, "extraCases": extra_cases(), "burst": burst_cases()}
+
+
+def burst_cases() -> list:
+    """Final Burst taps (D-022, armed D-066): every league shape, taps before and after arming.
+    Its own generator, so the other sections stay byte-for-byte the same."""
+    rng = random.Random(20261011)
+    out = []
+    for _ in range(200):
+        spec = {"sweepSeconds": rng.choice([1.1, 1.3, 1.6, 2.0, 2.4]), "targetDrift": rng.choice([0.0, 0.0, 0.3]),
+                "twoTargets": rng.random() < 0.25, "phase": rng.random()}
+        if rng.random() < 0.2:
+            spec["driftSeconds"] = rng.choice([2.9, 3.7, 4.3])
+        arm = rng.choice([0.0, 0.5, 0.5, 0.8])
+        taps = [round(rng.uniform(0, 3.0), 6) for _ in range(6)] + [arm, max(0.0, arm - 1e-6)]
+        out.append({"spec": spec, "arm": arm, "taps": taps,
+                    "scores": [bm.tap_score(t, spec, arm) for t in taps],
+                    "positions": [bm.position(t, spec["sweepSeconds"], spec["phase"]) for t in taps]})
+    return out
 
 
 def main(argv=None) -> None:

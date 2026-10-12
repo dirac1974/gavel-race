@@ -222,7 +222,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		and string.find(rs, "data.flags.bumpTip = true", 1, true) ~= nil and string.find(rs, "Trip.brushesInto(trip, i)", 1, true) ~= nil,
 		"RaceService: the first-brush tip goes with SteerControls and is marked seen at that brush; the log counts brushes per horse")
 	check(string.find(rv, "OnClientEvent:Connect(function(mover, other, dir, at, courseId)", 1, true) ~= nil
-		and string.find(rv, "Sound.play(\"count_tick\", POSE.brushVolume, part)", 1, true) ~= nil
+		and string.find(rv, "Sound.play(\"bump_soft\", POSE.brushVolume, part)", 1, true) ~= nil
 		and string.find(rv, "kind = \"brush\"", 1, true) ~= nil
 		and string.find(rv, "local how = SteerPose.brushStart(age, POSE)", 1, true) ~= nil
 		and string.find(rv, "if how == \"restart\" then b.at, age = drawnAt, 0 end", 1, true) ~= nil

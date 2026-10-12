@@ -160,9 +160,9 @@ VisitCare.OnServerEvent:Connect(function(player: Player, ownerId: any, horseId: 
 		local done, res = Visits.pat(vdata, owner.UserId, horseId, ids, now)
 		if not done then return end
 		if res.stamp then
-			Profiles.notify(player, "Tour stamp! You toured " .. owner.DisplayName .. "'s barn", "heart")
+			Profiles.notify(player, "📍 Tour pin! You toured " .. owner.DisplayName .. "'s barn", "heart")
 		elseif res.left > 0 and not res.already then
-			Profiles.notify(player, h.name .. " nuzzles you! " .. res.left .. " more to pat for a stamp", "heart")
+			Profiles.notify(player, h.name .. " nuzzles you! " .. res.left .. " more for a pin", "heart")
 		else
 			Profiles.notify(player, h.name .. " nuzzles you!", "heart")
 		end

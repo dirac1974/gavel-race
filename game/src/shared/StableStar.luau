@@ -10,6 +10,8 @@
 --   ranking; visitors see the wall, never the cards.
 -- p.stableStar = { counts = { [event] = n }, done = { [goalId] = true }, firsts = { [league] = true } }
 -- What's earned stays earned: selling, rehoming or retiring a horse never takes a rosette down.
+-- One exception (D-068): a Legend brought back to the races (Leagues.unretire) loses its Legend
+-- plaque, since it isn't retired any more; retiring it again puts a new one up.
 
 local StableStar = {}
 

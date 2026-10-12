@@ -30,6 +30,8 @@ local RaceShape = require(Shared:WaitForChild("RaceShape"))
 local Trip = require(Shared:WaitForChild("Trip"))
 local TripBaseline = require(Shared:WaitForChild("TripBaseline"))
 local ResultsText = require(Shared:WaitForChild("ResultsText"))
+local PacePreview = require(Shared:WaitForChild("PacePreview")) -- (D-067) when the post-lock preview runs
+local PREVIEW_AFTER_LOCK = GameConfig.pacePreviewAfterLock
 local Profile = require(Shared:WaitForChild("Profile"))
 local Horse = require(Shared:WaitForChild("Horse"))
 local TrackScene = require(script.Parent:WaitForChild("TrackScene"))
@@ -70,9 +72,10 @@ local PaceSchedule = makeRemote("PaceSchedule")   -- server -> all: the slider's
 local PaceResult = makeRemote("PaceResult")       -- server -> one: checkpoint, score, label, course
 local BurstOpened = makeRemote("BurstOpened")     -- server -> all: seg, open, close, meter spec, name, course
 local TapResult = makeRemote("TapResult")         -- server -> one: seg, burst score, label, course
-local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances, course
+local LiveChances = makeRemote("LiveChances")     -- server -> all: seg, chances, course, preview (true: a preview, not a checkpoint closing; D-067)
 local RaceFinished = makeRemote("RaceFinished")   -- server -> all: results, course
 local IntegrityNote = makeRemote("IntegrityNote") -- server -> one: private note (D-022 flag 2)
+local RideRank = makeRemote("RideRank")           -- server -> one: your ride score's rank in the race, only when it's 1st to 3rd, course (D-067)
 local RideReport = makeRemote("RideReport")       -- server -> one: stars, places gained by riding, place, [trip stars, places gained by the trip (riders with the steering buttons),] course (D-033, D-054)
 local TripInfo = makeRemote("TripInfo")           -- server -> all: steering on, lock time (server time), course (D-054)
 local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked at the far turn, course (D-054)
@@ -150,6 +153,7 @@ local function newCard(c)
 end
 
 local function claimCard(c, leagueName: string, kind: string)
+	leagueName = RaceQueues.claimLeague(leagueName, kind) -- Open Practice: always openPracticeLeague (D-068)
 	c.card.league = leagueName
 	c.card.cup = kind == "cup"
 	c.card.practice = kind == "practice"
@@ -326,6 +330,9 @@ BurstTap.OnServerEvent:Connect(function(player: Player, seg: any, claimed: any)
 	if not c or not c.current or seg ~= c.current.seg then return end
 	local t, cur = resolveTap(player, claimed, "burst")
 	if not t then return end
+	-- A tap before the burst is armed (GameConfig.burstArmSeconds, D-066) comes back nil: ignored,
+	-- and the rider's one tap is still to come. (A resolved time is never earlier than the claim,
+	-- so a tap the client saw armed is armed here too.)
 	local score = cur.session:submitBurst(tostring(player.UserId), seg, t - cur.open)
 	if score then
 		TapResult:FireClient(player, seg, score, GameConfig.labelFor(score), c.id)
@@ -414,7 +421,9 @@ end
 -- League queues: check the horse for its own league's card, then wait in that league-and-kind
 -- queue; pumpQueues puts the rider on a course when one can take them. A picked course is only a
 -- wish: a card for another league never takes them.
-local function joinQueue(player: Player, courseId: any, horseId: any, kind: string)
+-- `follow` (Race with a friend, D-068): courseId is the friend's course; move there even when
+-- already in line (alone, or in Open Practice on another course) if it has room.
+local function joinQueue(player: Player, courseId: any, horseId: any, kind: string, follow: boolean?)
 	local data = Profiles.get(player)
 	local id = if typeof(horseId) == "string" then horseId else nil
 	local pick = data and ((id and Profile.isStalled(data, id) and Profile.horse(data, id)) or Profile.activeHorse(data))
@@ -435,6 +444,11 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	end
 	local key = RaceQueues.key(h.league, kind)
 	local c = inLine[player]
+	local target = if follow and typeof(courseId) == "string" then courses[courseId] else nil
+	if c and target and target ~= c and RaceQueues.canTake(target, key, GameConfig.lanes) then
+		leaveLine(player) -- follow the friend: no same-card or alone-in-line shortcut
+		c = nil
+	end
 	if c then
 		if RaceQueues.cardKey(c.card) == key then -- same race, maybe another horse of the league
 			chosen[player] = h.id
@@ -455,13 +469,30 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	pumpQueues()
 	if RaceQueues.isWaiting(waits, player) then
 		waitStatus(player)
-		Profiles.notify(player, "You're in line! You race when a course is free.", "flag_ready")
+		if not follow then Profiles.notify(player, "You're in line! You race when a course is free.", "flag_ready") end
 	end
 	publishCards()
 end
 
+-- "Race with [friend]" (AAA Phase 3, D-068): a Practice join that names a Roblox friend in this
+-- server asks for the course that friend is in line for, when it's a Practice line (Open Practice).
+-- Nothing is ever sent to the friend: no invites.
+local TrainingFriends = require(script.Parent:WaitForChild("TrainingFriends"))
+-- Returns (the friend's course id or nil, the friend or nil). A friend whose stable visits are set to
+-- Nobody is never followed to a course (the join still goes to Open Practice).
+local function friendPracticeCourse(player: Player, kind: string, friendId: any): (string?, Player?)
+	if kind ~= "practice" or typeof(friendId) ~= "number" or not Leagues.openPractice() then return nil, nil end
+	if friendId ~= friendId or math.abs(friendId) == math.huge or friendId ~= math.floor(friendId) then return nil, nil end
+	local friend = Players:GetPlayerByUserId(friendId)
+	if not friend or not TrainingFriends.areFriends(player, friend) then return nil, nil end
+	local fd = Profiles.get(friend)
+	if fd and fd.settings and fd.settings.visits == "Nobody" then return nil, friend end
+	local c = inLine[friend]
+	return (if c and c.card and c.card.practice then c.id else nil), friend
+end
+
 local lastJoin: { [Player]: number } = {}
-JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any, horseId: any, kind: any)
+JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any, horseId: any, kind: any, friendId: any)
 	if os.clock() - (lastJoin[player] or 0) < 0.5 then return end
 	lastJoin[player] = os.clock()
 	if want == false then
@@ -473,7 +504,20 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 	if riding[player] then return end
 	kind = if kind == "cup" or kind == "practice" then kind else "race"
 	if LEAGUE_QUEUES then
-		joinQueue(player, courseId, horseId, kind)
+		local friendCourse, friend = friendPracticeCourse(player, kind, friendId)
+		if not friend then
+			joinQueue(player, courseId, horseId, kind)
+			return
+		end
+		joinQueue(player, friendCourse, horseId, kind, true)
+		-- One notice from the join (D-068): honest about whether the friend's race was found.
+		local c = inLine[player]
+		local with = friendCourse ~= nil and c ~= nil and c.id == friendCourse
+		local together = waits.of[player] ~= nil and waits.of[player] == waits.of[friend] -- both still waiting
+		if c or RaceQueues.isWaiting(waits, player) then
+			Profiles.notify(player, if with or together then string.format("🎈 You're in %s's race!", friend.DisplayName)
+				else string.format("Ask %s to tap 🎈 Practice too!", friend.DisplayName), "flag_ready")
+		end
 		return
 	end
 	local c = if typeof(courseId) == "string" and courses[courseId] then courses[courseId] else bestCourseCards()
@@ -611,7 +655,8 @@ local function runRace(c, players: { Player })
 	local riders = {}
 	for _, p in players do
 		local h = rideable(p, chosen[p], card)
-		if h and h.league ~= leagueName then h = nil end -- cash fields never mix leagues
+		-- cash fields never mix leagues; Open Practice does (D-068: no purse, no League Points)
+		if h and h.league ~= leagueName and not (card.practice and Leagues.openPractice()) then h = nil end
 		local cost = if h then costOf(card, h) else 0
 		local data = Profiles.get(p)
 		if h and data and not riding[p] and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
@@ -639,6 +684,7 @@ local function runRace(c, players: { Player })
 	newCard(c) -- the board shows the next race on this course while this one runs
 	-- Bots rated by league (D-061 stage 2), named from the horse-name chips.
 	local lanes = RaceSession.fillWithBots(humans, GameConfig.lanes, GameConfig, ThemePack, rng, { league = leagueName, nameParts = NameGen })
+	if card.practice and GameConfig.queue.practiceEqualHorses then RaceSession.equalizeRatings(lanes) end -- D-068
 	local coats = {}
 	local shines = {}
 	for i, lane in lanes do
@@ -948,7 +994,7 @@ local function runRace(c, players: { Player })
 			end
 		end
 		shownLive = session:previewLive(seg, partial)
-		LiveChances:FireAllClients(seg, shownLive, c.id)
+		LiveChances:FireAllClients(seg, shownLive, c.id, true) -- (D-067) a preview, not a checkpoint closing
 	end
 
 	local errors: { [number]: { number } } = {}
@@ -968,6 +1014,17 @@ local function runRace(c, players: { Player })
 				while now() < lastEnd do
 					task.wait(GameConfig.stretchPreviewSeconds)
 					previewStretch(seg)
+				end
+			elseif trip and PREVIEW_AFTER_LOCK and PREVIEW_AFTER_LOCK.enabled ~= false then
+				-- After the far-turn lock (AAA Phase 2, D-067): the open checkpoint's chances refresh each
+				-- second from its finished passes, as in the stretch drive, so taps move horses on screen
+				-- sooner. Drawn only: tau is fixed at the lock, before it nothing changes, and previewLive
+				-- stores nothing (the checkpoint's own close sets the scores and the chances, as before).
+				while now() < lastEnd and alive() do
+					task.wait(math.min(PREVIEW_AFTER_LOCK.seconds or 1, math.max(0.05, lastEnd - now())))
+					if PacePreview.afterLock(PREVIEW_AFTER_LOCK, trip.locked, seg, session.closed, false) and now() < lastEnd then
+						previewStretch(seg)
+					end
 				end
 			end
 			waitUntil(lastEnd + LATENCY_GRACE)
@@ -1103,6 +1160,10 @@ local function runRace(c, players: { Player })
 			local tripStars = if trip and steers[p] then Trip.stars(session.tau[i], GameConfig.steering) else nil
 			local tripGain = if tripStars then session:tripGain(i) else nil
 			RideReport:FireClient(p, table.unpack(ResultsText.reportArgs(stars, session:ridingGain(i), placeOf[i], c.id, tripStars, tripGain)))
+			-- "Best ride in the race!" (AAA Phase 2, D-067): your ride score ranked against every horse in
+			-- the race, bots included; sent to you alone and only for the top 3, so it can't become a board.
+			local rank = if GameConfig.results.riderRank ~= false then ResultsText.rideRank(S, i) else nil
+			if rank and rank <= 3 then RideRank:FireClient(p, rank, c.id) end
 			-- Personal best at this distance (D-063): private; only beating an earlier best says so.
 			local data = Profiles.get(p)
 			if data and not (GameConfig.comeback and GameConfig.comeback.bests == false) then

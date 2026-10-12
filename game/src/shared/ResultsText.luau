@@ -70,6 +70,102 @@ function ResultsText.gainedLine(horse: string, gain: number?, tripGain: number?,
 	return string.format("Your %s gained %s %d place%s!", who, name, n, if n == 1 then "" else "s")
 end
 
+local function ordinal(n: number): string
+	local teen = n % 100 >= 11 and n % 100 <= 13
+	return tostring(n) .. (if teen then "th" else ({ "st", "nd", "rd" })[n % 10] or "th")
+end
+
+-- Places 5 to 8 lead with praise for the ride (by its stars), not the place (the consult).
+ResultsText.PRAISE_HEAD = { [0] = "Home safe and sound!", [1] = "Nice riding!", [2] = "Great riding!", [3] = "Brilliant riding!" }
+
+local function starCount(stars: number?): number
+	return if finite(stars) then math.clamp(math.floor(stars :: number), 0, 3) else 0
+end
+
+-- The card's headline (AAA Phase 2, D-067): the place, big, under its ribbon for 1st to 4th; for
+-- 5th to 8th, praise for the ride (the place is in the line under it).
+function ResultsText.headline(place: number?, stars: number?): string
+	local n = places(place)
+	if n == 1 then return "1st! You won!" end
+	if n < 1 then return "Race done!" end
+	if n >= 5 then return ResultsText.PRAISE_HEAD[starCount(stars)] end
+	return ordinal(n) .. " place!"
+end
+
+ResultsText.RIBBON_WORD = { "Blue", "Red", "Yellow", "White" }
+-- Under the praise headline, places 5 to 8: the place, kindly, never a near miss ("so close").
+ResultsText.PRAISE = {
+	[0] = "%s came %s and loved the run!",
+	[1] = "%s came %s. Every tap helps!",
+	[2] = "%s came %s and felt every tap.",
+	[3] = "%s came %s, flying for you!",
+}
+
+-- The kind line under the headline: the ribbon for 1st to 4th, praise for the ride after that.
+function ResultsText.cheer(place: number?, stars: number?, horse: string?): string
+	local name = if type(horse) == "string" and horse ~= "" then horse else "your horse"
+	local n = places(place)
+	local ribbon = ResultsText.RIBBON_WORD[n]
+	if ribbon then return string.format("%s ribbon for %s!", ribbon, name) end
+	if n < 1 then return "" end
+	local lead = if name == "your horse" then "Your horse" else name
+	return string.format(ResultsText.PRAISE[starCount(stars)], lead, ordinal(n))
+end
+
+-- Where lane i's ride score ranks in the race, bots included (1 = best; equal scores share a
+-- rank). nil for a strange score. The server sends it to the rider only for the top 3.
+function ResultsText.rideRank(S: { number }, i: number): number?
+	local mine = S[i]
+	if not finite(mine) then return nil end
+	local rank = 1
+	for j, s in S do
+		if j ~= i and finite(s) and s > mine then rank += 1 end
+	end
+	return rank
+end
+
+-- "Best ride in the race!" for the top 3 ride scores only; "" for any other rank (never a list).
+function ResultsText.rankLine(rank: number?): string
+	if rank == 1 then return "Best ride in the race!" end
+	if rank == 2 then return "2nd best ride!" end
+	if rank == 3 then return "3rd best ride!" end
+	return ""
+end
+
+local function napping(h: any, energy: any): boolean
+	local free = type(energy) == "table" and type(energy.freeLeagues) == "table" and energy.freeLeagues[h.league or "Rookie"]
+	local cost = if type(energy) == "table" then energy.costPerCashRace or 1 else 1
+	return (h.energy or 0) < cost and not free
+end
+
+-- What the card's Race again button joins: what RACE! joins (Hud's one-tap rule, D-061): Practice
+-- while the horse naps outside the free leagues, the Cup once it has outgrown its league. With
+-- `horses` (all of yours) and results.feedWhenNapping (the systems consult): a napping horse whose
+-- stable has no other horse ready says "feed" instead, pointing at care, the one place Energy comes
+-- back by playing. The server's rules still decide (feeding gives Energy only off its cooldown).
+function ResultsText.nextKind(h: any, energy: any, horses: { any }?, feedWhenNapping: boolean?): string
+	if type(h) ~= "table" then return "race" end
+	if h.overCeiling then return if h.cupOpen then "cup" else "practice" end
+	if not napping(h, energy) then return "race" end
+	if feedWhenNapping and type(horses) == "table" then
+		for _, other in horses do
+			if type(other) == "table" and other ~= h and other.id ~= h.id and not other.overCeiling and not napping(other, energy) then
+				return "practice"
+			end
+		end
+		return "feed"
+	end
+	return "practice"
+end
+
+ResultsText.RACE_AGAIN = { race = "🏁 Race again", practice = "🎈 Practice race", cup = "🏆 Cup race!" }
+function ResultsText.raceAgainLabel(kind: string?, horse: string?): string
+	if kind == "feed" then
+		return "🌾 Feed " .. (if type(horse) == "string" and horse ~= "" then horse else "your horse")
+	end
+	return ResultsText.RACE_AGAIN[kind or "race"] or ResultsText.RACE_AGAIN.race
+end
+
 -- RideReport's arguments, built by RaceService: (stars, gain, place, course), or for a rider who had
 -- the steering buttons (stars, gain, place, trip stars, places the trip gained, course). The course
 -- id is always last.

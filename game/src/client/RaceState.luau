@@ -155,6 +155,17 @@ function RaceState.trackFolder(courseId: string?): Instance?
 	return workspace:FindFirstChild(if courseId == nil or courseId == "dirt" then "RaceTrack" else "RaceTrack_" .. courseId)
 end
 
+-- The replay's broadcast camera rig (D-034), shared with the finish moment's orbit (D-067): at
+-- progress p (lane-1 feet over the rail length) and lane position x, the track's heading (look),
+-- the way out toward the outer rail (right), and how far out the camera sits: just outside the
+-- outer rail, so no horse runs through it. The camera follows the track, never a body's turn.
+function RaceState.sideRig(courseId: string?, plan, p: number, x: number): (Vector3, Vector3, number)
+	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
+	local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, x) + 12
+	local _, _, dx, dz = TrackLayout.railPoint(cfg, plan, p * TrackLayout.railLength(cfg, plan), x)
+	return Vector3.new(dx, 0, dz), Vector3.new(-dz, 0, dx), outside
+end
+
 local SUFFIX = { "st", "nd", "rd" }
 
 function RaceState.ordinal(n: number): string

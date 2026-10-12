@@ -6,6 +6,9 @@
 --   slides in when the line is in range; a line of text gives your gap in horse lengths.
 --   Lap map: a small, still oval showing only your own dot, to answer "where are we?".
 -- Positions come from RaceState (RaceView writes them every frame).
+-- Phones (AAA Phase 2, D-067): the map shrinks with the race HUD, so it drops the lap oval and its
+-- title, and the gap line is sized so it never renders under ui.minTextPx. The lane dots carry no
+-- digits anywhere (a 9 px digit was unreadable): the Okabe-Ito colour is the lane, yours is big.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -20,6 +23,8 @@ local remotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 local player = Players.LocalPlayer
 local myId = tostring(player.UserId)
 local CFG = TrackLayout.churchill
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local MIN_TEXT = GameConfig.ui.minTextPx
 local HORSE_LENGTH = 8   -- feet (studs)
 local MIN_WINDOW = 80    -- the strip always shows at least ~10 lengths
 local LEADER_AT = 0.8    -- leader's place across the strip; the flag slides into the rest
@@ -143,9 +148,8 @@ for i = 1, 8 do
 	dot.Size = UDim2.fromOffset(DOT, DOT)
 	dot.Position = UDim2.fromOffset(0, (i - 0.5) * ROW_H)
 	dot.BackgroundColor3 = LANE_COLOURS[i]
-	dot.Text = tostring(i)
+	dot.Text = ""
 	dot.Font = Enum.Font.GothamBlack
-	dot.TextSize = 9
 	dot.TextColor3 = if LIGHT_LANES[i] then Color3.fromHex("1F2430") else Color3.new(1, 1, 1)
 	dot.ZIndex = 3
 	dot.Parent = strip
@@ -183,6 +187,27 @@ gapText.TextColor3 = Color3.fromHex("FFD34D")
 gapText.Text = ""
 gapText.Parent = panel
 
+local phoneMode: boolean? = nil
+local function applyPhone(on: boolean, s: number)
+	if phoneMode ~= on then
+		phoneMode = on
+		oval.Visible = not on
+		title.Visible = not on
+		local top = if on then PAD else PAD + OVAL_H + 6
+		strip.Position = UDim2.fromOffset(PAD, top)
+		gapText.Position = UDim2.fromOffset(PAD, top + stripH + 2)
+	end
+	-- the gap line (and the title, off phones) render at ui.minTextPx or more, whatever the HUD's scale
+	local px = math.max(15, math.ceil(MIN_TEXT / math.max(0.1, s)))
+	title.TextSize = math.max(16, px)
+	if gapText.TextSize ~= px then
+		gapText.TextSize = px
+		gapText.Size = UDim2.fromOffset(W - 2 * PAD, px + 5)
+		local top = if on then PAD else PAD + OVAL_H + 6
+		panel.Size = UDim2.fromOffset(W, top + stripH + px + 7 + PAD)
+	end
+end
+
 local myLane = nil
 local window = MIN_WINDOW
 remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, _cond, _resultAt, _burstOpen, courseId)
@@ -195,7 +220,6 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, _co
 	for i, r in rows do
 		local mine = i == myLane
 		r.dot.Size = if mine then UDim2.fromOffset(MY_DOT, MY_DOT) else UDim2.fromOffset(DOT, DOT)
-		r.dot.TextSize = if mine then 12 else 9
 		r.ring.Thickness = if mine then 2 else 0
 		r.dot.ZIndex = if mine then 5 else 3
 		r.line.BackgroundTransparency = if mine then 0.4 else 0.7
@@ -216,6 +240,7 @@ RunService.RenderStepped:Connect(function(dt)
 		and not (RaceState.cheerOpen and (RaceState.phone() or RaceState.stripCoversMap()))
 	if not gui.Enabled then return end
 	mapScale.Scale = RaceState.hudScale()
+	applyPhone(RaceState.phone(), mapScale.Scale)
 	local n = math.min(RaceState.lanes, 8)
 	local courseCfg = TrackLayout.courses[RaceState.course or "dirt"] or CFG
 	local railLength = TrackLayout.railLength(courseCfg, plan)

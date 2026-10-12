@@ -7,7 +7,9 @@
 --   visits also turns off Ride together invites and keeps your barn off friends' lists (D-060).
 --   For grown-ups: how races work (no gambling, nothing buys speed), what's saved, chat and
 --   safety, this week's play time, and where Roblox's parental controls live.
---   Tour: one friendly step at a time with a GO button (golden hoofprints) and Skip.
+--   Tour: one friendly step at a time with a GO button (golden hoofprints) and a quiet ✕ far from GO
+--   that asks once (AAA Phase 2, D-067). While it runs it owns the screen: it takes the top-centre
+--   spot (Ui.slot), and during the race step toasts wait and the step points at the real RACE!.
 --   Break reminder: off by default; when on, a gentle note after each hour of play.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -19,6 +21,7 @@ local TweenService = game:GetService("TweenService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
+local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
 local Guide = require(script.Parent:WaitForChild("Guide"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tour = require(Shared:WaitForChild("Tour"))
@@ -32,7 +35,19 @@ local player = Players.LocalPlayer
 local gui = Ui.screen("GrownUps", 12)
 
 -- ⚙️ button --------------------------------------------------------------------------
-local gear = Ui.button(gui, "⚙️", UDim2.fromOffset(52, 52), UDim2.new(1, -68, 0, 64), C.white, 26)
+-- On touch the 💎 pill sits top right (Hud), so the gear goes under it (touchLayout.gearBelowGem).
+local GuiService = game:GetService("GuiService")
+local TOUCH = GameConfig.touchLayout
+local gear = Ui.button(gui, "⚙️", UDim2.fromOffset(GameConfig.ui.minTouchPx, GameConfig.ui.minTouchPx), UDim2.new(1, -12, 0, 64), C.white, 26)
+gear.AnchorPoint = Vector2.new(1, 0)
+local function placeGear()
+	local top = GuiService:GetGuiInset().Y + 8
+	local under = TOUCH.gearBelowGem ~= false and TOUCH.gemPlacement == "topRight" and Ui.touchLayout()
+	-- the 💎 pill is minTouchPx tall (Hud.client.luau); the gear sits 8 px under it
+	gear.Position = UDim2.new(1, -12, 0, if under then top + GameConfig.ui.minTouchPx + 8 else top)
+end
+placeGear()
+Ui.TouchChanged.Event:Connect(placeGear)
 
 -- Panel ------------------------------------------------------------------------------
 local panelGui = Ui.screen("GrownUpsPanel", 13)
@@ -45,22 +60,13 @@ dim.BackgroundTransparency = 0.5
 dim.Parent = panelGui
 local W, H = 640, 470
 local panel = Ui.card(panelGui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.paper)
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-local scale = Instance.new("UIScale")
-scale.Parent = panel
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	local function rescale()
-		local v = workspace.CurrentCamera.ViewportSize
-		scale.Scale = math.min(1, (v.X - 20) / W, (v.Y - 20) / H)
-	end
-	rescale()
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
-local closeBtn = Ui.button(panel, "✕", UDim2.fromOffset(44, 44), UDim2.new(1, -56, 0, 10), C.white, 22)
+-- Smallest text 16, smallest button 56: never shrinks; on a short screen it gets shorter and its
+-- body scrolls (D-064 floors, AAA Phase 2).
+local slideIn = Ui.fitPanel(panel, W, H, 300, 16, 56)
+local closeBtn = Ui.closeButton(panel)
 local tabs = Instance.new("Frame")
 tabs.BackgroundTransparency = 1
-tabs.Size = UDim2.new(1, -120, 0, 44)
+tabs.Size = UDim2.new(1, -120, 0, 56)
 tabs.Position = UDim2.new(0, 16, 0, 12)
 tabs.Parent = panel
 local tl = Instance.new("UIListLayout")
@@ -69,8 +75,8 @@ tl.Padding = UDim.new(0, 8)
 tl.Parent = tabs
 local body = Instance.new("ScrollingFrame")
 body.BackgroundTransparency = 1
-body.Size = UDim2.new(1, -32, 1, -76)
-body.Position = UDim2.new(0, 16, 0, 64)
+body.Size = UDim2.new(1, -32, 1, -98)
+body.Position = UDim2.new(0, 16, 0, 84)
 body.AutomaticCanvasSize = Enum.AutomaticSize.Y
 body.CanvasSize = UDim2.new()
 body.ScrollBarThickness = 6
@@ -92,7 +98,7 @@ end
 local function choice(label: string, options: { { string } }, current: any, onPick, order: number)
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, 0, 0, 52)
+	row.Size = UDim2.new(1, 0, 0, 60)
 	row.LayoutOrder = order
 	row.Parent = body
 	Ui.text(row, label, 18, { Size = UDim2.new(0, 220, 1, 0), TextXAlignment = Enum.TextXAlignment.Left })
@@ -107,7 +113,7 @@ local function choice(label: string, options: { { string } }, current: any, onPi
 	l.VerticalAlignment = Enum.VerticalAlignment.Center
 	l.Parent = holder
 	for _, opt in options do
-		local b = Ui.button(holder, opt[2], UDim2.fromOffset(150, 44), UDim2.new(), if opt[1] == current then C.gold else C.white, 17)
+		local b = Ui.button(holder, opt[2], UDim2.fromOffset(150, 56), UDim2.new(), if opt[1] == current then C.gold else C.white, 17)
 		b.Activated:Connect(function() onPick(opt[1]) end)
 	end
 end
@@ -127,14 +133,14 @@ local function settingsTab()
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("smartSteer", v) end, 5)
 	choice("Share my ghost with friends", { { true, "👻 On" }, { false, "Off" } }, d.settings.shareGhost == true,
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("shareGhost", v) end, 6)
-	local tourBtn = Ui.button(body, "🧭 Show me around again", UDim2.fromOffset(260, 46), UDim2.new(), C.sky, 18)
+	local tourBtn = Ui.button(body, "🧭 Show me around again", UDim2.fromOffset(280, 56), UDim2.new(), C.sky, 18)
 	tourBtn.LayoutOrder = 7
 	tourBtn.Activated:Connect(function()
 		Ui.toast("Follow the steps at the top of the screen!", "map", "🧭")
 		panelGui.Enabled = false
 		gameRemotes:WaitForChild("SetSetting"):FireServer("tour", "restart")
 	end)
-	para("Only Roblox friends can visit, and only from the Map's Friends' barns list. Visitors can pat your horses, give one treat a day and drop a carrot in your post box; nobody can take, move or buy anything in your stable. Tap 🚪 Close gate any time to send visitors home. \"Nobody\" also means no Ride together invites.", 15, 8).TextColor3 = C.plum
+	para("Only Roblox friends can visit, and only from the Map's Friends' barns list. Visitors can pat your horses, give one treat a day and drop a carrot in your post box; nobody can take, move or buy anything in your stable. Tap 🚪 Close gate any time to send visitors home. \"Nobody\" also means no Ride together invites.", 16, 8).TextColor3 = C.plum
 end
 
 local function grownUpsTab()
@@ -153,11 +159,11 @@ local function grownUpsTab()
 		shop and shop.caps and shop.caps.dayRobux or 250, shop and shop.caps and shop.caps.monthRobux or 1000, shop and shop.monthRobux or 0), 16, 42)
 	para("🐴 Horses never get sick, run away or come to harm if your child takes a break. There are no streaks to lose and no countdowns.", 16, 50)
 	para("💬 Chat uses Roblox's own filtered chat and age settings. Horse names are built from a word list, so nothing can be typed.", 16, 60)
-	para("👫 Ride together: only Roblox friends can invite each other to a training ride, and only if the invite is accepted (it can always be declined, lapses by itself and is limited to a few). Riders see each other's stars and ribbons, never times or who was first. Setting stable visits to Nobody turns invites off.", 16, 61)
+	para("👫 Ride together: only Roblox friends can invite each other to a training ride, and only if the invite is accepted (it can always be declined, lapses by itself and is limited to a few). Riders see each other's stars and medals, never times or who was first. Setting stable visits to Nobody turns invites off. 🎈 Race with a friend: from More choices, your child can join a Roblox friend in this server in a free Practice race (no prizes, no points); nothing is sent to the friend.", 16, 61)
 	para("👻 Ghosts: a see-through horse shows your child's own best training ride. Friends see it only if \"Share my ghost with friends\" is turned on in Settings (it's off at first).", 16, 62)
 	para("🏡 Visiting friends' barns: the Map lists only Roblox friends who are in the same game server, and only if their stable visits are set to Friends. A visit is patting horses (no stats), one free treat a day and a carrot in the post box. Owners see how many carrots arrived, never who sent them, and nobody sees visitor counts, likes or rankings. The owner can close the gate in one tap, which walks visitors back to the lane.", 16, 63)
 	local career, rehome = GameConfig.career, GameConfig.rehome
-	para(string.format("🎖️ Careers: horses never get old or slower. Every %d races a horse earns a career badge, and at %d races it's a Veteran. A Veteran may retire as a 👑 Legend, only if your child chooses (we suggest it once): it moves to the Hall of Fame paddock beside the barn, keeps its stats and can still be ridden; its stall goes to another horse.",
+	para(string.format("🎖️ Careers: horses never get old or slower. Every %d races a horse earns a career patch, and at %d races it's a Veteran. A Veteran may retire as a 👑 Legend, only if your child chooses: it moves to the Hall of Fame paddock beside the barn, keeps its stats and can still be ridden; its stall goes to another horse. A Legend can come back to the races any time, with its record.",
 		career.badgeEvery, career.veteranAt), 16, 64)
 	para(string.format("🏫 Rehoming: at the Market Corral a horse can go to %s, a riding school where other children ride it. The school pays half of what your child paid for it (never more, and nothing for a tamed or gifted horse, or one bought before this feature, which earns a goodbye rosette instead). It takes two taps, and for %d days the horse can come back for the same Green Cash, with its name and stats. The first horse and the last racing horse always stay. Horses are never traded between players.",
 		rehome.school, rehome.undoHours // 24), 16, 65)
@@ -168,7 +174,7 @@ render = function()
 	for _, ch in tabs:GetChildren() do if ch:IsA("TextButton") then ch:Destroy() end end
 	for _, ch in body:GetChildren() do if not ch:IsA("UIListLayout") then ch:Destroy() end end
 	for _, t in { { "settings", "⚙️ Settings" }, { "grownups", "👪 For grown-ups" } } do
-		local b = Ui.button(tabs, t[2], UDim2.fromOffset(190, 42), UDim2.new(), if tab == t[1] then C.gold else C.white, 17)
+		local b = Ui.button(tabs, t[2], UDim2.fromOffset(200, 56), UDim2.new(), if tab == t[1] then C.gold else C.white, 18)
 		b.Activated:Connect(function()
 			tab = t[1]
 			render()
@@ -179,8 +185,7 @@ end
 
 local function open()
 	panelGui.Enabled = true
-	panel.Position = UDim2.fromScale(0.5, 0.55)
-	TweenService:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	slideIn()
 	render()
 end
 gear.Activated:Connect(function() if panelGui.Enabled then panelGui.Enabled = false else open() end end)
@@ -189,20 +194,25 @@ dim.Activated:Connect(function() panelGui.Enabled = false end)
 PlayerState.Changed.Event:Connect(function() if panelGui.Enabled then render() end end)
 
 -- Tour card -------------------------------------------------------------------------------
-local tourCard = Ui.card(gui, UDim2.fromOffset(520, 70), UDim2.new(0.5, 0, 0, 96), C.cream)
+-- The first minute has one voice (AAA Phase 2, D-067): the tour takes the top-centre spot (over
+-- the queue card and toasts), the race step points at the real RACE! button (Hud pulses it) instead
+-- of a GO of its own, toasts wait during that step, and the ✕ that skips sits at the far end from
+-- GO and asks once.
+local FM = GameConfig.firstMinute or {}
+local SLOTP = GameConfig.topSlot or { tour = 30 }
+local TOUR_W, TOUR_H = 600, 76
+local BTN = GameConfig.ui.minTouchPx
+local tourCard = Ui.card(gui, UDim2.fromOffset(TOUR_W, TOUR_H), UDim2.new(0.5, 0, 0, 96), C.cream)
 tourCard.AnchorPoint = Vector2.new(0.5, 0)
 tourCard.Visible = false
-local tourScale = Instance.new("UIScale")
-tourScale.Parent = tourCard
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	local v = workspace.CurrentCamera.ViewportSize
-	tourScale.Scale = math.min(1, (v.X - 20) / 520)
-end)
-local tourText = Ui.text(tourCard, "", 18, { Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -200, 1, 0), TextXAlignment = Enum.TextXAlignment.Left })
-local tourGo = Ui.button(tourCard, "GO ▶", UDim2.fromOffset(84, 44), UDim2.new(1, -180, 0.5, -22), C.orange, 18)
-local tourSkip = Ui.button(tourCard, "Skip", UDim2.fromOffset(80, 44), UDim2.new(1, -90, 0.5, -22), C.white, 16)
+local wantTop = Ui.slot("tour", SLOTP.tour or 30, tourCard)
+local tourSkip = Ui.closeButton(tourCard, UDim2.new(0, 10, 0.5, -BTN / 2), BTN)
+local tourText = Ui.text(tourCard, "", 18, { Position = UDim2.new(0, BTN + 22, 0, 0), Size = UDim2.new(1, -(BTN + 22) - 132, 1, 0),
+	TextXAlignment = Enum.TextXAlignment.Left })
+local tourGo = Ui.button(tourCard, "GO ▶", UDim2.fromOffset(112, BTN), UDim2.new(1, -122, 0.5, -BTN / 2), C.orange, 20)
 local currentStep = nil
+local inLine = false
+local skipAsked = 0 -- os.clock() of the first ✕ tap (skipConfirm), 0 = not asked
 
 local function goTo(go: string?)
 	if go == "stable" then
@@ -231,11 +241,19 @@ local function renderTour()
 		step = i and Tour.STEPS[i]
 	end
 	currentStep = if step then table.find(Tour.STEPS, step) else nil
-	tourCard.Visible = step ~= nil and not RaceState.active
 	if step then
 		local h = PlayerState.activeHorse()
-		tourText.Text = "🧭 " .. Tour.text(step, h and h.name)
-		tourGo.Visible = step.go ~= nil
+		local racing = step.go == "race"
+		local pointing = racing and FM.tourGoOnRace == false
+		if skipAsked > 0 then
+			tourText.Text = "Skip the tour? Tap ✕ again."
+		else
+			tourText.Text = "🧭 " .. Tour.text(step, h and h.name, pointing)
+		end
+		-- GO only where it does something: never while you're already in line for the race step.
+		tourGo.Visible = step.go ~= nil and not pointing and not (racing and inLine)
+		tourText.Size = UDim2.new(1, -(BTN + 22) - (if tourGo.Visible then 132 else 14), 1, 0)
+		tourSkip.BackgroundColor3 = if skipAsked > 0 then C.gold else C.white
 	end
 end
 tourGo.Activated:Connect(function()
@@ -243,16 +261,64 @@ tourGo.Activated:Connect(function()
 	if step then goTo(step.go) end
 end)
 tourSkip.Activated:Connect(function()
+	-- (D-069, the UI/UX consult) A quick double tap never skips: the second tap must come
+	-- skipGuardSeconds after the first.
+	if skipAsked > 0 and os.clock() - skipAsked < (FM.skipGuardSeconds or 0.6) then return end
+	if FM.skipConfirm ~= false and skipAsked == 0 then
+		skipAsked = os.clock()
+		renderTour()
+		task.delay(4, function()
+			if skipAsked > 0 and os.clock() - skipAsked >= 3.9 then
+				skipAsked = 0
+				renderTour()
+			end
+		end)
+		return
+	end
+	skipAsked = 0
 	gameRemotes:WaitForChild("TourSkip"):FireServer()
+	currentStep = nil
 	tourCard.Visible = false
 end)
+ReplicatedStorage:WaitForChild("RaceRemotes"):WaitForChild("QueueStatus").OnClientEvent:Connect(function(isIn)
+	inLine = isIn == true
+	renderTour()
+end)
 PlayerState.watch(function() renderTour() end)
+
+-- Toasts wait while the race step is up (the first minute), at most holdToastSeconds.
+local holdSince: number? = nil
+local holding = false
+local function setHold(on: boolean)
+	if on == holding then return end
+	holding = on
+	Ui.holdToasts(on)
+end
 RunService.Heartbeat:Connect(function()
 	-- While any race is on screen (riding or watching) the race map and board own the top.
-	local busy = RaceState.active == true
-	local showTour = currentStep ~= nil and not busy
-	if tourCard.Visible ~= showTour then tourCard.Visible = showTour end
-	if gear.Visible == busy then gear.Visible = not busy end
+	local busy = RaceState.active == true or RaceState.resultsOpen == true
+	local step = currentStep and Tour.STEPS[currentStep]
+	-- In line for the race step: that step is as good as done, and the queue card has the news.
+	local wants = step ~= nil and not busy and not (step.go == "race" and inLine)
+	local show = wantTop(wants)
+	if tourCard.Visible ~= show then tourCard.Visible = show end
+	if show then
+		local cx, w, top = Ui.topSlotPlace(TOUR_W)
+		tourCard.Position = UDim2.fromOffset(cx, top)
+		tourCard.Size = UDim2.fromOffset(w, TOUR_H)
+	end
+	-- (a training ride's ✕ Stop sits top right too)
+	local gearOff = busy or TrainingState.active == true
+	if gear.Visible == gearOff then gear.Visible = not gearOff end
+	-- The first minute: hold toasts during the race step until you're in line (or the time is up).
+	local raceStep = step ~= nil and step.go == "race" and FM.tourOwnsScreen ~= false
+	if raceStep and not inLine and not busy then
+		holdSince = holdSince or os.clock()
+		setHold(os.clock() - holdSince < (FM.holdToastSeconds or 60))
+	else
+		if not raceStep then holdSince = nil end
+		setHold(false)
+	end
 end)
 
 -- Break reminder ---------------------------------------------------------------------

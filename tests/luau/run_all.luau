@@ -98,6 +98,20 @@ for c, pc in data.pace do
 	end
 end
 
+-- The Final Burst, armed (D-066): src/burst_meter.py. A null score is a tap before arming (ignored).
+local BurstMeter = require("../../game/src/shared/BurstMeter")
+check(data.burst ~= nil and #data.burst > 0, "burst fixtures present")
+for c, bc in data.burst or {} do
+	for k, t in bc.taps do
+		local s = BurstMeter.tapScore(t, bc.spec, bc.arm)
+		local want = bc.scores[k]
+		check((s == nil) == (want == nil) and (s == nil or close(s :: number, want, 1e-9)),
+			`burst case {c}: tap {k} at {t} (arm {bc.arm}): {tostring(s)} vs {tostring(want)}`)
+		check(close(BurstMeter.position(t, bc.spec.sweepSeconds, bc.spec.phase), bc.positions[k], 1e-12),
+			`burst case {c}: position {k}`)
+	end
+end
+
 for _, w in data.windows do
 	check(close(RaceMath.windowScore(w.d), w.s, 1e-9), `windowScore({w.d})`)
 end
@@ -203,6 +217,11 @@ require("./clarity_tests")(check, close)
 require("./comeback_tests")(check, close)
 require("./career_tests")(check, close)
 require("./class_tests")(check, close)
+require("./progression_tests")(check, close) -- AAA Phase 3 (D-068): Open Practice, Legend undo, core-playtest switch
+require("./race_fx_tests")(check, close)
+require("./finish_tests")(check, close) -- AAA Phase 2 (D-067): finish moment, results card, coaching, post-lock preview
+require("./world_dressing_tests")(check, close) -- AAA Phase 4 Dev A (D-069): jockey pose, track dressing, Big Board, track life
+require("./presentation_tests")(check, close) -- AAA Phase 4 Dev B (D-069): gate pass, HUD restyle, music bed, finish polish
 
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

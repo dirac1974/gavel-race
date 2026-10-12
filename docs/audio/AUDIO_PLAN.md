@@ -1,6 +1,6 @@
 # Audio plan: Giddy-Up
 
-Status: voice lines made, uploaded and approved by Roblox moderation (2026-10-05); sound effects waiting on an ElevenLabs key permission (see "Blocked" below). Tone: County Fair Toy (docs/art/ART_DIRECTION.md): warm, sunny, friendly, short, nothing scary or loud. No wagering words in any prompt or line (CLAUDE.md rule 1; `tests/test_sound_assets.py` checks).
+Status: voice lines made, uploaded and approved by Roblox moderation (2026-10-05); ElevenLabs sound effects waiting on a key permission (see "Blocked" below), so every effect plays a synthesized stand-in from one sound sheet for now (see "Stand-in sound sheet", 2026-10-11). Tone: County Fair Toy (docs/art/ART_DIRECTION.md): warm, sunny, friendly, short, nothing scary or loud. No wagering words in any prompt or line (CLAUDE.md rule 1; `tests/test_sound_assets.py` checks).
 
 ## Pipeline
 
@@ -38,6 +38,7 @@ The key has no `user_read` permission, so `GET /v1/user/subscription` returns 40
 | bump_soft | P1 | soft padded thump as two horses brush shoulders (D-057 N5; not `brush`, which is grooming) | 0.5 s | 20 | | | not made |
 | burst_whoosh | P0 | sparkly whoosh for the Final Burst | 1.5 s | 60 | | | not made |
 | tap_good | P0 | soft bright tick (Great / Perfect tap) | 0.5 s | 20 | | | not made |
+| tap_ok | P1 | tiny wooden tick on every counted tap, pitched by score at runtime (`speed`) | 0.5 s | 20 | | | not made |
 | finish_fanfare | P0 | short cheerful brass flourish | 2.5 s | 100 | | | not made |
 | ui_pop | P0 | soft button pop | 0.5 s | 20 | | | not made |
 | coin | P0 | Green Cash chime | 1.0 s | 40 | | | not made |
@@ -65,7 +66,7 @@ Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_
 | --- | --- | --- |
 | Countdown | count_tick on "3", "2" and "1" (D-055) | `RaceController` (RaceStarted) |
 | Lanes lock at the far turn | lock_tick three times, a second apart, before "Lanes locked!" (riders with the steering buttons only; D-054 S3) | `RaceController` (TripInfo) |
-| Two horses brush shoulders (D-057 N5) | count_tick at half volume (`steerView.brushVolume`), positional at the horse that pressed, as the screen draws the brush; switch to bump_soft once it is made and uploaded | `RaceView` (SteerBrush) |
+| Two horses brush shoulders (D-057 N5) | bump_soft at half volume (`steerView.brushVolume`), positional at the horse that pressed, as the screen draws the brush | `RaceView` (SteerBrush) |
 | Gate opens | gate_bell, then vo_off 0.25 s later so they don't stack | `RaceController` (RaceStarted, cued at the start time) |
 | Your race runs | gallop_loop (riders only, while in the saddle; stops when the race ends, you leave the saddle or respawn) | `RaceController` |
 | Field enters the final far turn | vo_far_turn (skipped if under 4 s after the start) | `RaceController` (same sum as RaceService's `tFar`) |
@@ -87,6 +88,22 @@ Voice: ElevenLabs premade voice Liam (energetic, American), model `eleven_flash_
 
 Riders always hear their own race. Spectators hear race cues at half volume, and only when their character is within about 250 studs of that race's course (`SPECTATOR_HEARING_STUDS` in `RaceController`, measured from the course's outer edge with `TrackLayout.distanceToTrack`; the infield counts as at the track). Only riders hear their own hoofbeats. The Settings tab has Sound On/Off (`settings.sound`, on by default); Off mutes the SoundGroup, so loops already playing go quiet too, and a loop started while Off is heard once Sound is back On.
 
+## Stand-in sound sheet
+
+Until the ElevenLabs effects exist, every effect in `sounds.json` (including `tap_ok`) has a synthesized stand-in, all packed into **one** Audio upload, so the 30-day audio cap isn't spent per effect.
+
+| Step | Command | Writes |
+| --- | --- | --- |
+| Synthesize and pack | `python tools/audio/synth_sheet.py` | `assets/audio/sound_sheet.wav` (mono 16-bit 44.1 kHz, 27 s), `tools/audio/sheet.json` (name -> start, length, loop), `assets/audio/synth_preview/<name>.wav` (gitignored), `game/src/shared/SoundSheet.luau` |
+| Upload (one audio upload) | `python tools/roblox/upload_assets.py --kind Audio --only sound_sheet` | record `sound_sheet` in `uploaded.json`, its id in `SoundSheet.luau` |
+
+- Uploaded 2026-10-11 as asset **87356614588667**; moderation was `Reviewing` at upload. Until it is Approved the clips play nothing in game; a Rejected sheet drops to id 0.
+- Synthesis is numpy-only and seeded: bells and chimes are additive and FM, the gallop is four strides of a four-beat hoof pattern rendered round a circle (a seamless 2.0 s loop), the crowd is filtered noise, formant voices and claps under a gentle swell. Every clip is band-limited to 35 Hz to 9 kHz, de-clicked, and peak-normalized to -3 dBFS. Clips start on a 10 ms grid with 0.25 s of silence between them.
+- `Sound.luau` plays a name's own uploaded id first; with none, it plays that name's clip from the sheet (`PlaybackRegionsEnabled`, `PlaybackRegion`, and `LoopRegion` for loops). An ElevenLabs effect uploaded later replaces its stand-in with no code change.
+- `Sound.play(name, volume?, at?, speed?)` and `Sound.loop(name, volume?, speed?)` take an optional `PlaybackSpeed` (clamped 0.25 to 4), for `tap_ok` pitched by score.
+- The sheet's offsets are tied to the uploaded file: `synth_sheet.py` keeps an uploaded sheet unless run with `--rebuild` (which needs another audio upload), and `SoundSheet.luau` gets id 0 if the file on disk no longer matches the upload. To drop a clip that sounds wrong without re-uploading, add its name to `MUTED` in `synth_sheet.py` and re-run it.
+- **Nobody has listened yet**, `horse_nicker` (a pitched, fluttering formant voice) especially. Listen to the previews and in Studio, on a phone too, then tune `LEVEL` in `Sound.luau` or mute clips.
+
 ## Blocked: sound effects
 
 `POST /v1/sound-generation` returns 401 "missing the permission sound_generation". David: open https://elevenlabs.io/app/settings/api-keys, edit the key in `ELEVENLABS_API_KEY`, and turn on **Sound Effects** access. Then:
@@ -96,4 +113,4 @@ python tools/audio/generate_audio.py --priority P0 P1
 python tools/roblox/upload_assets.py --kind Audio
 ```
 
-Roblox audio uploads are capped per 30 days: 100 for ID-verified accounts, 10 otherwise, so `upload_assets.py --force` re-uploads sounds only with `--kind Audio`, and an upload request is never resent when it may already have gone through. Sounds that moderation marks Rejected are left out of `SoundAssets.luau`. The 8 voice lines used 8; the 17 effects need ID verification on the uploading account (or packing effects into one sheet with `Sound.PlaybackRegion`).
+Roblox audio uploads are capped per 30 days: 100 for ID-verified accounts, 10 otherwise, so `upload_assets.py --force` re-uploads sounds only with `--kind Audio`, and an upload request is never resent when it may already have gone through. Sounds that moderation marks Rejected are left out of `SoundAssets.luau`. The 8 voice lines used 8; the 19 effects need ID verification on the uploading account (or another packed sheet). The stand-in sheet used the 9th.

@@ -96,6 +96,18 @@ function RaceSession.fillWithBots(humans: { LaneInput }, lanes: number, config: 
 	return field
 end
 
+-- Practice with equal horses (AAA Phase 3, D-068, queue.practiceEqualHorses): every lane gets the
+-- field's mean Rating, so every base chance is 1/n and taps, the trip and luck decide. Call it after
+-- fillWithBots, so no random draw moves. Practice only: it pays nothing.
+function RaceSession.equalizeRatings(lanes: { any }): { any }
+	if #lanes == 0 then return lanes end
+	local total = 0
+	for _, l in lanes do total += l.rating end
+	local mean = total / #lanes
+	for _, l in lanes do l.rating = mean end
+	return lanes
+end
+
 function RaceSession.new(params: {
 	deps: { RaceMath: any, BurstMeter: any, PaceMeter: any, RaceShape: any },
 	config: any,
@@ -311,13 +323,15 @@ function RaceSession:burstSpec()
 	return self.burst
 end
 
--- One tap `t` seconds after the burst opened (already resolved by the caller).
+-- One tap `t` seconds after the burst opened (already resolved by the caller). A tap before the
+-- burst is armed (config.burstArmSeconds, D-066) is ignored: nil, and the rider can still tap.
 function RaceSession:submitBurst(id: string, seg: number, t: number): number?
 	local i = self:laneIndex(id)
 	if not i or self.finished or seg ~= self.closed + 1 or self:kind(seg) ~= "burst" then return nil end
 	local lane = self.lanes[i]
 	if lane.isBot or lane.scores[seg] ~= nil then return nil end
-	local s = self.deps.BurstMeter.score(t, self:burstSpec())
+	local s = self.deps.BurstMeter.tapScore(t, self:burstSpec(), self.config.burstArmSeconds)
+	if s == nil then return nil end
 	lane.scores[seg] = s
 	return s
 end

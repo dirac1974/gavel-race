@@ -36,7 +36,14 @@
 --   place before the line.
 --   Your own horse also gets a small nudge on a Great or Perfect tap (same size for
 --   everyone, never luck), so a rider sees their tap work straight away. It is drawn only:
---   places are ranked without it, so the place badge never flickers.
+--   places are ranked without it, so the place badge never flickers. Since D-066 it is 5 ft,
+--   moves no faster than a gap may (D-055), never draws your horse into the one ahead in your
+--   lane, and a second tap carries on from the first instead of snapping back (RaceFx).
+--   A Perfect tap also surges your horse (D-066, GameConfig.raceFx): it rocks forward 3 degrees
+--   with two short flank trails and a dust burst; your hooves kick up a puff of dust each stride.
+--   None of that under Reduced Motion, and none of it on anyone else's horse or screen.
+--   Bob (D-066): the body rises and falls with the legs' own stride (HorseLegs.bob), lowest as
+--   the leading forefoot lands, so horse and legs gallop as one body at any speed.
 -- It also records the followed race (positions 10 times a second) for the replay.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -55,12 +62,21 @@ local SteerPose = require(Shared:WaitForChild("SteerPose"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 local Playback = require(Shared:WaitForChild("Playback"))
+local RaceFx = require(Shared:WaitForChild("RaceFx"))
+local GuiService = game:GetService("GuiService")
 
 local myId = tostring(Players.LocalPlayer.UserId)
-local BOB_HZ, BOB_STUDS = 1.8, 0.3
-local PAST_LINE = 0.012     -- past the line, horses ease to a stop within about this fraction
+local BOB_HZ = 1.8 -- (bobFromLegs = false only: the old clock)
+-- Past the line, horses gallop out and ease down within about this fraction of the race (AAA Phase 2,
+-- D-067: GameConfig.finish.gallopOutFeet over each race's own length, the same distance in every race;
+-- 0.012 before, which stopped them almost dead). PAST_LINE is a Short race's, for callers without a race.
+local FINISH = GameConfig.finish or {}
+local PAST_LINE = RaceFx.pastLine(3886.5, FINISH)
 local RECORD_HZ = 10
 local VIEW = GameConfig.raceView
+local FX = GameConfig.raceFx
+local BOB_STUDS = VIEW.bobStuds or 0.3
+local BOB_FROM_LEGS = VIEW.bobFromLegs ~= false
 local STEER = GameConfig.steering
 local POSE = GameConfig.steerView
 local PLAYBACK = Playback.config(GameConfig)
@@ -114,28 +130,22 @@ local JUMP_STUDS = 60
 -- so the legs pick the gait for the race's real speed. yaw and roll (radians, toward higher lanes;
 -- SteerPose) turn and lean the body through a lane change; leanFeet and nod are a brush's (D-057
 -- N5: drawn only, never in the lanes that rank the race).
+-- `bob`: with raceView.bobFromLegs (D-066) the bob's height in studs, drawn in step with the legs
+-- (0 = no bob); otherwise the body's height this frame (the old clock). `pitchDeg`: a drawn rock,
+-- nose down (the surge).
 local function place(i: number, p: number, bob: number, plan, courseId: string?, timeScale: number?, x: number?,
-	yaw: number?, roll: number?, leanFeet: number?, nod: number?)
+	yaw: number?, roll: number?, leanFeet: number?, nod: number?, pitchDeg: number?)
 	local horse = horseModel(courseId, i)
 	if not horse then return end
 	local cfg = TrackLayout.courses[courseId or "dirt"] or TrackLayout.churchill
 	local railLength = TrackLayout.railLength(cfg, plan)
 	local px, pz, dx, dz = TrackLayout.railPoint(cfg, plan, p * railLength, (x or i) + (leanFeet or 0) / cfg.laneWidth)
-	local pos = Vector3.new(px, bob, pz)
-	local cf = CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
-	lastBase[horse] = cf
-	if (yaw and yaw ~= 0) or (roll and roll ~= 0) or (nod and nod ~= 0) then
-		local ry, rz = SteerPose.angles(yaw or 0, roll or 0)
-		-- (CFrame.Angles(x, y, z) is Rx * Ry * Rz: the nod turns about the track's sideways axis, the
-		-- unturned body's X, then the turn about the nodded up axis, then the lean about the body's length.
-		-- The turn is a few degrees at most, so the nod is all but about the turned body.)
-		cf = cf * CFrame.Angles(SteerPose.nodAngle(nod or 0), ry, rz)
-	end
-	horse:PivotTo(cf)
-	-- Running legs (D-051): stride with the ground actually covered since the last frame (the
-	-- horizontal move between placed positions), so outer horses on turns and sideways glides
-	-- (steering, S2) stride as far as they travel.
-	if HorseLegs.has(horse) then
+	-- Running legs (D-051) first, so the bob below reads this frame's stride: stride with the ground
+	-- actually covered since the last frame (the horizontal move between placed positions), so
+	-- outer horses on turns and sideways glides (steering, S2) stride as far as they travel. (The
+	-- legs are posed on the body where it was; the move below carries them along.)
+	local legs = HorseLegs.has(horse)
+	if legs then
 		local now = os.clock()
 		local prev = lastPlaced[horse]
 		local flat = Vector3.new(px, 0, pz)
@@ -152,8 +162,41 @@ local function place(i: number, p: number, bob: number, plan, courseId: string?,
 		end
 		HorseLegs.apply(horse, dist, dt, timeScale)
 	end
+	local height, rock = bob, 0
+	if BOB_FROM_LEGS then
+		local state = HorseLegs.stateOf(horse)
+		local lift, nose = 0, 0
+		if state then
+			lift, nose = HorseLegs.bodyBob(state) -- (cross-faded with the legs' gait change, times blend)
+		else -- a horse without running legs keeps the old clock
+			lift = math.abs(math.sin((serverNow() * BOB_HZ + i * 0.37) * math.pi))
+		end
+		height = bob * lift
+		rock = VIEW.bobPitchDeg * nose * (if BOB_STUDS > 0 then math.min(1, bob / BOB_STUDS) else 0)
+	end
+	local pos = Vector3.new(px, height, pz)
+	local cf = CFrame.lookAt(pos, pos + Vector3.new(dx, 0, dz))
+	lastBase[horse] = cf
+	local pitch = -math.rad(rock + (pitchDeg or 0)) -- (about the body's sideways axis: + is nose up)
+	if (yaw and yaw ~= 0) or (roll and roll ~= 0) or (nod and nod ~= 0) or pitch ~= 0 then
+		local ry, rz = SteerPose.angles(yaw or 0, roll or 0)
+		-- (CFrame.Angles(x, y, z) is Rx * Ry * Rz: the nod turns about the track's sideways axis, the
+		-- unturned body's X, then the turn about the nodded up axis, then the lean about the body's length.
+		-- The turn is a few degrees at most, so the nod is all but about the turned body.)
+		cf = cf * CFrame.Angles(SteerPose.nodAngle(nod or 0) + pitch, ry, rz)
+	end
+	horse:PivotTo(cf)
 end
 RaceState.placeHorse = place -- the replay uses the same placement
+RaceState.bobStuds = if BOB_FROM_LEGS then BOB_STUDS else 0 -- the replay's bob (D-066; none with the old clock)
+-- The bob's height at progress p (eased past the line) and s seconds after the gate, as drawn live:
+-- it grows in out of the gate and fades as the horse pulls up past the line. The replay uses it.
+function RaceState.bobAt(p: number, s: number, past: number?): number
+	if not BOB_FROM_LEGS then return 0 end
+	local speed = if p > 1 then math.clamp(1 - (p - 1) / (past or PAST_LINE), 0, 1)
+		elseif s > 0 then 1 - math.exp(-s / VIEW.gateEaseSeconds) else 0
+	return BOB_STUDS * speed
+end
 
 -- Legs straight down and the body straight (no turn or lean) for every horse on a course (a race
 -- or replay has ended, or the race was aborted).
@@ -182,9 +225,9 @@ function RaceState.finishFollowed(): boolean
 end
 
 -- Past the line, ease to a stop instead of running on.
-local function easePastLine(p: number): number
+local function easePastLine(p: number, past: number): number
 	if p <= 1 then return p end
-	return 1 + PAST_LINE * (1 - math.exp(-(p - 1) / PAST_LINE))
+	return 1 + past * (1 - math.exp(-(p - 1) / past))
 end
 
 remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, cond, _resultAt, _burstOpen, courseId)
@@ -198,6 +241,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		brushes = {}, -- (D-057 N5) { at (server time), mover, other, dir, started } still to draw or drawing
 		from = {}, to = {}, sampleAt = 0, -- (D-054's linear glide) the offsets' glide to the newest sample
 		done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond, predict = SteerPredict.new(),
+		past = RaceFx.pastLine(len1, FINISH), -- (D-067) the gallop-out
 	}
 	for i, lane in laneList do
 		race.offset[i], race.target[i], race.from[i], race.to[i] = 0, 0, 0, 0
@@ -224,6 +268,7 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		RaceState.recording = { start = start, plan = plan, lanes = #laneList, frames = {}, events = {}, course = courseId,
 			myLane = race.myLane, lane = table.clone(race.lane) }
 		RaceState.nudgeAt = -math.huge
+		RaceState.surgeAt = -math.huge
 	end
 	-- The stalls clear on this screen as the bell rings (the server's removal arrives a ping later).
 	task.delay(math.max(0, start - serverNow()), function()
@@ -346,6 +391,131 @@ remotes.RaceFinished.OnClientEvent:Connect(function(summary, courseId)
 	end
 end)
 
+-- Reduced Motion (read once, then on change): no surge rock, trails or dust (D-066).
+local still = false
+local function readStill()
+	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
+	still = ok and on == true
+end
+readStill()
+pcall(function() GuiService:GetPropertyChangedSignal("ReducedMotionEnabled"):Connect(readStill) end)
+local function reducedMotion(): boolean
+	return still
+end
+-- Jockeys crouch and pump with their horse's stride (AAA Phase 4, D-069; drawn only).
+require(script.Parent:WaitForChild("JockeyPose")).start({ HorseLegs = HorseLegs, RaceState = RaceState, TrackLayout = TrackLayout,
+	config = GameConfig.jockeyPose, reducedMotion = reducedMotion })
+
+-- Your horse's dust and surge trails (D-066), made on first use: a ParticleEmitter at its hooves
+-- (the built-in smoke texture, tinted dirt; puffs stay where they're kicked up) and a Trail down
+-- each flank, both on the body part, so they move with the horse. Drawn on your screen only.
+local fxOf = setmetatable({}, { __mode = "k" }) -- horse -> { dust, trails = { Trail } } or false
+local function horseFx(horse: Model)
+	local made = fxOf[horse]
+	if made ~= nil then return made or nil end
+	fxOf[horse] = false
+	local body = horse:FindFirstChild("Body", true)
+	if not (body and body:IsA("BasePart")) then body = horse.PrimaryPart or horse:FindFirstChildWhichIsA("BasePart", true) end
+	if not body then return nil end
+	local ok, fx = pcall(function()
+		local box, size = horse:GetBoundingBox() -- the model faces -Z: X is across the body
+		local function attach(name: string, offset: Vector3): Attachment
+			local a = Instance.new("Attachment")
+			a.Name = name
+			a.Parent = body -- (parent first: an unparented Attachment's world position is its local one)
+			a.CFrame = body.CFrame:ToObjectSpace(box * CFrame.new(offset))
+			return a
+		end
+		local out = { trails = {} }
+		if FX.dust then
+			local hooves = attach("FxHooves", Vector3.new(0, -size.Y / 2 + 0.3, 0))
+			local e = Instance.new("ParticleEmitter")
+			e.Name = "FxDust"
+			e.Texture = FX.dustTexture
+			e.Color = ColorSequence.new(Color3.fromRGB(FX.dustRgb[1], FX.dustRgb[2], FX.dustRgb[3]))
+			e.Rate = 0
+			e.Lifetime = NumberRange.new(0.25, 0.45)
+			e.Speed = NumberRange.new(2, 5)
+			e.SpreadAngle = Vector2.new(35, 35)
+			e.EmissionDirection = Enum.NormalId.Top
+			e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 2.2) })
+			e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+			e.Drag = 4
+			e.LockedToPart = false
+			e.Parent = hooves
+			out.dust = e
+		end
+		if FX.trails then
+			for _, side in { -1, 1 } do
+				local top = attach("FxTrailTop", Vector3.new(side * size.X / 2, size.Y * 0.15, 0))
+				local low = attach("FxTrailLow", Vector3.new(side * size.X / 2, -size.Y * 0.05, 0))
+				local trail = Instance.new("Trail")
+				trail.Name = "FxTrail"
+				trail.Attachment0, trail.Attachment1 = top, low
+				trail.Lifetime = 0.2
+				trail.Color = ColorSequence.new(Color3.new(1, 1, 1))
+				trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
+				trail.FaceCamera = true
+				trail.Enabled = false
+				trail.Parent = body
+				table.insert(out.trails, trail)
+			end
+		end
+		return out
+	end)
+	if ok and fx then fxOf[horse] = fx end
+	return if ok then fx else nil
+end
+
+-- The drawn nudge on your own horse (D-066, RaceFx): the curve of the newest Great or Perfect
+-- tap or the one before it, whichever is higher (a quick second tap carries on, never snaps
+-- back), followed at most raceFx.nudgeFeetPerSecond and kept clear of the horse ahead in your lane.
+local nudgeDrawn, nudgeLast, nudgePrev = 0, -math.huge, -math.huge
+local aheadScratch = {}
+local function myNudge(race, t: number, dt: number, ramp: number): number
+	local at = RaceState.nudgeAt or -math.huge
+	if at ~= nudgeLast then nudgeLast, nudgePrev = at, nudgeLast end
+	local goal = math.max(nudgeFeet(t - nudgeLast), nudgeFeet(t - nudgePrev))
+	if not race.myLane then return 0 end
+	table.clear(aheadScratch)
+	for i = 1, race.lanes do aheadScratch[i] = race.offset[i] * ramp end
+	local room = RaceFx.nudgeRoom(race.myLane, aheadScratch, race.lane, STEER.laneBand, FX.nudgeClearFeet)
+	nudgeDrawn = RaceFx.stepNudge(nudgeDrawn, goal, room, dt, FX)
+	return nudgeDrawn
+end
+
+-- Your horse's surge this frame (D-066): the rock in degrees (nose down), the flank trails on
+-- while it runs and a dust burst as it starts. Nothing under Reduced Motion.
+local surgeSeen, wasSurging = -math.huge, false
+local function mySurge(horse: Model?, t: number): number
+	local on = horse ~= nil and FX.enabled and FX.surge and not reducedMotion()
+	local fx = if on and horse then horseFx(horse) else nil
+	local surgeAt = RaceState.surgeAt or -math.huge
+	local k = if on then RaceFx.surge(t - surgeAt, FX) else 0
+	local surging = k > 0
+	if horse and surging ~= wasSurging then
+		local made = fxOf[horse]
+		if made then for _, trail in made.trails do trail.Enabled = surging end end
+	end
+	if fx and fx.dust and surging and surgeAt ~= surgeSeen then
+		surgeSeen = surgeAt
+		fx.dust:Emit(FX.dustPerSurge)
+	end
+	wasSurging = surging
+	return FX.surgePitchDeg * k
+end
+
+-- A puff of dust each stride, as your horse's leading forefoot lands (the legs' own phase).
+local function myDust(horse: Model?, phaseBefore: number?, gaitBefore: string?)
+	if not horse or not FX.enabled or reducedMotion() then return end
+	local fx = horseFx(horse)
+	if not (fx and fx.dust and phaseBefore) then return end
+	local phase, gait = HorseLegs.phaseOf(horse)
+	if phase and gait and gait == gaitBefore and HorseLegs.crossedPlant(gait, phaseBefore, phase) then
+		fx.dust:Emit(FX.dustPerStride)
+	end
+end
+
 local lastRecord = 0
 RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, function(dt)
 	local t = serverNow()
@@ -357,7 +527,6 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 		local s = t - race.start
 		local base = paceFeet(s, race.T, race.len1)
 		local gateSpeed = if s > 0 then 1 - math.exp(-s / VIEW.gateEaseSeconds) else 0
-		local nudge = if isFocus then nudgeFeet(t - (RaceState.nudgeAt or -math.huge)) else 0
 		-- Gaps change at a believable rate, unless a horse must hurry to be in its place by the line.
 		local toLine = race.start + race.T - t
 		local allowed = VIEW.maxGapFeetPerSecond * dt
@@ -390,7 +559,7 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 				b.started = true
 				local horse = horseModel(courseId, b.mover)
 				local part = horse and (horse.PrimaryPart or horse:FindFirstChildWhichIsA("BasePart", true))
-				if Sound and part then Sound.play("count_tick", POSE.brushVolume, part) end
+				if Sound and part then Sound.play("bump_soft", POSE.brushVolume, part) end
 				local rec = RaceState.recording
 				if isFocus and rec and rec.course == courseId then
 					table.insert(rec.events, { t = t, kind = "brush", mover = b.mover, other = b.other, dir = b.dir })
@@ -424,13 +593,18 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			local ramp = if race.steering then 1 else math.min(1, base / (0.3 * race.len1))
 			local feet = base + race.offset[i] * ramp
 			local raw = math.max(0, feet / race.len1)
-			local p = easePastLine(raw)
-			local moving = s > 0 and raw < 1 + 3 * PAST_LINE
+			local p = easePastLine(raw, race.past)
+			local moving = s > 0 and raw < 1 + 3 * race.past
 			if moving then allStopped = false end
-			local speed = if raw > 1 then math.exp(-(raw - 1) / PAST_LINE) else gateSpeed
-			local bob = BOB_STUDS * speed * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi))
+			local speed = if raw > 1 then math.exp(-(raw - 1) / race.past) else gateSpeed
+			local bob = if BOB_FROM_LEGS then BOB_STUDS * speed
+				else BOB_STUDS * speed * math.abs(math.sin((t * BOB_HZ + i * 0.37) * math.pi))
 			local shown = p
-			if i == race.myLane and nudge > 0 then shown = p + nudge / race.len1 end
+			local mine = isFocus and i == race.myLane
+			if mine then
+				local nudge = myNudge(race, t, dt, ramp)
+				if nudge > 0 then shown = p + nudge / race.len1 end
+			end
 			-- The body through lane changes (SteerPose): every horse in a steering race; your own
 			-- press's look cue on your horse (eased glide).
 			local yaw, roll, leanFeet, nod = 0, 0, 0, 0
@@ -446,10 +620,18 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 					nod = math.max(nod, n)
 				end
 			end
-			place(i, shown, bob, race.plan, courseId, nil, race.lane[i], yaw, roll, leanFeet, nod)
+			-- Your own horse's surge and stride dust (D-066), drawn on this screen only.
+			local surgeDeg, phaseBefore, gaitBefore, model = 0, nil, nil, nil
+			if mine then
+				model = horseModel(courseId, i)
+				if model then phaseBefore, gaitBefore = HorseLegs.phaseOf(model) end
+				surgeDeg = mySurge(model, t)
+			end
+			place(i, shown, bob, race.plan, courseId, nil, race.lane[i], yaw, roll, leanFeet, nod, surgeDeg)
+			if mine then myDust(model, phaseBefore, gaitBefore) end
 			if isFocus then
 				RaceState.progress[i] = p
-				if i == race.myLane and raw >= 1 + 2 * PAST_LINE then RaceState.myHome = true end
+				if i == race.myLane and raw >= 1 + 2 * race.past then RaceState.myHome = true end
 			end
 		end
 		if isFocus then
@@ -463,7 +645,10 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 				table.insert(rec.frames, frame)
 			end
 		end
-		if race.done and (allStopped or t - race.doneAt > GameConfig.runInSeconds + 4) then
+		-- (D-067) A longer gallop-out runs about three of its time constants before the cut-off, so
+		-- the horses are down to a few studs a second when their legs ease to standing (never a dead stop).
+		local runOut = math.max(GameConfig.runInSeconds + 4, 1 + 3 * race.past * race.len1 / GameConfig.raceSpeedStudsPerSecond)
+		if race.done and (allStopped or t - race.doneAt > runOut) then
 			-- Stopped: the legs ease to standing (they keep being placed, standing still), then rest.
 			race.settleAt = race.settleAt or t
 			if t - race.settleAt >= VIEW.settleSeconds then

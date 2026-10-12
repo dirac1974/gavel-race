@@ -67,7 +67,14 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 			best = math.max(best, sum / #phases)
 		end
 		check(best < 54, leagueName .. ": best fixed-delay macro is no better than random tapping")
+		-- Arming (D-066) only delays input: the armed window still holds a full sweep, so every
+		-- point of the bar (the glow included) passes under the marker after arming.
+		check(league.windowSeconds - GameConfig.burstArmSeconds >= league.sweepSeconds,
+			leagueName .. ": the armed Final Burst still covers a full sweep")
 	end
+	check(BurstMeter.tapScore(0.2, { sweepSeconds = 2, targetDrift = 0, twoTargets = false }, 0.5) == nil
+		and BurstMeter.tapScore(0.2, { sweepSeconds = 2, targetDrift = 0, twoTargets = false }, 0) ~= nil,
+		"a burst tap before arming is ignored; with no arming it counts")
 
 	-- TapTime (D-021) ---------------------------------------------------------
 	check(TapTime.resolve(10.0, 10.2, 9, 12, 0.3) == 10.0, "plausible claimed time is used")
@@ -281,8 +288,11 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(bots == 6, "six bots added")
 
 	local function perfectBurstTime(spec): number
-		-- fixed center target: position 0 when (t / sweep + phase) % 1 == 0.25
-		return ((0.25 - spec.phase) % 1) * spec.sweepSeconds
+		-- fixed center target: position 0 when (t / sweep + phase) % 1 == 0.25 (or 0.75), the first
+		-- such time once the burst is armed (D-066)
+		local t = ((0.25 - spec.phase) % 1) * spec.sweepSeconds
+		while t < GameConfig.burstArmSeconds do t += spec.sweepSeconds / 2 end
+		return t
 	end
 
 	local function newSession(seed: number)
@@ -344,8 +354,13 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 		else
 			local spec = sw:burstSpec()
 			check(sw:burstSpec() == spec, "burst spec is picked once and shared")
-			check(close(sw:submitBurst("1", seg, perfectBurstTime(spec)) :: number, 100, 1e-6), "perfect burst tap")
-			check(sw:submitBurst("1", seg, 0.1) == nil, "one burst tap per rider")
+			-- Armed (D-066): a tap before burstArmSeconds is ignored and doesn't use up the rider's tap.
+			check(GameConfig.burstArmSeconds == 0.5, "the Final Burst arms 0.5 s after it opens")
+			check(sw:submitBurst("1", seg, 0) == nil and sw:submitBurst("1", seg, GameConfig.burstArmSeconds - 1e-6) == nil,
+				"a tap before the burst is armed is ignored")
+			check(sw.lanes[1].scores[seg] == nil, "...and isn't scored")
+			check(close(sw:submitBurst("1", seg, perfectBurstTime(spec)) :: number, 100, 1e-6), "perfect burst tap after an early one")
+			check(sw:submitBurst("1", seg, perfectBurstTime(spec) + 0.1) == nil, "one burst tap per rider")
 		end
 		sw:closeSegment(seg)
 	end

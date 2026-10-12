@@ -32,6 +32,7 @@ local TrackLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChil
 local ReplayTrip = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ReplayTrip"))
 local SteerPose = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SteerPose"))
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local RaceFx = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("RaceFx"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local UiArt = require(script.Parent:WaitForChild("UiArt"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
@@ -296,6 +297,7 @@ local function start(mode: string)
 		subject = rec.myLane or winner or 1, -- a spectator's replay follows the winner
 		strips = buildTrip(rec), stripIdx = 1, lockShown = false,
 		pose = {}, lastProgress = {}, -- SteerPose per horse, fresh: the first frame turns nobody
+		past = RaceFx.pastLine(rec.plan.lengths[1], GameConfig.finish), -- (D-067) the gallop-out, for the bob
 	}
 	for i = 1, rec.lanes do playing.pose[i] = SteerPose.new() end
 	-- "Watch the finish" starts after the lock: no "Lanes locked!" then.
@@ -372,7 +374,10 @@ local function placeAll(rec, t: number, speed: number?, raceDt: number)
 				nod = math.max(nod, n)
 			end
 		end
-		RaceState.placeHorse(i, p, 0, rec.plan, rec.course, speed, lanes[i], yaw, roll, leanFeet, nod)
+		-- The body bobs with the legs as it did live (D-066: growing in out of the gate and fading past
+		-- the line; none with the old clock).
+		local bob = if RaceState.bobAt then RaceState.bobAt(p, t - rec.start, playing.past) else 0
+		RaceState.placeHorse(i, p, bob, rec.plan, rec.course, speed, lanes[i], yaw, roll, leanFeet, nod)
 	end
 	return progress, lanes
 end
@@ -418,11 +423,8 @@ RunService.RenderStepped:Connect(function(dt)
 		local target = pivot.Position + Vector3.new(0, 4, 0)
 		-- Side view from just outside the outer rail (broadcast angle), so no horse runs through it.
 		-- The camera follows the track's heading at the horse, never its body turn or lean (D-057).
-		local cfg = TrackLayout.courses[rec.course or "dirt"] or TrackLayout.churchill
-		local outside = TrackLayout.outerRadius(cfg) - TrackLayout.laneRadius(cfg, lanes[subject] or subject) + 12 -- its lane now
-		local _, _, dx, dz = TrackLayout.railPoint(cfg, rec.plan, (progress[subject] or 0) * TrackLayout.railLength(cfg, rec.plan),
-			lanes[subject] or subject)
-		local look, right = Vector3.new(dx, 0, dz), Vector3.new(-dz, 0, dx)
+		-- (RaceState.sideRig: the same rig the finish moment's orbit ends on, D-067)
+		local look, right, outside = RaceState.sideRig(rec.course, rec.plan, progress[subject] or 0, lanes[subject] or subject) -- its lane now
 		local eye = if playing.view == "side"
 			then target + right * outside + Vector3.new(0, 6, 0)
 			else target - look * 18 + Vector3.new(0, 7, 0)

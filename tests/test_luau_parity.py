@@ -15,7 +15,8 @@ FIXTURES = ROOT / "tests" / "fixtures"
 # unchanged tree skips the regeneration (CI starts clean and always generates).
 FIXTURE_INPUTS = [
     ROOT / "src" / "trip.py", ROOT / "src" / "gavel_race_v2.py", ROOT / "src" / "race_rating.py",
-    ROOT / "src" / "stride.py", ROOT / "src" / "pace_meter.py", FIXTURES / "make_fixtures.py",
+    ROOT / "src" / "stride.py", ROOT / "src" / "pace_meter.py", ROOT / "src" / "burst_meter.py",
+    FIXTURES / "make_fixtures.py",
     FIXTURES / "trip_baseline.json", FIXTURES / "trip_baseline_d054.json",
 ]
 FIXTURE_OUTPUTS = [FIXTURES / "race_math.json", FIXTURES / "trip.json", FIXTURES / "trip_d054.json",
@@ -58,6 +59,6 @@ def test_fixture_stamp_covers_the_generators_inputs():
     """Every module make_fixtures.py imports is in the stamp's inputs, so a change to any of them
     regenerates the fixtures."""
     text = (FIXTURES / "make_fixtures.py").read_text(encoding="utf-8")
-    for module in ("gavel_race_v2", "race_rating", "stride", "pace_meter", "trip"):
+    for module in ("gavel_race_v2", "race_rating", "stride", "pace_meter", "burst_meter", "trip"):
         assert f"import {module}" in text
         assert ROOT / "src" / f"{module}.py" in FIXTURE_INPUTS

@@ -202,3 +202,14 @@ def test_skill_premium_kappa_one_top_decile():
         s = [69.2] + [rng.gauss(50, 15) for _ in range(7)]
         tot += m.live_chances(q, m.skills(s, cfg), cfg)[0] / q[0]
     assert 0.30 < tot / n - 1 < 0.40
+
+
+@pytest.mark.parametrize("T", [12, 14.4, 18, 22])
+def test_practice_equal_horses_give_equal_base_chances(T):
+    """AAA Phase 3 (D-068, queue.practiceEqualHorses): RaceSession.equalizeRatings gives every
+    Practice lane the field's mean Rating; the Python model then gives each lane 1/n, as Luau does
+    (tests/luau/progression_tests.luau)."""
+    ratings = [47.0, 75.0, 32.0, 35.5, 29.0, 38.0, 30.0, 34.0]
+    mean = sum(ratings) / len(ratings)
+    q = m.base_chances([mean] * len(ratings), m.Config(T=T))
+    assert all(abs(x - 1 / len(ratings)) < 1e-12 for x in q)

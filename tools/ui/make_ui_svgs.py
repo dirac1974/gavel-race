@@ -1333,6 +1333,142 @@ def world_sheet(w: dict[str, tuple[int, int, str]]) -> str:
     return svg(width, int(y + 10), body)
 
 
+# ---- Track dressing (AAA Phase 4, D-069): whole images for Beams, Textures, Decals and particles ----
+# Not atlased: a Beam, Texture or ParticleEmitter shows a whole image, so each is its own Decal upload
+# (tools/roblox/upload_assets.py TEXTURES). Tileable left to right; transparent backgrounds.
+# Crowd: cheerful toy fans, no real people, no logos or words, hands empty or holding a little pennant
+# (never paper slips or tickets).
+STRIP_NAMES = ["bunting_strip", "crowd_strip", "confetti_square", "flag_pennant"]
+FAN_SKIN = ["#FFCC99", "#C69C6D", "#7C4A2D", "#EAB892"]  # the jockeys' skin set (TrackScene SKIN)
+FAN_SHIRT = [(ORANGE, ORANGE_DARK), (TEAL, "#0F7A72"), (SKY, "#4FA9DB"), (GOLD, GOLD_DARK)]
+CHEEK = "#F2607E"
+
+
+def bunting_strip() -> str:
+    """512 x 128 (one tile): a twine cord with five pennants. A Beam wraps it every buntingTileStuds."""
+    out = [
+        f'<line x1="-8" y1="18" x2="520" y2="18" stroke="{INK}" stroke-width="10" stroke-linecap="round"/>',
+        f'<line x1="-8" y1="18" x2="520" y2="18" stroke="{TWINE}" stroke-width="5" stroke-linecap="round"/>',
+    ]
+    gap = 512 / 5
+    for k, colour in enumerate([ORANGE, GOLD, SKY, TEAL, PAPER]):
+        cx = gap / 2 + k * gap
+        tri = f'<path d="M{cx - 38:.1f} 18 L{cx + 38:.1f} 18 L{cx:.1f} 112 Z"/>'
+        out.append(solid(colour, tri, outline=8))
+        out.append(f'<path d="M{cx - 26:.1f} 24 L{cx - 6:.1f} 24 L{cx - 4:.1f} 86 Z" fill="{WHITE}" opacity="0.35"/>')
+        out.append(f'<circle cx="{cx:.1f}" cy="18" r="6" fill="{TWINE}" stroke="{INK}" stroke-width="4"/>')
+    return "".join(out)
+
+
+def fan(cx: float, k: int) -> str:
+    """One toy fan in a 128-wide cell; pose by k: both arms up, pennant wave, both arms up, clapping."""
+    shirt, shirt_dark = FAN_SHIRT[k % 4]
+    skin = FAN_SKIN[k % 4]
+    hy = 84 if k % 2 == 0 else 90  # heads at two heights so the row isn't a fence
+    out = []
+    # Arms first (behind the body), as thick sleeves with a hand at the end.
+    if k == 3:
+        arms = [(f"M{cx - 26} {hy + 50} Q{cx - 26} {hy + 76} {cx - 4} {hy + 66}", (cx - 4, hy + 64)),
+                (f"M{cx + 26} {hy + 50} Q{cx + 26} {hy + 76} {cx + 4} {hy + 66}", (cx + 4, hy + 64))]
+    elif k == 1:
+        arms = [(f"M{cx - 26} {hy + 50} Q{cx - 46} {hy + 30} {cx - 42} {hy - 22}", (cx - 42, hy - 26)),
+                (f"M{cx + 26} {hy + 50} Q{cx + 40} {hy + 70} {cx + 34} {hy + 84}", (cx + 34, hy + 86))]
+    else:
+        arms = [(f"M{cx - 26} {hy + 50} Q{cx - 48} {hy + 20} {cx - 46} {hy - 26}", (cx - 46, hy - 30)),
+                (f"M{cx + 26} {hy + 50} Q{cx + 48} {hy + 20} {cx + 46} {hy - 26}", (cx + 46, hy - 30))]
+    if k == 1:  # a little fair pennant on a stick in the raised hand
+        hx, hyy = arms[0][1]
+        out.append(f'<line x1="{hx}" y1="{hyy + 6}" x2="{hx}" y2="{hyy - 44}" stroke="{INK}" stroke-width="9" stroke-linecap="round"/>')
+        out.append(f'<line x1="{hx}" y1="{hyy + 6}" x2="{hx}" y2="{hyy - 44}" stroke="{WOOD}" stroke-width="4" stroke-linecap="round"/>')
+        out.append(solid(ORANGE, f'<path d="M{hx + 2} {hyy - 44} L{hx + 40} {hyy - 33} L{hx + 2} {hyy - 22} Z"/>', outline=6))
+    limbs = "".join(band(d, 16, shirt, outline=8) for d, _ in arms) + "".join(
+        f'<circle cx="{hx}" cy="{hyy}" r="10" fill="{skin}" stroke="{INK}" stroke-width="6" paint-order="stroke"/>' for _, (hx, hyy) in arms)
+    if k != 3:  # raised arms go behind the body; clapping hands in front of it
+        out.append(limbs)
+    # Body: a chunky shirt down past the tile edge, with a paper stripe across the chest.
+    body = f'<rect x="{cx - 36}" y="{hy + 34}" width="72" height="120" rx="26"/>'
+    out.append(solid(shirt, body, outline=10))
+    out.append(f'<rect x="{cx - 31}" y="{hy + 62}" width="62" height="10" fill="{PAPER}" opacity="0.9"/>')
+    out.append(f'<path d="M{cx - 30} {hy + 96} L{cx + 30} {hy + 96}" stroke="{shirt_dark}" stroke-width="6" opacity="0.5"/>')
+    if k == 3:
+        out.append(limbs)
+    # Head, hair or hat, and a happy face.
+    if k == 1:  # curly hair puffs behind the head
+        out.append(solid("#3B2A20", *[f'<circle cx="{cx + dx}" cy="{hy + dy}" r="13"/>' for dx, dy in ((-22, -14), (-8, -24), (8, -24), (22, -14))], outline=8))
+    if k == 3:  # pigtails
+        out.append(solid("#6B4423", f'<circle cx="{cx - 30}" cy="{hy + 4}" r="11"/>', f'<circle cx="{cx + 30}" cy="{hy + 4}" r="11"/>', outline=8))
+    out.append(f'<circle cx="{cx}" cy="{hy}" r="28" fill="{skin}" stroke="{INK}" stroke-width="10" paint-order="stroke"/>')
+    if k == 0:  # straw sun hat
+        out.append(solid(HAY, f'<ellipse cx="{cx}" cy="{hy - 18}" rx="44" ry="10"/>', f'<path d="M{cx - 22} {hy - 18} Q{cx} {hy - 52} {cx + 22} {hy - 18} Z"/>', outline=8))
+        out.append(f'<path d="M{cx - 21} {hy - 24} L{cx + 21} {hy - 24}" stroke="{TEAL}" stroke-width="6"/>')
+    elif k == 2:  # plain cap, no logo
+        out.append(solid(PAPER, f'<path d="M{cx - 27} {hy - 10} Q{cx} {hy - 46} {cx + 27} {hy - 10} Z"/>', f'<rect x="{cx - 4}" y="{hy - 16}" width="38" height="9" rx="4"/>', outline=8))
+    elif k == 3:  # fringe
+        out.append(solid("#6B4423", f'<path d="M{cx - 26} {hy - 6} Q{cx} {hy - 44} {cx + 26} {hy - 6} Q{cx} {hy - 18} {cx - 26} {hy - 6} Z"/>', outline=6))
+    out.append(f'<ellipse cx="{cx - 10}" cy="{hy + 2}" rx="4" ry="5.5" fill="{INK}"/><ellipse cx="{cx + 10}" cy="{hy + 2}" rx="4" ry="5.5" fill="{INK}"/>')
+    out.append(f'<circle cx="{cx - 17}" cy="{hy + 12}" r="5" fill="{CHEEK}" opacity="0.45"/><circle cx="{cx + 17}" cy="{hy + 12}" r="5" fill="{CHEEK}" opacity="0.45"/>')
+    out.append(f'<path d="M{cx - 10} {hy + 12} Q{cx} {hy + 22} {cx + 10} {hy + 12}" fill="{INK}" stroke="{INK}" stroke-width="3" stroke-linejoin="round"/>')
+    return "".join(out)
+
+
+def crowd_strip() -> str:
+    """512 x 192 (one tile, 16 x 6 studs on a stand riser): four toy fans in four shirt palettes."""
+    return "".join(fan(64 + 128 * k, k) for k in range(4))
+
+
+def confetti_square() -> str:
+    """64 x 64 particle: a pure white paper square, so ParticleEmitter.Color tints it to the full colour."""
+    return f'<rect x="8" y="8" width="48" height="48" rx="6" fill="{WHITE}"/>'
+
+
+def flag_pennant() -> str:
+    """256 x 128 pennant: the hoist is the left edge (x = 0), drawn on a Beam that faces the camera. The horseshoe
+    stands upright, opening up (AAA Phase 4 feel consult); if Studio shows the Beam flipped, use trackDressing.buntingFlip."""
+    return (
+        solid(ORANGE, '<path d="M10 12 L246 64 L10 116 Z"/>', outline=10)
+        + f'<path d="M10 12 L46 20 L46 108 L10 116 Z" fill="{GOLD}" stroke="{INK}" stroke-width="5" stroke-linejoin="round"/>'
+        + f'<g transform="rotate(180 100 64)">{horseshoe(100, 64, 0.8, PAPER, w=12, outline=6)}</g>'
+    )
+
+
+def strip_assets() -> dict[str, tuple[int, int, str]]:
+    return {
+        "bunting_strip": (512, 128, bunting_strip()),
+        "crowd_strip": (512, 192, crowd_strip()),
+        "confetti_square": (64, 64, confetti_square()),
+        "flag_pennant": (256, 128, flag_pennant()),
+    }
+
+
+def strip_sheet(s: dict[str, tuple[int, int, str]]) -> str:
+    """Review sheet: bunting and crowd tiled as the game tiles them, the pennant and confetti tinted."""
+    width, pad = 1100, 24
+    out = [caption(width / 2, 40, "Giddy-Up track dressing (AAA Phase 4): tiled as in game", 22, True)]
+    out.append(f'<rect x="{pad}" y="60" width="{width - 2 * pad}" height="140" rx="14" fill="{SKY}"/>')
+    for i in range(4):
+        out.append(nested(pad + 10 + i * 256, 80, 256, 64, 512, 128, s["bunting_strip"][2]))
+    out.append(caption(pad, 220, "bunting_strip (Beam, Wrap)", 13, False, "start"))
+    for row, colour in enumerate(("#E8E4DA", "#9C978C")):
+        y = 240 + row * 96
+        out.append(f'<rect x="{pad}" y="{y}" width="{width - 2 * pad}" height="96" fill="{colour}"/>')
+        for i in range(4):
+            out.append(nested(pad + i * 256, y, 256, 96, 512, 192, s["crowd_strip"][2]))
+    out.append(caption(pad, 450, "crowd_strip (Texture on each StandTier riser, 16 x 6 studs)", 13, False, "start"))
+    out.append(f'<rect x="{pad}" y="470" width="300" height="170" rx="14" fill="{SKY}"/>')
+    out.append(f'<rect x="{pad + 40}" y="480" width="8" height="150" fill="#FBFBF5" stroke="{INK}" stroke-width="3"/>')
+    out.append(nested(pad + 48, 486, 200, 100, 256, 128, s["flag_pennant"][2]))
+    out.append(caption(pad + 150, 660, "flag_pennant (Beam, faces the camera)", 13))
+    x = pad + 340
+    for tint in (ORANGE, GOLD, SKY, TEAL, "#E0474C", "#2F6FDE"):
+        body = s["confetti_square"][2].replace(f'fill="{WHITE}"', f'fill="{tint}"')
+        out.append(f'<rect x="{x}" y="500" width="80" height="80" rx="10" fill="{PAPER}"/>')
+        out.append(nested(x + 8, 508, 64, 64, 64, 64, body))
+        x += 96
+    out.append(caption(pad + 340, 610, "confetti_square (white, tinted by the emitter)", 13, False, "start"))
+    body = f'<rect width="100%" height="100%" fill="#F4EBD9"/>' + "".join(out)
+    return svg(width, 680, body)
+
+
 def svg(w: int, h: int, body: str) -> str:
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">{body}</svg>\n'
 
@@ -1463,11 +1599,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-png", action="store_true")
     args = ap.parse_args(argv)
     OUT.mkdir(parents=True, exist_ok=True)
-    race, world = assets(), world_assets()
-    clash = set(race) & set(world)
+    race, world, strips = assets(), world_assets(), strip_assets()
+    clash = (set(race) & set(world)) | ((set(race) | set(world)) & set(strips))
     if clash:
-        raise SystemExit(f"world icon names clash with race icons: {sorted(clash)}")
-    a = {**race, **world}
+        raise SystemExit(f"icon names clash between the race, world and strip sets: {sorted(clash)}")
+    a = {**race, **world, **strips}
     for stale in OUT.glob("*.svg"):
         if stale.stem not in a and not stale.name.startswith("_sheet"):
             stale.unlink()
@@ -1475,7 +1611,9 @@ def main(argv: list[str] | None = None) -> int:
         write_if_changed(OUT / f"{name}.svg", svg(w, h, body))
     write_if_changed(OUT / "_sheet.svg", sheet(race))
     write_if_changed(OUT / "_sheet_world.svg", world_sheet(world))
-    print(f"make_ui_svgs: {len(race)} race + {len(world)} world SVGs, _sheet.svg and _sheet_world.svg in {OUT}")
+    write_if_changed(OUT / "_sheet_track.svg", strip_sheet(strips))
+    print(f"make_ui_svgs: {len(race)} race + {len(world)} world + {len(strips)} track SVGs, _sheet.svg, _sheet_world.svg "
+          f"and _sheet_track.svg in {OUT}")
     if not args.no_png:
         if PNG_OUT.is_dir():
             for stale in PNG_OUT.glob("*.png"):

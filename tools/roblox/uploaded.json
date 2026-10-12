@@ -13,12 +13,36 @@
   "sha256": "6c35bae70e74c8e1c614ab4664c0ad7bef1b19a81c918fa379568e837935f58b",
   "uploadedAt": "2026-10-05T06:55:38Z"
  },
+ "bunting_strip": {
+  "assetId": 118499327130794,
+  "file": "assets/ui/png/bunting_strip.png",
+  "kind": "Decal",
+  "moderation": "Approved",
+  "sha256": "96b7b879e4ed1412c38c68af3b3573873e4f102986b76119ba9ba4655c49de42",
+  "uploadedAt": "2026-10-12T00:35:09Z"
+ },
  "carrot_crop": {
   "assetId": 134730626513945,
   "file": "Models/generated/carrot_crop/carrot_crop.glb",
   "kind": "Model",
   "sha256": "f11766e77d55ac258b3e20549c5f7800d4810e808fa714efbcc8d292892296c0",
   "uploadedAt": "2026-10-05T06:50:16Z"
+ },
+ "confetti_square": {
+  "assetId": 94195307096733,
+  "file": "assets/ui/png/confetti_square.png",
+  "kind": "Decal",
+  "moderation": "Approved",
+  "sha256": "dd4e1711162e8aee1f26286f634a454629252b57b9a639a5b2b767e7da363e4b",
+  "uploadedAt": "2026-10-12T01:03:57Z"
+ },
+ "crowd_strip": {
+  "assetId": 73979376587458,
+  "file": "assets/ui/png/crowd_strip.png",
+  "kind": "Decal",
+  "moderation": "Approved",
+  "sha256": "688e8430c3ba40918e51bd117c19074cbf1e5eec40bf7f610950e8653d13b4ff",
+  "uploadedAt": "2026-10-12T00:35:12Z"
  },
  "feed_bucket": {
   "assetId": 77697719343785,
@@ -40,6 +64,14 @@
   "kind": "Model",
   "sha256": "61f90eaa623426fc707161bf09674ea4498c79c94cad3068767fa361710e6da5",
   "uploadedAt": "2026-10-05T03:45:10Z"
+ },
+ "flag_pennant": {
+  "assetId": 71088943701367,
+  "file": "assets/ui/png/flag_pennant.png",
+  "kind": "Decal",
+  "moderation": "Approved",
+  "sha256": "d002d321768678de95ff27b12c857e767ec860d4ea64ed775b00f3e90fd2e7fc",
+  "uploadedAt": "2026-10-12T01:03:59Z"
  },
  "foal_stand_bay": {
   "assetId": 135635594367079,
@@ -499,6 +531,14 @@
   "sha256": "a4c42d4f2fe2e294c5199a0deb88ea10842a2bac666fb0cf716c9fb633995b63",
   "uploadedAt": "2026-10-05T06:50:08Z"
  },
+ "sound_sheet": {
+  "assetId": 87356614588667,
+  "file": "assets/audio/sound_sheet.wav",
+  "kind": "Audio",
+  "moderation": "Approved",
+  "sha256": "ab321ca8443a9dbc27f6391db3597371fb1cb68a0bca5e0d2aceedfcd120f894",
+  "uploadedAt": "2026-10-11T23:25:34Z"
+ },
  "spa_wash_stall": {
   "assetId": 78029461963265,
   "file": "Models/generated/spa_wash_stall/spa_wash_stall.glb",
@@ -545,6 +585,7 @@
   "assetId": 138919800817033,
   "file": "assets/ui/atlas/ui_atlas_1.png",
   "kind": "Decal",
+  "moderation": "Approved",
   "sha256": "529a6deb20578d2985b11dfdce1fef5133b2f226db74758cd081d8c27a6d5d36",
   "uploadedAt": "2026-10-05T03:45:33Z"
  },
@@ -552,6 +593,7 @@
   "assetId": 94337225467876,
   "file": "assets/ui/atlas/ui_atlas_2.png",
   "kind": "Decal",
+  "moderation": "Approved",
   "sha256": "009513b2d9daf1bdf193dd29bffd05f2b9ccfb40d6e4e08ecd6080c204e42240",
   "uploadedAt": "2026-10-05T03:45:37Z"
  },
@@ -559,6 +601,7 @@
   "assetId": 134193368841769,
   "file": "assets/ui/atlas/ui_atlas_clarity_1.png",
   "kind": "Decal",
+  "moderation": "Approved",
   "sha256": "cef2630fe3dfca95f9e1c253813d475d451dcb7a3a397d952e222df2b18a39f2",
   "uploadedAt": "2026-10-07T17:44:01Z"
  },
@@ -566,6 +609,7 @@
   "assetId": 70883920012717,
   "file": "assets/ui/atlas/ui_atlas_world_1.png",
   "kind": "Decal",
+  "moderation": "Approved",
   "sha256": "c079bf1c5d473d0d70e9d3e4621ed37c4485deb7cecfda87d763c17da7b867f5",
   "uploadedAt": "2026-10-05T06:57:15Z"
  },
@@ -573,6 +617,7 @@
   "assetId": 84597027742671,
   "file": "assets/ui/atlas/ui_atlas_world_2.png",
   "kind": "Decal",
+  "moderation": "Approved",
   "sha256": "745d534a2803638d029411327fa9514039381ea1e99bda69e5125c69a4760df8",
   "uploadedAt": "2026-10-05T06:57:18Z"
  },

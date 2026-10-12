@@ -129,26 +129,16 @@ end)
 -- The gentle game ----------------------------------------------------------------------
 local gui = Ui.screen("Taming", 11)
 gui.Enabled = false
-local card = Ui.card(gui, UDim2.fromOffset(460, 330), UDim2.fromScale(0.5, 0.5), C.paper)
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-local scale = Instance.new("UIScale")
-scale.Parent = card
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	local function rescale()
-		local v = workspace.CurrentCamera.ViewportSize
-		scale.Scale = math.min(1, (v.X - 20) / 460, (v.Y - 20) / 330)
-	end
-	rescale()
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
-local title = Ui.text(card, "", 26, { Position = UDim2.new(0, 0, 0, 12), Size = UDim2.new(1, 0, 0, 32) })
-local hint = Ui.text(card, "Tap when the heart glows. Stay calm when it's startled!", 16, { Position = UDim2.new(0, 16, 0, 46), Size = UDim2.new(1, -32, 0, 22) })
+local card = Ui.card(gui, UDim2.fromOffset(460, 350), UDim2.fromScale(0.5, 0.5), C.paper)
+-- Floors (AAA Phase 2): smallest text 16, smallest button 60 (the Offer button); fits a 375 px phone.
+local slideIn = Ui.fitPanel(card, 460, 350, nil, 16, 60)
+local title = Ui.text(card, "", 26, { Position = UDim2.new(0, 80, 0, 12), Size = UDim2.new(1, -160, 0, 32) })
+local hint = Ui.text(card, "Tap when the heart glows. Stay calm when it's startled!", 16, { Position = UDim2.new(0, 16, 0, 78), Size = UDim2.new(1, -32, 0, 22) })
 hint.TextColor3 = C.plum
-local heart = Ui.text(card, "🤍", 80, { Size = UDim2.fromOffset(110, 110), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 140), TextScaled = true })
+local heart = Ui.text(card, "🤍", 80, { Size = UDim2.fromOffset(110, 110), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 162), TextScaled = true })
 local trust = Instance.new("Frame")
 trust.Size = UDim2.new(1, -60, 0, 18)
-trust.Position = UDim2.new(0, 30, 0, 206)
+trust.Position = UDim2.new(0, 30, 0, 228)
 trust.BackgroundColor3 = C.white
 Ui.corner(trust, 9)
 Ui.stroke(trust, 2)
@@ -159,7 +149,7 @@ fill.BackgroundColor3 = Color3.fromHex("FF6FA5")
 Ui.corner(fill, 9)
 fill.Parent = trust
 local tapBtn = Ui.button(card, "🥕 Offer", UDim2.fromOffset(200, 60), UDim2.new(0.5, -100, 1, -76), C.gold, 26)
-local closeBtn = Ui.button(card, "✕", UDim2.fromOffset(40, 40), UDim2.new(1, -50, 0, 10), C.white, 20)
+local closeBtn = Ui.closeButton(card)
 
 local answer: (boolean) -> () -- defined below
 local session = nil -- { horse, phase, phaseUntil, good, bad, conns }
@@ -259,6 +249,7 @@ local function start(h)
 	session = { horse = h, phase = "wait", phaseUntil = os.clock() + 1.2, good = 0, bad = 0, conns = {},
 		startedAt = workspace:GetServerTimeNow() }
 	gui.Enabled = true
+	slideIn()
 	local rng = Random.new()
 	table.insert(session.conns, RunService.RenderStepped:Connect(function()
 		if not session then return end

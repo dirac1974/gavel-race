@@ -10,8 +10,16 @@
 --   empty line goes to the longest-waiting queue (its card is claimed for that queue).
 --   A claimed card never takes a rider of another league or kind.
 -- Riders are opaque values (Players on the server, strings in tests).
+-- Open Practice (GameConfig.queue.openPractice, AAA Phase 3, D-068): every league's Practice is
+-- one queue, "Open|practice", so friends in different leagues race together. Its cards are always
+-- claimed at queue.openPracticeLeague ("Rookie": its sweep, burst, distances and bots), never the
+-- first rider's league, so a new kid following an expert friend gets the gentlest slider.
+
+local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 
 local RaceQueues = {}
+
+RaceQueues.OPEN = "Open"
 
 export type Waiting = { rider: any, at: number, want: string? }
 export type Queue = { key: string, league: string, kind: string, riders: { Waiting } }
@@ -22,7 +30,16 @@ function RaceQueues.new(): State
 end
 
 function RaceQueues.key(league: string, kind: string): string
+	if kind == "practice" and (GameConfig.queue or {}).openPractice == true then return RaceQueues.OPEN .. "|practice" end
 	return league .. "|" .. kind
+end
+
+-- The league a card of this kind is claimed with: Open Practice always runs at
+-- queue.openPracticeLeague (default Rookie); everything else at the rider's own league.
+function RaceQueues.claimLeague(league: string, kind: string): string
+	local q = GameConfig.queue or {}
+	if kind == "practice" and q.openPractice == true then return q.openPracticeLeague or "Rookie" end
+	return league
 end
 
 -- The queue key a claimed card serves, or nil when it is open.
@@ -71,7 +88,7 @@ function RaceQueues.join(state: State, rider: any, league: string, kind: string,
 	RaceQueues.leave(state, rider)
 	local q = state.queues[key]
 	if not q then
-		q = { key = key, league = league, kind = kind, riders = {} }
+		q = { key = key, league = RaceQueues.claimLeague(league, kind), kind = kind, riders = {} }
 		state.queues[key] = q
 	end
 	table.insert(q.riders, { rider = rider, at = now, want = want })

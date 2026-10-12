@@ -16,6 +16,8 @@ if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Horse = require(Shared:WaitForChild("Horse"))
 local NameGen = require(Shared:WaitForChild("NameGen"))
+local Tour = require(Shared:WaitForChild("Tour"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 
@@ -29,25 +31,24 @@ dim.BackgroundColor3 = C.ink
 dim.BackgroundTransparency = 0.35
 dim.Parent = gui
 
-local panel = Ui.card(gui, UDim2.new(0, 760, 0, 470), UDim2.fromScale(0.5, 0.5), C.paper)
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-local fit = Instance.new("UISizeConstraint")
-fit.MaxSize = Vector2.new(760, 470)
-fit.Parent = panel
-local aspect = Instance.new("UIScale") -- shrink on small phones
-aspect.Parent = panel
-local function rescale()
+-- The first screen anyone sees, at the floors (AAA Phase 2): its smallest text is 18 px and its
+-- smallest button 64 px, so it shrinks to 0.875 at most (14 px text and 56 px buttons rendered);
+-- what still doesn't fit a short phone scrolls instead of shrinking further.
+-- A short phone (under ui.starterCompactBelowPx tall, the UI/UX consult): smaller horse pictures
+-- and 🔀 New words in the button row, so the panel is 404 px (353 rendered) and Next ▶ shows whole
+-- without scrolling.
+local COMPACT = (function()
+	local waited = 0
+	while (not workspace.CurrentCamera or workspace.CurrentCamera.ViewportSize.Y < 2) and waited < 2 do
+		waited += task.wait()
+	end
 	local cam = workspace.CurrentCamera
-	if not cam then return end
-	local v = cam.ViewportSize
-	aspect.Scale = math.min(1, (v.X - 24) / 760, (v.Y - 24) / 470)
-end
-rescale()
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	rescale()
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
+	return cam ~= nil and cam.ViewportSize.Y > 1 and cam.ViewportSize.Y < (GameConfig.ui.starterCompactBelowPx or 0)
+end)()
+local VP = if COMPACT then 104 else 150 -- the horse pictures' height
+local W, H = 720, if COMPACT then 404 else 470
+local panel = Ui.card(gui, UDim2.fromOffset(W, H), UDim2.fromScale(0.5, 0.5), C.paper)
+local slideIn = Ui.fitPanel(panel, W, H, nil, 18, 64)
 
 local title = Ui.text(panel, "Choose your first horse!", 36, { Position = UDim2.new(0, 0, 0, 18), Size = UDim2.new(1, 0, 0, 44) })
 local subtitle = Ui.text(panel, "They're all just as fast. Pick the one you love!", 20,
@@ -74,7 +75,7 @@ end
 
 local function viewport(parent: GuiObject, coat: string)
 	local vp = Instance.new("ViewportFrame")
-	vp.Size = UDim2.new(1, -16, 0, 150)
+	vp.Size = UDim2.new(1, -16, 0, VP)
 	vp.Position = UDim2.new(0, 8, 0, 8)
 	vp.BackgroundColor3 = C.sky
 	vp.Ambient = Color3.fromRGB(200, 200, 200)
@@ -126,8 +127,8 @@ end
 for i, s in Horse.STARTERS do
 	local card = Ui.card(step1, UDim2.new(1 / 3, -14, 1, 0), UDim2.new((i - 1) / 3, 7, 0, 0), C.cream)
 	viewport(card, s.coat)
-	Ui.text(card, s.label, 26, { Position = UDim2.new(0, 0, 0, 164), Size = UDim2.new(1, 0, 0, 30) })
-	local blurb = Ui.text(card, s.blurb, 18, { Position = UDim2.new(0, 0, 0, 194), Size = UDim2.new(1, 0, 0, 24) })
+	Ui.text(card, s.label, 26, { Position = UDim2.new(0, 0, 0, VP + 14), Size = UDim2.new(1, 0, 0, 30) })
+	local blurb = Ui.text(card, s.blurb, 18, { Position = UDim2.new(0, 0, 0, VP + 44), Size = UDim2.new(1, 0, 0, 24) })
 	blurb.TextColor3 = C.plum
 	local hit = Instance.new("TextButton")
 	hit.BackgroundTransparency = 1
@@ -156,13 +157,14 @@ step2.Visible = false
 step2.Parent = panel
 
 local preview = Ui.text(step2, "", 44, { Size = UDim2.new(1, 0, 0, 54) })
-preview.TextColor3 = C.orangeDark
+-- (the chosen name in deep orange: the bright one fails contrast on paper)
+preview.TextColor3 = C.textWarn
 local rows = {}
 for r = 1, 2 do
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, 0, 0, 52)
-	row.Position = UDim2.new(0, 0, 0, 62 + (r - 1) * 62)
+	row.Size = UDim2.new(1, 0, 0, 64)
+	row.Position = UDim2.new(0, 0, 0, 58 + (r - 1) * 72)
 	row.Parent = step2
 	local l = Instance.new("UIListLayout")
 	l.FillDirection = Enum.FillDirection.Horizontal
@@ -177,7 +179,7 @@ local rng = Random.new()
 local function updatePreview()
 	local name = NameGen.build(chosen[1], chosen[2])
 	preview.Text = name or "Tap words to name your horse"
-	preview.TextColor3 = if name then C.orangeDark else C.shade
+	preview.TextColor3 = if name then C.textWarn else C.plum
 end
 
 local function fillChips()
@@ -188,7 +190,7 @@ local function fillChips()
 		end
 		chosen[r] = nil
 		for _, w in words do
-			local b = Ui.button(rows[r], w, UDim2.fromOffset(118, 46), UDim2.new(), C.white, 20)
+			local b = Ui.button(rows[r], w, UDim2.fromOffset(118, 64), UDim2.new(), C.white, 20)
 			b.Activated:Connect(function()
 				chosen[r] = if chosen[r] == w then nil else w
 				for _, other in rows[r]:GetChildren() do
@@ -203,19 +205,26 @@ local function fillChips()
 	updatePreview()
 end
 
-local shuffle = Ui.button(step2, "🔀 New words", UDim2.fromOffset(170, 44), UDim2.new(0.5, -85, 0, 192), C.sky, 20)
+local shuffle = Ui.button(step2, "🔀 New words", UDim2.fromOffset(180, 64), UDim2.new(0.5, -90, 0, 208), C.sky, 20)
 shuffle.Activated:Connect(fillChips)
 
 -- Buttons -------------------------------------------------------------------------
-local back = Ui.button(panel, "◀ Back", UDim2.fromOffset(130, 56), UDim2.new(0, 24, 1, -76), C.white, 22)
-local nextBtn = Ui.button(panel, "Next ▶", UDim2.fromOffset(250, 60), UDim2.new(1, -274, 1, -80), C.orange, 26)
+local back = Ui.button(panel, "◀ Back", UDim2.fromOffset(130, 64), UDim2.new(0, 24, 1, -80), C.white, 22)
+local nextBtn = Ui.button(panel, "Next ▶", UDim2.fromOffset(if COMPACT then 220 else 250, 64),
+	UDim2.new(1, if COMPACT then -244 else -274, 1, -80), C.orange, 26)
 back.Visible = false
+if COMPACT then -- (between Back and Next, only on the naming step)
+	shuffle.Parent = panel
+	shuffle.Position = UDim2.new(0, 166, 1, -80)
+	shuffle.Visible = false
+end
 
 local step = 1
 local function showStep(n: number)
 	step = n
 	step1.Visible, step2.Visible = n == 1, n == 2
 	back.Visible = n == 2
+	if COMPACT then shuffle.Visible = n == 2 end
 	if n == 1 then
 		title.Text, subtitle.Text = "Choose your first horse!", "They're all just as fast. Pick the one you love!"
 		nextBtn.Text = "Next ▶"
@@ -256,8 +265,7 @@ local function open()
 	spinConn = RunService.RenderStepped:Connect(function(dt)
 		for _, f in spinners do f(dt) end
 	end)
-	panel.Position = UDim2.fromScale(0.5, 0.6)
-	TweenService:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	slideIn()
 end
 
 local function close()
@@ -277,7 +285,10 @@ PlayerState.watch(function(data)
 		open()
 	elseif gui.Enabled then
 		close()
+		-- The tour takes it from here (AAA Phase 2: one voice in the first minute); without the tour
+		-- (skipped, or turned off) a toast says what to do.
+		local touring = (GameConfig.firstMinute or {}).tourOwnsScreen ~= false and Tour.current(data.flags or {}) ~= nil
 		local h = PlayerState.activeHorse()
-		if h then Ui.toast(string.format("Meet %s! Tap RACE! when you're ready.", h.name), "heart", "❤️") end
+		if h and not touring then Ui.toast(string.format("Meet %s! Tap RACE! when you're ready.", h.name), "heart", "❤️") end
 	end
 end)

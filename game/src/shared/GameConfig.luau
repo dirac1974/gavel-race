@@ -40,6 +40,11 @@ GameConfig.pace = {
 GameConfig.raceSpeedStudsPerSecond = 56
 GameConfig.burstLeadSeconds = 1.5    -- pace pauses and "FINAL BURST" shows this long before the burst
 GameConfig.burstAfterTurnSeconds = 0.5 -- the burst opens this long after the field enters the homestretch
+-- (D-066, AAA Phase 1) The Final Burst arms this long after it opens: a tap before then is ignored
+-- (not counted, not used up), so a reflex tap from the slider's rhythm can't spend the burst. The
+-- marker still starts at a random point (D-022) and every league's armed window still covers a
+-- full sweep. Server (RaceSession:submitBurst), client and src/burst_meter.py agree. 0 = before D-066.
+GameConfig.burstArmSeconds = 0.5
 GameConfig.stretchGapSeconds = 1.0   -- after the burst, the slider resumes for the stretch drive
 GameConfig.finishMarginSeconds = 1.5 -- the stretch drive's slider stops this long before the line
 -- Race shape (D-033): skill shows until the far turn, luck blends in to the last tap.
@@ -52,7 +57,8 @@ GameConfig.raceShape = {
 }
 GameConfig.offsetsPerSecond = 4      -- how often the server sends on-screen gaps
 GameConfig.stretchPreviewSeconds = 1 -- how often live chances refresh during the stretch drive
-GameConfig.tapNudgeFeet = 2          -- instant, luck-free nudge on your own screen for a Great or Perfect tap
+GameConfig.tapNudgeFeet = 5          -- instant, luck-free nudge on your own screen for a Great or Perfect tap
+                                     -- (drawn only; D-066 raised it from 2, capped by raceFx below)
 GameConfig.dismountTimeoutSeconds = 60 -- riders stay on their horse for results and replay until Done
 GameConfig.windowGapSeconds = 4.0    -- (unused by the race since D-026; kept for tools)
 GameConfig.runInSeconds = 3.5        -- after the result: horses cross the line in finish order (D-025)
@@ -157,7 +163,7 @@ GameConfig.steerView = {
 	brushLeanFeet = 1,       -- the mover's lean, drawn only (never in the lanes that rank the race)...
 	brushLeanSeconds = 0.4,  -- ...out and back over this long (the nods too)
 	brushNodDeg = 2,         -- a small nod, both horses
-	brushVolume = 0.5,       -- count_tick at half volume, at the mover's horse (silent until uploaded)
+	brushVolume = 0.5,       -- bump_soft at half volume, at the mover's horse (silent until uploaded)
 	brushLateSeconds = 1 / 30, -- a brush first drawn later than this into it starts from the beginning then
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
@@ -170,6 +176,11 @@ GameConfig.raceView = {
 	nudgeRiseSeconds = 0.15,  -- a good tap's nudge on your own horse eases in...
 	nudgeFallSeconds = 0.6,   -- ...and back out
 	settleSeconds = 0.6,      -- after the line, legs ease to standing before the race ends
+	-- (D-066) The body bob follows the legs: lowest as the leading forefoot lands, once a gallop
+	-- stride (HorseLegs.bob). false = the old 1.8 Hz clock, which drifted against the legs.
+	bobFromLegs = true,
+	bobStuds = 0.3,           -- how high the body rises between plants
+	bobPitchDeg = 1.5,        -- ...and how far it rocks, nose down on the plant (0 = no rock)
 	-- Steering races (D-057 N3; Playback): the screen draws the server's samples a little behind
 	-- the newest, by their server timestamps, so a jittery link never stalls or lurches a horse.
 	playback = {
@@ -180,6 +191,57 @@ GameConfig.raceView = {
 		gain = 2,                  -- clock rate change per second of delay error
 	},
 }
+-- Race feel (D-066, AAA Phase 1): what a tap looks and sounds like on your own screen. All of it is
+-- drawn or heard only, on your screen only: nothing here changes a score, the order or the trip.
+-- Reduced Motion turns off the camera kicks, the surge's rock, the trails and the dust; the label
+-- still shows (without its pop) and the nudge still moves your horse.
+GameConfig.raceFx = {
+	enabled = true,               -- false: no pop, surge, dust, kicks or tap tick (the nudge stays)
+	-- The tap nudge (tapNudgeFeet) never moves faster than the race view lets a gap move (D-055)...
+	nudgeFeetPerSecond = 10,      -- (raceView.maxGapFeetPerSecond)
+	nudgeClearFeet = 10,          -- ...nor closer than this behind a horse ahead in your lane (steering.holdGap);
+	nudgeSlackFeet = 1,           -- a horse cutting in eases the nudge back, pulled in at once only past this
+	labelPop = true,              -- the tap word pops in...
+	labelPopScale = 1.3,          -- ...from this size...
+	labelPopSeconds = 0.18,       -- ...over this long
+	surge = true,                 -- a Perfect pace tap: your horse rocks forward, with trails and a dust burst
+	surgeOnGreatStreak = 3,       -- ...and every 3rd Great-or-better tap in a row (0 = Perfect only)
+	surgeSeconds = 0.4,
+	surgePitchDeg = 3,
+	trails = true,                -- two short white streaks off the flanks during the surge
+	dust = true,                  -- dust from your horse's hooves: one puff a stride, a burst on a surge
+	dustPerStride = 1,
+	dustPerSurge = 6,
+	dustTexture = "rbxasset://textures/particles/smoke_main.dds", -- built in; fx_dust_puff isn't uploaded
+	dustRgb = { 227, 185, 133 },  -- dirt (ART_DIRECTION)
+	-- One owner for camera kicks (RaceController): the total stays at or under fovMaxDeg.
+	perfectFovDeg = 1.5,          -- a Perfect pace tap widens the view this much...
+	perfectFovEverySeconds = 0.8, -- ...at most this often
+	burstFovDeg = 4,              -- a Great or Perfect Final Burst: the big kick
+	fovRiseSeconds = 0.06,
+	fovFallSeconds = 0.3,         -- (the burst's eases back twice as slowly)
+	fovMaxDeg = 6,
+	tapTick = true,               -- a soft tick on every counted pace tap, a step higher for each label
+	tickSpeeds = { Miss = 0.9, Okay = 0.95, Good = 1.05, Great = 1.17, Perfect = 1.3 },
+	tickVolume = 1.6,             -- x tap_ok's own level (0.25): about 0.4, over the hoofbeats
+	gallopDuck = 0.67,            -- the hoofbeats (gallop_loop, 0.45) at this x while the slider runs: about 0.3
+	perfectChimeVolume = 0.6,     -- with the tick on, a Perfect also chimes (tap_good) at this volume; Great just ticks
+	-- Hoofbeats in step with the legs: gallop_loop plays at (race speed / gallop stride) / this, the
+	-- strides a second the loop was rendered at (2 now: about 1.55x). Re-tune when the loop is re-rendered.
+	gallopLoopStridesPerSecond = 2,
+	-- First-race coaching (AAA Phase 2, D-067): a player's first coachRaces races (profile
+	-- totals.races below it) show the rule "Tap once every time the marker passes the glow" for
+	-- coachHintPasses passes, the ghost thumb tapping over the glow and "NOW!" as the marker
+	-- enters it for coachPasses passes, and coachBurstHint as the Final Burst title comes up.
+	coachRaces = 1,
+	coachPasses = 4,
+	coachHintPasses = 3,
+	coachHint = "Tap once every time the marker passes the glow", -- (D-069: the glow is Gold now, not green)
+	coachBurstHint = "Big tap coming!",
+	judgeAtMarker = true,         -- every race: the tap's word also pops small at the marker, where you tapped
+	judgeSeconds = 0.6,
+	coachNowZone = 0.2,           -- "NOW!" while the marker is within this of the glow's centre (-1..1 units; the glow is 0.2 each side)
+}
 GameConfig.gateCountdownSeconds = 3 -- "3, 2, 1" over the gate, then "GO!" with the bell (D-055)
 -- Race screen (D-055).
 GameConfig.hud = {
@@ -188,6 +250,22 @@ GameConfig.hud = {
 	riderBoardInRace = false,    -- riders see the running-order board in the race (true = D-030)
 	boardShowsChance = false,    -- win % and purse on the board, and the rider's live win chance line
 	spectatorBoardRowsPhone = 4, -- spectators on phones: the top 3 plus their cheered rider
+	-- (D-066) The bar under the slider is the mean of your last few passes: how well you ride, not
+	-- how fast your horse goes, so it is "RIDING" (★ means riding, D-064), gold over slate.
+	rideMeterLabel = "RIDING",
+	-- (D-066) Phones with the ◀ ▶ pad: the slider and the bar under it sit right of the pad, the
+	-- whole race, so a thumb on Out ▶ never hides the glow. false = centred, as before.
+	sliderClearOfPad = true,
+	-- (D-066) A tap on the Final Burst while it's still grey (not armed) shows this, no sound, and the
+	-- grey bar gives a small shake (none under Reduced Motion). "" = nothing.
+	burstEarlyHint = "Wait for the rainbow!",
+	burstEarlyShakePx = 6,
+	-- (D-067) The chance arrow on your place badge (and a spectator's cheered rider): only when a
+	-- checkpoint closes, never on the once-a-second previews, so it doesn't flicker. true: previews
+	-- may show it too, on a change over arrowPreviewMinChange at most every arrowPreviewEverySeconds.
+	arrowOnPreview = false,
+	arrowPreviewMinChange = 0.01,
+	arrowPreviewEverySeconds = 3,
 }
 -- Watching a race you're not in (D-055): the race HUD, cheer strip and results card appear only
 -- within rangeStuds of the course's outer edge (the same range as race sound, D-052), stay until
@@ -201,6 +279,7 @@ GameConfig.spectate = { rangeStuds = 250, keepStuds = 300 }
 GameConfig.touchLayout = {
 	gemPlacement = "topRight",
 	movementColumn = 176, -- px kept free at the right edge for Hop (up to 170 px in) and Gallop
+	gearBelowGem = true,  -- AAA Phase 2 (D-067): the ⚙️ sits under the 💎 pill, not on top of it
 }
 -- Phones first (D-064, stage 1): rendered floors for the dock, whatever the screen. fitDock never
 -- scales a button below minTouchPx or a label below minTextPx; on a phone the dock is the horse
@@ -216,12 +295,70 @@ GameConfig.ui = {
 	panelMinText = 16,    -- stage 3: the smallest text on the big panels (picker, Stable Board, My Horses), unscaled
 	panelButtonPx = 64,   -- stage 3: the smallest button on those panels, unscaled (PanelFit keeps both at the floors)
 	pickerLineWords = 5,  -- stage 3: a race card's one line, at most this many words
+	closePx = 64,         -- AAA Phase 2 (D-067): every panel's ✕ (Ui.closeButton), unscaled
+	starterCompactBelowPx = 500, -- AAA Phase 2 fixes: the Starter on a shorter screen gets 104 px horse pictures (Next ▶ shows whole)
 }
 -- The results card (D-064): one row; tripRow = true brings back D-054's "Good trip ★★☆" row.
-GameConfig.results = { tripRow = false }
+-- AAA Phase 2 (D-067): the card is rebuilt at the panel floors (16 px text, 64 px buttons
+-- unscaled; it scrolls rather than shrink past them) under the Roblox top bar, with a place
+-- headline and kind words for every place (ResultsText.headline, .cheer). raceAgain: a 64 px
+-- "🏁 Race again" that does what RACE! does (the same league's line; Practice while napping, and
+-- it says so). riderRank: "Best ride in the race!", "2nd best ride!" or "3rd best ride!" from the
+-- ride score, top 3 only and only on your own card (never a board). false = the D-064 card's rows.
+-- Phase 2 fixes: rankMinStars (the gameplay consult): "Best ride" only with at least this many
+-- stars, so "★☆☆" never sits beside "3rd best ride!". feedWhenNapping (the systems consult): a
+-- napping horse with no other horse ready gets "🌾 Feed Comet" (to the stall) instead of Practice.
+-- twoColumnBelowPx (the UI/UX consult): on a landscape screen shorter than this the card is two
+-- columns, cardWideW px wide, so Race again, the replays and Done fit without scrolling.
+GameConfig.results = { tripRow = false, raceAgain = true, riderRank = true, headline = true, rankMinStars = 2,
+	feedWhenNapping = true, twoColumnBelowPx = 500, cardWideW = 720 }
+-- AAA Phase 2 (D-067): the finish moment, on the rider's own screen only and drawn only (no score,
+-- order or result reads any of it). Horses gallop on past the line and ease down over about
+-- gallopOutFeet (0.04 of a Short race; 0.012 before, a near dead stop). As your horse crosses, the
+-- camera arcs from behind it to the replay's side view (orbitSeconds, never more than 2.5), with
+-- confetti and a gold outline for 1st and the ribbon stamping onto the screen for 1st to 4th. Any
+-- tap skips to the card, and the card is up at the latest cardWithinSeconds after the leader
+-- reaches the line. Reduced Motion: no orbit and no confetti; the card fades in over fadeSeconds.
+-- enabled = false: the card after runInSeconds with no finish moment (horses still gallop out;
+-- gallopOutFeet = 46 is the old near stop).
+GameConfig.finish = {
+	enabled = true,
+	gallopOutFeet = 155,
+	orbit = true,
+	orbitSeconds = 2.5,
+	cardWithinSeconds = 4,
+	crossWaitSeconds = 1.5, -- your horse's crossing not seen this long after the leader's: start anyway
+	confetti = true,
+	confettiCount = 70,
+	stamp = true,
+	stampSeconds = 0.35,
+	fadeSeconds = 0.4,
+	dim = 0.75,             -- the world behind the card tints Ink to this transparency (warm, not black; the consult)
+	skipAfterSeconds = 1.0, -- (the feel consult) taps in the first second after the crossing don't skip: a reflex
+	                        -- tap from the stretch drive's rhythm never throws the moment away
+	stampAt = { 0.22, 0.30 }, -- the stamp's centre (screen x, y): the upper-left third, clear of your horse; scaled with the HUD
+	-- AAA Phase 4 (D-069): paper confetti (the confetti_square image once uploaded; the built-in sparkle
+	-- until then) in the art direction's colours, and the card's stars counting in one by one: the first
+	-- starDelaySeconds after the card shows, then every starStepSeconds, each with starTick at the next
+	-- of starTickSpeeds (a rising tick). Reduced Motion: the stars show at once, no ticks.
+	confettiFallback = "rbxasset://textures/particles/sparkles_main.dds",
+	starDelaySeconds = 0.3,
+	starStepSeconds = 0.2,
+	starTickSpeeds = { 1.0, 1.15, 1.3 },
+	starTick = "count_tick",
+	starTickVolume = 0.8,
+}
+-- AAA Phase 2 (D-067, the gameplay consult): after the far-turn lock the live chances shown on
+-- screen refresh every `seconds` from the open checkpoint's finished passes (as the stretch drive
+-- does), through checkpoint `throughCheckpoint`, so taps move horses on screen sooner. Drawn only:
+-- the trip's tau is already fixed at the lock and nothing before the lock changes; the result and
+-- the scores come from the checkpoints as before. Needs steering (no lock without it).
+GameConfig.pacePreviewAfterLock = { enabled = true, seconds = 1, throughCheckpoint = 2 }
 -- The "Next thing" pill (D-064, stage 3): one suggestion above the dock from Advice.nextThing, with
 -- GO; Pip gives a hint when the same suggestion has been up this long and you haven't moved.
-GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6 }
+-- raceFirstUntilRaces (AAA Phase 2, D-067): until a player has run this many races, the pill puts
+-- "Race with Comet!" before feeding, brushing and jobs (0 = the stage 3 order).
+GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6, raceFirstUntilRaces = 3 }
 -- Your horse's stall while it's out (D-056): empty, with a plaque on the door.
 GameConfig.stable = { awaySign = true }
 -- Visiting friends' barns (D-060, D-042): only Roblox friends in this server, never a count.
@@ -271,7 +408,14 @@ GameConfig.lobbyFillSeconds = 15     -- bots fill remaining lanes after this (D-
 -- course whose card is open goes to the longest-waiting queue, and a card claimed by one league
 -- never takes a rider of another. mode = "cards" restores the D-036 claiming (first rider's
 -- league claims a card; RACE! picks the busiest course).
-GameConfig.queue = { mode = "leagues" }
+-- openPractice (AAA Phase 3, D-068): every league's Practice shares one "Open" queue, so friends in
+-- different leagues can race together. Practice pays nothing and earns no League Points, so mixed
+-- Ratings are harmless. false = one Practice queue per league (D-061).
+-- openPracticeLeague: every Open Practice card runs at this league's settings (sweep, burst,
+-- distances, bots), never the first rider's league. practiceEqualHorses: in every Practice race
+-- each lane gets the same Rating (base chance 1/8), so taps, the trip and luck decide. Both are
+-- Practice-only (no purse, no points); false / nil restore the first Phase 3 build.
+GameConfig.queue = { mode = "leagues", openPractice = true, openPracticeLeague = "Rookie", practiceEqualHorses = true }
 GameConfig.kappa = 1.0
 GameConfig.qFloor = 0.025
 GameConfig.rFloor = -0.5
@@ -279,10 +423,13 @@ GameConfig.placePrizes = { 1.2, 0.8, 0.4 }       -- 2nd, 3rd, 4th, in units of B
 GameConfig.leaguePoints = { 10, 6, 4, 2 }        -- 1st..4th; everyone else gets finishPoints
 GameConfig.finishPoints = 1
 -- League Points needed to unlock each league's Stakes race (D-013, from sims/economy.py).
--- Silver 750 (was 1,400; D-062 stage 8): `python sims/economy.py --silver` gives a casual player
+-- History (before D-068): Silver 750 (was 1,400; D-062 stage 8): `python sims/economy.py --silver` gave a casual player
 -- (new kid, Silver-entry horse 68, against the league-anchored bots) the Cup in about 167 Silver
 -- races (target 150-200); 600 gave 133 and 1,400 about 313.
-GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 110, Silver = 750, Gold = 3000 }
+-- AAA Phase 3 (D-068): retuned with botRatingAnchor and leagueCeiling in one sim on realistic
+-- Ratings (training cap), `python sims/economy.py --ladder phase3`: a casual kid opens each Cup in
+-- about 20 / 40 / 90 / 180 races (docs/reviews/aaa-2026-10-11/phase3-sim.md). Before: 100/110/750/3000.
+GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 200, Silver = 450, Gold = 900 }
 -- Class badges and first wins (D-062 stage 8): a horse's first win in each league earns
 -- firstWinBonus League Points once; its badge is First Win (no wins in this league), Rising Star
 -- (fewer than risingStarBelow), Open, or Cup when its Cup is open. Labels only: one queue per
@@ -291,7 +438,9 @@ GameConfig.firstWinBonus = 10
 GameConfig.classes = { risingStarBelow = 3 }
 -- League ceilings (D-046): a horse whose best base Rating passes this has its Cup opened and
 -- its league's regular races closed. The Cup winner gets cupPurseB × B (D-048).
-GameConfig.leagueCeiling = { Rookie = 58, Bronze = 68, Silver = 78, Gold = 88 }
+-- AAA Phase 3 (D-068): an average kid wins about 36% at each ceiling, and they rise league to
+-- league. Before: 58/68/78/88.
+GameConfig.leagueCeiling = { Rookie = 55, Bronze = 57, Silver = 60, Gold = 66 }
 GameConfig.cupPurseB = 3
 GameConfig.maxTapRewindSeconds = 0.3             -- cap on the per-player latency allowance (D-021)
 GameConfig.tapJitterMarginSeconds = 0.05         -- added to measured one-way latency (D-021)
@@ -305,16 +454,40 @@ GameConfig.botBurstMean = 55
 GameConfig.botBurstSd = 15
 -- Bots by league (D-061 stage 2): every bot is rated anchor ± botRatingSpread (uniform), whoever
 -- is in the race. The debate's anchors (Rookie 50, Bronze 63, Silver 73, Gold 83, Champion 90)
--- failed the gate: a fresh starter ridden by an average kid won 12% of solo Rookie races. These
--- are tuned by `python sims/economy.py --solo` so a horse entering any league with an average kid
--- wins about 24% solo (20-35% for new to skilled kids) and about 35% at the league's ceiling.
+-- failed the gate: a fresh starter ridden by an average kid won 12% of solo Rookie races. The D-061
+-- anchors (32/46/56/69/80, tuned by `--solo` on the old fixed entry Ratings) are history now.
 -- botRatingAnchor = nil restores bots rated around the human median (before D-061).
-GameConfig.botRatingAnchor = { Rookie = 32, Bronze = 46, Silver = 56, Gold = 69, Champion = 80 }
+-- AAA Phase 3 (D-068): anchored to the Rating a casual horse really has on entering each league
+-- (an average kid wins about 25% on entry, Gold 22%). Before: 32/46/56/69/80.
+GameConfig.botRatingAnchor = { Rookie = 32, Bronze = 35, Silver = 38, Gold = 48, Champion = 56 }
 GameConfig.botRatingSpread = 6                   -- bots rated within ± this of the anchor (or the human median)
 -- The one race button and the queue card (D-061 stage 2). oneTapRace: RACE! joins the line for
 -- your active horse at once ("More choices" on the queue card opens the picker); false = RACE!
 -- opens the picker (stage 1). raceTimeSeconds: how long "Race time!" shows as the gate fills.
-GameConfig.queueCard = { enabled = true, oneTapRace = true, raceTimeSeconds = 3 }
+-- AAA Phase 2 (D-067): compactPhone draws the card on a phone as one 64 px row (ring, "Race in 12 ·
+-- 3 riders", ✕); tap it to see the gate. warmUp adds a "Warm up" button to that row for a player's
+-- first warmUpRaces races: a practice slider on the card that counts nothing and sends nothing.
+GameConfig.queueCard = { enabled = true, oneTapRace = true, raceTimeSeconds = 3,
+	compactPhone = true, compactHeight = 64, warmUp = true, warmUpRaces = 3 }
+
+-- The first minute (AAA Phase 2, D-067): one voice. While the tour runs it owns the screen.
+GameConfig.firstMinute = {
+	tourOwnsScreen = true, -- the Next-thing pill steps aside while the tour runs, and the Starter's toast is dropped
+	holdToastSeconds = 60, -- during the tour's race step, toasts wait (at most this long), then show
+	tourGoOnRace = false,  -- the race step points at the real RACE! button (true: the tour card has its own GO)
+	pulseRace = true,      -- ...which pulses under a hoofprint arrow (Reduced Motion: the arrow only)
+	skipConfirm = true,    -- the tour's ✕ (far from GO) asks once before skipping
+	hideGemPill = true,    -- no 💎 door until the tour's race step is done
+	-- AAA Phase 4 (D-069, Phase 2 should-fixes): the tour's ✕ ignores a second tap this soon after the
+	-- first (a quick double tap never skips); a toast that comes within raceReasonSeconds of a RACE! press
+	-- (or, when RACE! opened the picker, of the picker closing on its join) is never held, so the reason a
+	-- race didn't start always shows.
+	skipGuardSeconds = 0.6,
+	raceReasonSeconds = 4,
+}
+-- One card at a time at the top centre (Ui.slot): the highest priority that wants the spot shows;
+-- toasts stack below whatever card is up. raceTime: the queue card's "Race time!" outranks the tour.
+GameConfig.topSlot = { tour = 30, queueCard = 20, raceTime = 40, gapPx = 8, sideReservePx = 134 }
 
 -- Macro detection (D-022). Log only until a month of real data sets the threshold.
 GameConfig.integrity = {
@@ -377,8 +550,12 @@ GameConfig.comeback = {
 -- ridden, and frees its stall. legacyMax is the most Potential a Legend passes to one foal once
 -- breeding exists (D-047); unused until then. retireNeedsVeteran = false brings back retiring
 -- any horse at any time (as before stage 7).
+-- AAA Phase 3 (D-068): suggest = false stops the one-time Legend card until breeding exists (the
+-- 👑 Legend button on the horse's card stays), and a Legend can come back to the races
+-- (Leagues.unretire, "🏁 Back to races" on its card). true = the stage 7 suggestion at veteranAt.
 GameConfig.career = {
 	enabled = true,
+	suggest = false,
 	badgeEvery = 25,
 	veteranAt = 100,
 	legacyMax = 2,
@@ -483,5 +660,91 @@ function GameConfig.labelFor(score: number, labels: { { min: number, label: stri
 	end
 	return "Miss"
 end
+
+-- AAA Phase 4, Dev A (D-069): world and jockey. All drawn only: nothing here reads or changes a score,
+-- the order, the trip or a purse.
+-- Jockey crouch-and-pump (client/JockeyPose): degrees in the plan's convention (+ = flex forward for the
+-- waist, shoulders and elbows; hips -70 lift the thigh forward; knees +100 fold the shin back; neck -15
+-- lifts the head). pelvisDeg tips the hips forward too, so the back sits under 45 degrees from
+-- horizontal (90 - pelvis - waist). The pump (once a stride, on the lead forefoot's landing, the same
+-- beat as the hoof dust): waist +-pumpDeg, shoulders +-shoulderPumpDeg, a rise of riseStuds between
+-- landings. seatDropStuds: tune in Studio if feet sink into the horse. R6 rigs keep the sit.
+GameConfig.jockeyPose = { enabled = true, waistDeg = 35, pelvisDeg = 15, hipDeg = -70, kneeDeg = 100, shoulderDeg = 55,
+	elbowDeg = 70, neckDeg = -15, pumpDeg = 4, shoulderPumpDeg = 10, riseStuds = 0.12, seatDropStuds = 0, refreshHz = 4 }
+-- County Fair dressing (server/TrackDressing, built once with the venue). Budget: maxParts new parts and
+-- maxBeams Beams. The rail bunting stands railPostOffset studs outside the outer rail, behind the replay
+-- and finish-orbit side camera (outer rail + 12), so it never crosses that shot. Crowd tiles are 16 x 6
+-- studs: one row of fans per 6-stud stand riser. buntingFlip swaps the Beams' ends if the pennants read
+-- upside down in Studio.
+GameConfig.trackDressing = { enabled = true, bunting = true, flags = true, crowd = true, maxParts = 350, maxBeams = 80,
+	roofSpacing = 40, railSpacing = 40, railPostStuds = 8, railPostOffset = 14.5, railFromFeet = 660, railPastFeet = 200,
+	flagSpacing = 80, flagClearOfSpires = 50, buntingWidth = 2.5, buntingTileStuds = 10, sag = 1.5, buntingFlip = false,
+	crowdTileU = 16, crowdTileV = 6 }
+-- Track life (client/TrackLife): the crowd bounces (calm in the lobby; cheering from the burst, or once
+-- the leader passes cheerFromProgress, until the card shows) and the flags flutter. Both stop under
+-- Reduced Motion, and only tick while you're within spectate.keepStuds of a course (phoneHz on phones).
+GameConfig.trackLife = { enabled = true, crowdBounce = true, calmStuds = 0.12, calmHz = 1.5, cheerStuds = 0.3, cheerHz = 3,
+	cheerFromProgress = 0.8, flagFlutter = true, flutterDeg = 6, flutterHz = 0.8, updateHz = 30, phoneHz = 15 }
+-- The Big Board shows the followed race's top 4 (lane chip, number, horse name), refreshed at refreshHz;
+-- "GIDDY-UP!" when no race runs. Never a win %, purse or any number but places and lanes (rule 1, D-055).
+GameConfig.bigBoard = { live = true, rows = 4, refreshHz = 4 }
+-- Practice with a friend (AAA Phase 3 should-fix): a small friends mark under a friend's lane badge,
+-- on the riders' screens only.
+GameConfig.friendRace = { badge = true }
+
+-- AAA Phase 4, Dev B (D-069): HUD, camera, music and finish polish. Drawn and heard only: nothing here
+-- reads or changes a score, the order, the trip or a purse (RacePresent holds the timing and levels).
+-- The gate line-up (client/GateIntro): in the countdown, never in the lobby wait (D-061), and the
+-- countdown stays at gateCountdownSeconds. As you're seated the camera dollies in front of the gate
+-- from the outside lane to lane 1 at heightStuds, frontStuds out, looking at the horses' faces, over
+-- dollySeconds (eased); then handOff "cut" (default, the feel consult): a cutFadeSeconds Paper fade to the
+-- chase shot; "blend" (the switch-back) glides behind your horse over blendSeconds. The Follow camera is
+-- back by handBackBefore seconds before GO. Riders only, never spectators, never under Reduced Motion; a seat
+-- later than lateSeatSeconds into the countdown goes straight to the chase view.
+GameConfig.gateIntro = { enabled = true, dollySeconds = 1.6, blendSeconds = 0.4, handBackBefore = 1.0, lateSeatSeconds = 0.3,
+	handOff = "cut", cutFadeSeconds = 0.12, heightStuds = 7, frontStuds = 16, chaseBackStuds = 14, chaseUpStuds = 5 }
+-- The race HUD in the art direction's colours (client/RaceHudStyle): Paper panels with an Ink outline,
+-- Fredoka One labels, Builder Sans Bold numbers, the Gold count with an Ink outline, the slider on Slate
+-- with a Gold glow. enabled = false keeps the colours the code builds (Paper panels either way).
+-- youMarker: riderShown = false (the UI/UX consult) hides it in your own chase view and the gate pass (the
+-- place badge says where you are); true shows it small and low there (riderStuds, riderPx x riderPxTall).
+-- Hidden in first person (camera zoom under firstPersonZoom) and during the finish orbit; replays and
+-- spectators keep the big one.
+GameConfig.raceHud = { enabled = true,
+	youMarker = { riderShown = false, riderStuds = 7, riderPx = 56, riderPxTall = 72, otherStuds = 12, otherPx = 90, otherPxTall = 120, firstPersonZoom = 2 } }
+-- Audio. music (client/MusicBed): one beatless bed from Roblox's licensed music library (no upload; the
+-- last audio upload this window is kept for an emergency). id = 0: no music at all (David picks the
+-- track). Levels: lobby, race (your slider runs: far under the tap tick), spectate (watching a race),
+-- finish (the finish moment and the card); duckUnderVoice while an announcer line plays; fades over
+-- fadeSeconds. The Sound setting mutes it with everything else. If the chosen track has a steady beat, set
+-- race = 0 (kids must tap to the marker, never to a beat; CONSENSUS).
+GameConfig.audio = {
+	music = { id = 0, lobby = 0.35, race = 0.12, spectate = 0.08, finish = 0.4, fadeSeconds = 0.6, duckUnderVoice = 0.5 },
+}
+
+-- Core-playtest switch (AAA Phase 3, D-068): true turns the meta off so the core race loop can be
+-- playtested alone: the Spa, friends' barn visits, careers (badges and Legends), rehoming, the
+-- Photo Finish camera and the Horse Book. It works only through each feature's own flag, applied
+-- once here when this module loads, so every feature still checks one place. false (the default)
+-- changes nothing. See game/PLAYTEST.md.
+GameConfig.corePlaytest = false
+GameConfig.CORE_PLAYTEST_OFF = {
+	{ "spa", "enabled" }, { "visit", "enabled" }, { "career", "enabled" }, { "rehome", "enabled" },
+	{ "comeback", "photo" }, { "comeback", "horseBook" },
+}
+-- Returns the flags it switched off ("spa.enabled", ...), or none when corePlaytest is false.
+function GameConfig.applyCorePlaytest(cfg: any): { string }
+	local off = {}
+	if not cfg.corePlaytest then return off end
+	for _, path in GameConfig.CORE_PLAYTEST_OFF do
+		local t = cfg[path[1]]
+		if type(t) == "table" then
+			t[path[2]] = false
+			table.insert(off, path[1] .. "." .. path[2])
+		end
+	end
+	return off
+end
+GameConfig.applyCorePlaytest(GameConfig)
 
 return GameConfig

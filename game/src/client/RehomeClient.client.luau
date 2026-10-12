@@ -8,6 +8,8 @@
 --   "↩️ Undo" for rehome.undoHours (said in days, never a clock).
 --   Legend card: once per horse, when it becomes a Veteran: "👑 Show me" opens My Horses, where
 --   the Legend button (two taps) retires it to the Hall of Fame paddock. Never during a race.
+--   Off while GameConfig.career.suggest is false (AAA Phase 3, D-068); a Legend can always come
+--   back to the races from its card in My Horses.
 -- Text is never under ui.panelMinText and buttons never under ui.panelButtonPx (D-064).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -62,7 +64,7 @@ end
 -- Rehome card ------------------------------------------------------------------------------------
 local RW, RH = 600, 470
 local rgui, rpanel, rbody, rslide, rdim = modal("RehomeCard", RW, RH)
-local rclose = Ui.button(rpanel, "✕", UDim2.fromOffset(TAP, TAP), UDim2.new(1, -TAP - 8, 0, 6), C.white, 26)
+local rclose = Ui.closeButton(rpanel, UDim2.new(1, -TAP - 8, 0, 6), TAP)
 local sure: string? = nil
 
 local function renderRehome()
@@ -147,7 +149,7 @@ local function showGoodbye(info)
 	Ui.text(gbody, string.format("%s is joining %s!", info.name, SCHOOL), 24,
 		{ Position = UDim2.new(0, 20, 0, 92), Size = UDim2.new(1, -40, 0, 64), TextWrapped = true })
 	Ui.text(gbody, if info.cash > 0 then string.format("+💵 %d Green Cash", info.cash) elseif info.rosette then "🏵️ A goodbye rosette for you" else "Thank you for sharing!", 22,
-		{ Position = UDim2.new(0, 20, 0, 164), Size = UDim2.new(1, -40, 0, 30) }).TextColor3 = C.cash
+		{ Position = UDim2.new(0, 20, 0, 164), Size = UDim2.new(1, -40, 0, 30) }).TextColor3 = C.textGood
 	Ui.text(gbody, string.format("Changed your mind? Undo for %d days.", info.days or 3), TEXT,
 		{ Position = UDim2.new(0, 20, 0, 202), Size = UDim2.new(1, -40, 0, 24) }).TextColor3 = C.plum
 	local undo = Ui.button(gbody, "↩️ Undo", UDim2.fromOffset(190, TAP), UDim2.new(0.5, -200, 1, -TAP - 18), C.white, 22)
@@ -176,7 +178,7 @@ local function showLegend(h)
 	Ui.text(lbody, string.format("🎖️ %s is a Veteran!", h.name), 26, { Position = UDim2.new(0, 20, 0, 90), Size = UDim2.new(1, -40, 0, 34) })
 	Ui.text(lbody, string.format("%d races! %s can retire as a 👑 Legend.", h.record.races, h.name), TEXT + 2,
 		{ Position = UDim2.new(0, 20, 0, 128), Size = UDim2.new(1, -40, 0, 48), TextWrapped = true })
-	Ui.text(lbody, "Legends live in your Hall of Fame paddock. You can still ride them!", TEXT,
+	Ui.text(lbody, "Legends live in your Hall of Fame paddock. Ride them, or bring them back to race!", TEXT,
 		{ Position = UDim2.new(0, 20, 0, 180), Size = UDim2.new(1, -40, 0, 48), TextWrapped = true }).TextColor3 = C.plum
 	local show = Ui.button(lbody, "👑 Show me", UDim2.fromOffset(190, TAP), UDim2.new(0.5, -200, 1, -TAP - 18), C.gold, 22)
 	local later = Ui.button(lbody, "Not now", UDim2.fromOffset(190, TAP), UDim2.new(0.5, 10, 1, -TAP - 18), C.white, 22)

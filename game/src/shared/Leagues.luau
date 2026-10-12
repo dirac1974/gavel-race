@@ -90,9 +90,15 @@ function Leagues.cupOpen(h: any, bestRating: number): boolean
 	return Leagues.pointsToCup(h) == 0 or Leagues.overCeiling(h, bestRating)
 end
 
+-- Practice is open to every league (GameConfig.queue.openPractice, AAA Phase 3, D-068)?
+function Leagues.openPractice(): boolean
+	return (GameConfig.queue or {}).openPractice == true
+end
+
 -- Can this horse enter a race card? (card = { league, cup, practice })
 function Leagues.canEnter(h: any, card: any, bestRating: number): (boolean, string?)
 	if h.legend ~= nil then return false, h.name .. " is a Legend now. Ride for fun!" end -- D-059
+	if card.practice and Leagues.openPractice() then return true, nil end -- any league's Practice (D-068)
 	if card.league and card.league ~= h.league then
 		return false, string.format("That race is for %s horses. %s is %s.", card.league, h.name, h.league)
 	end
@@ -141,6 +147,7 @@ function Leagues.retire(p: any, id: string, now: number): (any, string?)
 	local h = Profile.horse(p, id)
 	if not h then return nil, "No such horse" end
 	if h.legend ~= nil then return nil, h.name .. " is already a Legend!" end
+	if not GameConfig.career.enabled then return nil, "Legends are resting today!" end -- careers off (corePlaytest)
 	if not Career.canBeLegend(h) then
 		return nil, string.format("Legends need %d races. Keep going!", GameConfig.career.veteranAt)
 	end
@@ -151,6 +158,9 @@ function Leagues.retire(p: any, id: string, now: number): (any, string?)
 	Profile.fillStalls(p)
 	Profile.fixActive(p)
 	if typeof(p.hallOfFame) ~= "table" then p.hallOfFame = {} end
+	for i = #p.hallOfFame, 1, -1 do -- a Legend that came back and retired again: one plaque, new record
+		if p.hallOfFame[i].horseId == h.id then table.remove(p.hallOfFame, i) end
+	end
 	local plaque = {
 		name = h.name, coat = h.coat, league = h.league, races = h.record.races, wins = h.record.wins,
 		places = h.record.places, cash = h.record.cash, cups = h.record.cups or 0, retired = now,
@@ -159,6 +169,30 @@ function Leagues.retire(p: any, id: string, now: number): (any, string?)
 	table.insert(p.hallOfFame, 1, plaque)
 	while #p.hallOfFame > Leagues.MAX_PLAQUES do table.remove(p.hallOfFame) end
 	return plaque, nil
+end
+
+-- Back to the races (AAA Phase 3, D-068): undo Legend Retirement. The horse races again in its own
+-- league with its points and record; it takes a free stall, or waits in the pasture when the barn
+-- is full (the caller tells the kid to free a stall). Its Legend plaque comes down (retiring again
+-- puts up a new one): the one exception to "what's earned stays earned" (StableStar). Never suggested again.
+-- `busy` is the owner's state as for retireBlock. Returns (true, nil) or (false, why).
+function Leagues.unretire(p: any, id: string, busy: any?): (boolean, string?)
+	local Profile = if script then require(script.Parent.Profile) :: any else require("./Profile")
+	local h = Profile.horse(p, id)
+	if not h then return false, "No such horse" end
+	if h.legend == nil then return false, h.name .. " is racing already!" end
+	local why = Leagues.retireBlock(h.name, id, busy or {}, "Bring back") -- the same busy rule as retiring
+	if why then return false, why end
+	h.legend = nil
+	h.legendAsked = true
+	h.stall = Profile.freeStall(p)
+	Profile.fixActive(p)
+	if typeof(p.hallOfFame) == "table" then
+		for i = #p.hallOfFame, 1, -1 do
+			if p.hallOfFame[i].horseId == id then table.remove(p.hallOfFame, i) end
+		end
+	end
+	return true, nil
 end
 
 -- The one-time Legend suggestion was shown (either answer): never shown again for this horse.

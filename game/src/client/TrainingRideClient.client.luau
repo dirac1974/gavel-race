@@ -49,6 +49,7 @@ local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local PanelFit = require(Shared:WaitForChild("PanelFit"))
 local TrainingCourses = require(Shared:WaitForChild("TrainingCourses"))
 local TrainingRide = require(Shared:WaitForChild("TrainingRide"))
 
@@ -109,7 +110,7 @@ dotLayout.FillDirection = Enum.FillDirection.Horizontal
 dotLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 dotLayout.Padding = UDim.new(0, 8)
 dotLayout.Parent = dots
-local stopBtn = Ui.button(hud, "✕ Stop", UDim2.fromOffset(104, 46), UDim2.new(1, -16, 0, 64), C.white, 20)
+local stopBtn = Ui.button(hud, "✕ Stop", UDim2.fromOffset(120, GameConfig.ui.minTouchPx), UDim2.new(1, -16, 0, 64), C.white, 20)
 stopBtn.AnchorPoint = Vector2.new(1, 0)
 local countdown = Ui.text(gui, "", 120, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.new(0, 400, 0, 140), Visible = false })
 countdown.TextColor3 = C.gold
@@ -900,18 +901,8 @@ dim.BackgroundTransparency = 0.55
 dim.Parent = cardGui
 local CW, CH = 520, 420
 local card = Ui.card(cardGui, UDim2.fromOffset(CW, CH), UDim2.fromScale(0.5, 0.5), C.paper)
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-local cardScale = Instance.new("UIScale")
-cardScale.Parent = card
-local function rescale()
-	local cam = workspace.CurrentCamera
-	if cam then cardScale.Scale = math.min(1, (cam.ViewportSize.X - 20) / CW, (cam.ViewportSize.Y - 20) / CH) end
-end
-rescale()
-task.spawn(function()
-	while not workspace.CurrentCamera do task.wait(0.1) end
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
-end)
+-- Floors (AAA Phase 2): smallest text 18, smallest button 64 (shrinks to 0.875 at most, then scrolls).
+local slideCard = Ui.fitPanel(card, CW, CH, nil, 18, 64)
 local body = Instance.new("Frame")
 body.BackgroundTransparency = 1
 body.Size = UDim2.fromScale(1, 1)
@@ -922,9 +913,9 @@ local together = nil -- { course, list } from TrainTogether
 local togetherStrip: Frame? = nil
 
 local RIBBON = {
-	bronze = { emoji = "🥉", text = "Bronze ribbon", color = Color3.fromHex("E3A26B") },
-	silver = { emoji = "🥈", text = "Silver ribbon", color = Color3.fromHex("D7DCE3") },
-	gold = { emoji = "🥇", text = "Gold ribbon", color = C.gold },
+	bronze = { emoji = "🥉", text = "Bronze medal", color = Color3.fromHex("E3A26B") },
+	silver = { emoji = "🥈", text = "Silver medal", color = Color3.fromHex("D7DCE3") },
+	gold = { emoji = "🥇", text = "Gold medal", color = C.gold },
 }
 
 local RIBBON_EMOJI = { bronze = "🥉", silver = "🥈", gold = "🥇" }
@@ -983,8 +974,6 @@ local function showCard(r)
 	local c = TC.courses[r.course]
 	if not c then return end
 	cardGui.Enabled = true
-	card.Position = UDim2.fromScale(0.5, 0.55)
-	TweenService:Create(card, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
 	Ui.text(body, c.emoji .. " " .. c.name, 30, { Position = UDim2.new(0, 0, 0, 14), Size = UDim2.new(1, 0, 0, 36) })
 	local horse = Ui.text(body, r.horseName or "", 18, { Position = UDim2.new(0, 0, 0, 50), Size = UDim2.new(1, 0, 0, 22) })
 	horse.TextColor3 = C.plum
@@ -1024,7 +1013,7 @@ local function showCard(r)
 	local barLabel = Ui.text(body, string.format("%s %.1f", label, r.before or 0), 18,
 		{ Position = UDim2.new(0, 40, 0, 180), Size = UDim2.new(1, -80, 0, 24), TextXAlignment = Enum.TextXAlignment.Left })
 	local gainText = Ui.text(body, "", 22, { Position = UDim2.new(0, 20, 0, 238), Size = UDim2.new(1, -40, 0, 50) })
-	gainText.TextColor3 = C.cash
+	gainText.TextColor3 = C.textGood
 	-- The ribbon.
 	local ribbon = Ui.card(body, UDim2.fromOffset(300, 48), UDim2.new(0.5, -150, 0, 292), C.cream)
 	ribbon.Visible = false
@@ -1032,8 +1021,7 @@ local function showCard(r)
 	-- Riding together: your friend's stars and ribbon (the card grows to fit).
 	local withFriend = together ~= nil and together.course == r.course and together.groupId ~= nil and together.groupId == r.groupId
 	CH = if withFriend then 470 else 420
-	card.Size = UDim2.fromOffset(CW, CH)
-	rescale()
+	slideCard(CH)
 	togetherStrip = Instance.new("Frame")
 	togetherStrip.BackgroundTransparency = 1
 	togetherStrip.Position = UDim2.new(0, 20, 0, 346)
@@ -1042,8 +1030,8 @@ local function showCard(r)
 	togetherStrip.Parent = body
 	renderTogether()
 	-- Buttons.
-	local again = Ui.button(body, "🔁 Ride again", UDim2.fromOffset(200, 56), UDim2.new(0.5, -210, 1, -72), C.orange, 22)
-	local done = Ui.button(body, "Done", UDim2.fromOffset(200, 56), UDim2.new(0.5, 10, 1, -72), C.green, 22)
+	local again = Ui.button(body, "🔁 Ride again", UDim2.fromOffset(200, 64), UDim2.new(0.5, -210, 1, -76), C.orange, 22)
+	local done = Ui.button(body, "Done", UDim2.fromOffset(200, 64), UDim2.new(0.5, 10, 1, -76), C.green, 22)
 	again.Activated:Connect(function()
 		local res = lastResult
 		closeCard(false)
@@ -1182,8 +1170,7 @@ TrainTogether.OnClientEvent:Connect(function(course, list, groupId)
 	if cardGui.Enabled and lastResult and lastResult.course == course and lastResult.groupId == groupId then
 		if CH ~= 470 then
 			CH = 470
-			card.Size = UDim2.fromOffset(CW, CH)
-			rescale()
+			slideCard(CH, true)
 		end
 		renderTogether()
 	end
@@ -1199,7 +1186,9 @@ local inviteScale = Instance.new("UIScale")
 inviteScale.Parent = inviteCard
 local function fitInvite()
 	local cam = workspace.CurrentCamera
-	if cam then inviteScale.Scale = math.clamp(math.min((cam.ViewportSize.X * 0.55) / IW, (cam.ViewportSize.Y - 100) / IH), 0.55, 1) end
+	-- never under the floors: 20 px text and 66 px buttons stay at 14 / 56 (AAA Phase 2)
+	if cam then inviteScale.Scale = math.clamp(math.min((cam.ViewportSize.X * 0.55) / IW, (cam.ViewportSize.Y - 100) / IH),
+		PanelFit.floor(20, 66, GameConfig.ui), 1) end
 end
 fitInvite()
 task.spawn(function()

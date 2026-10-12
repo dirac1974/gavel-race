@@ -28,7 +28,7 @@ Training.MIN_GAIN = 0.1
 Training.STAMPS = { "checkup", "potential", "teeth", "farrier", "vaccine" }
 Training.STAMP_LABELS = {
 	checkup = "First check-up", potential = "Potential revealed", teeth = "Shiny teeth",
-	farrier = "New horseshoes", vaccine = "Vaccinations",
+	farrier = "New shoes", vaccine = "Vaccines", -- short enough for a 16 px stamp (AAA Phase 2)
 }
 
 local function week(now: number): number

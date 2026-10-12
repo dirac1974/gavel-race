@@ -89,6 +89,13 @@ function Advice.nextThing(profile: any, now: number): Next
 	end
 	local name = h.name or "your horse"
 	local jobs = profile.jobs or {}
+	-- A new player races first (AAA Phase 2, D-067): until nextThing.raceFirstUntilRaces races are
+	-- run, racing comes before chores, so the first minute has one voice ("race!", like the tour).
+	local raceFirst = (GameConfig.nextThing and GameConfig.nextThing.raceFirstUntilRaces) or 0
+	local races = (profile.totals and tonumber(profile.totals.races)) or 0
+	if races < raceFirst and not h.resting and not h.overCeiling then
+		return { key = "race:" .. tostring(h.id), emoji = "🏁", icon = "flag_ready", text = "Race with " .. name .. "!", go = "race" }
+	end
 	for _, set in { jobs.daily or {}, jobs.weekly or {}, jobs.monthly or {} } do
 		for _, j in set do
 			if jobReady(j) then return { key = "claim", emoji = "🎁", icon = "gift", text = "Get your job prize!", go = "board" } end

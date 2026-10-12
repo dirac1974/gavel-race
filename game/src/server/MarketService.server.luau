@@ -29,6 +29,7 @@ local SwapStall = Profiles.remote("SwapStall")     -- client -> server: stalled 
 local Rename = Profiles.remote("RenameHorse")      -- client -> server: horse id, first word, second word
 local Retire = Profiles.remote("RetireHorse")      -- client -> server: horse id (Legend Retirement, player's choice, D-046/D-059)
 local LegendAsked = Profiles.remote("LegendAsked")  -- client -> server: horse id (the one-time suggestion was shown)
+local Unretire = Profiles.remote("UnretireHorse")  -- client -> server: horse id (a Legend back to the races, AAA Phase 3, D-068)
 local Rehome = Profiles.remote("RehomeHorse")      -- client -> server: horse id (at the Market Corral, D-059)
 local UndoRehome = Profiles.remote("UndoRehome")   -- client -> server: horse id (within rehome.undoHours)
 local RehomeResult = Profiles.remote("RehomeResult") -- server -> client: the goodbye card { name, coat, id, cash, rosette, days }
@@ -236,6 +237,23 @@ Retire.OnServerEvent:Connect(function(player: Player, id: any)
 		Profiles.changed(player)
 	elseif no then
 		Profiles.notify(player, no, "heart")
+	end
+end)
+
+-- Back to the races (D-068): undo Legend Retirement, the player's choice, any time.
+Unretire.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player, 1, "unretire") or typeof(id) ~= "string" then return end
+	local data = Profiles.get(player)
+	if not data then return end
+	local h = Profile.horse(data, id)
+	if not h then return end
+	local ok, why = Leagues.unretire(data, id, busyState(player))
+	if ok then
+		Profiles.notify(player, if h.stall then string.format("🏁 %s is back at the races!", h.name)
+			else string.format("🏁 %s is back! Free a stall to race.", h.name), "trophy")
+		Profiles.changed(player)
+	elseif why then
+		Profiles.notify(player, why, "heart")
 	end
 end)
 
