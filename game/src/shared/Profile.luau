@@ -86,7 +86,8 @@ function Profile.new(now: number): Profile
 		garden = Profile.emptyGarden(),
 		chores = {},
 		diamonds = 0,
-		style = { owned = {}, equipped = {} },
+		style = { owned = {}, equipped = {}, shelfSeen = "Rookie" },
+		bestLeague = "Rookie", -- Barn Builder shelves (D-070): the best league ever reached
 		receipts = {},
 		tour = Profile.emptyTour(now // 86400),
 		postBox = { day = now // 86400, today = 0, total = 0 },
@@ -257,7 +258,58 @@ function Profile.migrate(data: any, now: number): Profile
 	Profile.repairVisits(p, now)
 	HorseBook.repair(p) -- the Horse Book and personal bests (D-063)
 	Profile.repairCareers(p, now)
+	Profile.repairBarnBuilder(p)
 	return p :: Profile
+end
+
+-- Barn Builder (D-070) -----------------------------------------------------------------------
+-- p.bestLeague: the highest league any of your horses has ever reached, Legends, horses at the
+-- riding school and Hall of Fame plaques included. A high-water mark: it never goes down, even
+-- when that horse leaves. It opens Barn Builder's shelves.
+local LEAGUE_ORDER = { "Rookie", "Bronze", "Silver", "Gold", "Champion" } -- Leagues.ORDER (a test keeps them equal)
+Profile.LEAGUE_ORDER = LEAGUE_ORDER
+
+local function leagueRank(l: any): number
+	return (typeof(l) == "string" and table.find(LEAGUE_ORDER, l)) or 0
+end
+
+-- Raise p.bestLeague to the best league on the profile now. Returns (bestLeague, rose).
+function Profile.syncBestLeague(p: any): (string, boolean)
+	local had = leagueRank(p.bestLeague)
+	local best = math.max(1, had)
+	for _, h in (typeof(p.horses) == "table" and p.horses) or {} do
+		if typeof(h) == "table" then best = math.max(best, leagueRank(h.league)) end
+	end
+	for _, e in (typeof(p.rehomed) == "table" and p.rehomed) or {} do
+		if typeof(e) == "table" and typeof(e.horse) == "table" then best = math.max(best, leagueRank(e.horse.league)) end
+	end
+	for _, pl in (typeof(p.hallOfFame) == "table" and p.hallOfFame) or {} do
+		if typeof(pl) == "table" then best = math.max(best, leagueRank(pl.league)) end
+	end
+	p.bestLeague = LEAGUE_ORDER[best]
+	return p.bestLeague, had > 0 and best > had
+end
+
+-- Loading: the high-water mark from what an older save holds, the "new shelf" note already seen
+-- for it (no announcement for shelves a kid had before Barn Builder), and the wish and build
+-- times cleaned.
+function Profile.repairBarnBuilder(p: any)
+	Profile.syncBestLeague(p)
+	local st = p.style
+	if leagueRank(st.shelfSeen) == 0 then st.shelfSeen = p.bestLeague end
+	if leagueRank(st.shelfSeen) > leagueRank(p.bestLeague) then st.shelfSeen = p.bestLeague end
+	if typeof(st.wish) ~= "string" or #st.wish > 40 then st.wish = nil end
+	if st.wishTold ~= nil and (typeof(st.wishTold) ~= "string" or #st.wishTold > 40) then st.wishTold = nil end
+	for _, k in { "boughtAt", "paid", "builtAt" } do
+		if st[k] ~= nil and typeof(st[k]) ~= "table" then st[k] = nil end
+		for id, v in st[k] or {} do
+			if typeof(id) ~= "string" or typeof(v) ~= "number" then st[k][id] = nil end
+		end
+	end
+	if st.paidIn ~= nil and typeof(st.paidIn) ~= "table" then st.paidIn = nil end
+	for id, v in st.paidIn or {} do
+		if typeof(id) ~= "string" or (v ~= "cash" and v ~= "diamonds") then st.paidIn[id] = nil end
+	end
 end
 
 -- Careers and rehoming (D-059): the starter is marked (older saves: the first horse, h1, when the
@@ -624,7 +676,11 @@ function Profile.view(p: Profile, now: number, energyCfg: Horse.EnergyConfig): {
 			today = if p.postBox and p.postBox.day == now // 86400 then p.postBox.today else 0,
 			total = if p.postBox then p.postBox.total else 0,
 		},
-		style = { owned = table.clone((p.style and p.style.owned) or {}), equipped = table.clone((p.style and p.style.equipped) or {}) },
+		style = { owned = table.clone((p.style and p.style.owned) or {}), equipped = table.clone((p.style and p.style.equipped) or {}),
+			-- Barn Builder (D-070): the wish, the one "You can build" pill already shown, the shelf last announced
+			wish = p.style and p.style.wish, wishTold = p.style and p.style.wishTold, shelfSeen = p.style and p.style.shelfSeen,
+			builtAt = table.clone((p.style and p.style.builtAt) or {}) },
+		bestLeague = (p :: any).bestLeague or "Rookie",
 		rehomed = rehomed,
 		goodbyeRosettes = tonumber((p :: any).goodbyeRosettes) or 0,
 	}

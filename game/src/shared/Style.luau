@@ -7,14 +7,26 @@
 -- Horse, rider, barn and fan items: one worn per slot. Yard decor: each piece is placed or put
 -- away on its own. Owned items stay owned; anything bought can be returned within 24 hours
 -- for all its Diamonds. Nothing is random, timed or limited.
+-- Barn Builder (D-070, provisional): BarnCatalog's items join ITEMS with currency "cash". They are
+-- bought with Green Cash only (buyCash), open by tier (the highest league any horse has ever
+-- reached, Profile.bestLeague), and a return within greenCash.returnHours gives back the Green Cash
+-- paid. Each shop lists one currency (shopItems): Tack & Paint never shows a cash item, Barn
+-- Builder never a Diamond one, and no item is sold for both.
+
+local BarnCatalog = if script then require(script.Parent.BarnCatalog) :: any else require("./BarnCatalog")
+local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 
 local Style = {}
 
 export type Item = {
 	id: string,
 	name: string,
-	slot: string,      -- "cloth" | "helmet" | "paint" | "plate" | "fan" | "yard"
-	price: number,     -- Diamonds (multiples of 25); 0 = free starter
+	slot: string,      -- "cloth" | "helmet" | "paint" | "plate" | "fan" | "yard" | "doors" | "trim" | "frame" | "fence"
+	price: number,     -- Diamonds (multiples of 25), or Green Cash for a "cash" item; 0 = free starter
+	currency: string?, -- "cash" (Barn Builder) or nil / "diamonds" (Tack & Paint)
+	tier: string?,     -- Barn Builder: the league that opens it
+	spot: any,         -- Barn Builder: where it shows (BarnCatalog)
+	build: string?,    -- Barn Builder yard pieces: how StableService builds it
 	color: string?,    -- main colour hex
 	color2: string?,   -- second colour (paint roof / trim)
 	color3: string?,
@@ -28,6 +40,7 @@ export type Item = {
 
 Style.SLOT_LABELS = {
 	cloth = "Saddle cloth", helmet = "Helmet", paint = "Barn paint", plate = "Name plates", fan = "Fan flag", yard = "Yard",
+	doors = "Stall doors", trim = "Barn trim", frame = "Wall frame", fence = "Fence",
 }
 Style.CATEGORIES = {
 	{ id = "tack", label = "🐴 Tack", slots = { "cloth" } },
@@ -82,12 +95,33 @@ Style.ITEMS = {
 	{ id = "fan_hoof", name = "Foam hoof", slot = "fan", price = 0, fanLevel = 5, emoji = "🧡" },
 } :: { Item }
 
+-- Barn Builder's shelf (BarnCatalog), Green Cash only.
+for _, b in BarnCatalog.ITEMS do
+	local it = table.clone(b) :: any
+	it.currency = "cash"
+	table.insert(Style.ITEMS, it)
+end
+
 -- Owning a whole set adds a little extra (no random rolls): the Star Set puts a gold star on
 -- your name plates.
 Style.SETS = { star = { name = "Star Set", reward = "A gold star on your name plates" } }
 
 local byId: { [string]: Item } = {}
 for _, it in Style.ITEMS do byId[it.id] = it end
+
+function Style.isCash(it: Item): boolean
+	return it.currency == "cash"
+end
+
+-- The items one shop lists: "tack" (Tack & Paint: Diamond looks and free or earned ones) or
+-- "barn" (Barn Builder: Green Cash things). Never both, and never the other's.
+function Style.shopItems(shop: string): { Item }
+	local out = {}
+	for _, it in Style.ITEMS do
+		if (shop == "barn") == Style.isCash(it) then table.insert(out, it) end
+	end
+	return out
+end
 
 function Style.item(id: string): Item?
 	return byId[id]
@@ -115,8 +149,14 @@ function Style.owns(p: any, id: string): boolean
 	return it.price == 0 or p.style.owned[id] == true
 end
 
+-- For sale for Diamonds (Tack & Paint). A Barn Builder item never is.
 function Style.forSale(it: Item): boolean
-	return it.price > 0 and it.fanLevel == nil and it.month == nil
+	return it.price > 0 and it.fanLevel == nil and it.month == nil and not Style.isCash(it)
+end
+
+-- For sale for Green Cash (Barn Builder).
+function Style.forCash(it: Item): boolean
+	return Style.isCash(it) and it.price > 0 and it.fanLevel == nil and it.month == nil
 end
 
 -- A free starter for its slot (worn when nothing else is): not a Fan or monthly item.
@@ -163,28 +203,151 @@ function Style.buy(p: any, id: string, now: number): (boolean, string)
 	p.style.boughtAt[id] = now
 	p.style.paid = p.style.paid or {}
 	p.style.paid[id] = it.price
+	p.style.paidIn = p.style.paidIn or {}
+	p.style.paidIn[id] = "diamonds" -- a return pays back what was paid, whatever shop the item is in later
 	Style.equip(p, id)
 	return true, it.name .. " is yours! (You can return it within a day.)"
 end
 
--- Changed your mind? Return an item within 24 hours for all its Diamonds.
+-- Barn Builder (D-070) ---------------------------------------------------------------------
+local GC = GameConfig.greenCash or {}
+Style.CASH_RETURN_SECONDS = (GC.returnHours or 24) * 3600
+
+-- Tiers are open up to the highest league any horse has ever reached (Profile.bestLeague; a
+-- profile without one has the Starter shelf only).
+function Style.tierOpen(p: any, it: Item): boolean
+	local need = BarnCatalog.tierIndex(it.tier) or 1
+	local best = BarnCatalog.tierIndex(typeof(p) == "table" and p.bestLeague or nil) or 1
+	return need <= best
+end
+
+-- What Barn Builder shows: every item of the open tiers, then the next tier's items (locked,
+-- shown greyed with no price). Later tiers are hidden. nextTier is nil once Champion is open.
+function Style.shelf(p: any): ({ Item }, string?, { Item })
+	local best = BarnCatalog.tierIndex(typeof(p) == "table" and p.bestLeague or nil) or 1
+	local nextTier = BarnCatalog.TIERS[best + 1]
+	local open, locked = {}, {}
+	for _, it in Style.shopItems("barn") do
+		local k = BarnCatalog.tierIndex(it.tier) or 1
+		if k <= best then
+			table.insert(open, it)
+		elseif it.tier == nextTier then
+			table.insert(locked, it)
+		end
+	end
+	return open, nextTier, locked
+end
+
+-- Why a Green Cash buy can't happen ("missing" | "owned" | "tier" | "cash"), or nil when it can.
+function Style.cashBlock(p: any, id: string): string?
+	ensure(p)
+	local it = byId[id]
+	if not it or not Style.forCash(it) then return "missing" end
+	if Style.owns(p, id) then return "owned" end
+	if not Style.tierOpen(p, it) then return "tier" end
+	if (tonumber(p.cash) or 0) < it.price then return "cash" end
+	return nil
+end
+
+-- Build it with Green Cash: checked, paid and owned in one step (nothing yields in between), and
+-- worn or placed at once. Returns (ok, message, reason).
+function Style.buyCash(p: any, id: string, now: number): (boolean, string, string?)
+	local why = Style.cashBlock(p, id)
+	local it = byId[id]
+	if why == "missing" or not it then return false, "That isn't in Barn Builder", why end
+	if why == "owned" then return false, "You already built it!", why end
+	if why == "tier" then return false, "That shelf opens with a higher league", why end
+	if why == "cash" then return false, string.format("%s costs 💵 %d", it.name, it.price), why end
+	-- The one wallet (Profile.spendCash). Required here, not at load: Profile -> HorseBook -> Style.
+	local Profile = if script then require(script.Parent.Profile) :: any else require("./Profile")
+	if not Profile.spendCash(p, it.price) then return false, string.format("%s costs 💵 %d", it.name, it.price), "cash" end
+	p.style.owned[id] = true
+	p.style.boughtAt = p.style.boughtAt or {}
+	p.style.boughtAt[id] = now
+	p.style.paid = p.style.paid or {}
+	p.style.paid[id] = it.price
+	p.style.paidIn = p.style.paidIn or {}
+	p.style.paidIn[id] = "cash"
+	p.style.builtAt = p.style.builtAt or {}
+	p.style.builtAt[id] = now
+	if p.style.wish == id then p.style.wish = nil end
+	Style.equip(p, id)
+	return true, it.name .. " built!", nil
+end
+
+-- Changed your mind? Return an item within 24 hours (greenCash.returnHours for a Green Cash
+-- thing) for everything paid, in the currency it was paid in.
+function Style.returnSeconds(it: Item?): number
+	return if it and Style.isCash(it) then Style.CASH_RETURN_SECONDS else Style.RETURN_SECONDS
+end
+
 function Style.canReturn(p: any, id: string, now: number): boolean
 	ensure(p)
 	local it = byId[id]
 	local at = p.style.boughtAt and p.style.boughtAt[id]
-	return it ~= nil and p.style.owned[id] == true and at ~= nil and now - at < Style.RETURN_SECONDS
+	return it ~= nil and p.style.owned[id] == true and at ~= nil and now - at < Style.returnSeconds(it)
 end
 
 function Style.giveBack(p: any, id: string, now: number): (boolean, string)
 	if not Style.canReturn(p, id, now) then return false, "That can't be returned now" end
 	local it = byId[id] :: Item
 	local paid = (p.style.paid and p.style.paid[id]) or it.price
+	-- What was paid decides the refund; only a save from before paidIn falls back to the item's shop.
+	local paidIn = p.style.paidIn and p.style.paidIn[id]
+	local inCash = if paidIn ~= nil then paidIn == "cash" else Style.isCash(it)
 	Style.unequip(p, id)
 	p.style.owned[id] = nil
 	p.style.boughtAt[id] = nil
 	if p.style.paid then p.style.paid[id] = nil end
+	if p.style.paidIn then p.style.paidIn[id] = nil end
+	if p.style.builtAt then p.style.builtAt[id] = nil end
+	if inCash then
+		p.cash = (tonumber(p.cash) or 0) + paid -- a refund, not new earnings
+		return true, string.format("Returned %s: +💵 %d", it.name, paid)
+	end
 	p.diamonds += paid
 	return true, string.format("Returned %s: +%d 💎", it.name, paid)
+end
+
+-- The wish (D-070): one Barn Builder item to save for. Only a cash item you don't own yet whose
+-- shelf is open; nil (or "") clears it. Returns (ok, message).
+function Style.setWish(p: any, id: string?): (boolean, string?)
+	ensure(p)
+	if id == nil or id == "" then
+		p.style.wish = nil
+		return true, nil
+	end
+	local it = byId[id :: string]
+	if not it or not Style.forCash(it) or Style.owns(p, it.id) or not Style.tierOpen(p, it) then return false, "Pick something on an open shelf" end
+	p.style.wish = it.id
+	return true, nil
+end
+
+-- The wished item and how full its bar is (0..1, Green Cash / price), or nil with no wish.
+function Style.wishProgress(p: any): (Item?, number)
+	if typeof(p) ~= "table" or typeof(p.style) ~= "table" then return nil, 0 end
+	local id = p.style.wish
+	local it = if typeof(id) == "string" then byId[id] else nil
+	if not it or not Style.forCash(it) or (p.style.owned and p.style.owned[it.id]) then return nil, 0 end
+	return it, math.clamp((tonumber(p.cash) or 0) / it.price, 0, 1)
+end
+
+-- Friends' barns (D-070): the newest build under `hours` old (a ✨ by the name), or nil.
+function Style.freshBuildId(p: any, now: number, hours: number): string?
+	local built = typeof(p) == "table" and typeof(p.style) == "table" and p.style.builtAt
+	if typeof(built) ~= "table" then return nil end
+	local best, bestAt = nil, -math.huge
+	for id, at in built do
+		if p.style.owned and p.style.owned[id] and typeof(at) == "number" and now - at < hours * 3600 and now >= at
+			and (at > bestAt or (at == bestAt and id < (best or "~"))) then
+			best, bestAt = id, at
+		end
+	end
+	return best
+end
+
+function Style.freshBuild(p: any, now: number, hours: number): boolean
+	return Style.freshBuildId(p, now, hours) ~= nil
 end
 
 -- Wear an owned item (yard pieces: place it). Returns (ok, message).
@@ -192,7 +355,7 @@ function Style.equip(p: any, id: string): (boolean, string)
 	ensure(p)
 	local it = byId[id]
 	if not it then return false, "That isn't in the shop" end
-	if not Style.owns(p, id) then return false, "Get it in the Tack & Paint shop first" end
+	if not Style.owns(p, id) then return false, if Style.isCash(it) then "Build it at Barn Builder first" else "Get it in the Tack & Paint shop first" end
 	if it.slot == "yard" then
 		p.style.equipped["yard:" .. id] = true
 	else

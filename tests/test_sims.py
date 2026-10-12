@@ -223,9 +223,10 @@ def test_phase3_skill_premium():
 
 
 def test_phase3_purses_and_entry_unchanged():
-    """D-068 keeps purses (flattening waits for a cosmetics sink), adds no entry fee and keeps the
-    D-061 Rookie anchor."""
-    assert economy.LEAGUE_B == {"Rookie": 20, "Bronze": 50, "Silver": 120, "Gold": 300, "Champion": 750}
+    """D-068 kept purses (flattening waited for the Barn Builder sink, which D-070 added), adds no
+    entry fee and keeps the D-061 Rookie anchor."""
+    assert economy.LEAGUE_B_D068 == {"Rookie": 20, "Bronze": 50, "Silver": 120, "Gold": 300, "Champion": 750}
+    assert economy.LEAGUE_B == {"Rookie": 20, "Bronze": 30, "Silver": 45, "Gold": 65, "Champion": 85}
     assert economy.PHASE3["anchors"]["Rookie"] == economy.BOT_RATING_ANCHOR["Rookie"]
 
 
@@ -256,3 +257,126 @@ def test_phase3_light_player_never_stuck(league):
     assert rep["cup_tries"] <= 4, (league, rep["cup_tries"])
     assert _ladder("light", players=160)["Champion"]["week"] <= 20
 
+
+
+# --- Green Cash sink: Barn Builder against each profile's cash (D-070) -----------------------
+# Run on economy.LEAGUE_B (= GameConfig, test_ladder_mirrors_match_game_code) and economy.CATALOG.
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import gavel_race_v2  # noqa: E402
+
+GC_UP_TO_GOLD = ["Rookie", "Bronze", "Silver", "Gold"]
+
+
+@lru_cache(maxsize=None)
+def _gc(profile: str, policy: str = "wish", purses: tuple | None = None) -> dict:
+    b = dict(zip(economy.LEAGUES, purses)) if purses else economy.LEAGUE_B
+    return economy.greencash_report(economy.PROFILES[profile], economy.PHASE3, b, players=60, seed=31,
+                                    weeks=economy.GC_WEEKS, policy=policy)
+
+
+def test_greencash_purses_match_everywhere():
+    """GameConfig (checked in test_ladder_mirrors_match_game_code), the sim and the reference model
+    carry the same B; the Cup stays 3B."""
+    assert gavel_race_v2.LEAGUE_B == economy.LEAGUE_B
+    assert economy.CUP_PURSE_B == 3
+
+
+@pytest.mark.parametrize("profile", ["casual", "light", "engaged"])
+def test_greencash_next_item_within_two_sessions(profile):
+    """Plan gate 1: from any session in Rookie to Gold, the next build is at most 2 sessions away
+    (median over sessions and kids)."""
+    rep = _gc(profile)["league"]
+    for lg in GC_UP_TO_GOLD:
+        assert rep[lg]["wait"] <= economy.GAP_MAX, (profile, lg, rep[lg]["wait"])
+
+
+def test_greencash_fresh_rookie_builds_in_first_session():
+    """Acceptance: a fresh Rookie can afford a Barn Builder item within 1-2 sessions."""
+    for profile in ("casual", "light"):
+        assert _gc(profile)["league"]["Rookie"]["first_item"] <= 2, profile
+
+
+@pytest.mark.parametrize("profile", ["casual", "casual-perfect", "light"])
+def test_greencash_no_pile_at_week_12(profile):
+    """Plan gate 2: a kid who builds when it can holds at most 2x the next item's price at week 12."""
+    rep = _gc(profile)
+    assert rep["pile"] <= economy.PILE_MAX, (profile, rep["pile"])
+
+
+@pytest.mark.parametrize("profile", list(economy.GC_PROFILES))
+def test_greencash_no_pile_before_champion(profile):
+    """No pile before Champion for anyone: the session the horse reaches Champion, the kid holds at
+    most 2x the next item (engaged kids pile up after Champion; see greencash-sim.md)."""
+    rep = _gc(profile)
+    if rep["champion_pile"] is not None:
+        assert rep["champion_pile"] <= economy.PILE_MAX, (profile, rep["champion_pile"])
+
+
+@pytest.mark.parametrize("profile,policy", [(p, "wish") for p in economy.GC_PROFILES] + [("casual", "saver")])
+def test_greencash_feed_always_affordable(profile, policy):
+    """Plan gate 3: every kid can pay for a session's hay, grain, treats and seeds at every session
+    start, saver included (the kid never builds below FEED_RESERVE)."""
+    assert _gc(profile, policy)["feed_ok"]
+    assert economy.FEED_RESERVE >= max(economy.FEED_COST.values())
+
+
+def test_greencash_perfect_rider_reaches_shelves_sooner():
+    """Gameplay vote: a perfect rider on the casual schedule reaches each shelf's first item in no
+    more sessions than a casual kid, and sooner on at least 3 of the 5 shelves."""
+    casual, perfect = _gc("casual")["league"], _gc("casual-perfect")["league"]
+    sooner = 0
+    for lg in economy.LEAGUES:
+        c, p = casual[lg]["first_item"], perfect[lg]["first_item"]
+        assert p <= c, (lg, p, c)
+        sooner += p < c
+    assert sooner >= 3, sooner
+
+
+def test_greencash_skill_premium_kept():
+    """Flattening B keeps the premium: a perfect rider earns at least 1.33x per race in every
+    league, about 1.5x overall."""
+    casual, perfect = _gc("casual")["league"], _gc("casual-perfect")["league"]
+    ratios = []
+    for lg in economy.LEAGUES:
+        if casual[lg]["cash_per_race"] and perfect[lg]["cash_per_race"]:
+            r = perfect[lg]["cash_per_race"] / casual[lg]["cash_per_race"]
+            assert r >= economy.PREMIUM_MIN, (lg, r)
+            ratios.append(r)
+    assert 1.35 <= sum(ratios) / len(ratios) <= 1.75, ratios
+
+
+def test_greencash_old_purses_ran_out_of_shelf():
+    """Why D-070 flattened B: on 20/50/120/300/750 a casual kid owns the whole catalog by week 12
+    and the cash piles up (no next item)."""
+    rep = _gc("casual", purses=tuple(economy.LEAGUE_B_D068[lg] for lg in economy.LEAGUES))
+    assert rep["pile"] == float("inf")
+    assert rep["league"]["Gold"]["wait"] > economy.GAP_MAX
+
+
+FREE_YARD_MODELS = {"hay_bale", "water_trough", "feed_bucket", "wheelbarrow", "horseshoe_decor", "photo_frame_stand"}
+
+
+def test_greencash_catalog_rules():
+    """Cosmetic, cash-only shelves: nothing that looks like a real win (trophy, Cup, medal), none of
+    the props every yard already has for free (variants only), Gold in fair materials (no chrome or
+    brass), every shelf priced above the one below, about 45k in all."""
+    ids = [it[0] for it in economy.CATALOG]
+    assert len(ids) == len(set(ids))
+    for item_id, label, lg, price in economy.CATALOG + economy.STALL_ITEMS:
+        assert lg in economy.LEAGUES and price > 0 and price % 50 == 0, item_id
+        assert item_id not in FREE_YARD_MODELS, item_id
+        assert not re.search(r"trophy|cup|medal|rosette$|random|mystery", (item_id + " " + label).lower()), item_id
+        if lg == "Gold":
+            assert not re.search(r"chrome|brass|metal|steel", (item_id + " " + label).lower()), item_id
+    prices = economy.catalog_prices()
+    for lo, hi in zip(economy.LEAGUES, economy.LEAGUES[1:]):
+        assert max(prices[lo]) <= min(prices[hi]), (lo, hi)
+        assert sum(prices[lo]) < sum(prices[hi]), (lo, hi)
+    assert 40_000 <= sum(sum(v) for v in prices.values()) <= 50_000
+
+
+@pytest.mark.xfail(economy.luau_cash_prices() is None, reason="BarnCatalog.luau not landed yet", strict=True)
+def test_greencash_barn_catalog_matches_sim_catalog():
+    """BarnCatalog.luau carries the sim's prices, shelf by shelf (a strict xfail until it lands)."""
+    assert economy.luau_cash_prices() == economy.catalog_prices()

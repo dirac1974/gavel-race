@@ -15,4 +15,6 @@ Useful check (Phase 2): pytest does not compile client scripts, so compile every
 
 Phase 4 lesson: the session's injected commit attribution put "Claude <model name>" in the Co-Authored-By trailer (bed9d9e, 67f503f), breaking hard rule 5; policy_guard uses `git grep` so it never sees commit messages. Always check `git log --format=%B` trailers in reviews; never ask for history rewrite (rule 6), only fix forward.
 
+Green Cash (D-070) lesson: "never sold" checks (trophy/rosette/Cup) in tests only regex ids and names; check item `emoji` fields too (a 🏵️ on a 💵 frame slipped through). Also check that a D-number isn't claimed by two features at once (tap gap is D-071 per plans-consensus.md, but its code said D-070).
+
 Phase 3 lesson: "🔀 More choices" (RacePicker) is only reachable from the queue card, i.e. while the player is already in line. Any new picker action that passes a course to `JoinRace` must survive `joinQueue`'s early returns (same key → keep course; alone in line → card follows the pick). Phase 3's Race-with-friend broke on exactly that. Also, `pytest` now includes `tests/test_compile_all.py`, but still run the Lune compile when client files change.

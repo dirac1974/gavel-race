@@ -58,7 +58,7 @@ UI_PNG = REPO / "assets" / "ui" / "png"
 # Whole images for Beams, Textures, Decals and particles (AAA Phase 4, D-069; tools/ui/make_ui_svgs.py STRIP_NAMES).
 # Uploaded as Decals like the UI sheets, so they land in UiImages and AssetService publishes each image id as
 # ReplicatedStorage attribute UiSheet_<name> (read through game/src/shared/WorldArt.luau).
-TEXTURES = ("bunting_strip", "crowd_strip", "confetti_square", "flag_pennant")
+TEXTURES = ("bunting_strip", "crowd_strip", "confetti_square", "flag_pennant", "horse_silhouette")  # + the weathervane (D-070)
 
 API = "https://apis.roblox.com/assets/v1"
 CONTENT_TYPES = {".glb": "model/gltf-binary", ".fbx": "model/fbx", ".png": "image/png", ".mp3": "audio/mpeg",

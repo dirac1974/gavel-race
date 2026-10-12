@@ -16,4 +16,14 @@ function PacePreview.afterLock(cfg: any, locked: boolean, seg: number, closed: n
 	return seg == closed + 1 and seg <= (cfg.throughCheckpoint or 2)
 end
 
+-- (D-071) Steering off (no trip, so no lock and no TapPreview): preview the open pace checkpoint
+-- at every pass end from the gate, as the stretch drive does, so taps move horses on screen all
+-- race. tapCfg = GameConfig.tapPreview; only with it enabled and steeringOffWholeRace; never the
+-- stretch drive (its own preview). With w = 0 before the far turn the shown offsets carry no luck.
+function PacePreview.beforeLock(tapCfg: any, steering: boolean, seg: number, closed: number, stretch: boolean): boolean
+	if type(tapCfg) ~= "table" or tapCfg.enabled ~= true or tapCfg.steeringOffWholeRace == false then return false end
+	if steering or stretch then return false end
+	return seg == closed + 1
+end
+
 return PacePreview

@@ -222,6 +222,8 @@ require("./race_fx_tests")(check, close)
 require("./finish_tests")(check, close) -- AAA Phase 2 (D-067): finish moment, results card, coaching, post-lock preview
 require("./world_dressing_tests")(check, close) -- AAA Phase 4 Dev A (D-069): jockey pose, track dressing, Big Board, track life
 require("./presentation_tests")(check, close) -- AAA Phase 4 Dev B (D-069): gate pass, HUD restyle, music bed, finish polish
+require("./tap_preview_tests")(check, close) -- D-071: the draw-only pre-lock preview (TapPreview)
+require("./greencash_tests")(check, close) -- Green Cash sink, game half (D-070): Barn Builder
 
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

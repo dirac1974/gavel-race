@@ -7,7 +7,7 @@
 
 local WorldArt = {}
 
-WorldArt.NAMES = { "bunting_strip", "crowd_strip", "confetti_square", "flag_pennant" }
+WorldArt.NAMES = { "bunting_strip", "crowd_strip", "confetti_square", "flag_pennant", "horse_silhouette" } -- (the weathervane, D-070)
 
 -- "rbxassetid://<image id>" for a world image, or nil while it isn't loaded.
 function WorldArt.image(name: string): string?

@@ -34,7 +34,7 @@ class Config:
 
 
 LEAGUE_T = {"Rookie": 22.0, "Bronze": 18.0, "Silver": 18.0, "Gold": 14.4, "Champion": 12.0}
-LEAGUE_B = {"Rookie": 20, "Bronze": 50, "Silver": 120, "Gold": 300, "Champion": 750}
+LEAGUE_B = {"Rookie": 20, "Bronze": 30, "Silver": 45, "Gold": 65, "Champion": 85}  # D-070 (was 20/50/120/300/750)
 PLACE_PRIZES = (1.2, 0.8, 0.4)  # 2nd, 3rd, 4th, in units of B
 
 

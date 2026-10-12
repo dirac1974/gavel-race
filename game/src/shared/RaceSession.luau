@@ -425,6 +425,30 @@ function RaceSession:previewLive(seg: number, partial: { [number]: number }): { 
 	return RaceMath.liveChances(self.q, self:tilts(S), self.mathCfg)
 end
 
+-- (D-071) Live chances if segment `seg` closed now with these provisional scores for riders
+-- (`partial[laneIndex]`) and every other lane keeping its own pace there: its score so far over the
+-- closed checkpoints, or `expected` (default botPaceMean) before the first close. Without partial
+-- scores it is the live chances themselves, so the difference is what a rider's own taps in the open
+-- checkpoint have changed: a rider tapping as before moves nothing, and the bots' scores wait for
+-- the close (an average-only lane, D-022, keeps its pace too). TapPreview draws it. Nothing is stored.
+function RaceSession:previewOwn(seg: number, partial: { [number]: number }, expected: number?): { number }
+	assert(seg == self.closed + 1, "preview the open segment")
+	local weights = self.config.segmentWeights
+	local S = {}
+	for i, lane in self.lanes do
+		local before = if self.closed > 0 then weightedScore(lane, self.closed, weights) else (expected or self.config.botPaceMean)
+		local now = if lane.averageOnly then before else (partial[i] or before)
+		local total, wsum = 0, 0
+		for k = 1, seg do
+			local w = weights[k] or 1
+			total += w * (if k == seg then now else (lane.scores[k] or 0))
+			wsum += w
+		end
+		S[i] = total / wsum
+	end
+	return self.deps.RaceMath.liveChances(self.q, self:tilts(S), self.mathCfg)
+end
+
 -- On-screen offsets (feet ahead of the pace) for blend weight w (RaceShape).
 function RaceSession:displayOffsets(live: { number }, w: number, shapeCfg: any): { number }
 	return self.deps.RaceShape.offsets(live, self.luck, w, shapeCfg)

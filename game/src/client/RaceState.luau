@@ -73,7 +73,7 @@ end
 -- Busy (D-055): a training ride (the server sets TrainingRide), a care or training game, or a
 -- full-screen panel. A spectator's race HUD waits until the kid is done.
 local PANELS = { "Care", "Paddock", "Taming", "MyHorses", "MarketCard", "RacePicker", "StableBoard", "Starter",
-	"StyleShop", "Map", "GrownUpsPanel" }
+	"StyleShop", "Map", "GrownUpsPanel", "BarnBuilder" }
 function RaceState.busy(): boolean
 	if localPlayer:GetAttribute("TrainingRide") then return true end
 	local playerGui = localPlayer:FindFirstChild("PlayerGui")

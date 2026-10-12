@@ -28,6 +28,11 @@ schedules with average or perfect riding) races through every league with the re
 League Points, first-win bonus, Cup races and ceilings. `--ladder-search` re-derives PHASE3:
 anchors from each league's casual entry Rating, ceilings at about 35% wins, Cup points for
 20 / 40 / 90 / 180 counted races. Results: docs/reviews/aaa-2026-10-11/phase3-sim.md.
+
+`--greencash` (D-070) runs each ladder profile's cash (races, jobs, feed) against the Barn Builder
+catalog (`CATALOG`, stalls too) for 16 weeks: the wait for the next build in each league, the
+first item of each shelf, balances at weeks 4/8/12/16 and the week-12 pile. `--purses` tries other
+B values. Results: docs/reviews/aaa-2026-10-11/greencash-sim.md.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from __future__ import annotations
 import argparse
 import math
 import random
+import re
 import statistics as st
 import sys
 from pathlib import Path
@@ -202,7 +208,9 @@ MIN_GAIN = 0.1               # Training.MIN_GAIN
 POTENTIAL = (70, 85)         # Horse.starter: Potential per stat
 BOND_CAP = 100
 CUP_PURSE_B = 3              # GameConfig.cupPurseB
-LEAGUE_B = {"Rookie": 20, "Bronze": 50, "Silver": 120, "Gold": 300, "Champion": 750}  # purses unchanged
+# B per league (GameConfig.leagues[*].B, a test checks): flattened by D-070 (provisional) so the Barn
+# Builder shelves stay in reach; LEAGUE_B_D068 below keeps the old values.
+LEAGUE_B = {"Rookie": 20, "Bronze": 30, "Silver": 45, "Gold": 65, "Champion": 85}
 LEAGUE_DISTANCES = {"Rookie": ("Sprint", "Mile"), "Bronze": ("Sprint", "Mile", "Classic")}
 ALL_DISTANCES = ("Sprint", "Mile", "Classic", "Marathon")
 SURFACES = ("Dirt", "Turf")
@@ -284,11 +292,14 @@ def ladder_race(rng: random.Random, league: str, rating: float, kid: str, anchor
 
 
 def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
-           kappa: dict | None = None, stop_at: str | None = None) -> dict:
+           kappa: dict | None = None, stop_at: str | None = None, purses: dict | None = None,
+           ledger: list | None = None) -> dict:
     """One horse from a fresh starter until it reaches Champion (or max_weeks). Per league:
     entry Rating, counted races to open the Cup, races in the league (Cup tries included), week
     and races played when it moved up, cash, and the live win chance over its first and last ten
-    regular races there."""
+    regular races there. With `ledger` (a list) it runs all max_weeks and appends (league, race
+    cash) per session; `purses` overrides LEAGUE_B (Green Cash sim, D-070)."""
+    purses = purses or LEAGUE_B
     anchors, stakes, ceilings = params["anchors"], params["stakes"], params["ceilings"]
     stats = {k: float(STARTER_STAT) for k in rr.STATS}
     potential = {k: rng.randint(*POTENTIAL) for k in rr.STATS}
@@ -307,6 +318,7 @@ def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
                 gained += _train_rides(stats, potential, rides, prof.train_score, WEEKLY_CAP - gained)
                 best = None
             bond = min(BOND_CAP, bond + prof.bond)
+            before = sum(x["cash"] for x in out.values())
             for _ in range(prof.races):
                 lg = out[league]
                 if lg["entry_rating"] is None:
@@ -328,7 +340,7 @@ def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
                                             (kappa or {}).get(league, 1.0))
                 lg["races"] += 1
                 played += 1
-                B = LEAGUE_B[league]
+                B = purses[league]
                 if place == 1:
                     lg["cash"] += CUP_PURSE_B * B if cup_open else math.floor(B / q0 + 0.5)
                 elif place <= 4:
@@ -353,7 +365,9 @@ def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
                     if not lg["first_win"]:
                         lg["first_win"] = True
                         points += FIRST_WIN_BONUS
-        if league == "Champion" and out["Champion"]["races"] >= 30:
+            if ledger is not None:
+                ledger.append((league, sum(x["cash"] for x in out.values()) - before))
+        if ledger is None and league == "Champion" and out["Champion"]["races"] >= 30:
             break
     return out
 
@@ -468,6 +482,232 @@ def search_ladder(players: int = 150, seed: int = 1, entry_target: dict | None =
     return params
 
 
+# ---------------------------------------------------------------------------------------------
+# Green Cash sink (D-070, provisional): the Barn Builder catalog against each profile's cash.
+# Tiers open by the highest league a horse has reached (p.bestLeague, never goes down). Every item
+# is cosmetic and cash only. Items the yard already shows for free (StableService: hay bale,
+# trough, feed bucket, wheelbarrow, horseshoe, photo board) are sold only as variants. Gold uses
+# fair materials (painted wood, rope, bunting). Prices: greencash-plan.md "Final prices (sim)".
+
+LEAGUE_B_D068 = {"Rookie": 20, "Bronze": 50, "Silver": 120, "Gold": 300, "Champion": 750}  # before D-070
+GREENCASH_PLAN_B = {"Rookie": 20, "Bronze": 30, "Silver": 45, "Gold": 60, "Champion": 80}  # the plan's start
+TIER_NAME = {"Rookie": "Starter", "Bronze": "Bronze", "Silver": "Silver", "Gold": "Gold", "Champion": "Champion"}
+# (id, label, tier = league that opens it, price in Green Cash)
+CATALOG = [
+    ("paint_barn_red", "Red barn paint", "Rookie", 300),
+    ("paint_barn_sky", "Sky barn paint", "Rookie", 350),
+    ("paint_barn_mint", "Mint barn paint", "Rookie", 400),
+    ("paint_barn_lilac", "Lilac barn paint", "Rookie", 450),
+    ("cloth_sun", "Sunny saddle cloth", "Rookie", 300),
+    ("cloth_sky", "Sky saddle cloth", "Rookie", 350),
+    ("cloth_berry", "Berry saddle cloth", "Rookie", 400),
+    ("plates_wood", "Carved wood name plates", "Rookie", 350),
+    ("trough_painted", "Painted water trough", "Rookie", 300),
+    ("wheelbarrow_flowers", "Flower-box wheelbarrow", "Rookie", 400),
+    ("bucket_painted", "Painted feed bucket", "Rookie", 250),
+    ("hay_ribbon", "Hay bale with a ribbon", "Rookie", 250),
+    ("apple_tree_1", "Apple tree", "Bronze", 700),
+    ("apple_tree_2", "Second apple tree", "Bronze", 700),
+    ("horseshoe_lucky", "Lucky red horseshoe", "Bronze", 600),
+    ("helmet_red", "Red helmet", "Bronze", 500),
+    ("helmet_blue", "Blue helmet", "Bronze", 500),
+    ("helmet_green", "Green helmet", "Bronze", 500),
+    ("cloth_stars", "Stars saddle cloth", "Bronze", 600),
+    ("cloth_checks", "Checks saddle cloth", "Bronze", 600),
+    ("cloth_hearts", "Hearts saddle cloth", "Bronze", 600),
+    ("stall_doors", "Stall-door paint", "Bronze", 800),
+    ("log_jump", "Yard log jump", "Silver", 1500),
+    ("frame_silver", "Silver Rosette Wall frame", "Silver", 1200),
+    ("fence_paint", "Fence paint", "Silver", 1000),
+    ("barn_birch", "Silver Birch barn", "Silver", 1200),
+    ("photo_board_flowers", "Flower photo board", "Silver", 1400),
+    ("barn_gold_trim", "Gold-painted barn trim", "Gold", 2000),
+    ("frame_ribbon", "Gold ribbon Rosette Wall frame", "Gold", 2500),
+    ("hayloft", "Hay-loft doors and sign", "Gold", 3500),
+    ("bunting", "County-fair bunting", "Gold", 1800),
+    ("weathervane", "Horse weathervane", "Champion", 5000),
+    ("paint_champion", "Champion barn paint", "Champion", 4000),
+    ("gate_arch", "Grand gate arch", "Champion", 6000),
+    ("frame_champion", "Champion Rosette Wall frame", "Champion", 4000),
+]
+# Stalls (Market.STALL_PRICES, not league-gated in game): the sim's kid wants the next one as each
+# league opens, so it sits on that league's shelf here.
+STALL_ITEMS = [("stall_3", "3rd stall", "Bronze", 300), ("stall_4", "4th stall", "Silver", 800),
+               ("stall_5", "5th stall", "Gold", 2000), ("stall_6", "6th stall", "Champion", 4000)]
+START_CASH = 50              # Profile.START_CASH
+JOBS_CASH = 15               # Jobs: about three daily jobs a play day, 3-10 cash each (weekly jobs left out)
+FEED_COST = {"half": 12, "full": 25}  # per session: hay 2, grain 5, treat 6, seeds 3-8 (Care.SHOP)
+FEED_RESERVE = 50            # the kid never spends below this, so a session's feed is always there
+SAVER_EVERY_WEEKS = 4        # the saver opens Barn Builder once every four weeks
+GC_WEEKS = 12                # the pile check's week
+GC_RUN_WEEKS = 16            # the report runs past it, so Champion shows too
+GAP_MAX = 2                  # sessions: median wait for the next item, every league up to Gold
+PILE_MAX = 2.0               # week-12 balance at most 2x the next item's price
+PREMIUM_MIN = 1.33
+GC_PROFILES = ("casual", "casual-perfect", "engaged", "engaged-perfect", "light")
+
+
+BARN_CATALOG = Path(__file__).resolve().parents[1] / "game" / "src" / "shared" / "BarnCatalog.luau"
+
+
+def luau_cash_prices(path: Path = BARN_CATALOG) -> dict | None:
+    """{league: sorted prices} of the game's Barn Builder items (BarnCatalog.ITEMS), None until the
+    module exists. A tier may be written as the league or "Starter"."""
+    if not path.exists():
+        return None
+    out: dict = {}
+    for tier, price in re.findall(r'tier\s*=\s*"(\w+)"\s*,\s*price\s*=\s*(\d+)', path.read_text(encoding="utf-8")):
+        out.setdefault("Rookie" if tier == "Starter" else tier, []).append(int(price))
+    return {k: sorted(v) for k, v in out.items()} or None
+
+
+def catalog_prices() -> dict:
+    out: dict = {}
+    for _, _, lg, price in CATALOG:
+        out.setdefault(lg, []).append(price)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def _shelf(stalls: bool = True) -> list:
+    return CATALOG + (STALL_ITEMS if stalls else [])
+
+
+def greencash_player(rng: random.Random, prof: Profile, params: dict, purses: dict, weeks: int = GC_WEEKS,
+                     policy: str = "wish", stalls: bool = True) -> dict:
+    """One kid over `weeks`: the ladder career's race cash per session plus jobs, minus feed, buying
+    from Barn Builder. "wish": the kid always wishes for the cheapest unowned item on the newest open
+    shelf and builds it as soon as it is affordable (keeping FEED_RESERVE). "saver": the same, but it
+    only shops every SAVER_EVERY_WEEKS weeks."""
+    ledger: list = []
+    career(rng, prof, params, max_weeks=weeks, purses=purses, ledger=ledger)
+    shelf = _shelf(stalls)
+    feed = FEED_COST["full" if prof.care >= 1 else "half"]
+    cash, owned, best = START_CASH, set(), 0
+    buys, balances, leagues, feed_ok, champion_pile = [], {}, [], True, None
+    race_cash = {lg: [0, 0] for lg in LEAGUES}
+    created = destroyed = 0
+    for i, (league, earned) in enumerate(ledger):
+        week = i // prof.sessions + 1
+        if cash < feed:
+            feed_ok = False
+        cash += earned + JOBS_CASH - feed
+        created += earned + JOBS_CASH
+        destroyed += feed
+        race_cash[league][0] += earned
+        race_cash[league][1] += prof.races
+        best = max(best, LEAGUES.index(league))
+        leagues.append(league)
+        last_of_week = (i + 1) % prof.sessions == 0
+        if policy == "wish" or (last_of_week and week % SAVER_EVERY_WEEKS == 0):
+            while True:
+                wish = _next_wish(shelf, owned, best)
+                if wish is None or cash - wish[3] < FEED_RESERVE:
+                    break
+                cash -= wish[3]
+                destroyed += wish[3]
+                owned.add(wish[0])
+                buys.append((i, wish[2], wish[3], wish[0]))
+        if last_of_week:
+            nxt = _next_wish(shelf, owned, best)
+            balances[week] = (cash, nxt[3] if nxt else None)
+        if league == "Champion" and champion_pile is None:
+            # no pile before Champion: what the kid holds the session its horse gets there
+            nxt = _next_wish(shelf, owned, best)
+            champion_pile = cash / nxt[3] if nxt else float("inf")
+    nxt = _next_wish(shelf, owned, best)
+    return {"buys": buys, "balances": balances, "leagues": leagues, "feed_ok": feed_ok,
+            "champion_pile": champion_pile,
+            "next_price": nxt[3] if nxt else None, "cash": cash, "race_cash": race_cash,
+            "created": created, "destroyed": destroyed, "sessions": len(ledger), "owned": len(owned)}
+
+
+def _next_wish(shelf: list, owned: set, best: int):
+    open_items = [it for it in shelf if it[0] not in owned and LEAGUES.index(it[2]) <= best]
+    if not open_items:
+        return None
+    return min(open_items, key=lambda it: (-LEAGUES.index(it[2]), it[3]))
+
+
+def greencash_report(prof: Profile, params: dict | None = None, purses: dict | None = None,
+                     players: int = 100, seed: int = 1, weeks: int = GC_WEEKS, policy: str = "wish",
+                     stalls: bool = True) -> dict:
+    """Medians over players: per league, the wait (sessions) from any session there to the next
+    build, and sessions from the start to the first item of that league's shelf; balances at weeks
+    4/8/12, the week-12 balance over the next item's price, race cash per race by league, cash
+    created and destroyed per week, and whether feed was always affordable."""
+    params, purses = params or PHASE3, purses or LEAGUE_B
+    rng = random.Random(seed)
+    runs = [greencash_player(rng, prof, params, purses, weeks, policy, stalls) for _ in range(players)]
+    rep: dict = {"league": {}}
+    for lg in LEAGUES:
+        waits, firsts, per_race = [], [], []
+        for r in runs:
+            buy_sessions = sorted({b[0] for b in r["buys"]})
+            for s, here in enumerate(r["leagues"]):
+                if here != lg:
+                    continue
+                nxt = next((b for b in buy_sessions if b >= s), None)
+                waits.append(nxt - s + 1 if nxt is not None else float("inf"))
+            first = next((b[0] + 1 for b in r["buys"] if b[1] == lg), None)
+            firsts.append(first if first is not None else float("inf"))
+            c, n = r["race_cash"][lg]
+            if n:
+                per_race.append(c / n)
+        reached = sum(1 for r in runs if lg in r["leagues"])
+        rep["league"][lg] = {
+            "reached": reached / players,
+            "wait": st.median(waits) if waits else None,
+            "wait_p75": sorted(waits)[int(len(waits) * 0.75)] if waits else None,
+            "first_item": st.median(firsts),
+            "cash_per_race": st.median(per_race) if per_race else None,
+        }
+    rep["balance"] = {w: st.median(r["balances"][w][0] for r in runs) for w in (4, 8, 12, 16) if w <= weeks}
+    # the pile check at week 12 (or the last week): balance over the next unowned item's price
+    pw = min(GC_WEEKS, weeks)
+    pile = sorted(b / n if n else float("inf") for b, n in (r["balances"][pw] for r in runs))
+    rep["pile"] = st.median(pile)
+    rep["pile_p90"] = pile[int(len(pile) * 0.9)]
+    cp = sorted(r["champion_pile"] for r in runs if r["champion_pile"] is not None)
+    rep["champion_pile"] = st.median(cp) if cp else None
+    rep["champion_pile_p90"] = cp[int(len(cp) * 0.9)] if cp else None
+    rep["owned"] = st.median(r["owned"] for r in runs)
+    rep["feed_ok"] = all(r["feed_ok"] for r in runs)
+    rep["created_per_week"] = st.median(r["created"] for r in runs) / weeks
+    rep["destroyed_per_week"] = st.median(r["destroyed"] for r in runs) / weeks
+    rep["end_cash"] = st.median(r["cash"] for r in runs)
+    return rep
+
+
+def _fmt(v) -> str:
+    return "-" if v is None else "all owned" if v == float("inf") else f"{v:.2f}"
+
+
+def print_greencash(purses: dict, players: int = 100, seed: int = 1, weeks: int = GC_RUN_WEEKS) -> None:
+    total = sum(it[3] for it in CATALOG)
+    tiers = {TIER_NAME[lg]: sum(it[3] for it in CATALOG if it[2] == lg) for lg in LEAGUES}
+    print(f"B {purses}, Cup {CUP_PURSE_B}B; catalog {total:,} ({tiers}) + stalls "
+          f"{sum(it[3] for it in STALL_ITEMS):,}; feed {FEED_COST}/session, jobs +{JOBS_CASH}/session")
+    print(f"targets: median wait <= {GAP_MAX} sessions up to Gold; week-{GC_WEEKS} balance <= {PILE_MAX}x next item; "
+          f"feed always affordable; perfect >= {PREMIUM_MIN}x cash per race")
+    for name in GC_PROFILES:
+        prof = PROFILES[name]
+        for policy in ("wish", "saver") if name == "casual" else ("wish",):
+            rep = greencash_report(prof, PHASE3, purses, players, seed, weeks, policy)
+            print()
+            print(f"{name} [{policy}] ({prof.sessions}x{prof.races} a week, {prof.kid} kid): "
+                  f"balance w{'/w'.join(map(str, rep['balance']))} {'/'.join(f'{v:,.0f}' for v in rep['balance'].values())}, "
+                  f"w{min(GC_WEEKS, weeks)} balance / next item {rep['pile']:.2f} (p90 {rep['pile_p90']:.2f}), "
+                  f"at Champion {_fmt(rep['champion_pile'])} (p90 {_fmt(rep['champion_pile_p90'])}), "
+                  f"owned {rep['owned']:.0f}/{len(_shelf())}, feed ok {rep['feed_ok']}, "
+                  f"created {rep['created_per_week']:,.0f}/wk, destroyed {rep['destroyed_per_week']:,.0f}/wk")
+            print(f"  {'league':9}{'reached':>8}{'wait':>6}{'p75':>5}{'1st item':>9}{'cash/race':>10}")
+            for lg, r in rep["league"].items():
+                def f(v, w, fmt):
+                    return f"{v:{w}{fmt}}" if v is not None and v != float("inf") else f"{'-':>{w}}"
+                print(f"  {lg:9}{r['reached']:8.0%}{f(r['wait'], 6, '.0f')}{f(r['wait_p75'], 5, '.0f')}"
+                      f"{f(r['first_item'], 9, '.0f')}{f(r['cash_per_race'], 10, '.0f')}")
+
+
 def race(rng: random.Random, my_mean: float, league: str):
     """One race; returns (place, cash)."""
     cfg = m.Config(T=14.4)
@@ -544,7 +784,14 @@ def main(argv=None):
     ap.add_argument("--silver", action="store_true", help="Silver Cup races-to-open by threshold (D-062)")
     ap.add_argument("--ladder", choices=["phase3", "current"], help="realistic-Rating ladder by profile (D-068)")
     ap.add_argument("--ladder-search", action="store_true", help="search anchors, ceilings and Cup points (D-068)")
+    ap.add_argument("--greencash", action="store_true", help="Barn Builder catalog against each profile's cash (D-070)")
+    ap.add_argument("--weeks", type=int, default=GC_RUN_WEEKS, help="--greencash: weeks to simulate")
+    ap.add_argument("--purses", help="--greencash: B per league, Rookie..Champion (default LEAGUE_B)")
     args = ap.parse_args(argv)
+    if args.greencash:
+        purses = dict(zip(LEAGUES, map(int, args.purses.split(",")))) if args.purses else LEAGUE_B
+        print_greencash(purses, min(args.players, 100), args.seed, args.weeks)
+        return
     if args.ladder_search:
         print(search_ladder(players=args.players, seed=args.seed))
         return

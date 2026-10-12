@@ -1,2 +1,3 @@
 - [Ladder Phase 3 retune](project_ladder_phase3.md) — D-068 realistic-Rating sim: PHASE3 anchors/Cup points/ceilings, Champion drift + cash flags
 - [Sim/config test conventions](sim_conventions.md) — strict conditional xfail until GameConfig lands; whole-ladder test; pin history tests
+- [Green Cash D-070](project_greencash_d070.md) — B 20/30/45/65/85, Barn Builder 45.3k catalog, sim gates, engaged post-Champion pile open

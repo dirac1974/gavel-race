@@ -22,7 +22,7 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 
 1. **Base win chance** from Race Ratings, floored so no horse is hopeless:
    `q_i = softmax(Rating_i / T)`, floor each `q_i` at 2.5%, renormalize. `T = 10 / ln 2 ≈ 14.4` means 10 rating points doubles a horse's chance.
-2. **Locked win purse in whole cash:** `Purse_i = round(B / q_i)`. Since `q_i · B / q_i = B`, every horse expects `B` of win cash at average play, up to rounding: whole-cash rounding moves a horse's expectation by at most `0.5 q_i` cash, a share of `0.5 q_i / B` (worst case about 1% in Rookie, under 0.2% from Silver up). An earlier version rounded to 5 cash and claimed < 0.2%; that bound was wrong for small purses (up to ~4.4% in Rookie), so D-017 switched to whole cash. Place prizes are flat: 2nd 1.2B, 3rd 0.8B, 4th 0.4B.
+2. **Locked win purse in whole cash:** `Purse_i = round(B / q_i)`. Since `q_i · B / q_i = B`, every horse expects `B` of win cash at average play, up to rounding: whole-cash rounding moves a horse's expectation by at most `0.5 q_i` cash, a share of `0.5 q_i / B` (worst case about 1% in any league at the D-070 purses, B 20–85). An earlier version rounded to 5 cash and claimed < 0.2%; that bound was wrong for small purses (up to ~4.4% in Rookie), so D-017 switched to whole cash. Place prizes are flat: 2nd 1.2B, 3rd 0.8B, 4th 0.4B.
 3. **Gavel window score:** `s = 100 (1 − d)`, `d` = distance from meter center / half-width. Constant-speed (triangle-wave) meter, so a random tap averages 50. `S` = mean of three windows. *Superseded in the game by stride stretches (D-022): each window's score is the mean beat score of a stride stretch; a Final Burst tap after the last stretch counts double, so `S = (stretch₁ + stretch₂ + stretch₃ + 2 · burst) / 5`, still 0–100, and steps 4–6 are unchanged.*
 4. **Skill vs. this race:** `R_i = clamp((S_i − mean S) / 50, −0.5, 1)`, mean over all lanes in the race. During the race, use only the windows played so far.
 5. **Live win chance (exponential tilt):** `p'_i = q_i · e^{κ R_i} / Σ_j q_j · e^{κ R_j}`, `κ = 1.0`. With the crowd boost (D-020) and race steering (D-054) the exponent becomes `κ R_i + c_i + τ_i`:
@@ -40,7 +40,7 @@ The target platform (Roblox) prohibits both simulated and actual gambling, inclu
 | Equal play returns base chances | On average, if average play is exactly S = 50 | Exact whenever every lane scores the same |
 | Prices locked before the race | Yes | Yes (cash purses) |
 | Expected cash per race fixed | Exact | Within about 0.2–0.5% |
-| Rounding treats horses equally | No | Close: ±`0.5 q / B` (≤ 1% in Rookie, ≤ 0.2% from Silver up) |
+| Rounding treats horses equally | No | Close: ±`0.5 q / B` (about 1% at most in every league at B 20–85) |
 
 **Known edge case (tested):** if your skill is already at the floor and a rival is already capped at R = 1, other riders scoring higher raises the race average, lowers them, and can raise your chance slightly (+0.05 points in the worst case found). Whenever no clamp binds, a rival improving never raises your chance.
 
@@ -56,7 +56,7 @@ Because the tilt rescales the whole field, adding the same constant to every `R`
 | `κ` | 1.0 (range 1.0–1.2) | Who earns upsets: how much timing moves win chance |
 | `q` floor | 2.5% | Smallest win chance; biggest purse ≈ 40B |
 | `R` floor | −0.5 | How much one bad race can hurt |
-| `B` | Rookie 20 → Champion 750 | Expected win cash per entry; the race faucet |
+| `B` | Rookie 20, Bronze 30, Silver 45, Gold 65, Champion 85 (D-070; was 20 → 750) | Expected win cash per entry; the race faucet |
 | `α` (reserve) | 1.0 | `Purse ∝ q^(−α)`; α < 1 lets favorites expect more win cash |
 
 ## Results

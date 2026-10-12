@@ -6,6 +6,8 @@
 
 local Care = if script then require(script.Parent.Care) :: any else require("./Care")
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
+local Style = if script then require(script.Parent.Style) :: any else require("./Style")
+local BarnCatalog = if script then require(script.Parent.BarnCatalog) :: any else require("./BarnCatalog")
 
 local Advice = {}
 
@@ -82,7 +84,40 @@ local function jobReady(j: any): boolean
 	return not j.claimed and (j.progress or 0) >= (j.target or 1)
 end
 
-function Advice.nextThing(profile: any, now: number): Next
+-- Barn Builder's "You can build the <item>!" (D-070): your wish is affordable, once per item (until
+-- profile.style.wishTold names it), with GO to Feed & Seed. It ranks below racing first, job prizes,
+-- feeding, brushing and the Cup (nextThing's order). Never without a context, never while the tour
+-- runs, while you're in line, racing or training, on the results card or while Race again shows, and
+-- never within greenCash.pillAfterRaceSeconds of your race.
+--   ctx = { sinceRace: number? (seconds since your race ended; nil = no race yet), busy: boolean?,
+--           resultsOpen: boolean?, raceAgain: boolean?, touring: boolean? }
+export type BuildCtx = { sinceRace: number?, busy: boolean?, resultsOpen: boolean?, raceAgain: boolean?, touring: boolean? }
+
+function Advice.buildPill(profile: any, ctx: BuildCtx?): Next?
+	local cfg = GameConfig.greenCash
+	if not cfg or cfg.enabled == false or not ctx or not profile then return nil end
+	if ctx.busy or ctx.resultsOpen or ctx.raceAgain or ctx.touring then return nil end
+	if ctx.sinceRace ~= nil and ctx.sinceRace < (cfg.pillAfterRaceSeconds or 120) then return nil end
+	local it, fill = Style.wishProgress(profile)
+	if not it or fill < 1 or not Style.tierOpen(profile, it) then return nil end
+	if typeof(profile.style) == "table" and profile.style.wishTold == it.id then return nil end
+	return { key = "build:" .. it.id, emoji = it.emoji, icon = "cash", text = "You can build the " .. it.name .. "!", go = "feedStore" }
+end
+
+-- "New shelf at Barn Builder!" (D-070, the UI/UX consult): once after a horse reaches a new league
+-- (bestLeague above style.shelfSeen), with GO to Feed & Seed. The same calm-moment rules as buildPill.
+function Advice.shelfPill(profile: any, ctx: BuildCtx?): Next?
+	local cfg = GameConfig.greenCash
+	if not cfg or cfg.enabled == false or cfg.shelfNote == false or not ctx or not profile then return nil end
+	if ctx.busy or ctx.resultsOpen or ctx.raceAgain or ctx.touring then return nil end
+	if ctx.sinceRace ~= nil and ctx.sinceRace < (cfg.pillAfterRaceSeconds or 120) then return nil end
+	local best = BarnCatalog.tierIndex(profile.bestLeague)
+	local seen = typeof(profile.style) == "table" and BarnCatalog.tierIndex(profile.style.shelfSeen) or nil
+	if not best or not seen or best <= seen then return nil end
+	return { key = "shelf:" .. profile.bestLeague, emoji = "🔨", icon = "cash", text = "New shelf at Barn Builder!", go = "feedStore" }
+end
+
+function Advice.nextThing(profile: any, now: number, ctx: BuildCtx?): Next
 	local h = profile and activeHorse(profile)
 	if not h then
 		return { key = "starter", emoji = "🐴", icon = "heart", text = "Pick your first horse!", go = "starter" }
@@ -110,6 +145,8 @@ function Advice.nextThing(profile: any, now: number): Next
 	if h.cupOpen and not h.resting then
 		return { key = "cup:" .. tostring(h.id), emoji = "🏆", icon = "trophy", text = "Win the Cup with " .. name .. "!", go = "race" }
 	end
+	local build = Advice.shelfPill(profile, ctx) or Advice.buildPill(profile, ctx)
+	if build then return build end
 	for i, j in jobs.daily or {} do
 		if not j.claimed then
 			local go = if j.go == "raceBoard" then "race" else j.go

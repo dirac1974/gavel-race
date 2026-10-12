@@ -1,6 +1,10 @@
 --!nonstrict
 -- StyleService (D-050): the Tack & Paint shop on the server.
 --   Looks: buy with Diamonds, wear, put away, return within 24 hours.
+--   Barn Builder (D-070): BuyCash builds a BarnCatalog item with Green Cash (checked again here:
+--   the item, its tier against the best league ever reached, the Green Cash, not owned, the race
+--   window and a buy gap; paid and owned in one step), StyleWish sets the wish, StyleReturn gives
+--   back the currency paid. Green Cash is never sold and never swapped for Diamonds.
 --   Diamond packs: the server shows Roblox's purchase prompt only when it's a calm moment:
 --   never while you're in line, racing, on your results, or for 2 minutes after your race; never
 --   past our own daily and monthly caps; never if PolicyService can't be read (treated as
@@ -18,11 +22,20 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Style = require(Shared:WaitForChild("Style"))
 local DiamondProducts = require(Shared:WaitForChild("DiamondProducts"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
+local Profile = require(Shared:WaitForChild("Profile"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 
 local StyleBuy = Profiles.remote("StyleBuy")         -- client -> server: item id
 local StyleWear = Profiles.remote("StyleWear")       -- client -> server: item id, wear (bool)
 local StyleReturn = Profiles.remote("StyleReturn")   -- client -> server: item id
 local BuyDiamonds = Profiles.remote("BuyDiamonds")   -- client -> server: pack index
+-- Barn Builder (D-070): Green Cash only, never Diamonds, never sold.
+local BuyCash = Profiles.remote("BuyCash")           -- client -> server: item id
+local CashBuilt = Profiles.remote("CashBuilt")       -- server -> client: item id (the build moment)
+local StyleWish = Profiles.remote("StyleWish")       -- client -> server: item id or "" (clear)
+local WishTold = Profiles.remote("WishTold")         -- client -> server: item id (its "You can build" pill was shown)
+local ShelfSeen = Profiles.remote("ShelfSeen")       -- client -> server: the "New shelf" note was shown
+local GC = GameConfig.greenCash or {}
 
 local last: { [Player]: number } = {}
 local policyOk: { [Player]: boolean } = {}
@@ -62,6 +75,8 @@ local function blocked(player: Player, data, pack): string?
 end
 
 Profiles.addDecorator(function(data, view)
+	Profile.syncBestLeague(data) -- the high-water mark (D-070): a promotion opens the next shelf
+	view.bestLeague = data.bestLeague
 	local day, month = spent(data, os.time())
 	local packs = {}
 	for i, pack in DiamondProducts.packs do
@@ -85,6 +100,76 @@ StyleBuy.OnServerEvent:Connect(function(player: Player, id: any)
 	if ok then Profiles.changed(player) end
 end)
 
+-- The high-water mark moves the moment anything changes (a Cup promotion calls Profiles.changed), not
+-- only when a view is built; it never goes down (D-070).
+Profiles.Changed.Event:Connect(function(player: Player)
+	local data = Profiles.get(player)
+	if data then Profile.syncBestLeague(data) end
+end)
+
+-- Why building with Green Cash isn't possible right now (nil = it is): never in line, racing,
+-- on a training ride or within greenCash.pillAfterRaceSeconds of your race, like the 💎 door.
+local function cashWindowShut(player: Player): string?
+	if GC.enabled == false then return "Barn Builder is closed right now." end
+	if player:GetAttribute("Racing") or player:GetAttribute("InLine") or player:GetAttribute("TrainingRide") then
+		return "Barn Builder opens after your race."
+	end
+	local raceEnd = player:GetAttribute("LastRaceEnd")
+	if typeof(raceEnd) == "number" and os.time() - raceEnd < (GC.pillAfterRaceSeconds or 120) then
+		return "Barn Builder opens a little after your race."
+	end
+	return nil
+end
+
+local lastBuy: { [Player]: number } = {}
+BuyCash.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player) or typeof(id) ~= "string" or #id > 40 then return end
+	if os.clock() - (lastBuy[player] or -math.huge) < (GC.buyGapSeconds or 1) then return end
+	lastBuy[player] = os.clock()
+	local data = Profiles.get(player)
+	if not data then return end
+	local why = cashWindowShut(player)
+	if why then
+		Profiles.notify(player, why, "heart")
+		return
+	end
+	Profile.syncBestLeague(data)
+	local ok, msg = Style.buyCash(data, id, os.time()) -- checks, pays and owns in one step
+	if not ok then
+		Profiles.notify(player, msg, "cash")
+		return
+	end
+	Profiles.changed(player)
+	CashBuilt:FireClient(player, id)
+end)
+
+StyleWish.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player) or (id ~= nil and typeof(id) ~= "string") then return end
+	local data = Profiles.get(player)
+	if not data then return end
+	Profile.syncBestLeague(data)
+	local ok = Style.setWish(data, if id == "" then nil else id)
+	if ok then Profiles.changed(player) end
+end)
+
+WishTold.OnServerEvent:Connect(function(player: Player, id: any)
+	if busy(player) or typeof(id) ~= "string" then return end
+	local data = Profiles.get(player)
+	if not data or not data.style or data.style.wish ~= id or data.style.wishTold == id then return end
+	data.style.wishTold = id
+	Profiles.changed(player)
+end)
+
+ShelfSeen.OnServerEvent:Connect(function(player: Player)
+	if busy(player) then return end
+	local data = Profiles.get(player)
+	if not data or not data.style then return end
+	Profile.syncBestLeague(data)
+	if data.style.shelfSeen == data.bestLeague then return end
+	data.style.shelfSeen = data.bestLeague
+	Profiles.changed(player)
+end)
+
 StyleWear.OnServerEvent:Connect(function(player: Player, id: any, wear: any)
 	if busy(player) or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
@@ -101,8 +186,9 @@ StyleReturn.OnServerEvent:Connect(function(player: Player, id: any)
 	if busy(player) or typeof(id) ~= "string" then return end
 	local data = Profiles.get(player)
 	if not data then return end
+	local it = Style.item(id)
 	local ok, msg = Style.giveBack(data, id, os.time())
-	Profiles.notify(player, msg, "diamond")
+	Profiles.notify(player, msg, if it and Style.isCash(it) then "cash" else "diamond")
 	if ok then Profiles.changed(player) end
 end)
 
@@ -131,5 +217,5 @@ end
 Players.PlayerAdded:Connect(checkPolicy)
 for _, p in Players:GetPlayers() do task.spawn(checkPolicy, p) end
 Players.PlayerRemoving:Connect(function(player: Player)
-	last[player], policyOk[player] = nil, nil
+	last[player], policyOk[player], lastBuy[player] = nil, nil, nil
 end)

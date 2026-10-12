@@ -1338,7 +1338,7 @@ def world_sheet(w: dict[str, tuple[int, int, str]]) -> str:
 # (tools/roblox/upload_assets.py TEXTURES). Tileable left to right; transparent backgrounds.
 # Crowd: cheerful toy fans, no real people, no logos or words, hands empty or holding a little pennant
 # (never paper slips or tickets).
-STRIP_NAMES = ["bunting_strip", "crowd_strip", "confetti_square", "flag_pennant"]
+STRIP_NAMES = ["bunting_strip", "crowd_strip", "confetti_square", "flag_pennant", "horse_silhouette"]
 FAN_SKIN = ["#FFCC99", "#C69C6D", "#7C4A2D", "#EAB892"]  # the jockeys' skin set (TrackScene SKIN)
 FAN_SHIRT = [(ORANGE, ORANGE_DARK), (TEAL, "#0F7A72"), (SKY, "#4FA9DB"), (GOLD, GOLD_DARK)]
 CHEEK = "#F2607E"
@@ -1431,12 +1431,49 @@ def flag_pennant() -> str:
     )
 
 
+def horse_silhouette() -> str:
+    """512 x 320 Decal for the Barn Builder weathervane (D-070, BarnDecor): a trotting horse in matte painted iron,
+    facing right (+X, the way the arrow points), shown on both faces of a thin panel. One flat colour with a thin pale
+    rim so it reads against the sky and the roof at 40 px; calm, ears forward, no saddle, no rider."""
+    iron, rim = "#2B2B30", "#FBFBF5"
+    body = (
+        '<ellipse cx="246" cy="172" rx="122" ry="46"/>'
+        # neck and head: a long face sloping down to the muzzle, two ears forward
+        '<path d="M316 150 C326 116 350 80 384 58 L398 50 L396 30 L412 46 L420 28 L428 50 '
+        'C444 58 462 78 480 104 C488 116 486 128 472 132 C460 134 448 128 436 120 '
+        'C424 112 414 116 406 128 C394 150 384 178 368 200 Z"/>'
+        # the mane along the crest
+        '<path d="M330 128 C344 98 362 74 392 56 L398 70 C376 86 360 108 348 138 Z"/>'
+        # tail, set high on the rump and flowing down
+        '<path d="M132 150 C104 150 84 172 76 206 C70 230 76 252 90 264 C92 236 104 206 132 188 Z"/>'
+    )
+    legs = "".join(
+        f'<path d="M{x0} {y0} L{x1} {y1} L{x2} {y2}" fill="none" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>'
+        for (x0, y0, x1, y1, x2, y2) in (
+            (346, 190, 374, 238, 392, 284),   # near fore, reaching
+            (322, 196, 316, 244, 304, 288),   # far fore
+            (172, 196, 150, 238, 128, 276),   # near hind, pushing off
+            (202, 202, 214, 248, 222, 290),   # far hind
+        )
+    )
+    hooves = "".join(f'<ellipse cx="{x}" cy="{y}" rx="12" ry="7"/>' for (x, y) in ((396, 290), (304, 294), (124, 282), (224, 296)))
+    shape = body + hooves
+    return (
+        f'<g fill="{rim}" stroke="{rim}" stroke-width="10" stroke-linejoin="round">{shape}</g>'
+        f'<g stroke="{rim}" fill="none">{legs.replace('stroke-width="16"', 'stroke-width="26"')}</g>'
+        f'<g fill="{iron}">{shape}</g>'
+        f'<g stroke="{iron}" fill="none">{legs}</g>'
+        f'<circle cx="440" cy="76" r="4" fill="{rim}"/>'
+    )
+
+
 def strip_assets() -> dict[str, tuple[int, int, str]]:
     return {
         "bunting_strip": (512, 128, bunting_strip()),
         "crowd_strip": (512, 192, crowd_strip()),
         "confetti_square": (64, 64, confetti_square()),
         "flag_pennant": (256, 128, flag_pennant()),
+        "horse_silhouette": (512, 320, horse_silhouette()),
     }
 
 
