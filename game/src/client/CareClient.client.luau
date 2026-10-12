@@ -12,6 +12,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
+local GoTo = require(script.Parent:WaitForChild("GoTo")) -- Find it (D-075): GO opens this feature
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
@@ -436,5 +437,7 @@ task.spawn(function()
 	end
 	shopPrompt()
 end)
+
+GoTo.register("feedShop", shopCard)
 
 -- Toasts for results come from the server's Notice remote (Hud).

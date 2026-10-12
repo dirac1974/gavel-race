@@ -48,6 +48,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import pickle
 import random
 import sys
 import time
@@ -66,7 +68,7 @@ REPORT_SEED = 20261006
 GRIEF_SEED = 20261008
 STRESS_SEED = 20261009
 BASELINE_RACES = 2000     # per course x distance: each post gets this many Smart Steer riders
-REPORT_RACES = 600
+REPORT_RACES = 1000        # D-072 ruling 1: >= 1,000 report races per cell for the post bias
 GRIEF_RACES = 200         # D-057: per course x distance, each scenario and kid policy
 STRESS_RACES = 500        # D-057: per course x distance (4,000 in all)
 PROBE_RACES = 4           # the first races of each cell, stored for the regeneration test
@@ -81,6 +83,9 @@ REPORT_JSON_D057 = ROOT / "tests" / "fixtures" / "steering_report_d057.json"
 BASELINE_JSON_D054 = ROOT / "tests" / "fixtures" / "trip_baseline_d054.json"
 REPORT_JSON_D054 = ROOT / "tests" / "fixtures" / "steering_report_d054.json"
 PROFILES = ("live", "d057", "d054")
+OVERTAKE_FEET = 8.0     # D-072 drawn overtakes (ruling 8): from a length behind to a length clear...
+OVERTAKE_HOLD_TICKS = 20  # ...held this long (2 s)...
+OVERTAKE_LANES = 1.5    # ...of a neighbour (within this many lanes)
 
 # League temperatures that run each distance (GameConfig.leagues: Rookie runs Sprint and
 # Mile, Bronze adds the Classic, Silver and up run everything).
@@ -96,12 +101,13 @@ LATENCY_GRACE = 0.35              # RaceService: a checkpoint closes this long a
 
 FOCAL = ("rail", "never", "wanderer", "scripted")
 FOCAL_D057 = FOCAL + ("masher", "ditherer")
+FOCAL_D072 = FOCAL_D057 + ("lit",)  # D-072 ruling 2: the press-when-lit rider, report only
 POLICIES = ("smart",) + FOCAL
 POLICIES_D057 = ("smart",) + FOCAL_D057
 GRIEFERS = ("shadow", "crew_in", "crew_out", "crew_ahead", "bumper")
 PRESSERS = ("rail", "wanderer", "scripted", "masher", "ditherer", "doubletap") + GRIEFERS
 KIND = {"bot": "bot", "smart": "smart", "rail": "smart", "never": "manual", "wanderer": "smart", "scripted": "smart",
-        "masher": "smart", "ditherer": "smart", "doubletap": "smart", "shadow": "smart", "crew_in": "smart", "crew_out": "smart",
+        "masher": "smart", "ditherer": "smart", "lit": "smart", "doubletap": "smart", "shadow": "smart", "crew_in": "smart", "crew_out": "smart",
         "crew_ahead": "smart", "bumper": "smart"}
 
 TARGETS = {
@@ -125,6 +131,16 @@ TARGETS_D057 = {
 }
 
 # Mirrors GameConfig.steerView (D-057, N3's SteerPose) for the body-turn estimate.
+# D-072 phase A (race realism; consensus.md, racing-plan.md section 4).
+TARGETS_D072 = {"post_bias": 0.002,          # ruling 1: kid among bots (all-Smart <= 0.003, reported)
+                "allsmart_post_bias": 0.003, "style_bias": 0.002, "tau_p99": 0.04, "drift_rel": 3.0,
+                "smart_mean": 0.003,        # ruling 5: a passive kid among bots nets 0 +- this
+                "intent3s": 0.55, "intent6s": 0.85,  # ruling 3
+                "masher_reversals_per_min": 8.0,     # ruling 4 (8.5 only if 8 still fails at weaveWindowSeconds 8)
+                "passes_sprint": (1.0, 10.0), "passes": (3.0, 10.0),  # ruling 8: Trip passes a race
+                "overtakes": (3.0, 15.0),   # ruling 8: drawn overtakes, a length clear held 2 s
+                "pass_along_min": 0.8}      # feel: every completed pass alongside at least this long
+
 STEER_VIEW = {"yawGain": 1.0, "yawMaxDeg": 10.0, "yawSmoothSeconds": 0.15, "leanDegPerFtps2": 0.12, "leanMaxDeg": 3.0}
 
 # D-057 griefing scenarios: (stranger policies, feet ahead of the kid's skill target for each).
@@ -176,6 +192,44 @@ def profile_config(profile: str) -> Dict:
     raise ValueError(f"unknown profile {profile!r}")
 
 
+def _peak_mb() -> float:
+    """This process's peak working set in MB (Windows; 0 elsewhere). For --mem only."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+        pmc = PMC()
+        pmc.cb = ctypes.sizeof(PMC)
+        k32 = ctypes.WinDLL("kernel32")
+        psapi = ctypes.WinDLL("psapi")
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        psapi.GetProcessMemoryInfo(k32.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb)
+        return pmc.PeakWorkingSetSize / 2 ** 20
+    except Exception:  # noqa: BLE001 - not Windows
+        return 0.0
+
+
+def _mem(label: str) -> None:
+    """--mem: print this process's peak working set to stderr (never into any output)."""
+    if os.environ.get("STEERING_MEM"):
+        print(f"[mem] pid {os.getpid()} {label}: peak {_peak_mb():.0f} MB", file=sys.stderr, flush=True)
+
+
+OUT_DIR: Optional[Path] = None  # --out: write the files here instead (a scratch run)
+
+
+def _out(path: Path) -> Path:
+    return path if OUT_DIR is None else OUT_DIR / path.name
+
+
 def baseline_path(profile: str) -> Path:
     return {"live": BASELINE_JSON, "d057": BASELINE_JSON_D057, "d054": BASELINE_JSON_D054}[profile]
 
@@ -198,7 +252,16 @@ def race_setup(seed: int, distance: str) -> Dict:
     p1 = m.live_chances(q, m.skills(s1, mcfg), mcfg)
     uniforms = [rng.random() for _ in range(2 * LANES)]
     focal = rng.randrange(LANES)
-    return {"q": q, "p1": p1, "s1": s1, "uniforms": uniforms, "focal": focal, "press_seed": rng.getrandbits(32)}
+    press_seed = rng.getrandbits(32)
+    # D-072: seven more per lane, after every earlier draw (so those keep their values)
+    uniforms72 = [rng.random() for _ in range(trip.D072_UNIFORMS * LANES)]
+    return {"q": q, "p1": p1, "s1": s1, "uniforms": uniforms, "focal": focal, "press_seed": press_seed,
+            "uniforms72": uniforms72}
+
+
+def race_uniforms(setup: Dict, cfg: Dict) -> List[float]:
+    """The uniforms Trip consumes: two per lane, and D-072's seven per lane after them when on."""
+    return setup["uniforms"] + setup["uniforms72"] if trip.d072_on(cfg) else setup["uniforms"]
 
 
 def switch_tick(geo: Dict, cfg: Dict = trip.CONFIG) -> int:
@@ -265,6 +328,13 @@ class Rider:
                 self.again_dir = d
                 self.again_at = tick + int(self.rng.uniform(3, 9))
                 return d
+        elif p == "lit":
+            # D-072 ruling 2 (phase C's gate, reported now): a horse within 20 ft ahead in its lane and a
+            # side with room ("lit"): press that way, outside first, at most every 0.3 s
+            if tick % 3 == 0 and st.x[i] == st.tgt[i] and st.want[i] == 0 and trip.horse_ahead(st, i, 20.0):
+                for d in (1, -1):
+                    if trip.side_state(st, i, d) == "free":
+                        return d
         elif p == "ditherer":
             if tick % 2 == 0:
                 self.flip = -self.flip
@@ -297,7 +367,16 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
     "motion" (the focal horse's lane-change starts; every horse's sideways speed, acceleration
     and estimated body yaw and lean), "stress" (overlaps and the fastest fall-back)."""
     kinds = [KIND[p] for p in policies]
-    st = trip.new_state(posts(), setup["q"], setup["uniforms"], geo, cfg, kinds)
+    st = trip.new_state(posts(), setup["q"], race_uniforms(setup, cfg), geo, cfg, kinds)
+    d072 = trip.d072_on(cfg)
+    pack_on = d072 and "pack" in measure
+    behind: Dict[Tuple[int, int], Tuple[int, int, int]] = {}  # D-072 overtakes: (i, j) -> (order, candidate, since)
+    overtakes = overtakes_straight = 0
+    drift_rel = 0.0
+    prev_drift: List[float] = list(st.drift)
+    along_acc = [0.0] * LANES
+    pass_along: List[float] = []
+    ev_seen = 0
     press_rng = random.Random(setup["press_seed"])
     riders = {i: Rider(p, press_rng, focal) for i, p in enumerate(policies) if p in PRESSERS}
     dt = 1.0 / cfg["tickHz"]
@@ -313,6 +392,8 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
     # so in practice a first press is accepted, queued, cancelled or bounds.
     pending: List[Tuple[int, int, int, bool, bool]] = []
     reach_ok = reach_n = intent_ok = intent_n = 0
+    pending6: List[Tuple[int, int, int]] = []  # D-072 ruling 3: the same intents, within 6 s
+    intent6_ok = intent6_n = 0
     last_press: Dict[int, int] = {}
     counts = {"accepted": 0, "queued": 0, "cancelled": 0, "bounds": 0, "rate": 0, "locked": 0, "invalid": 0}
     min_gap = math.inf
@@ -360,6 +441,8 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
             per_intent = first and ans in ("accepted", "queued", "cancelled", "steady", "brush")
             if d < 0 and (per_press or per_intent) and (tick + reach_ticks) * dt <= t_lock:
                 pending.append((i, goal, tick + reach_ticks, per_press, per_intent))
+            if d < 0 and per_intent and (tick + 2 * reach_ticks) * dt <= t_lock:
+                pending6.append((i, goal, tick + 2 * reach_ticks))
             if boxed_on and i == focal and ans in ("accepted", "queued") and (tick + 10) * dt <= t_lock:
                 waits.append((tick, st.tgt[i], d))
         still = []
@@ -379,6 +462,16 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
             else:
                 still.append((lane_i, goal, deadline, per_press, first))
         pending = still
+        still6 = []
+        for lane_i, goal, deadline in pending6:
+            if st.x[lane_i] <= goal + trip.EPS:
+                intent6_ok += 1
+                intent6_n += 1
+            elif tick >= deadline:
+                intent6_n += 1
+            else:
+                still6.append((lane_i, goal, deadline))
+        pending6 = still6
         for i in range(LANES):
             for j in range(i + 1, LANES):
                 if abs(st.x[i] - st.x[j]) < cfg["laneBand"]:
@@ -428,6 +521,42 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
                 for j in range(i + 1, LANES):
                     if abs(st.x[i] - st.x[j]) < 0.5 and abs(st.off[i] - st.off[j]) < 6.0:
                         overlaps += 1
+        if pack_on:
+            # Drawn overtakes before the lock (ruling 8): neighbours (within OVERTAKE_LANES) whose order
+            # flips from a length (OVERTAKE_FEET) one way to a length the other, the new order held
+            # OVERTAKE_HOLD_TICKS; and the drift's relative speed between any two horses.
+            in_turn, _ = trip._turn_info(geo, st.speed * t)
+            for i in range(LANES):
+                for j in range(i + 1, LANES):
+                    a = st.off[i] - st.off[j]
+                    side = 1 if a >= OVERTAKE_FEET else (-1 if a <= -OVERTAKE_FEET else 0)
+                    if abs(st.x[i] - st.x[j]) > OVERTAKE_LANES:
+                        side = 0
+                    was, cand, since = behind.get((i, j), (0, 0, 0))
+                    if side != cand:
+                        cand, since = side, tick
+                    if cand != 0 and cand != was and tick - since >= OVERTAKE_HOLD_TICKS:
+                        if was != 0:
+                            overtakes += 1
+                            overtakes_straight += 0 if in_turn else 1
+                        was = cand
+                    behind[(i, j)] = (was, cand, since)
+            # D-072 feel: time alongside (within pass.alongFeet) in each completed pass
+            for i in range(LANES):
+                j = st.pass_from[i]
+                if j >= 0 and abs(st.off[i] - st.off[j]) < cfg["pass"]["alongFeet"]:
+                    along_acc[i] += dt
+            for e in st.pack_events[ev_seen:]:
+                if e[1] == "pass":
+                    pass_along.append(along_acc[e[2]])
+                if e[1] in ("pass", "out"):
+                    along_acc[e[2]] = 0.0
+            ev_seen = len(st.pack_events)
+            if tick > 0:
+                for i in range(LANES):
+                    for j in range(i + 1, LANES):
+                        drift_rel = max(drift_rel, abs((st.drift[i] - prev_drift[i]) - (st.drift[j] - prev_drift[j])) / dt)
+            prev_drift = list(st.drift)
         tick += 1
     lock_x = list(st.x)
     trip.lock(st)
@@ -442,6 +571,18 @@ def run_race(geo: Dict, setup: Dict, policies: Sequence[str], cfg: Dict = trip.C
                     "vhist": vhist, "ahist": ahist, "yhist": yhist})
     if stress_on:
         out["overlaps"], out["back_max"] = overlaps, back_max
+    if d072:
+        ev = st.pack_events
+        out["intent6"] = (intent6_ok, intent6_n)
+        out["style"] = list(st.style)
+        out["outs"] = sum(1 for e in ev if e[1] == "out")
+        out["passes"] = sum(1 for e in ev if e[1] == "pass")
+        out["passes_straight"] = sum(1 for e in ev if e[1] == "pass" and e[4] == 0)
+        out["shuts"] = sum(1 for e in ev if e[1] == "shut")
+        out["shut_on"] = [sum(1 for e in ev if e[1] == "shut" and e[3] == i) for i in range(LANES)]
+        if pack_on:
+            out["overtakes"], out["overtakes_straight"], out["drift_rel"] = overtakes, overtakes_straight, drift_rel
+            out["pass_along"] = pass_along
     return out
 
 
@@ -460,7 +601,7 @@ def glide_seconds(cfg: Dict, lanes: int = 1) -> Optional[float]:
     """A free glide of `lanes` lanes inward (one press each, pressed as soon as the queue takes
     it, the field far behind), from the first press to landing."""
     geo = trip.phase_a("dirt", "Mile")
-    st = trip.new_state([5, 1, 2, 3, 4, 6, 7, 8], [0.125] * 8, [0.5] * 16, geo, cfg, ["manual"] * 8)
+    st = trip.new_state([5, 1, 2, 3, 4, 6, 7, 8], [0.125] * 8, [0.5] * 72, geo, cfg, ["manual"] * 8)
     for i in range(1, 8):
         st.off[i] = -200.0 - 20 * i
     live = [0.125] * 8
@@ -486,40 +627,64 @@ def _baseline_chunk(args) -> List[Dict]:
     course, distance = cells()[cell]
     geo = trip.phase_a(course, distance)
     out = []
+    d072 = trip.d072_on(cfg)
     for k in range(k0, k1):
         setup = race_setup(race_seed(SEED, cell, k), distance)
-        sweep = [run_race(geo, setup, smart_at(p), cfg)["trip"] for p in range(LANES)]
-        allsmart = run_race(geo, setup, ["smart"] * LANES, cfg)["trip"]
-        out.append({"sweep": sweep, "allsmart": allsmart})
+        if not d072:
+            sweep = [run_race(geo, setup, smart_at(p), cfg)["trip"] for p in range(LANES)]
+            allsmart = run_race(geo, setup, ["smart"] * LANES, cfg)["trip"]
+            out.append({"sweep": sweep, "allsmart": allsmart})
+            continue
+        res = [run_race(geo, setup, smart_at(p), cfg) for p in range(LANES)]
+        alls = run_race(geo, setup, ["smart"] * LANES, cfg)
+        out.append({"sweep": [r["trip"] for r in res], "allsmart": alls["trip"],
+                    "styles": [r["style"] for r in res], "allsmart_styles": alls["style"]})
+    _mem("baseline chunk")
     return out
 
 
-def _tau(res: Dict, row: Sequence[float], cfg: Dict) -> List[float]:
+def style_lanes(styles: Sequence[int], srow: Optional[Sequence[float]]) -> Optional[List[float]]:
+    """Each lane's per-style baseline (D-072), or None without a style row."""
+    if srow is None:
+        return None
+    return [srow[s] for s in styles]
+
+
+def _tau(res: Dict, row: Sequence[float], cfg: Dict, srow: Optional[Sequence[float]] = None) -> List[float]:
     if not trip.d057_on(cfg):
         return trip.tau(res["trip"], posts(), row, cfg)
+    if trip.d072_on(cfg):
+        return trip.tau(res["trip"], posts(), row, cfg, res["brush_cost"], style_lanes(res["style"], srow))
     return trip.tau(res["trip"], posts(), row, cfg, res["brush_cost"])
 
 
 def _report_chunk(args) -> List[Dict]:
-    cell, k0, k1, cfg, table = args
+    cell, k0, k1, cfg, table, *more = args
     d057 = trip.d057_on(cfg)
+    d072 = trip.d072_on(cfg)
     course, distance = cells()[cell]
     geo = trip.phase_a(course, distance)
     row = trip.baseline_row(table, course, distance)
+    srow = trip.style_row(more[0], course, distance) if d072 and more and more[0] else None
     out = []
     for k in range(k0, k1):
         setup = race_setup(race_seed(REPORT_SEED, cell, k), distance)
         f = setup["focal"]
         rec: Dict = {"focal": f, "p1": setup["p1"], "s1": setup["s1"]}
-        bots = run_race(geo, setup, ["bot"] * LANES, cfg)
-        rec["bot_tau"] = _tau(bots, row, cfg)
+        bots = run_race(geo, setup, ["bot"] * LANES, cfg, measure=("pack",) if d072 else ())
+        rec["bot_tau"] = _tau(bots, row, cfg, srow)
+        if d072:
+            rec["bot_style"] = bots["style"]
+            rec["bot_raw"] = trip.tau_unclamped(bots["trip"], posts(), row, cfg, style_lanes(bots["style"], srow))
+            rec["pack"] = {k: bots[k] for k in ("outs", "passes", "passes_straight", "shuts", "overtakes",
+                                                 "overtakes_straight", "drift_rel", "pass_along")}
         rec["bot_ground"] = bots["ground"]
         rec["bot_draft"] = bots["draft"]
         rec["min_gap"] = bots["min_gap"]
         sweep_tau, sweep_lane, sweep_boxed = [], [], []
         for p in range(LANES):
             res = run_race(geo, setup, smart_at(p), cfg, focal=p, measure=("boxed",) if d057 else ())
-            sweep_tau.append(_tau(res, row, cfg)[p])
+            sweep_tau.append(_tau(res, row, cfg, srow)[p])
             sweep_lane.append(res["lock_x"][p])
             rec["min_gap"] = min(rec["min_gap"], res["min_gap"])
             if d057:
@@ -528,15 +693,15 @@ def _report_chunk(args) -> List[Dict]:
         rec["smart"] = {"tau": sweep_tau[f], "lane": sweep_lane[f]}
         if d057:
             rec["sweep_boxed"] = sweep_boxed
-        for pol in FOCAL_D057 if d057 else FOCAL:
+        for pol in (FOCAL_D072 if d072 else FOCAL_D057) if d057 else FOCAL:
             pols = ["bot"] * LANES
             pols[f] = pol
             res = run_race(geo, setup, pols, cfg, focal=f, measure=("boxed", "motion") if d057 else ())
-            rec[pol] = {"tau": _tau(res, row, cfg)[f], "lane": res["lock_x"][f],
+            rec[pol] = {"tau": _tau(res, row, cfg, srow)[f], "lane": res["lock_x"][f],
                         "reach": res["reach"], "counts": res["counts"]}
             if d057:
                 rec[pol].update({
-                    "intent": res["intent"], "brushes": res["brushes"][f], "charged": res["charged"][f],
+                    "intent": res["intent"], "intent6": res.get("intent6", (0, 0)), "brushes": res["brushes"][f], "charged": res["charged"][f],
                     "cost": res["brush_cost"][f], "others_charged": sum(res["charged"]) - res["charged"][f],
                     "boxed": res["boxed"], "boxed_no_tuck": res["boxed_no_tuck"], "waits1s": res["waits1s"],
                     "seconds": res["seconds"],
@@ -545,17 +710,19 @@ def _report_chunk(args) -> List[Dict]:
                     "vhist": res["vhist"], "ahist": res["ahist"], "yhist": res["yhist"]})
             rec["min_gap"] = min(rec["min_gap"], res["min_gap"])
         allsmart = run_race(geo, setup, ["smart"] * LANES, cfg)
-        rec["allsmart_tau"] = _tau(allsmart, row, cfg)
+        rec["allsmart_tau"] = _tau(allsmart, row, cfg, srow)
         out.append(rec)
+    _mem("report chunk")
     return out
 
 
 def _grief_chunk(args) -> List[Dict]:
     """D-057 griefing: per race and kid policy, every GRIEF scenario with the same race."""
-    cell, k0, k1, cfg, table = args
+    cell, k0, k1, cfg, table, *more = args
     course, distance = cells()[cell]
     geo = trip.phase_a(course, distance)
     row = trip.baseline_row(table, course, distance)
+    srow = trip.style_row(more[0], course, distance) if trip.d072_on(cfg) and more and more[0] else None
     out = []
     for k in range(k0, k1):
         setup = race_setup(race_seed(GRIEF_SEED, cell, k), distance)
@@ -574,7 +741,7 @@ def _grief_chunk(args) -> List[Dict]:
                     match[others[g]] = ft
                 res = run_race(geo, setup, pols, cfg, match=match, focal=kid, measure=("boxed",))
                 strangers = [others[g] for g in range(len(gpols))]
-                per[name] = {"tau": trip.tau(res["trip"], posts(), row, cfg, res["brush_cost"])[kid],
+                per[name] = {"tau": _tau(res, row, cfg, srow)[kid],
                              "own": res["trip"][kid] - res["brush_cost"][kid], "cost": res["brush_cost"][kid],
                              "lane": res["lock_x"][kid],
                              "kid_charged": res["charged"][kid], "kid_brushes": res["brushes"][kid],
@@ -583,6 +750,7 @@ def _grief_chunk(args) -> List[Dict]:
                              "boxed": res["boxed"], "seconds": res["seconds"]}
             rec[kid_pol] = per
         out.append(rec)
+    _mem("grief chunk")
     return out
 
 
@@ -607,6 +775,7 @@ def _stress_chunk(args) -> Dict:
         res["min_gap"] = min(res["min_gap"], r["min_gap"])
         res["back_max"] = max(res["back_max"], r["back_max"])
         res["brushes"] += sum(r["brushes"])
+    _mem("stress chunk")
     return res
 
 
@@ -650,17 +819,64 @@ def _chunks(total: int, size: int) -> List[Tuple[int, int]]:
 
 # ---------------------------------------------------------------- baseline files
 
+# ---- memory (D-072 write): workers hand back each chunk pickled, and the parent keeps records
+# pickled until it reads them; the baseline is run and calibrated one cell at a time. The numbers
+# are the same as building every list in memory (pickle round-trips floats exactly, and every
+# record is read in the same order).
+
+def _packed(job: Tuple) -> bytes:
+    fn, args = job
+    return pickle.dumps(fn(args), protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class PickledRecs:
+    """A cell's records, kept as the workers' pickled chunks in chunk order; iterating unpickles one
+    chunk at a time."""
+
+    def __init__(self) -> None:
+        self.blobs: List[bytes] = []
+        self.n = 0
+
+    def add(self, blob: bytes, n: int) -> None:
+        self.blobs.append(blob)
+        self.n += n
+
+    def __iter__(self):
+        for blob in self.blobs:
+            yield from pickle.loads(blob)
+
+    def __len__(self) -> int:
+        return self.n
+
+
+def _gather(pool, fn, tasks: List[Tuple], sizes: List[int]) -> Dict[int, "PickledRecs"]:
+    """Runs fn over tasks ((cell, ...) each, sizes[k] records), in order, into one PickledRecs a cell."""
+    out: Dict[int, PickledRecs] = {}
+    for task, size, blob in zip(tasks, sizes, pool.imap(_packed, [(fn, t) for t in tasks])):
+        out.setdefault(task[0], PickledRecs()).add(blob, size)
+    return out
+
+
+class _BaselineCells:
+    """per_cell for summarize_baseline: a cell's rows are run when it is read (once per cell), so
+    only one cell's rows are ever in memory."""
+
+    def __init__(self, pool, races: int, cfg: Dict) -> None:
+        self.pool, self.races, self.cfg = pool, races, cfg
+
+    def __getitem__(self, cell: int) -> List[Dict]:
+        tasks = [(cell, a, b, self.cfg) for a, b in _chunks(self.races, 25)]
+        rows: List[Dict] = []
+        for blob in self.pool.imap(_packed, [(_baseline_chunk, t) for t in tasks]):
+            rows.extend(pickle.loads(blob))
+        return rows
+
+
 def generate_baseline(races: int, jobs: Optional[int], cfg: Dict = trip.CONFIG, mix: float = MIX_WEIGHT) -> Dict:
-    tasks = []
-    for cell in range(len(cells())):
-        for a, b in _chunks(races, 25):
-            tasks.append((cell, a, b, cfg))
     with Pool(jobs) as pool:
-        parts = pool.map(_baseline_chunk, tasks)
-    per_cell: Dict[int, List] = {}
-    for (cell, _a, _b, _cfg), part in zip(tasks, parts):
-        per_cell.setdefault(cell, []).extend(part)
-    return summarize_baseline(per_cell, races, cfg, mix)
+        data = summarize_baseline(_BaselineCells(pool, races, cfg), races, cfg, mix)
+    _mem("parent, after the baseline")
+    return data
 
 
 def raw_profiles(rows: List[Dict]) -> Tuple[List[float], List[float]]:
@@ -686,26 +902,57 @@ def calibrate(rows: List[Dict], cfg: Dict, mix: float = MIX_WEIGHT) -> List[floa
     and can't be removed (the report shows it). With mix = 0.5 the two kinds of field end up
     with residuals of equal size and opposite sign, half the gap between their profiles.
     Smart Steer never brushes, so no brush term enters the baseline (D-057)."""
+    return calibrate_styles(rows, cfg, mix)[0]
+
+
+def calibrate_styles(rows: List[Dict], cfg: Dict, mix: float = MIX_WEIGHT) -> Tuple[List[float], Optional[List[float]]]:
+    """calibrate(), and with D-072 on the per-style row too (front, stalker, closer, rider). Each
+    pass first moves the posts as calibrate() does (taus with the style row), then each style by
+    its mean residual in the kid-among-bots fields (that style's mean tau there, the kid as the
+    rider, minus the mean over every lane), shifted so the stalker sits at 0 (a shift common to
+    every style cancels in the field mean). The rider entry takes the level a Smart Steer kid sits
+    at among bots, which the posts can't (their residuals are taken against the mean over posts):
+    a passive kid nets 0 among bots. Without D-072 the style row is None and the posts are
+    calibrate()'s exactly."""
     n = len(rows)
     raw_a, raw_b = raw_profiles(rows)
     base = [mix * raw_a[p] + (1 - mix) * raw_b[p] for p in range(LANES)]
+    d072 = trip.d072_on(cfg) and "styles" in rows[0]
+    srow: Optional[List[float]] = [0.0] * len(trip.STYLES) if d072 else None
     if not cfg["enabled"] or cfg["scale"] <= 0:
-        return base
+        return base, srow
     ps = posts()
     for _ in range(CALIBRATION_PASSES):
         sa = [0.0] * LANES
         sb = [0.0] * LANES
         for race in rows:
             for p in range(LANES):
-                sa[p] += trip.tau(race["sweep"][p], ps, base, cfg)[p]
-            tb = trip.tau(race["allsmart"], ps, base, cfg)
+                sl = style_lanes(race["styles"][p], srow) if d072 else None
+                sa[p] += trip.tau(race["sweep"][p], ps, base, cfg, None, sl)[p]
+            sl = style_lanes(race["allsmart_styles"], srow) if d072 else None
+            tb = trip.tau(race["allsmart"], ps, base, cfg, None, sl)
             for p in range(LANES):
                 sb[p] += tb[p]
         ra = [v / n for v in sa]
         rb = [v / n for v in sb]
         ma, mb = sum(ra) / LANES, sum(rb) / LANES
         base = [base[p] + (mix * (ra[p] - ma) + (1 - mix) * (rb[p] - mb)) / cfg["scale"] for p in range(LANES)]
-    return base
+        if not d072:
+            continue
+        tot = [0.0] * len(trip.STYLES)
+        cnt = [0] * len(trip.STYLES)
+        for race in rows:
+            for p in range(LANES):
+                styles = race["styles"][p]
+                taus = trip.tau(race["sweep"][p], ps, base, cfg, None, style_lanes(styles, srow))
+                for j in range(LANES):
+                    tot[styles[j]] += taus[j]
+                    cnt[styles[j]] += 1
+        allm = sum(tot) / max(1, sum(cnt))
+        resid = [tot[s] / cnt[s] - allm if cnt[s] else 0.0 for s in range(len(trip.STYLES))]
+        srow = [srow[s] + resid[s] / cfg["scale"] for s in range(len(trip.STYLES))]
+        srow = [v - srow[1] for v in srow]
+    return base, srow
 
 
 def summarize_baseline(per_cell: Dict[int, List], races: int, cfg: Dict, mix: float) -> Dict:
@@ -713,14 +960,22 @@ def summarize_baseline(per_cell: Dict[int, List], races: int, cfg: Dict, mix: fl
     src_a: Dict = {c: {} for c in trip.COURSE_ORDER}
     src_b: Dict = {c: {} for c in trip.COURSE_ORDER}
     probe: Dict = {c: {} for c in trip.COURSE_ORDER}
+    styles: Dict = {c: {} for c in trip.COURSE_ORDER}
+    probe_styles: Dict = {c: {} for c in trip.COURSE_ORDER}
+    d072 = trip.d072_on(cfg)
     for cell, (course, distance) in enumerate(cells()):
         rows = per_cell[cell]
         raw_a, raw_b = raw_profiles(rows)
-        table[course][distance] = [round(v, 6) for v in calibrate(rows, cfg, mix)]
+        base, srow = calibrate_styles(rows, cfg, mix)
+        table[course][distance] = [round(v, 6) for v in base]
         src_a[course][distance] = [round(v, 6) for v in raw_a]
         src_b[course][distance] = [round(v, 6) for v in raw_b]
-        probe[course][distance] = calibrate(rows[:PROBE_RACES], cfg, mix)
-    return {
+        pbase, psrow = calibrate_styles(rows[:PROBE_RACES], cfg, mix)
+        probe[course][distance] = pbase
+        if d072:
+            styles[course][distance] = [round(v, 6) for v in srow]
+            probe_styles[course][distance] = psrow
+    out = {
         "generator": "sims/steering.py --write",
         "seed": SEED,
         "races": races,
@@ -733,13 +988,22 @@ def summarize_baseline(per_cell: Dict[int, List], races: int, cfg: Dict, mix: fl
         "allSmart": src_b,
         "probe": {"races": PROBE_RACES, "baseline": probe},
     }
+    if d072:
+        out["styles"] = styles  # D-072: per course and distance, (front, stalker, closer, rider)
+        out["probe"]["styles"] = probe_styles
+    return out
 
 
 def probe_cell(course: str, distance: str, cfg: Dict = trip.CONFIG, mix: float = MIX_WEIGHT) -> List[float]:
     """The generator's whole pipeline on the first PROBE_RACES races of one cell (the
     regeneration test compares it with the stored probe)."""
+    return probe_cell_styles(course, distance, cfg, mix)[0]
+
+
+def probe_cell_styles(course: str, distance: str, cfg: Dict = trip.CONFIG,
+                      mix: float = MIX_WEIGHT) -> Tuple[List[float], Optional[List[float]]]:
     cell = cells().index((course, distance))
-    return calibrate(_baseline_chunk((cell, 0, PROBE_RACES, cfg)), cfg, mix)
+    return calibrate_styles(_baseline_chunk((cell, 0, PROBE_RACES, cfg)), cfg, mix)
 
 
 def render_luau(data: Dict) -> str:
@@ -761,6 +1025,17 @@ def render_luau(data: Dict) -> str:
             vals = ", ".join(_num(v) for v in data["baseline"][course][distance])
             lines.append(f"\t\t{distance} = {{ {vals} }},")
         lines.append("\t},")
+    if "styles" in data:
+        lines.append("\t-- D-072: per-style baseline, styles[course][distance] = { front, stalker, closer, rider }")
+        lines.append("\t-- (bots' running styles and every rider; stalker at 0); Trip.tau subtracts it with the post's.")
+        lines.append("\tstyles = {")
+        for course in trip.COURSE_ORDER:
+            lines.append(f"\t\t{course} = {{")
+            for distance in trip.DISTANCE_ORDER:
+                vals = ", ".join(_num(v) for v in data["styles"][course][distance])
+                lines.append(f"\t\t\t{distance} = {{ {vals} }},")
+            lines.append("\t\t},")
+        lines.append("\t},")
     lines.append("}")
     return "\n".join(lines) + "\n"
 
@@ -771,9 +1046,9 @@ def _num(v: float) -> str:
 
 
 def write_baseline(data: Dict, profile: str = "live") -> None:
-    baseline_path(profile).write_text(json.dumps(data, indent=1) + "\n")
+    _out(baseline_path(profile)).write_text(json.dumps(data, indent=1) + "\n")
     if profile == "live":
-        BASELINE_LUAU.write_text(render_luau(data))
+        _out(BASELINE_LUAU).write_text(render_luau(data))
 
 
 def load_baseline(profile: str = "live") -> Dict:
@@ -793,28 +1068,29 @@ def mean(v: Sequence[float]) -> float:
 def run_report(races: int, jobs: Optional[int], data: Dict, cfg: Dict = trip.CONFIG,
                grief_races: int = GRIEF_RACES, stress_races: int = STRESS_RACES) -> Dict:
     table = data["baseline"]
+    stable = data.get("styles")
     d057 = trip.d057_on(cfg)
-    tasks = []
+    tasks, sizes = [], []
     for cell in range(len(cells())):
         for a, b in _chunks(races, 10):
-            tasks.append((cell, a, b, cfg, table))
+            tasks.append((cell, a, b, cfg, table, stable))
+            sizes.append(b - a)
     with Pool(jobs) as pool:
-        parts = pool.map(_report_chunk, tasks)
-        grief_parts, stress_parts = [], []
-        grief_tasks, stress_tasks = [], []
+        per_cell = _gather(pool, _report_chunk, tasks, sizes)
+        stress_parts = []
+        grief_cell: Dict[int, PickledRecs] = {}
+        stress_tasks = []
         if d057:
-            grief_tasks = [(cell, a, b, cfg, table) for cell in range(len(cells())) for a, b in _chunks(grief_races, 10)]
+            grief_tasks, grief_sizes = [], []
+            for cell in range(len(cells())):
+                for a, b in _chunks(grief_races, 10):
+                    grief_tasks.append((cell, a, b, cfg, table, stable))
+                    grief_sizes.append(b - a)
             stress_tasks = [(cell, a, b, cfg) for cell in range(len(cells())) for a, b in _chunks(stress_races, 25)]
-            grief_parts = pool.map(_grief_chunk, grief_tasks)
+            grief_cell = _gather(pool, _grief_chunk, grief_tasks, grief_sizes)
             stress_parts = pool.map(_stress_chunk, stress_tasks)
-    per_cell: Dict[int, List[Dict]] = {}
-    for (cell, *_rest), part in zip(tasks, parts):
-        per_cell.setdefault(cell, []).extend(part)
     summary = summarize_report(per_cell, cfg)
     if d057:
-        grief_cell: Dict[int, List[Dict]] = {}
-        for (cell, *_rest), part in zip(grief_tasks, grief_parts):
-            grief_cell.setdefault(cell, []).extend(part)
         stress_cell: Dict[int, List[Dict]] = {}
         for (cell, *_rest), part in zip(stress_tasks, stress_parts):
             stress_cell.setdefault(cell, []).append(part)
@@ -848,7 +1124,7 @@ def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict) -> Dict:
     pols_all = POLICIES_D057 if d057 else POLICIES
     rows = []
     for cell, (course, distance) in enumerate(cells()):
-        recs = per_cell[cell]
+        recs = list(per_cell[cell])
         r: Dict = {"course": course, "distance": distance, "races": len(recs)}
         for pol in pols_all:
             taus = [x[pol]["tau"] for x in recs]
@@ -918,6 +1194,8 @@ def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict) -> Dict:
         r["min_gap"] = min(x["min_gap"] for x in recs)
         if d057:
             _summarize_d057_cell(r, recs)
+        if trip.d072_on(cfg):
+            _summarize_d072_cell(r, recs)
         rows.append(r)
     tot_ok = sum(r["scripted_reach_ok"] for r in rows)
     tot_n = sum(r["scripted_reach_n"] for r in rows)
@@ -931,8 +1209,57 @@ def summarize_report(per_cell: Dict[int, List[Dict]], cfg: Dict) -> Dict:
     }
     if d057:
         _summarize_d057(summary, per_cell)
+    if trip.d072_on(cfg):
+        summary["d072"] = {"post_bias_max": max(r["smart_post_max"] for r in rows),
+                           "allsmart_post_bias_max": max(r["allsmart_post_max"] for r in rows),
+                           "smart_mean_max": max(abs(r["smart_among_bots"]) for r in rows),
+                           "pass_along_min": min((r["pass_along_min"] for r in rows if r["pass_along_min"] is not None),
+                                                 default=None),
+                           "lit_vs_never": mean([r["lit_vs_never"] for r in rows]),
+                           "style_bias_max": max(r["style_bias_max"] for r in rows),
+                           "tau_raw_p99": max(r["tau_raw_p99"] for r in rows),
+                           "passes_per_race": mean([r["passes_per_race"] for r in rows]),
+                           "overtakes_per_race": mean([r["overtakes_per_race"] for r in rows]),
+                           "drift_rel_max": max(r["drift_rel_max"] for r in rows)}
     summary["checks"] = check_targets(summary)
     return summary
+
+
+def _summarize_d072_cell(r: Dict, recs: List[Dict]) -> None:
+    """D-072, per cell (bot fields): each style's mean tau minus the bots' mean (style bias), the
+    trip part of tau before the clamp at p99, passes, drawn overtakes, shut doors, drift speed."""
+    tot = [0.0] * len(trip.STYLES)
+    cnt = [0] * len(trip.STYLES)
+    raw = []
+    for x in recs:
+        for j in range(LANES):
+            tot[x["bot_style"][j]] += x["bot_tau"][j]
+            cnt[x["bot_style"][j]] += 1
+        raw.extend(x["bot_raw"])
+    allm = sum(tot) / max(1, sum(cnt))
+    r["style_bias"] = [tot[k] / cnt[k] - allm if cnt[k] else 0.0 for k in range(len(trip.STYLES))]
+    r["style_bias_max"] = max(abs(v) for v in r["style_bias"])
+    raw.sort()
+    r["tau_raw_p99"] = raw[int(0.99 * (len(raw) - 1))]
+    r["tau_raw_p1"] = raw[int(0.01 * (len(raw) - 1))]
+    pk = [x["pack"] for x in recs]
+    r["outs_per_race"] = mean([v["outs"] for v in pk])
+    r["passes_per_race"] = mean([v["passes"] for v in pk])
+    r["passes_straight_share"] = sum(v["passes_straight"] for v in pk) / max(1, sum(v["passes"] for v in pk))
+    r["overtakes_per_race"] = mean([v["overtakes"] for v in pk])
+    r["overtakes_straight_share"] = sum(v["overtakes_straight"] for v in pk) / max(1, sum(v["overtakes"] for v in pk))
+    r["shuts_per_race"] = mean([v["shuts"] for v in pk])
+    r["drift_rel_max"] = max(v["drift_rel"] for v in pk)
+    along = [a for v in pk for a in v["pass_along"]]
+    r["pass_along_min"] = min(along) if along else None
+    r["pass_along_median"] = sorted(along)[len(along) // 2] if along else None
+    for pol in ("scripted", "rail"):
+        ok = sum(x[pol]["intent6"][0] for x in recs)
+        n = sum(x[pol]["intent6"][1] for x in recs)
+        r[pol + "_intent6s"] = ok / n if n else float("nan")
+    r["intent6s"] = r["scripted_intent6s"]
+    r["lit_vs_never"] = mean([x["lit"]["tau"] - x["never"]["tau"] for x in recs])
+    r["lit"] = mean([x["lit"]["tau"] for x in recs])
 
 
 def _summarize_d057_cell(r: Dict, recs: List[Dict]) -> None:
@@ -969,12 +1296,23 @@ def _summarize_d057_cell(r: Dict, recs: List[Dict]) -> None:
     r["smart_boxed_1s_races"] = mean([1.0 if b[0] >= 1.0 - 1e-9 else 0.0 for p in range(LANES) for b in boxed[p]])
 
 
+class _AllRecs:
+    """Every cell's records in cell order, read afresh on each pass (never all in memory)."""
+
+    def __init__(self, per_cell) -> None:
+        self.per_cell = per_cell
+
+    def __iter__(self):
+        for cell in range(len(cells())):
+            yield from self.per_cell[cell]
+
+
 def _summarize_d057(summary: Dict, per_cell: Dict[int, List[Dict]]) -> None:
     """Pooled over the cells: reach per intent, motion, boxed by post and policy, brushes."""
     rows = summary["rows"]
     summary["intent3s"] = sum(r["scripted_intent_ok"] for r in rows) / max(1, sum(r["scripted_intent_n"] for r in rows))
     summary["rail_intent3s"] = sum(r["rail_intent_ok"] for r in rows) / max(1, sum(r["rail_intent_n"] for r in rows))
-    allrecs = [x for cell in range(len(cells())) for x in per_cell[cell]]
+    allrecs = _AllRecs(per_cell)
     motion: Dict = {}
     vh, ah, yh = [0] * 16, [0] * 13, [0] * 12
     vmax = amax = yaw_max = lean_max = 0.0
@@ -1137,6 +1475,25 @@ def check_targets(s: Dict) -> Dict[str, bool]:
             s["griefing"]["smart"]["pooled"][name]["kid_charged_per_race"] == 0 for name in GRIEF)
     if "stress" in s:
         out["stress"] = s["stress"]["overlap_frames"] == 0 and s["stress"]["back_max"] <= t["stress_fallback_ftps"]
+    if "d072" in s:
+        t72 = TARGETS_D072
+        # ruling 2: the rail-rider target is retired (Smart Steer rides the rail); ruling 3: the
+        # inward-press gate is >= 55% within 3 s and >= 85% within 6 s
+        del out["rail_vs_smart"]
+        out["intent3s"] = all(r["intent3s"] >= t72["intent3s"] for r in rows)
+        out["d072_intent6s"] = all(r["intent6s"] >= t72["intent6s"] for r in rows)
+        out["masher_reversals"] = all(r["masher_reversals_per_min"] <= t72["masher_reversals_per_min"] for r in rows)
+        out["d072_post_bias"] = s["d072"]["post_bias_max"] <= t72["post_bias"]
+        out["d072_smart_mean"] = s["d072"]["smart_mean_max"] <= t72["smart_mean"]
+        lo, hi = t72["passes_sprint"]
+        lo2, hi2 = t72["passes"]
+        out["d072_passes"] = all((lo <= r["passes_per_race"] <= hi) if r["distance"] == "Sprint"
+                                 else (lo2 <= r["passes_per_race"] <= hi2) for r in rows)
+        out["d072_overtakes"] = all(t72["overtakes"][0] <= r["overtakes_per_race"] <= t72["overtakes"][1] for r in rows)
+        out["d072_pass_along"] = s["d072"]["pass_along_min"] is None or s["d072"]["pass_along_min"] >= t72["pass_along_min"]
+        out["d072_style_bias"] = s["d072"]["style_bias_max"] <= t72["style_bias"]
+        out["d072_tau_p99"] = s["d072"]["tau_raw_p99"] <= t72["tau_p99"]
+        out["d072_drift"] = s["d072"]["drift_rel_max"] <= t72["drift_rel"] + 1e-9
     return out
 
 
@@ -1144,13 +1501,13 @@ LABELS = {
     "rail_vs_smart": "Rail rider vs Smart Steer +0.01 to +0.03 (every cell)",
     "never": "Never-steer between -0.02 and -0.01 (every cell)",
     "reach3s": "Inward request reaching its lane within 3 s >= 70% (every cell)",
-    "intent3s": "Inward press reaching its lane within 3 s >= 70%, per intent (every cell)",
+    "intent3s": "Inward press reaching its lane within 3 s, per intent: >= 70% (D-057), >= 55% (D-072 ruling 3) (every cell)",
     "draft_share": "Draft share of positive trip <= 40% (every cell)",
     "post_bias_smart_among_bots": "Post bias < 0.005, Smart Steer kid among bots (every cell, every post)",
     "post_bias_all_smart": "Post bias < 0.005, all-Smart fields (every cell, every post)",
     "smart_among_bots_mean": "Smart Steer kid among bots averages 0 +- 0.003 (every cell)",
     "all_smart_field_mean": "All-Smart field mean 0 +- 0.003 (every cell)",
-    "masher_reversals": "Masher reversals <= 8 a minute (every cell)",
+    "masher_reversals": "Masher reversals <= 8 a minute (every cell; D-072 ruling 4 allows 8.5 if griefing and brushes hold)",
     "masher_reversal_gap": "No masher reversal within 3 s of the previous (every cell)",
     "sideways_accel": "Sideways acceleration <= 30 ft/s^2 between ticks, + 0.5 for the landing tick (every horse)",
     "casual_charged": "Casual riders charged for a brush in <= 5% of races (every cell)",
@@ -1159,6 +1516,15 @@ LABELS = {
     "griefing_brushes": "Griefing: brush charges strangers add >= -0.001 (each scenario, every kid but the masher, pooled)",
     "griefing_mover_pays": "Griefing: a kid is only ever charged for its own brushes (a Smart Steer kid never)",
     "stress": "Stress: 0 overlaps and fall-back <= 20 ft/s",
+    "d072_post_bias": "D-072: post bias <= 0.002, kid among bots (every cell, every post; all-Smart <= 0.003 reported)",
+    "d072_smart_mean": "D-072: a passive Smart Steer kid among bots nets 0 +- 0.003 (every cell)",
+    "d072_intent6s": "D-072: inward press reaching its lane within 6 s >= 85%, per intent (every cell)",
+    "d072_passes": "D-072: Trip passes a race 1-10 (Sprint), 3-10 (others), bot fields (every cell)",
+    "d072_overtakes": "D-072: drawn overtakes (a length clear, held 2 s) 3-15 a race, bot fields (every cell)",
+    "d072_pass_along": "D-072: every completed pass alongside >= 0.8 s (the minimum over all)",
+    "d072_style_bias": "D-072: style bias <= 0.002 (bot fields, every cell, every style)",
+    "d072_tau_p99": "D-072: trip part of tau before the clamp, p99 <= +0.04 (bot fields, every cell)",
+    "d072_drift": "D-072: drift moves two horses apart at most 3 ft/s",
 }
 
 
@@ -1231,6 +1597,24 @@ def format_report(s: Dict, data: Dict, cfg: Dict) -> str:
     out.append(f"Closest same-lane horses at a tick end: {min(r['min_gap'] for r in rows):.2f} ft")
     if d057:
         out.extend(_format_d057(s))
+    if "d072" in s:
+        out.append("")
+        d = s["d072"]
+        out.append(f"D-072: kid-among-bots post bias max {d['post_bias_max']:.4f}, all-Smart {d['allsmart_post_bias_max']:.4f} "
+                   f"(reported), passive kid mean max |{d['smart_mean_max']:.4f}|, pass alongside min "
+                   f"{d['pass_along_min'] if d['pass_along_min'] is None else round(d['pass_along_min'], 2)} s, "
+                   f"press-when-lit minus never {d['lit_vs_never']:+.4f} (reported; phase C gate +0.003..+0.008)")
+        out.append("  per cell: intent 3 s / 6 s; masher reversals a minute; lit - never")
+        for r in rows:
+            out.append(f"  {r['course']:4s} {r['distance']:8s} {r['intent3s']:.0%} / {r['intent6s']:.0%}; "
+                       f"{r['masher_reversals_per_min']:.2f}; {r['lit_vs_never']:+.4f}")
+        out.append("D-072 (bot fields): style bias front/stalker/closer/rider; tau before the clamp p1/p99; passes (straight share); "
+                   "outs; drawn overtakes (straight share); shut doors; drift relative speed max")
+        for r in rows:
+            out.append(f"  {r['course']:4s} {r['distance']:8s} {_posts(r['style_bias'])}; {r['tau_raw_p1']:+.4f}/{r['tau_raw_p99']:+.4f}; "
+                       f"{r['passes_per_race']:.2f} ({r['passes_straight_share']:.0%}); {r['outs_per_race']:.2f}; "
+                       f"{r['overtakes_per_race']:.2f} ({r['overtakes_straight_share']:.0%}); {r['shuts_per_race']:.2f}; "
+                       f"{r['drift_rel_max']:.2f} ft/s")
     out.append("")
     for key, ok in s["checks"].items():
         out.append(f"  [{'PASS' if ok else 'MISS'}] {LABELS[key]}")
@@ -1303,9 +1687,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--jobs", type=int, default=0, help="worker processes (default: all cores)")
     ap.add_argument("--mix", type=float, default=None, help="trial: weight of the kid-among-bots profile")
     ap.add_argument("--json", type=str, default="", help="also write the report numbers to this file")
+    ap.add_argument("--out", type=str, default="", help="with --write: write the files into this folder instead (scratch)")
+    ap.add_argument("--mem", action="store_true", help="print each process's peak memory to stderr")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                     help="try a config change (e.g. groundPerLaneTurn=0.011, smart.homeLane=2); nothing is written")
     args = ap.parse_args(argv)
+    global OUT_DIR
+    if args.out:
+        OUT_DIR = Path(args.out)
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+    if args.mem:
+        os.environ["STEERING_MEM"] = "1"  # inherited by the workers
     cfg = profile_config(args.profile)
     if args.set:
         cfg = json.loads(json.dumps(cfg))
@@ -1334,6 +1726,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("warning: the checked-in baseline was made with a different config; run with --write")
     summary = run_report(args.report_races, jobs, data, cfg, args.grief_races, args.stress_races)
     print(format_report(summary, data, cfg))
+    _mem("parent, after the report")
     print(f"({time.time() - t0:.0f} s)")
     stored = {"seed": REPORT_SEED, "races": args.report_races, "baselineSeed": data["seed"],
               "baselineRaces": data["races"], "mixWeight": data["mixWeight"], "config": trip.config_record(cfg),
@@ -1342,7 +1735,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         stored.update({"profile": args.profile, "griefSeed": GRIEF_SEED, "griefRaces": args.grief_races,
                        "stressSeed": STRESS_SEED, "stressRaces": args.stress_races, "probes": probe_races(cfg)})
     if args.write:
-        report_path(args.profile).write_text(json.dumps(stored, indent=1) + "\n")
+        _out(report_path(args.profile)).write_text(json.dumps(stored, indent=1) + "\n")
         print(f"wrote {report_path(args.profile).relative_to(ROOT)}")
     if args.json:
         Path(args.json).write_text(json.dumps(stored, indent=1))

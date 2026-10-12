@@ -127,7 +127,14 @@ task.spawn(function()
 	end)
 	if ok and module then moveControls = module:GetControls() end
 end)
+-- In a race saddle (setJumping(false) .. setJumping(true)) the steering keys are always bound and
+-- sunk (D-072), so the arrows never turn the camera. One table (RaceController is near Luau's 200
+-- top-level locals): on = in the saddle, wanted = the buttons want the keys, bound = bound now;
+-- sync and hint are set with bindSteer and showChip below.
+local saddleKeys = { on = false, wanted = false, bound = false, sync = function() end, hint = function() end }
 local function setJumping(enabled: boolean)
+	saddleKeys.on = not enabled
+	saddleKeys.sync()
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, enabled) end
 	if moveControls then
@@ -699,6 +706,22 @@ steerPad.BackgroundTransparency = 1
 steerPad.ZIndex = 8
 steerPad.Visible = false
 steerPad.Parent = steerGui
+do -- (D-072 consult, UI/UX) a see-through halo steerHud.padHaloPx round the pad (and between the two
+	-- buttons) that takes stray touches, so a thumb just off a button never reaches the camera or the
+	-- world; it steers nothing. Behind the buttons (ZIndex 7), shown and hidden with the pad.
+	local halo = Instance.new("TextButton")
+	halo.Name = "Halo"
+	local px = SHUD.padHaloPx or 16
+	halo.Size = UDim2.new(1, 2 * px, 1, 2 * px)
+	halo.Position = UDim2.fromOffset(-px, -px)
+	halo.BackgroundTransparency = 1
+	halo.Text = ""
+	halo.AutoButtonColor = false
+	halo.Selectable = false
+	halo.Active = true
+	halo.ZIndex = 7
+	halo.Parent = steerPad
+end
 local BUTTON_COLOUR, LOCKED_COLOUR = Color3.fromHex("F4EFE6"), Color3.fromRGB(170, 170, 170)
 local GREY_COLOUR = Color3.fromRGB(SHUD.greyRgb[1], SHUD.greyRgb[2], SHUD.greyRgb[3]) -- a boxed-in arrow (D-057 N4): soft, never red
 -- Per button: the small horse icon (grey: a horse is there), the wait ring and its fill gradient,
@@ -868,28 +891,50 @@ local steer = nil
 
 -- While you have the buttons, the steering keys (A/D, the arrows, the D-pad) are bound above the
 -- camera's own keys and sunk, so the arrows steer instead of turning the camera, and never tap.
+-- (D-072) They are also bound and sunk the whole time you sit in a race saddle, buttons or not:
+-- in a rider's first races (Smart Steer, no buttons) a press shows "Smart Steer is steering for
+-- you" once a race and sends nothing; after the lock and through the results it does nothing.
+-- The D-pad passes through only while a menu has the gamepad selection (the results card's Done).
 local STEER_ACTION = "GiddyUpSteer"
 local STEER_KEYS = {}
 for name in RaceInput.STEER do
 	local ok, code = pcall(function() return (Enum.KeyCode :: any)[name] end)
 	if ok and code then table.insert(STEER_KEYS, code) end
 end
-local steerBound = false
 local steerPress: (number) -> () = function(_dir: number) end -- set below
-local function bindSteer(on: boolean)
-	if on == steerBound then return end
-	steerBound = on
-	if on then
-		ContextActionService:BindActionAtPriority(STEER_ACTION, function(_, state, input)
-			if state == Enum.UserInputState.Begin then
-				local dir = RaceInput.steerDir(input.KeyCode.Name)
-				if dir then steerPress(dir) end
-			end
-			return Enum.ContextActionResult.Sink
-		end, false, Enum.ContextActionPriority.High.Value + 1, table.unpack(STEER_KEYS))
-	else
+saddleKeys.sync = function()
+	local on = saddleKeys.wanted or saddleKeys.on
+	if on == saddleKeys.bound then return end
+	saddleKeys.bound = on
+	if not on then
 		ContextActionService:UnbindAction(STEER_ACTION)
+		return
 	end
+	ContextActionService:BindActionAtPriority(STEER_ACTION, function(_, state, input)
+		local name = input.KeyCode.Name
+		if string.sub(name, 1, 4) == "DPad" and GuiService.SelectedObject ~= nil then
+			return Enum.ContextActionResult.Pass -- gamepad menu navigation
+		end
+		local dir = RaceInput.steerDir(name)
+		if state ~= Enum.UserInputState.Begin or not dir then return Enum.ContextActionResult.Sink end
+		local s = steer
+		local t = serverNow()
+		local racing = s ~= nil and riding and s.race == cueRace and t >= s.start
+		local locked = s ~= nil and (s.locked or (s.lockAt ~= nil and t >= s.lockAt))
+		local act = RaceInput.saddleKey(racing, s ~= nil and s.shown, locked, s ~= nil and s.smartHinted == true,
+			s ~= nil and RaceInput.smartSteering(s.controls == true, s.shown, s.smart))
+		if act == "steer" then
+			steerPress(dir)
+		elseif act == "hint" then
+			s.smartHinted = true
+			saddleKeys.hint()
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.ContextActionPriority.High.Value + 1, table.unpack(STEER_KEYS))
+end
+local function bindSteer(on: boolean)
+	saddleKeys.wanted = on
+	saddleKeys.sync()
 end
 
 local chipToken = 0
@@ -914,6 +959,8 @@ local function showChip(text: string, seconds: number?)
 		end)
 	end)
 end
+
+saddleKeys.hint = function() showChip(RaceInput.SMART_HINT) end -- (D-072) an arrow while Smart Steer steers
 
 local function paintButtons(locked: boolean)
 	for _, b in { inBtn, outBtn } do
@@ -1050,7 +1097,7 @@ local function updateSteer(t: number, dt: number)
 	end
 	paintArrow(inBtn, inArrow)
 	paintArrow(outBtn, outArrow)
-	if SteerChips.noRoom(s.chips, s.lane, raceNow, SHUD) then showChip("No room yet") end
+	if SteerChips.noRoom(s.chips, s.lane, raceNow, SHUD) then showChip("No room yet!") end
 	-- The ghost-thumb tip, once, just after the gate.
 	if s.tipAt and t >= s.tipAt then
 		s.tipAt = nil
@@ -1100,7 +1147,9 @@ local function updateSteer(t: number, dt: number)
 	end
 	-- A gentle tip when you steer yourself and are wide going into a turn (the far turn included).
 	local manualNow = not s.smart or os.clock() - s.lastPress < STEER.smart.resumeSeconds
-	if s.tips < SHUD.tipsPerRace and manualNow and x[me] >= STEER.smart.homeLane + SHUD.wideLanes - 0.05 then
+	-- (D-072: Smart Steer's home lane is file.homeLane, the rail, while filing in is on)
+	local home = if STEER.file and STEER.file.enabled then STEER.file.homeLane else STEER.smart.homeLane
+	if s.tips < SHUD.tipsPerRace and manualNow and x[me] >= home + SHUD.wideLanes - 0.05 then
 		local starts = { s.geo.lockS }
 		for _, turn in s.geo.turns do table.insert(starts, turn[1]) end
 		for _, a in starts do
@@ -1544,6 +1593,7 @@ remotes:WaitForChild("SteerControls").OnClientEvent:Connect(function(shown, smar
 	local s = steer
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace then return end
 	s.shown, s.smart = shown == true, smart ~= false
+	s.controls = true -- (D-072) this race has steering: an arrow may say Smart Steer is riding for you
 	s.bumpTip = s.shown and bumpTip == true -- (D-057 N5) the one-time tip on your first brush
 	if s.shown and tip then s.tipAt = s.start + 1.5 end
 	if s.shown and RaceState.recording then RaceState.recording.steer = true end -- the replay draws your line
@@ -1582,6 +1632,16 @@ remotes:WaitForChild("SteerBrush").OnClientEvent:Connect(function(mover, _other,
 	if not s or s.course ~= (courseId or "dirt") or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
 	s.brushAt = (at or serverNow()) - s.start
 end)
+-- A shut door (D-072): when a bot shuts the door on your own press, as your screen draws the bot
+-- turning toward you, "No room yet" under the chips' limits (the brush's: never within
+-- noRoomChipEvery of the last, nor chipMinGap of another chip). Never on Smart Steer's own tries
+-- (no press of yours waiting). Passes ("out", "pass") say nothing here: the lanes draw them.
+RaceState.PackDrawn.Event:Connect(function(courseId, kind, _bot, mover, _dir)
+	local s = steer
+	if kind ~= "shut" or not s or s.course ~= courseId or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
+	if not (s.lane and s.lane.wait ~= 0) then return end
+	if SteerChips.brushed(s.chips, serverNow() - s.start, SHUD) then showChip("No room yet!") end
+end)
 RaceState.BrushDrawn.Event:Connect(function(courseId, mover, _at)
 	local s = steer
 	if not s or s.course ~= courseId or s.race ~= cueRace or not s.shown or s.locked or mover ~= myLaneIndex then return end
@@ -1590,7 +1650,7 @@ RaceState.BrushDrawn.Event:Connect(function(courseId, mover, _at)
 		s.bumpTip = false
 		showChip("Bump! Press once, then wait for a gap", SHUD.tipSeconds)
 	elseif chip == "noRoom" then
-		showChip("No room yet")
+		showChip("No room yet!")
 	end
 end)
 remotes:WaitForChild("TripInfo").OnClientEvent:Connect(function(enabled, lockAt, courseId)
@@ -1837,6 +1897,7 @@ local function fillCard(summary)
 		Card.setRide(nil)
 		Card.gainLine.Text, Card.tripRowLine.Text = "", ""
 	end
+	Card.setCup(mine) -- (D-076) the Cup bar and the class path's next goal (your row only)
 	-- 🏁 Race again (your own card only): what RACE! would join now, and it says Practice when it is.
 	Card.againBtn.Visible = GameConfig.results.raceAgain ~= false and rideReport ~= nil
 	if Card.againBtn.Visible then
@@ -1849,9 +1910,16 @@ local function fillCard(summary)
 	Card.watchBtn.Visible, Card.fullBtn.Visible = hasRecording, hasRecording
 	Card.doneBtn.Visible = true
 	Card.layout()
+	-- (D-072) a gamepad player lands on 🏁 Race again when it shows, else Done, so the D-pad (sunk for
+	-- steering only while nothing is selected) moves round the card straight away. closeResults and a
+	-- replay clear the selection, or the D-pad would stop steering in the next race.
+	if string.sub(UserInputService:GetLastInputType().Name, 1, 7) == "Gamepad" then
+		pcall(function() GuiService.SelectedObject = if Card.againBtn.Visible then Card.againBtn else Card.doneBtn end)
+	end
 end
 
 local function closeResults()
+	pcall(function() GuiService.SelectedObject = nil end) -- (D-072) the D-pad steers again next race
 	results.Visible = false
 	RaceState.resultsOpen, RaceState.holdFocus = false, false
 	finishSeq = nil
@@ -1883,6 +1951,7 @@ local function replay(mode: string)
 	if not Card.ready() then return end
 	if finishSeq then finishSeq.orbiting = false end
 	clearFinishFx()
+	pcall(function() GuiService.SelectedObject = nil end) -- (D-072) nothing selected under the replay
 	results.Visible = false
 	RaceState.ReplayRequested:Fire(mode)
 end

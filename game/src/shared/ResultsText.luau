@@ -145,6 +145,7 @@ end
 -- back by playing. The server's rules still decide (feeding gives Energy only off its cooldown).
 function ResultsText.nextKind(h: any, energy: any, horses: { any }?, feedWhenNapping: boolean?): string
 	if type(h) ~= "table" then return "race" end
+	if type(h.legs) == "table" and h.legs.needsVet then return "vet" end -- (D-077) RACE! is VET CHECK now
 	if h.overCeiling then return if h.cupOpen then "cup" else "practice" end
 	if not napping(h, energy) then return "race" end
 	if feedWhenNapping and type(horses) == "table" then
@@ -158,7 +159,7 @@ function ResultsText.nextKind(h: any, energy: any, horses: { any }?, feedWhenNap
 	return "practice"
 end
 
-ResultsText.RACE_AGAIN = { race = "🏁 Race again", practice = "🎈 Practice race", cup = "🏆 Cup race!" }
+ResultsText.RACE_AGAIN = { race = "🏁 Race again", practice = "🎈 Practice race", cup = "🏆 Cup race!", vet = "🩺 Vet check" }
 function ResultsText.raceAgainLabel(kind: string?, horse: string?): string
 	if kind == "feed" then
 		return "🌾 Feed " .. (if type(horse) == "string" and horse ~= "" then horse else "your horse")

@@ -12,6 +12,10 @@
 -- The "Next thing" pill (D-064): one thing to do above the dock, from Advice.nextThing, with GO;
 -- Pip gives a hint when you seem stuck.
 -- No bell, no red badge, no timers. Words state facts about the horse, never guilt.
+-- Find it (D-075): every GO goes through GoTo (walk when near, a trip when far, and it opens what's
+-- there), and says "Take me ▶" when it's a trip. The pill also carries the "New!" first-time pointers
+-- (FindIt.pointerDue: at most one per 3 minutes, never on the tour, in line or right after a race),
+-- and rings the dock button (PointAt).
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -21,12 +25,13 @@ local RunService = game:GetService("RunService")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
-local Guide = require(script.Parent:WaitForChild("Guide"))
+local GoTo = require(script.Parent:WaitForChild("GoTo"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
 local Advice = require(Shared:WaitForChild("Advice"))
+local FindIt = require(Shared:WaitForChild("FindIt"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 
 local player = Players.LocalPlayer
@@ -112,21 +117,16 @@ local swapping = false
 local function goTo(go: string?)
 	if not go then return end
 	gui.Enabled = false
-	if go == "stable" or go == "wall" then
-		local i = player:GetAttribute("PlotIndex")
-		if i then
-			-- the Rosette Wall stands at (52, 12) in the plot (StableService); stop just in front of it
-			local x, z = if go == "wall" then WorldLayout.plotPoint(i, 46, 12) else WorldLayout.plotPoint(i, 40, 0)
-			Guide.to(x, z)
-		end
-	elseif go == "raceBoard" then
-		local p = WorldLayout.places.raceBoard
-		Guide.to(p.x, p.z + 10)
-	elseif WorldLayout.places[go] then
-		local p = WorldLayout.places[go]
-		Guide.to(p.x + p.fx * 12, p.z + p.fz * 12)
-	end
-	Ui.toast("Follow the golden hoofprints!", "hoofprint", "🐾")
+	-- (D-075) GoTo walks or makes the trip, then opens what's there; a walk gets the hoofprints line.
+	local plan = GoTo.place(go, nil, { toast = false })
+	if plan.how == "walk" then Ui.toast("Follow the golden hoofprints!", "hoofprint", "🐾") end
+end
+
+-- A GO button's words: "GO ▶" near, "Take me ▶" for a trip (smaller, so it fits).
+local function goWords(b: TextButton, go: string)
+	local words = GoTo.label(go)
+	b.Text = words
+	b.TextSize = if #words > 6 then 18 else 20
 end
 
 local function rewardText(r): string
@@ -159,6 +159,7 @@ local function horseCard(h, tip)
 	next.TextTruncate = Enum.TextTruncate.AtEnd
 	if tip.go then
 		local go = Ui.button(card, "GO ▶", UDim2.fromOffset(104, TAP), UDim2.new(1, -112, 1, -TAP - 10), C.orange, 20)
+		goWords(go, tip.go)
 		go.Activated:Connect(function() goTo(tip.go) end)
 	end
 end
@@ -205,6 +206,7 @@ local function jobCard(parent: Instance, job, index: number)
 		end)
 	elseif job.go then
 		local go = Ui.button(card, "GO ▶", UDim2.new(1, -20, 0, TAP), foot, C.orange, 20)
+		goWords(go, job.go)
 		go.Activated:Connect(function() goTo(job.go) end)
 	end
 end
@@ -434,6 +436,32 @@ task.spawn(function()
 	placePill()
 end)
 
+-- "New!" pointers (D-075): one at a time on the pill, for pointers.showSeconds on screen (or its GO),
+-- then the profile remembers it (seen_<id>); the next waits pointers.gapSeconds.
+local PTR = GameConfig.findIt.pointers
+local pointer: any = nil
+local pointerShown = 0
+local lastPointerAt: number? = nil
+local function markSeen(id: string)
+	gameRemotes:WaitForChild("SetSetting"):FireServer("seen", id)
+end
+local function pointerNow(d): any
+	local ctx = buildCtx(d)
+	if pointer then
+		-- (code review B1) a kept pointer passes the same gates every time: a race, a line or the
+		-- after-race window drops it unseen, so a Market GO never comes right after a race.
+		if FindIt.pointerOk(ctx) then return pointer end
+		pointer = nil
+		return nil
+	end
+	local p = FindIt.pointerDue(d, ctx, lastPointerAt, os.clock())
+	if p then
+		pointer, pointerShown, lastPointerAt = p, 0, os.clock()
+		localEvent("PointAt"):Fire(p.ring, p.go)
+	end
+	return pointer
+end
+
 local function renderPill()
 	local d = PlayerState.data
 	if not d then
@@ -441,6 +469,10 @@ local function renderPill()
 		return
 	end
 	local nxt = Advice.nextThing(d, workspace:GetServerTimeNow(), buildCtx(d))
+	local ptr = if inLine then nil else pointerNow(d)
+	if ptr then
+		nxt = { key = "new:" .. ptr.id, emoji = "✨", icon = "", text = ptr.text, go = ptr.go }
+	end
 	if inLine then -- waiting for a race (AAA Phase 2): say so, whatever else is next
 		nxt = { key = "inline", emoji = "🏁", icon = "flag_ready", text = "You're in line! Race soon.", go = nil }
 	end
@@ -454,6 +486,11 @@ local function renderPill()
 	pillIcon = Ui.icon(pill, nxt.icon, nxt.emoji, UDim2.fromOffset(40, 40), UDim2.new(0, 10, 0.5, -20))
 	pillText.Text = nxt.text
 	pillGo.Visible = nxt.go ~= nil
+	pillGo.Text, pillGo.TextSize = "GO ▶", 22
+	if nxt.go and nxt.go ~= "race" and nxt.go ~= "board" and nxt.go ~= "starter" then
+		local words = GoTo.label(nxt.go)
+		pillGo.Text, pillGo.TextSize = words, if #words > 6 then 18 else 22
+	end
 	pillText.Size = UDim2.new(1, if nxt.go then -176 else -68, 1, 0)
 end
 PlayerState.watch(renderPill)
@@ -467,6 +504,15 @@ pillGo.Activated:Connect(function()
 	pipBubble.Visible = false
 	local go = current.go
 	tellBuilt(current.key) -- (D-070) GO on "You can build" counts as shown
+	if pointer and current.key == "new:" .. pointer.id and not FindIt.pointerOk(buildCtx(PlayerState.data)) then
+		pointer = nil -- (B1) never a pointer GO in line or right after a race
+		renderPill()
+		return
+	end
+	if pointer and current.key == "new:" .. pointer.id then -- (D-075) GO on a pointer counts as seen
+		markSeen(pointer.id)
+		pointer = nil
+	end
 	if go == "board" then
 		-- open on the first tab with a prize waiting
 		local jobs = (PlayerState.data and PlayerState.data.jobs) or {}
@@ -510,6 +556,20 @@ RunService.Heartbeat:Connect(function()
 	if string.sub(current.key, 1, 6) == "build:" or string.sub(current.key, 1, 6) == "shelf:" then
 		buildShown += 0.5
 		if buildShown >= (GC.pillShowSeconds or 45) then tellBuilt(current.key) end
+	end
+	if pointer and current.key == "new:" .. pointer.id and not FindIt.pointerOk(buildCtx(d)) then
+		pointer = nil -- (B1) a gate closed while it showed: dropped unseen
+		renderPill()
+		if not current then return end
+	end
+	if pointer and current.key == "new:" .. pointer.id then
+		pointerShown += 0.5
+		if pointerShown >= PTR.showSeconds then
+			markSeen(pointer.id)
+			pointer = nil
+			renderPill()
+			if not current then return end
+		end
 	end
 	if now - lastPillAt > 5 then -- time-based suggestions (crops ready) show without a data change
 		lastPillAt = now

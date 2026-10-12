@@ -3,9 +3,12 @@
 --   Privacy: each plot publishes its owner and visit setting; this client turns a plot's
 --   invisible walls solid for itself when it isn't allowed in (default Friends only) or the
 --   owner has closed the gate (D-060).
---   Map: the dock's Map button opens five big picture buttons for fast travel, and a sixth,
---   "Friends' barns" (D-060): the faces and names of Roblox friends in this server whose barn
---   lets you in; tap one to go to their gate. Your Tour stamps show under the list.
+--   Map: the dock's Map button opens every place as a tile (Find it, D-075): GO takes you there and
+--   opens what's there (GoTo). "Visit barns" (D-060, D-079) lists Roblox friends' barns in this
+--   server that let you in (faces, "👫 Friend") and every other barn open to Everyone here (a barn
+--   picture, never a face); tap one to go to its gate. No counts, likes or rankings. The first time
+--   it opens it asks once, "Let other riders visit?" (👫 Friends · 🌍 Everyone; never over a Nobody).
+--   Your Tour pins show under it.
 --   Race Board: its prompt puts you in line like the RACE! button.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
@@ -15,9 +18,11 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
+local GoTo = require(script.Parent:WaitForChild("GoTo"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local WorldLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WorldLayout"))
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local FindIt = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FindIt"))
 
 local player = Players.LocalPlayer
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
@@ -36,13 +41,18 @@ local function isFriend(userId: number): boolean
 	return friendCache[userId]
 end
 
+local Visits = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Visits"))
 local function allowed(plot: Model): boolean
 	local owner = plot:GetAttribute("OwnerId")
-	if not owner or owner == player.UserId then return true end
-	local visits = plot:GetAttribute("Visits") or "Friends"
-	if visits == "Nobody" then return false end
-	if plot:GetAttribute("GateClosed") then return false end -- the owner closed the gate (D-060)
-	return isFriend(owner) -- "Club" is treated as Friends until clubs exist
+	if typeof(owner) ~= "number" or owner == player.UserId then return true end
+	-- The server's matrix on what it publishes (D-079, code review S2): the owner's effective setting,
+	-- the gate (D-060), this player's PolicyService answer and Ask to leave, so the walls never let in
+	-- someone the server would walk back out.
+	local visits = plot:GetAttribute("Visits")
+	return Visits.clientMay({ visits = visits, gateClosed = plot:GetAttribute("GateClosed"),
+		friend = Visits.setting(visits) ~= "Nobody" and isFriend(owner), strangersOk = player:GetAttribute("VisitStrangersOk"),
+		askedOutOf = player:GetAttribute("AskedOutOf"), askedOutUntil = player:GetAttribute("AskedOutUntil"), ownerId = owner,
+		serverNow = workspace:GetServerTimeNow() }, "enter")
 end
 
 local function applyPlot(plot: Model)
@@ -83,9 +93,28 @@ task.spawn(function()
 	if not plots then return end
 	for _, plot in plots:GetChildren() do watchPlot(plot) end
 	plots.ChildAdded:Connect(watchPlot)
+	-- This player's PolicyService answer or an Ask to leave changes every plot's walls; an Ask to
+	-- leave runs out by itself, so look again then (D-079).
+	local function applyAll()
+		for _, plot in plots:GetChildren() do
+			if plot:IsA("Model") then applyPlot(plot) end
+		end
+	end
+	player:GetAttributeChangedSignal("VisitStrangersOk"):Connect(applyAll)
+	player:GetAttributeChangedSignal("AskedOutUntil"):Connect(function()
+		applyAll()
+		local untilT = player:GetAttribute("AskedOutUntil")
+		if typeof(untilT) == "number" then
+			task.delay(math.max(0, untilT - workspace:GetServerTimeNow()) + 0.5, applyAll)
+		end
+	end)
 end)
 
 -- Map -----------------------------------------------------------------------------
+-- Find it (D-075): every place, 14 tiles in a 5 × 3 grid (the 💞 Foal Barn is tile 14, D-080) (findIt.map: 116 × 96 tiles, a 48 px icon
+-- over an 18 px word and one plum "what to do here" line of 2 words or fewer, FindIt.hint). A tile
+-- is GO (GoTo.place): it takes you there and opens what's there. "Visit barns" opens the barns list.
+local MAPC = GameConfig.findIt.map
 local gui = Ui.screen("Map", 12)
 gui.Enabled = false
 local dim = Instance.new("TextButton")
@@ -95,54 +124,91 @@ dim.Size = UDim2.fromScale(1, 1)
 dim.BackgroundColor3 = C.ink
 dim.BackgroundTransparency = 0.45
 dim.Parent = gui
-local PANEL_W, PANEL_H = 736, 316
+local PANEL_W, PANEL_H = FindIt.panelSize()
 local panel = Ui.card(gui, UDim2.fromOffset(PANEL_W, PANEL_H), UDim2.fromScale(0.5, 0.5), C.paper)
--- Floors (AAA Phase 2): smallest text 18, smallest button 64; at 0.875 it fits a 667 px phone.
-local slideIn = Ui.fitPanel(panel, PANEL_W, PANEL_H, nil, 18, 64)
-local title = Ui.text(panel, "Where to?", 34, { Position = UDim2.new(0, 0, 0, 14), Size = UDim2.new(1, 0, 0, 40) })
+-- Floors: smallest text 16 (the hint line), smallest button 64; at 0.875 it fits a 667 × 375 phone.
+local slideIn = Ui.fitPanel(panel, PANEL_W, PANEL_H, nil, 16, 64)
+local title = Ui.text(panel, "Where to?", 30, { Position = UDim2.new(0, 160, 0, 12), Size = UDim2.new(1, -320, 0, 40) })
 local row = Instance.new("Frame")
 row.BackgroundTransparency = 1
-row.Size = UDim2.new(1, -32, 0, 190)
-row.Position = UDim2.new(0, 16, 0, 80)
+row.Size = UDim2.new(1, -32, 0, PANEL_H - MAPC.headerPx - MAPC.gapPx)
+row.Position = UDim2.new(0, 16, 0, MAPC.headerPx)
 row.Parent = panel
-local layout = Instance.new("UIListLayout")
-layout.FillDirection = Enum.FillDirection.Horizontal
+local layout = Instance.new("UIGridLayout")
+layout.CellSize = UDim2.fromOffset(MAPC.tileW, MAPC.tileH)
+layout.CellPadding = UDim2.fromOffset(MAPC.gapPx, MAPC.gapPx)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-layout.Padding = UDim.new(0, 10)
 layout.Parent = row
 local close = Ui.closeButton(panel)
 
 local friendsPage: Frame
 local back: TextButton
+local showFriends
+local tiles: { [string]: { button: TextButton, hint: TextLabel } } = {}
+local pointed: string? = nil -- a "New!" pointer's place: its tile is gold the next time the Map opens
 local function hide() gui.Enabled = false end
+local function renderHints()
+	for id, t in tiles do
+		t.hint.Text = FindIt.hint(id, PlayerState.data)
+		t.button.BackgroundColor3 = if id == pointed then C.gold elseif id == "visit" then C.cream else C.white
+	end
+end
 local function show()
 	gui.Enabled = true
 	row.Visible = true
 	friendsPage.Visible = false
 	back.Visible = false
 	title.Text = "Where to?"
+	renderHints()
+	pointed = nil -- (shown once)
 	slideIn()
 end
-for _, dest in WorldLayout.MAP do
-	local b = Ui.button(row, "", UDim2.fromOffset(108, 170), UDim2.new(), C.cream, 18)
-	Ui.icon(b, WorldLayout.MAP_ICONS[dest], WorldLayout.MAP_EMOJI[dest], UDim2.fromOffset(78, 78), UDim2.new(0.5, -39, 0, 14))
-	Ui.text(b, WorldLayout.MAP_LABELS[dest], 20, { Position = UDim2.new(0, 4, 0, 104), Size = UDim2.new(1, -8, 0, 56) })
+for _, tile in FindIt.tiles() do
+	local dest = tile.id
+	local b = Ui.button(row, "", UDim2.fromOffset(MAPC.tileW, MAPC.tileH), UDim2.new(), C.white, 18)
+	b.Name = "Tile_" .. dest
+	b.LayoutOrder = (tile.row - 1) * MAPC.columns + tile.col
+	Ui.icon(b, tile.icon, tile.emoji, UDim2.fromOffset(MAPC.iconPx, MAPC.iconPx), UDim2.new(0.5, -MAPC.iconPx / 2, 0, 4))
+	-- (UI/UX must-fix 3) the name scales 16-18 px so "Barn Builder" and "Tack & Paint" fit whole
+	local word = Ui.text(b, tile.label, 18, { Position = UDim2.new(0, 2, 0, 52), Size = UDim2.new(1, -4, 0, 22), TextWrapped = false,
+		TextScaled = true })
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MinTextSize, fit.MaxTextSize = MAPC.hintPx, MAPC.wordPx
+	fit.Parent = word
+	local hint = Ui.text(b, "", 16, { Position = UDim2.new(0, 2, 0, 74), Size = UDim2.new(1, -4, 0, 20), TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd })
+	hint.TextColor3 = C.plum
+	tiles[dest] = { button = b, hint = hint }
 	b.Activated:Connect(function()
-		if dest == "stable" and not (PlayerState.data and #PlayerState.data.horses > 0) then
+		if (dest == "stable" or dest == "visit") and not (PlayerState.data and #PlayerState.data.horses > 0) then
 			Ui.toast("Pick your first horse to open your stable!", "heart", "🐴")
 			return
 		end
-		gameRemotes:WaitForChild("Travel"):FireServer(dest)
+		if dest == "visit" then
+			if GameConfig.visit.enabled and GameConfig.visit.mapList then showFriends() end
+			return
+		end
 		hide()
+		GoTo.place(dest)
 	end)
 end
-
--- Friends' barns (D-060) ---------------------------------------------------------------
-local friendsBtn = Ui.button(row, "", UDim2.fromOffset(108, 170), UDim2.new(), C.gold, 18)
-friendsBtn.LayoutOrder = 99
-friendsBtn.Visible = GameConfig.visit.enabled and GameConfig.visit.mapList
-Ui.icon(friendsBtn, "friends", "👫", UDim2.fromOffset(78, 78), UDim2.new(0.5, -39, 0, 14))
-Ui.text(friendsBtn, "Friends' barns", 20, { Position = UDim2.new(0, 4, 0, 104), Size = UDim2.new(1, -8, 0, 56) })
+-- The barns list (D-060, D-079) is the "Visit barns" tile: whatever the server's FriendBarns sends
+-- (Visits.list), friends' barns and barns open to everyone here.
+tiles.visit.button.Visible = GameConfig.visit.enabled and GameConfig.visit.mapList
+tiles.foalBarn.button.Visible = GameConfig.breeding.enabled == true -- (D-080) the Foal Barn only while breeding is on
+PlayerState.Changed.Event:Connect(function()
+	if gui.Enabled and row.Visible then renderHints() end
+end)
+local pointAt = HudEvents:FindFirstChild("PointAt") -- (StableBoard fires it with a "New!" pointer)
+if not pointAt then
+	pointAt = Instance.new("BindableEvent")
+	pointAt.Name = "PointAt"
+	pointAt.Parent = HudEvents
+end
+pointAt.Event:Connect(function(_ring, place)
+	if typeof(place) == "string" and tiles[place] then pointed = place end
+end)
 
 friendsPage = Instance.new("Frame")
 friendsPage.BackgroundTransparency = 1
@@ -198,8 +264,45 @@ end
 
 local function showStamps()
 	local n = PlayerState.data and PlayerState.data.tourStamps or 0
-	stampText.Text = if n == 0 then "Tour pins: none yet. Pat every horse in a friend's barn to get one!"
+	stampText.Text = if n == 0 then "Tour pins: walk a barn's 4 stops!"
 		else "Tour pins: " .. n .. (if n == 1 then " barn toured" else " barns toured")
+end
+
+-- The one-time ask (D-079): "Let other riders visit?" the first time the barns list opens. A strip
+-- under the list, never over it (code review S4): 👫 Friends (gold, the current choice), 🌍 Everyone,
+-- and Not now (keeps Friends; asks again next time the game starts).
+local ask = Instance.new("Frame")
+ask.BackgroundTransparency = 1
+ask.Size = UDim2.new(1, 0, 0, 108)
+ask.Position = UDim2.new(0, 0, 0, 180)
+ask.Visible = false
+ask.Parent = friendsPage
+Ui.card(ask, UDim2.fromScale(1, 1), UDim2.new(), C.cream)
+Ui.text(ask, "Let other riders visit?", 22, { Position = UDim2.new(0, 12, 0, 18), Size = UDim2.new(0, 210, 0, 30),
+	TextXAlignment = Enum.TextXAlignment.Left })
+Ui.text(ask, "Who can come to your barn?", 16, { Position = UDim2.new(0, 12, 0, 52), Size = UDim2.new(0, 210, 0, 40),
+	TextXAlignment = Enum.TextXAlignment.Left }).TextColor3 = C.plum
+local askFriends = Ui.button(ask, "👫 Friends", UDim2.fromOffset(120, 64), UDim2.new(1, -388, 0, 20), C.gold, 18)
+local askEveryone = Ui.button(ask, "🌍 Everyone", UDim2.fromOffset(120, 64), UDim2.new(1, -260, 0, 20), C.white, 18)
+local askLater = Ui.button(ask, "Not now", UDim2.fromOffset(120, 64), UDim2.new(1, -132, 0, 20), C.white, 18)
+local askedThisSession = false
+local function closeAsk()
+	ask.Visible = false
+	stampRow.Visible = true
+	askedThisSession = true
+end
+local function answer(v: string)
+	closeAsk()
+	gameRemotes:WaitForChild("SetSetting"):FireServer("visitAsk", v)
+	if PlayerState.data and PlayerState.data.settings then PlayerState.data.settings.visitAsked = true end
+end
+askFriends.Activated:Connect(function() answer("Friends") end)
+askEveryone.Activated:Connect(function() answer("Everyone") end)
+askLater.Activated:Connect(closeAsk) -- nothing saved: Friends stays, and it asks again another day
+local function needsAsk(): boolean
+	local s = PlayerState.data and PlayerState.data.settings
+	return GameConfig.visit.askOnce ~= false and GameConfig.visit.everyone ~= false and s ~= nil
+		and s.visitAsked ~= true and s.visits ~= "Nobody" and not askedThisSession
 end
 
 local function drawFriends(list)
@@ -208,7 +311,7 @@ local function drawFriends(list)
 	end
 	if typeof(list) ~= "table" then list = {} end
 	empty.Visible = #list == 0
-	empty.Text = "No friends' barns here yet.\nWhen a Roblox friend is in this game, their face shows up here."
+	empty.Text = "No open barns yet"
 	for k, f in list do
 		if typeof(f) == "table" and typeof(f.userId) == "number" and typeof(f.name) == "string" then
 			local b = Ui.button(faces, "", UDim2.fromOffset(132, 168), UDim2.new(), if f.closed then C.white else C.cream, 18)
@@ -219,11 +322,17 @@ local function drawFriends(list)
 			img.Position = UDim2.new(0.5, -42, 0, 10)
 			img.Parent = b
 			Ui.corner(img, 42)
-			face(f.userId, img)
+			if f.friend == true then
+				face(f.userId, img) -- a friend's face; a stranger's barn shows a barn, never a profile picture (D-079)
+			else
+				Ui.text(img, "🏡", 48, { Size = UDim2.fromScale(1, 1), TextWrapped = false })
+			end
 			-- ✨ (D-070): something new built at that barn in the last two days; never a count
 			Ui.text(b, if f.fresh == true then "✨ " .. f.name else f.name, 18,
 				{ Position = UDim2.new(0, 4, 0, 98), Size = UDim2.new(1, -8, 0, 26), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false })
-			local go = Ui.text(b, if f.closed then "🔒 Gate closed" else "🏡 Visit ▶", 18, { Position = UDim2.new(0, 4, 0, 128), Size = UDim2.new(1, -8, 0, 30) })
+			-- who's a friend (D-079): "👫 Friend" or "🌍 Open"; a closed friend's gate says so
+			local go = Ui.text(b, if f.closed then "🔒 Gate closed" elseif f.friend == true then "👫 Friend ▶" else "🌍 Open ▶", 18,
+				{ Position = UDim2.new(0, 4, 0, 128), Size = UDim2.new(1, -8, 0, 30) })
 			go.TextColor3 = if f.closed then C.plum else C.ink
 			if f.closed then
 				img.ImageTransparency = 0.5
@@ -240,20 +349,28 @@ local function drawFriends(list)
 end
 
 gameRemotes:WaitForChild("FriendBarns").OnClientEvent:Connect(function(list)
-	if friendsPage.Visible then drawFriends(list) end
+	if friendsPage.Visible then
+		drawFriends(list)
+	end
 end)
 
-local function showFriends()
+showFriends = function()
+	if not gui.Enabled then
+		gui.Enabled = true
+		slideIn()
+	end
 	row.Visible = false
 	friendsPage.Visible = true
 	back.Visible = true
-	title.Text = "Friends' barns"
+	title.Text = "Visit barns"
 	empty.Visible = true
-	empty.Text = "Looking for your friends..."
+	empty.Text = "Looking for barns..."
 	for _, ch in faces:GetChildren() do
 		if ch:IsA("GuiObject") then ch:Destroy() end
 	end
 	showStamps()
+	ask.Visible = needsAsk()
+	stampRow.Visible = not ask.Visible -- the strip sits where the Tour pins line goes; the list stays
 	gameRemotes:WaitForChild("FriendBarns"):FireServer()
 end
 local function showPlaces()
@@ -262,12 +379,15 @@ local function showPlaces()
 	back.Visible = false
 	title.Text = "Where to?"
 end
-friendsBtn.Activated:Connect(function()
+-- GO to "Visit barns" (a "New!" pointer): the Map opens on the barns list.
+GoTo.register("visit", function()
 	if not (PlayerState.data and #PlayerState.data.horses > 0) then
 		Ui.toast("Pick your first horse to open your stable!", "heart", "🐴")
-		return
+	elseif GameConfig.visit.enabled and GameConfig.visit.mapList then
+		showFriends()
+	else
+		Ui.toast("Visits are closed today", "heart", "🏡")
 	end
-	showFriends()
 end)
 back.Activated:Connect(showPlaces)
 PlayerState.Changed.Event:Connect(function()

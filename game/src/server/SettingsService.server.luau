@@ -1,8 +1,11 @@
 --!nonstrict
 -- SettingsService (D-042, D-045, D-049): the owner's own settings and the gentle extras.
---   Stable visits: Friends (default) or Nobody (D-042); the plot's walls follow it.
+--   Stable visits: Friends (default), Everyone here or Nobody (D-042, D-079); the plot's walls follow
+--   it. "visitAsk" is the barns list's one-time "Let other riders visit?" (Friends or Everyone only,
+--   once; never over a Nobody someone already chose). Any visits choice counts as asked.
 --   Break reminder: optional, off by default (D-045).
 --   Sound: on by default; Off mutes the client's effects and announcer (Sound.luau).
+--   Seen (D-075): the "New!" pointers and the queue card's ❓ strip, each shown once (FindIt.SEEN_IDS).
 --   Smart Steer: on by default; Off means your race horse changes lane only when you press ◀ ▶ (D-054).
 --   Play time this week: counted while playing, shown in the For grown-ups panel (D-045).
 --   The first-ten-minutes tour (D-049): each step finishes when the player does the thing
@@ -14,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tour = require(Shared:WaitForChild("Tour"))
+local FindIt = require(Shared:WaitForChild("FindIt"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
@@ -21,7 +25,8 @@ local SetSetting = Profiles.remote("SetSetting")   -- client -> server: key, val
 local TourSkip = Profiles.remote("TourSkip")       -- client -> server
 local BoardOpened = Profiles.remote("BoardOpened") -- client -> server: the Stable Board was opened (tour step)
 
-local VISITS = { Friends = true, Nobody = true }
+local VISITS = { Friends = true, Everyone = true, Nobody = true } -- (D-079) Everyone here
+local ASK = { Friends = true, Everyone = true } -- the one-time ask offers these two
 local last: { [Player]: number } = {}
 
 local function week(t: number): number
@@ -61,14 +66,30 @@ Profiles.addDecorator(function(data, view)
 	view.settings.breakReminder = data.settings.breakReminder
 end)
 
+local seenCount: { [Player]: number } = {}
 SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
-	if os.clock() - (last[player] or 0) < 0.3 then return end
-	last[player] = os.clock()
 	local data = Profiles.get(player)
 	if not data then return end
+	-- "seen" (D-075) has its own bucket so a pointer's save is never dropped by another setting's limit:
+	-- bounded by FindIt.SEEN_IDS, so at most that many saves a session matter.
+	if key == "seen" then
+		if typeof(value) ~= "string" or not FindIt.SEEN_IDS[value] or data.flags[FindIt.seenKey(value)] then return end
+		seenCount[player] = (seenCount[player] or 0) + 1
+		if seenCount[player] > 64 then return end
+		data.flags[FindIt.seenKey(value)] = true -- a "New!" pointer or the ❓ strip, shown once
+		Profiles.changed(player)
+		return
+	end
+	if os.clock() - (last[player] or 0) < 0.3 then return end
+	last[player] = os.clock()
 	ensure(data)
 	if key == "visits" and typeof(value) == "string" and VISITS[value] then
 		data.settings.visits = value
+		data.settings.visitAsked = true
+	elseif key == "visitAsk" and typeof(value) == "string" and ASK[value] then
+		if data.settings.visitAsked then return end -- asked once; ⚙️ changes it after that
+		if data.settings.visits ~= "Nobody" then data.settings.visits = value end
+		data.settings.visitAsked = true
 	elseif key == "breakReminder" and typeof(value) == "boolean" then
 		data.settings.breakReminder = value
 	elseif key == "sound" and typeof(value) == "boolean" then
@@ -116,4 +137,7 @@ task.spawn(function()
 	end
 end)
 
-Players.PlayerRemoving:Connect(function(player: Player) last[player] = nil end)
+Players.PlayerRemoving:Connect(function(player: Player)
+	last[player] = nil
+	seenCount[player] = nil
+end)

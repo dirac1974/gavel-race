@@ -94,6 +94,11 @@ local function burst(at: Vector3, kind: string, n: number)
 	task.delay(2, function() p:Destroy() end)
 end
 
+-- A small dust puff (D-074: a ride horse landing a hop); none under Reduced Motion.
+function BuildFx.dust(at: Vector3, n: number?)
+	burst(at, "dust", n or 8)
+end
+
 function BuildFx.sparkle(at: Vector3, n: number?)
 	burst(at, "sparkle", n or 24)
 end

@@ -161,6 +161,10 @@ def main(argv=None) -> None:
     d054_out = ROOT / "tests" / "fixtures" / "trip_d054.json"
     d054_out.write_text(json.dumps(trip_d054_fixture()))
     print(f"wrote {TRIP_D054_RUNS} D-054 trip runs to {d054_out.relative_to(ROOT)}")
+    d072_out = ROOT / "tests" / "fixtures" / "trip_d072.json"
+    d072 = trip_d072_fixture()
+    d072_out.write_text(json.dumps(d072))
+    print(f"wrote {len(d072['runs'])} D-072 trip runs and {len(d072['edges'])} edge runs to {d072_out.relative_to(ROOT)}")
     if "--d057" not in argv:
         return
     d057 = trip_d057_fixture()
@@ -208,15 +212,22 @@ def extra_cases():
     return out
 
 
-def trip_run(k, baseline, geometry, base=None):
+def trip_run(k, baseline, geometry, base=None, overrides=None, styles=None):
     """One scripted phase-A run from its own seed (so a test can build any subset), on base
-    (trip.CONFIG by default)."""
+    (trip.CONFIG by default). overrides: TRIP_OVERRIDES by default (D-072: D072_OVERRIDES, where
+    "fixedLanes" is the race's fixed-lanes flag, not a config key); styles: the per-style table.
+    With D-072 on, the seven extra uniforms per lane and the learner flags come from a second
+    generator, so every other draw keeps its value."""
     rng = random.Random(20261007 * 1000 + k)
     course = trip.COURSE_ORDER[k % 2]
     distance = trip.DISTANCE_ORDER[(k // 2) % 4]
     geo = geometry[course][distance]
     cfg = trip.CONFIG if base is None else base
-    override = TRIP_OVERRIDES[k % len(TRIP_OVERRIDES)] if k >= 8 else None
+    overrides = TRIP_OVERRIDES if overrides is None else overrides
+    override = overrides[k % len(overrides)] if k >= 8 else None
+    fixed = bool(override and override.get("fixedLanes"))
+    if override:
+        override = {key: v for key, v in override.items() if key != "fixedLanes"}
     if override:
         cfg = json.loads(json.dumps(cfg))
         for key, value in override.items():
@@ -254,21 +265,42 @@ def trip_run(k, baseline, geometry, base=None):
                     intents.append([tick, i + 1, d])
                     by_tick.setdefault(tick, []).append((i, d))
     after_lock = [[rng.randrange(n) + 1, rng.choice([-1, 1])] for _ in range(rng.choice([1, 2, 3]))]
-    st_ = trip.new_state(posts, q, uniforms, geo, cfg, kinds)
+    d072 = trip.d072_on(cfg)
+    learners = None
+    if d072:
+        xr = random.Random(20261012 * 1000 + k)
+        uniforms = uniforms + [xr.random() for _ in range(trip.D072_UNIFORMS * n)]
+        learners = [kinds[i] != "bot" and xr.random() < 0.4 for i in range(n)]
+    st_ = trip.new_state(posts, q, uniforms, geo, cfg, kinds, learners=learners, fixed_lanes=fixed)
     answers = []
     snaps = []
+    pack_events = []
     for tick in range(ticks):
         t = tick * dt
+        before = len(st_.pack_events)
         answers.extend(trip.step(st_, q if tick < switch else p1, by_tick.get(tick, []), t, dt))
+        for e in st_.pack_events[before:]:
+            pack_events.append([tick, e[1], e[2] + 1, e[3] + 1, e[4]])
         if tick % SNAPSHOT_EVERY == 0 or tick == ticks - 1:
-            snaps.append({"tick": tick, "x": list(st_.x), "off": list(st_.off), "tgt": list(st_.tgt)})
+            snap = {"tick": tick, "x": list(st_.x), "off": list(st_.off), "tgt": list(st_.tgt)}
+            if d072:
+                snap.update({"drift": list(st_.drift), "skill": list(st_.skill),
+                             "passFrom": [j + 1 if j >= 0 else 0 for j in st_.pass_from],
+                             "returning": list(st_.returning), "doorUntil": list(st_.door_until),
+                             "doorLane": list(st_.door_lane), "blockSince": list(st_.block_since)})
+            snaps.append(snap)
     lock_x = list(st_.x)
     trip.lock(st_)
     # Presses after the bell: refused, and nothing moves.
     lock_answers = trip.step(st_, p1, [(lane - 1, d) for lane, d in after_lock], ticks * dt, dt)
     tr = trip.trip_values(st_)
     row = trip.baseline_row(baseline, course, distance)
-    tau = trip.tau(tr, posts, row, cfg, trip.brush_charges(st_))  # with the brush term (all 0 with brushes off)
+    if d072:
+        srow = trip.style_row(styles, course, distance) if styles else [0.0] * len(trip.STYLES)
+        floors = trip.learner_floors(st_, row, srow)
+        tau = trip.tau(tr, posts, row, cfg, trip.brush_charges(st_), trip.style_baseline(st_, srow), floors, fixed)
+    else:
+        tau = trip.tau(tr, posts, row, cfg, trip.brush_charges(st_))  # with the brush term (all 0 with brushes off)
     # Lune's JSON reader can land a number one ulp off; Luau's tonumber is exact, so the inputs
     # that drive the lanes also go as exact decimal strings.
     exact = {"q": [repr(v) for v in q], "p1": [repr(v) for v in p1], "uniforms": [repr(v) for v in uniforms]}
@@ -279,6 +311,10 @@ def trip_run(k, baseline, geometry, base=None):
            "stars": [trip.trip_stars(v, cfg) for v in tau]}
     if override:
         run["cfg"] = trip.config_record(cfg)
+    if d072:
+        run.update({"learners": learners, "fixedLanes": fixed, "styles": list(st_.style), "packEvents": pack_events,
+                    "learnerFloors": floors,
+                    "presses": list(st_.presses), "passes": list(st_.passes)})
     return run
 
 
@@ -292,16 +328,22 @@ def trip_fixture(only=None, base=None, baseline=None):
     After the lock, afterLock presses are stepped once (all "locked", nothing changes).
     Snapshots of x, off and tgt every SNAPSHOT_EVERY ticks and on the last tick. geometry
     holds each course and distance's gate and phase A for the TrackLayout check in run_all."""
+    styles = None
     if baseline is None:
-        baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]
+        data = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())
+        baseline, styles = data["baseline"], data.get("styles")
     geometry = {c: {d: trip.phase_a(c, d) for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
     cfg = trip.CONFIG if base is None else base
-    runs = [trip_run(k, baseline, geometry, cfg) for k in (only if only is not None else range(TRIP_RUNS))]
+    runs = [trip_run(k, baseline, geometry, cfg, styles=styles)
+            for k in (only if only is not None else range(TRIP_RUNS))]
     geo_out = {c: {d: {key: geometry[c][d][key] for key in ("segments", "lockS", "turnLength", "length", "r1", "gate")}
                    for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
     finish = {c: trip.COURSES[c]["finishFromTop"] for c in trip.COURSE_ORDER}
-    return {"cfg": trip.config_record(cfg), "race": trip.RACE, "geometry": geo_out, "finishFromTop": finish,
-            "distances": trip.DISTANCES, "baseline": baseline, "runs": runs}
+    out = {"cfg": trip.config_record(cfg), "race": trip.RACE, "geometry": geo_out, "finishFromTop": finish,
+           "distances": trip.DISTANCES, "baseline": baseline, "runs": runs}
+    if styles is not None and trip.d072_on(cfg):
+        out["styles"] = styles
+    return out
 
 
 
@@ -613,13 +655,120 @@ def trip_d057_fixture(only=None):
     trip.CONFIG with every key, what GameConfig.steering holds (D-057 in full since N5); a run with
     other settings carries its whole cfg.
     Each config also comes as exact decimal strings (cfgExact, defaultsExact)."""
-    baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())["baseline"]
+    # D-057's own baseline (since D-072 the game's table, trip_baseline.json, is D-072's)
+    baseline = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline_d057.json").read_text())["baseline"]
     geometry = {c: {d: trip.phase_a(c, d) for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
     runs = [trip_d057_run(k, baseline, geometry) for k in (only if only is not None else range(TRIP_D057_RUNS))]
     return {"cfg": trip.d057_config(), "cfgExact": _exact(trip.d057_config()), "defaults": trip.CONFIG,
             "defaultsExact": _exact(trip.CONFIG), "race": trip.RACE, "baseline": baseline, "runs": runs,
             "edges": trip_d057_edges(baseline)}
 
+
+# ---------------------------------------------------------------- D-072 (race realism phase A)
+
+TRIP_D072_RUNS = 40
+# Runs k >= 8 cycle these on top of trip.CONFIG (D-072 on): each block off on its own, the levers,
+# a fixed-lanes race (Hurdles) and the whole switch-back (every block off: D-057's race).
+D072_OVERRIDES = [None] * 8 + [
+    {"file.enabled": False}, {"pack.enabled": False}, {"pass.enabled": False}, {"doors.enabled": False},
+    {"fixedLanes": True}, {"file.riderRoomFeet": 0.0}, {"pass.riderTurnChance": 1.0, "pass.riderTriggerFeet": 6.0},
+    {"doors.shutChance": 1.0, "doors.reachFeet": 30.0}, {"pack.driftMaxFeetPerSecond": 5.0, "pack.driftFadeSeconds": 0.0},
+    {"learner.tauFloor": -0.005}, {"pass.maxPasses": 1, "pass.giveUpSeconds": 3.0},
+    {"pass.closingFeetPerSecond": 20.0, "pass.alongFeet": 4.0}, {"weaveWindowSeconds": 7.0, "introRaces": 3},
+    {"file.enabled": False, "pack.enabled": False, "pass.enabled": False, "doors.enabled": False},
+]
+
+
+def _d072_edge(name, posts, kinds, live, presses, ticks, uniforms, offs, learners=None, course="dirt",
+               distance="Classic", fixed=False, styles=None, baseline=None):
+    """A hand-built D-072 run on trip.CONFIG: nine uniforms per lane, starting offsets set before
+    the first tick (exact strings in "exact"), live fixed all race, every tick snapshotted."""
+    geo = trip.phase_a(course, distance)
+    cfg = trip.CONFIG
+    st_ = trip.new_state(posts, live, uniforms, geo, cfg, kinds, learners=learners, fixed_lanes=fixed)
+    st_.off = list(offs)
+    dt = 1.0 / cfg["tickHz"]
+    intents, answers, snaps, events = [], [], [], []
+    for tick in range(ticks):
+        now = presses.get(tick, [])
+        for lane, d in now:
+            intents.append([tick, lane + 1, d])
+        before = len(st_.pack_events)
+        answers.extend(trip.step(st_, live, now, tick * dt, dt))
+        for e in st_.pack_events[before:]:
+            events.append([tick, e[1], e[2] + 1, e[3] + 1, e[4]])
+        snaps.append({"tick": tick, "x": list(st_.x), "off": list(st_.off), "tgt": list(st_.tgt), "drift": list(st_.drift),
+                      "doorUntil": list(st_.door_until), "passFrom": [j + 1 if j >= 0 else 0 for j in st_.pass_from]})
+    trip.lock(st_)
+    tr = trip.trip_values(st_)
+    row = baseline[course][distance] if baseline else [0.0] * 8
+    srow = trip.style_row(styles, course, distance) if styles else [0.0] * len(trip.STYLES)
+    floors = trip.learner_floors(st_, row, srow)
+    tau = trip.tau(tr, posts, row, cfg, trip.brush_charges(st_), trip.style_baseline(st_, srow), floors, fixed)
+    return {"name": name, "course": course, "distance": distance, "posts": posts, "kinds": kinds, "live": live,
+            "uniforms": uniforms, "exact": {"live": [repr(v) for v in live], "uniforms": [repr(v) for v in uniforms],
+                                            "offs": [repr(v) for v in offs]},
+            "offs": offs, "learners": learners, "fixedLanes": fixed, "ticks": ticks, "intents": intents,
+            "answers": answers, "snapshots": snaps, "packEvents": events, "trip": tr, "tau": tau,
+            "styles": list(st_.style), "presses": list(st_.presses), "learnerFloors": floors}
+
+
+def _u72(n, base=0.5, extra=None, rails=None):
+    """Nine uniforms per lane: extra = {(lane, slot 0-6): value} for the D-072 seven, rails =
+    {lane: the rail uniform}."""
+    out = [base] * (2 * n) + [base] * (trip.D072_UNIFORMS * n)
+    for (lane, slot), v in (extra or {}).items():
+        out[2 * n + trip.D072_UNIFORMS * lane + slot] = v
+    for lane, v in (rails or {}).items():
+        out[2 * lane] = v
+    return out
+
+
+def trip_d072_edges(baseline, styles):
+    lead = 0.5 + 20 / 320
+    kw = {"baseline": baseline, "styles": styles}
+    return [
+        # a bot held 20 ft behind its target moves out on the straight, passes and heads back in
+        _d072_edge("pass", [1, 1], ["bot", "bot"], [lead, 1 - lead], {}, 200,
+                   _u72(2, extra={(1, 6): 0.9}, rails={0: 0.1, 1: 0.1}), [-10.0, 0.0], **kw),
+        # a bot on the rail 12 ft ahead shuts the door on a rider pressing In, for 1.5 s
+        _d072_edge("door", [2, 1], ["manual", "bot"], [0.5, 0.5], {0: [(0, -1)]}, 30, _u72(2, extra={(1, 6): 0.1}),
+                   [0.0, 12.0], **kw),
+        # the same with a learner: no door
+        _d072_edge("door-learner", [2, 1], ["manual", "bot"], [0.5, 0.5], {0: [(0, -1)]}, 30,
+                   _u72(2, extra={(1, 6): 0.1}), [0.0, 12.0], learners=[True, False], **kw),
+        # a learner presses Out through a turn and loses ground: its tau floors at learner.tauFloor
+        _d072_edge("learner-floor", [1, 5, 7], ["manual", "bot", "bot"], [1 / 3] * 3,
+                   {k: [(0, 1)] for k in range(40, 100, 15)}, 400, _u72(3, rails={1: 0.1, 2: 0.1}), [0.0, 0.0, 0.0],
+                   learners=[True, False, False], distance="Mile", **kw),
+        # fixed lanes: presses answer "fixed", nobody changes lane, tau 0
+        _d072_edge("fixed", [3, 4, 5], ["manual", "smart", "bot"], [1 / 3] * 3, {5: [(0, -1)], 9: [(1, 1)]}, 80,
+                   _u72(3), [0.0, 0.0, 0.0], fixed=True, **kw),
+        # running styles: a front-runner, a stalker and a closer, alone on the track
+        _d072_edge("styles", [2, 4, 6], ["bot", "bot", "bot"], [1 / 3] * 3, {}, 250,
+                   _u72(3, extra={(0, 0): 0.1, (2, 0): 0.95}, rails={0: 0.9, 1: 0.9, 2: 0.9}), [0.0, 0.0, 0.0], **kw),
+        # a rider looking for room won't file in behind a horse just ahead on the rail
+        _d072_edge("rider-room", [3, 1], ["smart", "bot"], [0.5, 0.5], {}, 120,
+                   _u72(2, extra={(1, 6): 0.9}, rails={1: 0.1}), [0.0, 12.0], **kw),
+    ]
+
+
+def trip_d072_fixture(only=None):
+    """D-072 parity runs for the Trip.luau port (trip.json's conventions): TRIP_D072_RUNS scripted
+    runs on trip.CONFIG (runs k >= 8 cycle D072_OVERRIDES) with learners and nine uniforms per lane,
+    and hand-built edges (pass, door, door-learner, learner-floor, fixed, styles, rider-room).
+    Snapshots add drift, skill, passFrom (1-based, 0 = none), returning, doorUntil, doorLane and
+    blockSince; results add styles (0 front .. 3 rider), presses, passes, packEvents ([tick, kind,
+    horse, other, flag], 1-based; flag = 1 on a turn for "out"/"pass", the direction for "shut") and
+    tau with the style row and the learner floor. styles = the per-style table (front, stalker,
+    closer, rider)."""
+    data = json.loads((ROOT / "tests" / "fixtures" / "trip_baseline.json").read_text())
+    baseline, styles = data["baseline"], data.get("styles")
+    geometry = {c: {d: trip.phase_a(c, d) for d in trip.DISTANCE_ORDER} for c in trip.COURSE_ORDER}
+    runs = [trip_run(k, baseline, geometry, trip.CONFIG, D072_OVERRIDES, styles)
+            for k in (only if only is not None else range(TRIP_D072_RUNS))]
+    return {"cfg": trip.config_record(trip.CONFIG), "cfgExact": _exact(trip.CONFIG), "race": trip.RACE,
+            "baseline": baseline, "styles": styles, "runs": runs, "edges": trip_d072_edges(baseline, styles)}
 
 if __name__ == "__main__":
     main()

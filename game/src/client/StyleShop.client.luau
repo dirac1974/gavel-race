@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
+local GoTo = require(script.Parent:WaitForChild("GoTo")) -- Find it (D-075): GO opens this feature
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Style = require(Shared:WaitForChild("Style"))
@@ -308,6 +309,11 @@ ev.Event:Connect(function()
 	elseif not RaceState.shopClosed(DiamondProducts.afterRaceSeconds) then
 		open()
 	end
+end)
+
+-- The Map's Tack & Paint tile (D-075): the same door as 💎, shut around races (D-050, D-056).
+GoTo.register("tackShop", function()
+	if not gui.Enabled and not RaceState.shopClosed(DiamondProducts.afterRaceSeconds) then open() end
 end)
 
 -- Your race starting closes the shop.

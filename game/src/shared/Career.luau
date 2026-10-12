@@ -1,7 +1,7 @@
 --!strict
 -- Careers (D-059, stage 7). Pure rules on horse records, tested under Lune.
---   No ageing and no decline: a horse only gains. A career badge every career.badgeEvery races
---   (🎖️), a Veteran at career.veteranAt, and then an opt-in Legend Retirement (Leagues.retire),
+--   Stats never drop (Ageing.luau only changes the raced Rating). A career badge every career.badgeEvery races
+--   (🎖️), a Veteran at career.veteranAt (= ageing.veteranAt), and then an opt-in Legend Retirement (Leagues.retire),
 --   suggested once per horse and never forced.
 
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")

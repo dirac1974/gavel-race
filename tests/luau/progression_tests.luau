@@ -134,7 +134,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		Profile.repairStalls(p)
 		local starter, a, b = p.horses[1], p.horses[2], p.horses[3]
 		check(starter.stall ~= nil and a.stall ~= nil and b.stall == nil, "two stalls, one horse in the pasture")
-		a.record.races, a.record.wins, a.points, a.league = 130, 20, 70, "Silver"
+		a.record.races, a.record.wins, a.points, a.league = 360, 20, 70, "Silver"
 		local plaque = Leagues.retire(p, a.id, T0)
 		check(plaque ~= nil and a.legend == T0 and b.stall ~= nil, "a Veteran retires; the pasture horse takes its stall")
 		check(#p.hallOfFame == 1, "one plaque")
@@ -148,7 +148,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		end
 		local ok, why = Leagues.unretire(p, a.id, {})
 		check(ok and why == nil and a.legend == nil, "back to the races")
-		check(a.league == "Silver" and a.points == 70 and a.record.races == 130 and a.record.wins == 20,
+		check(a.league == "Silver" and a.points == 70 and a.record.races == 360 and a.record.wins == 20,
 			"same league, points and record")
 		check(a.stall == nil and Profile.racers(p) == 3, "a full barn: it waits in the pasture, racing again")
 		check(#p.hallOfFame == 0, "its Legend plaque comes down")
@@ -168,25 +168,28 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	-- The last racing horse (the starter when it's alone) never retires -----------------------------
 	do
 		local solo = stable(0)
-		solo.horses[1].record.races = 300
+		solo.horses[1].record.races = 400
 		local pl, why = Leagues.retire(solo, solo.horses[1].id, T0)
 		check(pl == nil and why ~= nil and solo.horses[1].legend == nil, "the starter, your only racer, can't retire")
 	end
 
 	-- No Legend suggestion until breeding; careers off means no Legends ----------------------------
 	do
-		check(GameConfig.career.suggest == false, "career.suggest = false")
+		check(GameConfig.career.suggest == GameConfig.breeding.enabled, "career.suggest goes with breeding (D-080)")
+		local wasSuggest = GameConfig.career.suggest
+		GameConfig.career.suggest = false
 		local h = Horse.new("v", "Vet", "bay", STATS, POT, T0)
-		h.record.races = 150
+		h.record.races = 400
 		check(not Career.suggestLegend(h) and Career.canBeLegend(h), "a Veteran isn't asked, but can still choose Legend")
+		GameConfig.career.suggest = wasSuggest
 		GameConfig.career.enabled = false
 		check(not Career.canBeLegend(h), "career.enabled = false: no Legend button")
 		local v = Career.view(h)
 		check(v.line == "" and v.toNextBadge == nil, "career.enabled = false: no career row")
 		local p = stable(1)
-		p.horses[2].record.races = 150
+		p.horses[2].record.races = 400
 		local pl, why = Leagues.retire(p, p.horses[2].id, T0)
-		check(pl == nil and why == "Legends are resting today!", "careers off: the right reason, not 'needs 100 races'")
+		check(pl == nil and why == "Legends are resting today!", "careers off: the right reason, not 'needs 350 races'")
 		GameConfig.career.enabled = true
 	end
 

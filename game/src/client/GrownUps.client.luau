@@ -1,7 +1,7 @@
 --!nonstrict
 -- GrownUps (D-045, D-049): the ⚙️ button (top right) opens settings and a page for parents;
 -- plus the first-ten-minutes tour card and the optional break reminder.
---   Settings: who can visit your stable (Friends or Nobody), break reminder on or off, sound on or off,
+--   Settings: who can visit your stable (Friends, Everyone here or Nobody, D-079), break reminder on or off, sound on or off,
 --   Easy Rein (steering help on training courses, D-053) on or off, Smart Steer in races (D-054, on
 --   by default), and whether friends may see your training ghosts (off by default). "Nobody"
 --   visits also turns off Ride together invites and keeps your barn off friends' lists (D-060).
@@ -22,7 +22,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
-local Guide = require(script.Parent:WaitForChild("Guide"))
+local GoTo = require(script.Parent:WaitForChild("GoTo"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tour = require(Shared:WaitForChild("Tour"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
@@ -95,7 +95,7 @@ local function para(text: string, size: number?, order: number)
 	return l
 end
 
-local function choice(label: string, options: { { string } }, current: any, onPick, order: number)
+local function choice(label: string, options: { { string } }, current: any, onPick, order: number, buttonW: number?)
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
 	row.Size = UDim2.new(1, 0, 0, 60)
@@ -113,7 +113,7 @@ local function choice(label: string, options: { { string } }, current: any, onPi
 	l.VerticalAlignment = Enum.VerticalAlignment.Center
 	l.Parent = holder
 	for _, opt in options do
-		local b = Ui.button(holder, opt[2], UDim2.fromOffset(150, 56), UDim2.new(), if opt[1] == current then C.gold else C.white, 17)
+		local b = Ui.button(holder, opt[2], UDim2.fromOffset(buttonW or 150, 56), UDim2.new(), if opt[1] == current then C.gold else C.white, 17)
 		b.Activated:Connect(function() onPick(opt[1]) end)
 	end
 end
@@ -121,8 +121,12 @@ end
 local function settingsTab()
 	local d = PlayerState.data
 	if not d then return end
-	choice("Who can visit my stable?", { { "Friends", "👫 Friends" }, { "Nobody", "🔒 Nobody" } }, d.settings.visits,
-		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("visits", v) end, 1)
+	-- (D-079) three choices, 116 px each so they fit beside the label; an old "Club" shows as Friends
+	local visits = if d.settings.visits == "Everyone" or d.settings.visits == "Nobody" then d.settings.visits else "Friends"
+	local visitOpts = { { "Friends", "👫 Friends" }, { "Everyone", "🌍 Everyone here" }, { "Nobody", "🔒 Nobody" } }
+	if GameConfig.visit.everyone == false then table.remove(visitOpts, 2) end
+	choice("Who can visit my stable?", visitOpts, visits,
+		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("visits", v) end, 1, 116)
 	choice("Break reminder (each hour)", { { true, "On" }, { false, "Off" } }, d.settings.breakReminder == true,
 		function(v) gameRemotes:WaitForChild("SetSetting"):FireServer("breakReminder", v) end, 2)
 	choice("Sound", { { true, "🔊 On" }, { false, "🔇 Off" } }, d.settings.sound ~= false,
@@ -140,7 +144,7 @@ local function settingsTab()
 		panelGui.Enabled = false
 		gameRemotes:WaitForChild("SetSetting"):FireServer("tour", "restart")
 	end)
-	para("Only Roblox friends can visit, and only from the Map's Friends' barns list. Visitors can pat your horses, give one treat a day and drop a carrot in your post box; nobody can take, move or buy anything in your stable. Tap 🚪 Close gate any time to send visitors home. \"Nobody\" also means no Ride together invites.", 16, 8).TextColor3 = C.plum
+	para("👫 Friends: only Roblox friends can visit. 🌍 Everyone here: anyone in this server can look around, pat your horses and send a cheer; only friends can give a treat or drop a carrot. Nobody can take, move, buy or write anything in your stable. Tap 🚪 Close gate any time to send visitors home. \"Nobody\" also means no Ride together invites.", 16, 8).TextColor3 = C.plum
 end
 
 local function grownUpsTab()
@@ -157,16 +161,23 @@ local function grownUpsTab()
 	para("Never for sale: horses, coats, stats, speed, Green Cash, food, Energy, race entries, fan gear, trophies, rosettes or anything random.", 16, 41)
 	para(string.format("Our own limits: the game won't offer more than %d Robux of Diamonds in 24 hours or %d in 30 days. Diamonds bought in the last 30 days: %d Robux. No buying in line, during a race, on the results screen or for two minutes after. Any look can be returned within a day for all its Diamonds; Robux refunds go through Roblox Support.",
 		shop and shop.caps and shop.caps.dayRobux or 250, shop and shop.caps and shop.caps.monthRobux or 1000, shop and shop.monthRobux or 0), 16, 42)
-	para("🐴 Horses never get sick, run away or come to harm if your child takes a break. There are no streaks to lose and no countdowns.", 16, 50)
+	para("🐴 Horses never fall ill, run away or come to harm if your child takes a break. There are no streaks to lose and no countdowns.", 16, 50)
 	para("💬 Chat uses Roblox's own filtered chat and age settings. Horse names are built from a word list, so nothing can be typed.", 16, 60)
 	para("👫 Ride together: only Roblox friends can invite each other to a training ride, and only if the invite is accepted (it can always be declined, lapses by itself and is limited to a few). Riders see each other's stars and medals, never times or who was first. Setting stable visits to Nobody turns invites off. 🎈 Race with a friend: from More choices, your child can join a Roblox friend in this server in a free Practice race (no prizes, no points); nothing is sent to the friend.", 16, 61)
 	para("👻 Ghosts: a see-through horse shows your child's own best training ride. Friends see it only if \"Share my ghost with friends\" is turned on in Settings (it's off at first).", 16, 62)
-	para("🏡 Visiting friends' barns: the Map lists only Roblox friends who are in the same game server, and only if their stable visits are set to Friends. A visit is patting horses (no stats), one free treat a day and a carrot in the post box. Owners see how many carrots arrived, never who sent them, and nobody sees visitor counts, likes or rankings. The owner can close the gate in one tap, which walks visitors back to the lane.", 16, 63)
+	para(string.format("🏡 Visiting barns: stable visits are set to Friends unless changed (Settings). The Map lists Roblox friends' barns in the same game server, plus barns whose owners chose Everyone here. Anyone visiting can look around, walk a 4-stop tour, pat horses (no stats) and send one of 4 preset cheers, shown to the owner with no name. Only friends can give a free treat or drop a carrot. There is no typing, nothing can be taken or changed, and nobody sees visitor counts, likes or rankings. Everyone here works only where Roblox allows content sharing for both players; otherwise only friends visit. Visitors arrive outside the gate. The owner can ask one visitor to leave (they can't come back for %d minutes) or close the gate in one tap, which walks everyone back to the lane. Nobody keeps everyone out.", GameConfig.visit.askLeaveSeconds // 60), 16, 63)
 	local career, rehome = GameConfig.career, GameConfig.rehome
-	para(string.format("🎖️ Careers: horses never get old or slower. Every %d races a horse earns a career patch, and at %d races it's a Veteran. A Veteran may retire as a 👑 Legend, only if your child chooses: it moves to the Hall of Fame paddock beside the barn, keeps its stats and can still be ridden; its stall goes to another horse. A Legend can come back to the races any time, with its record.",
-		career.badgeEvery, career.veteranAt), 16, 64)
-	para(string.format("🏫 Rehoming: at the Market Corral a horse can go to %s, a riding school where other children ride it. The school pays half of what your child paid for it (never more, and nothing for a tamed or gifted horse, or one bought before this feature, which earns a goodbye rosette instead). It takes two taps, and for %d days the horse can come back for the same Green Cash, with its name and stats. The first horse and the last racing horse always stay. Horses are never traded between players.",
-		rehome.school, rehome.undoHours // 24), 16, 65)
+	para(string.format("🎖️ Careers: every %d races a horse earns a career patch. Horses have life stages: Young (training grows a little faster for the first %d races), Prime, and Veteran at %d races. Once a Veteran has finished growing, it races a little slower in rated races, very gently (at most %d Rating), never in Practice; stats, League Points and everything earned stay. The card says so 10 races ahead. A Veteran may retire as a 👑 Legend, only if your child chooses: it moves to the Hall of Fame paddock, keeps its stats and can still be ridden. A Legend can come back to the races any time.",
+		career.badgeEvery, GameConfig.ageing.youngRaces, career.veteranAt, GameConfig.ageing.declineCap), 16, 64)
+	para(string.format("🩺 Legs and the vet: after %d races in a row on one horse, rated races wait for a free 30-second Cool-down Check at the Vet (cool water, soft wraps, a carrot). Practice stays open. Feeding, brushing, %d minutes' rest, a Spa Day or training lowers the count. It only comes from lots of racing, never from neglect; nothing is permanent and nothing is for sale.",
+		GameConfig.legs.runLimit, GameConfig.legs.restSeconds // 60), 16, 65)
+	para(string.format("🏫 Riding School: a horse can be lent to %s for free and brought home any time (it stays yours), or sold there. A sale pays half of what your child paid plus a small bonus for its wins (never more than the price; nothing for a tamed or gifted horse, which earns a goodbye rosette instead). It takes two taps, and for %d days a sold horse can come back for the same Green Cash. The first horse is never sold and the last racing horse always stays. Horses are never traded between players.",
+		rehome.school, rehome.undoHours // 24), 16, 66)
+	local breed = GameConfig.breeding
+	if breed and breed.enabled then
+		para(string.format("💞 Foals: two of your child's own horses (each with %d races, one in %s or higher) can have a foal at the Foal Barn for Green Cash, which is earned in the game and never sold. Before paying, the card shows every coat the foal can have and its chance, so nothing is a hidden surprise; Diamonds and Robux can't be used, and nothing can be re-rolled. The foal arrives after %d races or the next day they play, with no clock, and one foal can start every %d races. Foals are never traded between players and never come to harm.",
+			breed.minParentRaces, breed.needLeague, breed.foalAfterRaces, breed.foalEveryRaces), 16, 67)
+	end
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 70)
 end
 
@@ -215,20 +226,11 @@ local inLine = false
 local skipAsked = 0 -- os.clock() of the first ✕ tap (skipConfirm), 0 = not asked
 
 local function goTo(go: string?)
-	if go == "stable" then
-		local i = player:GetAttribute("PlotIndex")
-		if i then
-			local x, z = WorldLayout.plotPoint(i, 40, 0)
-			Guide.to(x, z)
-		end
-	elseif go == "race" then -- the tour's first GO: the RACE! button's one tap (D-063)
+	if go == "race" then -- the tour's first GO: the RACE! button's one tap (D-063)
 		local quick = HudEvents:FindFirstChild("QuickRace")
 		if quick then quick:Fire() end
-	elseif go == "raceBoard" then
-		local p = WorldLayout.places.raceBoard
-		Guide.to(p.x, p.z + 10)
-		local picker = HudEvents:FindFirstChild("OpenRacePicker")
-		if picker then picker:Fire() end
+	elseif go then -- (D-075) walk or a trip, then open what's there (GoTo)
+		GoTo.place(go)
 	end
 end
 

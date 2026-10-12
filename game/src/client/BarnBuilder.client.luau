@@ -23,6 +23,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local Guide = require(script.Parent:WaitForChild("Guide"))
+local GoTo = require(script.Parent:WaitForChild("GoTo")) -- Find it (D-075): GO opens this feature
 local BuildFx = require(script.Parent:WaitForChild("BuildFx"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
@@ -525,6 +526,7 @@ local function close()
 	gui.Enabled = false
 	confirming, returning, justBuilt = nil, nil, nil
 end
+GoTo.register("barnBuilder", open) -- (open is shut around races, like the counter)
 closeBtn.Activated:Connect(close)
 dim.Activated:Connect(close)
 PlayerState.Changed.Event:Connect(function() render() end)

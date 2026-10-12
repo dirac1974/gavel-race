@@ -188,7 +188,7 @@ local function trainingGroundTests(check: (boolean, string) -> (), close: (numbe
 		check(gymOk, gkey .. ": gymkhana pieces inside the arena and on the route; logs clear of the gate-to-gate walkway")
 		check(counts.mud == TCfg.grit.mud and counts.log == TCfg.grit.logs and counts.pole == TCfg.grit.poles and close(points, 100, 1e-9),
 			gkey .. ": 4 puddles, 3 logs, 4 poles worth 100 points")
-		check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, 42 * 42 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
+		check(TCfg.grit.logHeight < TC.RIDE_HOP and close(TC.RIDE_HOP, GameConfig.riding.hop.jumpPower ^ 2 / (2 * 196.2), 0.01), "logs are lower than the ride horse's hop")
 		check(TCfg.grit.airborne < TC.RIDE_HOP - 1, "a hop clears the log-height test")
 		local slowOk = true
 		local aPole: any, aMud: any = nil, nil
@@ -2126,6 +2126,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(not Training.ready(th, T0 + 60) and Training.ready(th, T0 + 8 * 86400), "cap resets next week")
 	local th2 = Horse.starter("h8", "Daisy", "grey", rng, T0)
 	th2.potential.stamina = 75
+	th2.record.races = 30 -- a Prime horse: the classic gains (D-078: a Young horse trains x ageing.youngTrainMult)
 	local _, ga = Training.train(th2, "stamina", 0, T0)                    -- rested, poor score: 0.12 × 30 × 0.5 × 1.5 = 2.7
 	local _, gb = Training.train(th2, "stamina", 100, T0 + 600)            -- not rested: 0.12 × 27.3 × 1.0 = 3.276 → capped at 3.3 (6 − 2.7)
 	check(close(ga, 2.7, 1e-9) and close(gb, 3.3, 1e-9), "gain follows room left, score and rest; cap total")
@@ -2300,7 +2301,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Profile.addHorse(rp, r2)
 	r1.record.races, r1.record.wins = 40, 9
 	check(Leagues.retire(rp, r1.id, T0) == nil, "Legend Retirement waits for a Veteran (D-059)")
-	r1.record.races = 100
+	r1.record.races = GameConfig.career.veteranAt
 	local plaque = Leagues.retire(rp, r1.id, T0)
 	check(plaque and plaque.wins == 9 and #rp.horses == 2 and r1.legend == T0 and rp.activeHorse == r2.id and rp.hallOfFame[1].name == "Old Timer",
 		"retiring keeps a Hall of Fame plaque, and the Legend stays (D-059)")

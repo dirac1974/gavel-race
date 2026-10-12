@@ -229,7 +229,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	-- horse the same body motion (a whole race, every horse, through the jittery link).
 	local track = require("../../game/src/shared/TrackLayout")
 	local plan = track.plan(track.courses.dirt, track.distances.Mile)
-	local st = Trip.new({ 1, 2, 3, 4, 5, 6, 7, 8 }, table.create(8, 1 / 8), table.create(16, 0.5),
+	local st = Trip.new({ 1, 2, 3, 4, 5, 6, 7, 8 }, table.create(8, 1 / 8), table.create(72, 0.5),
 		track.phaseA(track.courses.dirt, plan), GameConfig.steering, { "bot", "smart", "manual", "bot", "smart", "manual", "bot", "smart" },
 		Trip.raceParams(GameConfig))
 	local b = Playback.new(cfg)
@@ -270,4 +270,21 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(moved >= 3 and maxYaw > math.rad(5) and maxYaw <= math.rad(10) + 1e-12 and maxRollAll <= math.rad(3) + 1e-12,
 		string.format("bots, Smart Steer and riders turn the same way through their glides: %d horses moved, the most %.1f deg turn and %.1f deg lean",
 			moved, math.deg(maxYaw), math.deg(maxRollAll)))
+	-- Shut doors (D-072, votes-feel R3): the bot turns shutYawDeg toward the horse it held, eased in and
+	-- out, held for the door's shutSeconds, 0 outside, never a snap.
+	do
+		local hold = GameConfig.steering.doors.shutSeconds
+		local peak = SteerPose.shut(hold / 2, POSE, -1, hold)
+		local edges = SteerPose.shut(0, POSE, -1, hold) == 0 and SteerPose.shut(hold, POSE, -1, hold) == 0
+			and SteerPose.shut(-0.1, POSE, 1, hold) == 0
+		local maxStep, prev = 0, 0
+		for k = 1, math.floor(hold * 60) + 2 do
+			local y = SteerPose.shut(k / 60, POSE, 1, hold)
+			maxStep = math.max(maxStep, math.abs(y - prev))
+			prev = y
+		end
+		check(edges and math.abs(peak - math.rad(POSE.shutYawDeg)) < 1e-12 and SteerPose.shut(hold / 2, POSE, 1, hold) == -peak
+			and maxStep < math.rad(POSE.shutYawDeg) / 8,
+			"a shut door: the bot turns toward the horse it held (out for a horse moving in), eased, held, never a snap")
+	end
 end

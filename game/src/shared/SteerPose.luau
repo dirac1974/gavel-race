@@ -18,6 +18,10 @@
 --   most brushLeanFeet, out and back over brushLeanSeconds, and nods (brushNodDeg); the other horse
 --   only nods. Both on a sine squared, starting and ending at rest, so nothing snaps; drawn only
 --   (never in the lanes that rank the race). No stumble, no flinch: a calm shoulder-to-shoulder brush.
+-- * Shut door (D-072, SteerPose.shut): a bot that shuts the door on a horse moving into its lane
+--   turns its body shutYawDeg toward that horse and leans shutLeanFeet toward it, eased in and out
+--   over shutEaseSeconds, held for the door's shutSeconds, and its jockey pumps shutPumpScale harder
+--   (SteerPose.shutShape), so the kid sees who shut it (votes-feel R3, consult). Drawn only.
 -- Angles are radians, positive toward higher lane numbers (outward), which is the horse's right
 -- on every course (TrackLayout.railPoint: x grows outward from the rail on its left).
 
@@ -94,6 +98,27 @@ function SteerPose.brush(age: number, cfg: any, mover: boolean, dir: number): (n
 	local shape = half * half -- sin^2: out and back, starting and ending at rest (no first-frame jump)
 	local lean = if mover then dir * cfg.brushLeanFeet * shape else 0
 	return lean, math.rad(cfg.brushNodDeg) * shape
+end
+
+-- A shut door `age` seconds ago (D-072): the shutting bot's extra yaw in radians, toward the mover.
+-- dir = the mover's direction (-1 in, 1 out): a horse moving in comes from outside, so the bot turns
+-- out (-dir). hold = how long the door holds (steering.doors.shutSeconds). Smoothstep in and out over
+-- shutEaseSeconds (never longer than half the hold), 0 outside it, so nothing snaps.
+function SteerPose.shutShape(age: number, cfg: any, hold: number): number
+	if age < 0 or age >= hold or hold <= 0 then return 0 end
+	local ease = math.min(cfg.shutEaseSeconds or 0.25, hold / 2)
+	local f = 1
+	if ease > 0 then f = math.min(1, age / ease, (hold - age) / ease) end
+	return f * f * (3 - 2 * f)
+end
+
+function SteerPose.shut(age: number, cfg: any, dir: number, hold: number): number
+	return -dir * math.rad(cfg.shutYawDeg or 6) * SteerPose.shutShape(age, cfg, hold)
+end
+
+-- The shutting bot's drawn lean toward the mover, in feet (the brush lean's sign: + outward).
+function SteerPose.shutLean(age: number, cfg: any, dir: number, hold: number): number
+	return -dir * (cfg.shutLeanFeet or 0) * SteerPose.shutShape(age, cfg, hold)
 end
 
 -- The CFrame.Angles arguments for a pose, applied as

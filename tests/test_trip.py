@@ -708,20 +708,29 @@ def test_trip_fixture_replays_exactly():
         by_tick = {}
         for tick, lane, d in run["intents"]:
             by_tick.setdefault(tick, []).append((lane - 1, d))
-        st = trip.new_state(run["posts"], run["q"], run["uniforms"], geo, cfg, run["kinds"])
+        d072 = trip.d072_on(cfg)
+        st = trip.new_state(run["posts"], run["q"], run["uniforms"], geo, cfg, run["kinds"],
+                            learners=run.get("learners"), fixed_lanes=run.get("fixedLanes", False))
         answers, snaps = [], []
         for tick in range(run["ticks"]):
             answers.extend(trip.step(st, run["q"] if tick < run["switchTick"] else run["p1"], by_tick.get(tick, []),
                                      tick * DT, DT))
             if tick % make_fixtures.SNAPSHOT_EVERY == 0 or tick == run["ticks"] - 1:
                 snaps.append({"tick": tick, "x": list(st.x), "off": list(st.off), "tgt": list(st.tgt)})
-        assert answers == run["answers"] and snaps == run["snapshots"]
+        assert answers == run["answers"]
+        assert [{k: s[k] for k in ("tick", "x", "off", "tgt")} for s in run["snapshots"]] == snaps
         trip.lock(st)
         late = trip.step(st, run["p1"], [(lane - 1, d) for lane, d in run["afterLock"]], run["ticks"] * DT, DT)
         assert late == run["afterLockAnswers"] == ["locked"] * len(run["afterLock"])
         tr = trip.trip_values(st)
         assert tr == run["trip"]
-        assert trip.tau(tr, run["posts"], fx["baseline"][run["course"]][run["distance"]], cfg, trip.brush_charges(st)) == run["tau"]
+        row = fx["baseline"][run["course"]][run["distance"]]
+        if d072:  # D-072 (the game since phase A): the style row and the learner floor
+            srow = trip.style_row(fx["styles"], run["course"], run["distance"]) if "styles" in fx else [0.0] * 4
+            assert trip.tau(tr, run["posts"], row, cfg, trip.brush_charges(st), trip.style_baseline(st, srow),
+                            trip.learner_floors(st, row, srow), run["fixedLanes"]) == run["tau"]
+        else:
+            assert trip.tau(tr, run["posts"], row, cfg, trip.brush_charges(st)) == run["tau"]
     assert {r["course"] for r in fx["runs"]} == {"dirt", "turf"}
     assert fx["geometry"]["dirt"]["Mile"]["gate"] == {"straight": "home", "offset": pytest.approx(1258.5707, abs=1e-3),
                                                       "laps": 0}
@@ -739,9 +748,11 @@ def test_d054_config_switches_every_d057_rule_off():
         assert CFG[key] == value, key
     assert set(trip.D057) == set(off)
     assert all(CFG[k] == trip.D057_OFF[k] for k in trip.D057_KEYS) and not trip.d057_on(CFG)
-    assert all(CFG[k] == trip.CONFIG[k] for k in CFG if k not in trip.D057_KEYS)
+    assert all(CFG[k] == trip.D072_OFF[k] for k in trip.D072_KEYS) and not trip.d072_on(CFG)  # and D-072 off
+    assert all(CFG[k] == trip.CONFIG[k] for k in CFG if k not in trip.D057_KEYS + trip.D072_KEYS + tuple(trip.D072_RETUNED))
+    assert all(CFG[k] == v for k, v in trip.D072_RETUNED.items())  # D-072 retuned these; the switch-back restores them
     record = trip.config_record(CFG)
-    assert list(record) == [k for k in CFG if k not in trip.D057_KEYS]
+    assert list(record) == [k for k in CFG if k not in trip.D057_KEYS + trip.D072_KEYS]
     assert record == steering.load_baseline("d054")["config"] == steering.load_report("d054")["config"]
     assert trip.config_from_record(record) == CFG
     assert trip.d054_config()["smart"] is not trip.CONFIG["smart"]  # a copy: changing it never touches CONFIG

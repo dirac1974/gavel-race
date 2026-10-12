@@ -122,15 +122,72 @@ function QueueView.view(s: State, me: number?, now: number): View
 end
 
 -- The compact phone card's one line (AAA Phase 2, D-067): "Race in 12 · 3 riders".
-function QueueView.compactLine(v: View): string
+-- Find it (D-075): with the line's short name (QueueView.lineShort) it names the line instead, and the
+-- seconds stay in the ring beside it: "🟠 Bronze line · 3 riders".
+function QueueView.compactLine(v: View, short: string?): string
 	if v.phase == "racetime" then return "Race time! GO!" end
+	local riders = 0
+	for _, sl in v.slots do if sl.filled then riders += 1 end end
+	local full = riders >= #v.slots and #v.slots > 0
+	if short and short ~= "" then
+		if v.phase == "countdown" then
+			return if full then short .. " · full gate!" else string.format("%s · %d rider%s", short, riders, if riders == 1 then "" else "s")
+		end
+		return short
+	end
 	if v.phase == "countdown" then
-		local riders = 0
-		for _, sl in v.slots do if sl.filled then riders += 1 end end
-		if riders >= #v.slots and #v.slots > 0 then return string.format("Race in %d · full gate!", v.seconds or 0) end
+		if full then return string.format("Race in %d · full gate!", v.seconds or 0) end
 		return string.format("Race in %d · %d rider%s", v.seconds or 0, riders, if riders == 1 then "" else "s")
 	end
 	return v.title
+end
+
+-- Which line you're in, and why (Find it, D-075; David: "how does the queue work for each one?").
+-- The server names your line in the player attribute LineKey (RaceQueues.key: "Bronze|race",
+-- "Silver|cup", "Open|practice") and your horse in LineHorse. League colours are dots, as on the
+-- race cards (Ui.leagueColors): 🥉 already means 3rd place and a bronze medal (one symbol per meaning, D-064).
+QueueView.LEAGUE_DOT = { Rookie = "🟢", Bronze = "🟠", Silver = "⚪", Gold = "🟡", Champion = "🟣" }
+
+-- "Bronze|race" -> "Bronze", "race"; nil or a malformed key -> nil, nil.
+function QueueView.parseKey(key: string?): (string?, string?)
+	if typeof(key) ~= "string" then return nil, nil end
+	local league, kind = string.match(key, "^(%w+)|(%w+)$")
+	if kind ~= "race" and kind ~= "cup" and kind ~= "practice" then return nil, nil end
+	return league, kind
+end
+
+-- The full card's title: "🟠 Bronze race line", "🏆 Bronze Cup line", "🎈 Open Practice line".
+function QueueView.lineTitle(key: string?): string
+	local league, kind = QueueView.parseKey(key)
+	if not league then return "" end
+	if kind == "practice" then return if league == "Open" then "🎈 Open Practice line" else "🎈 " .. league .. " Practice line" end
+	if kind == "cup" then return "🏆 " .. league .. " Cup line" end
+	return (QueueView.LEAGUE_DOT[league :: string] or "🏁") .. " " .. league .. " race line"
+end
+
+-- Why you're in it, in 6 words or fewer: "Horses like Comet race here".
+function QueueView.lineWhy(key: string?, horse: string?, equalPractice: boolean?): string
+	local league, kind = QueueView.parseKey(key)
+	if not league then return "" end
+	if kind == "practice" then return if equalPractice then "Anyone! Horses all equal" else "Anyone can practice here" end
+	if kind == "cup" then return "Only Cup horses" end
+	return "Horses like " .. (if horse and horse ~= "" then horse else "yours") .. " race here"
+end
+
+-- The phone row's name: "🟠 Bronze line", "🏆 Cup line", "🎈 Practice line".
+function QueueView.lineShort(key: string?): string
+	local league, kind = QueueView.parseKey(key)
+	if not league then return "" end
+	if kind == "practice" then return "🎈 Practice line" end
+	if kind == "cup" then return "🏆 Cup line" end
+	return (QueueView.LEAGUE_DOT[league :: string] or "🏁") .. " " .. league .. " line"
+end
+
+-- The picker's Join button says which line it puts you in: "Join Bronze line".
+function QueueView.joinWord(league: string?, kind: string?): string
+	if kind == "practice" then return "Join Practice line" end
+	if kind == "cup" then return "Join Cup line" end
+	return "Join " .. (league or "Rookie") .. " line"
 end
 
 -- The warm-up slider's word for a practice tap (it counts nothing and is never sent anywhere).

@@ -47,6 +47,11 @@ local RaceQueues = require(Shared:WaitForChild("RaceQueues"))
 local NameGen = require(Shared:WaitForChild("NameGen"))
 local HorseBook = require(Shared:WaitForChild("HorseBook"))
 local StableStar = require(Shared:WaitForChild("StableStar")) -- first-win rosettes on the Rosette Wall (D-062)
+local Legs = require(Shared:WaitForChild("Legs"))           -- the vet run (fun-and-return phase 3, D-077)
+local Ageing = require(Shared:WaitForChild("Ageing"))       -- the gentle Veteran decline (phase 4, D-078)
+local ClassPath = require(Shared:WaitForChild("ClassPath")) -- the class path and Cup bar (phase 2, D-076)
+local HorseLook = require(Shared:WaitForChild("HorseLook")) -- wraps and the Veteran look (D-077, D-078)
+local Foals = require(script.Parent:WaitForChild("Foals")) -- a foal ready, a foal's first race (D-080)
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -83,6 +88,7 @@ local TripLocked = makeRemote("TripLocked")       -- server -> all: lanes locked
 local SteerControls = makeRemote("SteerControls") -- server -> one rider: buttons shown, Smart Steer on, first-time tip, first-brush tip (D-057 N5), course (D-054 S3)
 local SteerRequest = makeRemote("SteerRequest")   -- client -> server: dir (-1 in toward the rail, 1 out), seq (D-054 S3)
 local SteerBrush = makeRemote("SteerBrush")       -- server -> all: a brush (mover, other, dir, server time, course), D-057 N5
+local PackEvent = makeRemote("PackEvent")         -- server -> all: a pack event ("out" | "pass" | "shut", horse, other, flag, server time, course), D-072
 local SteerLane = makeRemote("SteerLane")         -- server -> one rider, on change: own lane tgt, destination, last seq answered, waiting press, its race time, tucking, in side, out side, the state's race time, course (D-054 S3, D-057 N4)
 local Dismount = makeRemote("Dismount")           -- client -> server: rider pressed Done after results or replay
 local PersonalBest = makeRemote("PersonalBest")   -- server -> one: distance, ride score, earlier best, course ("New best!", D-063)
@@ -270,9 +276,16 @@ local function waitStatus(player: Player)
 	QueueGate:FireClient(player, nil, gateRiders(list), GameConfig.lanes, nil, false)
 end
 
+-- Find it (D-075): the queue card names your line and why from these (QueueView.lineTitle, lineWhy).
+local function markLine(player: Player, key: string?, horseName: string?)
+	player:SetAttribute("LineKey", key)
+	player:SetAttribute("LineHorse", if key then horseName else nil)
+end
+
 local function leaveLine(player: Player)
 	if RaceQueues.leave(waits, player) then
 		player:SetAttribute("InLine", nil)
+		markLine(player, nil)
 		QueueStatus:FireClient(player, false, 0, nil, nil)
 	end
 	local c = inLine[player]
@@ -280,6 +293,7 @@ local function leaveLine(player: Player)
 	RaceTime:FireClient(player, c.id, true) -- cancels a "Race time!" already shown (D-061 stage 2)
 	inLine[player] = nil
 	player:SetAttribute("InLine", nil)
+	markLine(player, nil)
 	local i = table.find(c.queue, player)
 	if i then table.remove(c.queue, i) end
 	if #c.queue == 0 then
@@ -324,7 +338,8 @@ end)
 
 -- Steering (D-054 S3): a rider's lane-change press. Trip.submit checks it as it arrives (in this
 -- race, before the lock, dir -1 or 1, seq rising, not spam) and the next 10 Hz tick applies it.
--- Riders whose buttons are hidden (their first introRaces races) can't steer.
+-- Riders whose buttons are hidden (their first introRaces races; 0 since D-072) can't steer, nor can
+-- anyone in a fixed-lanes race (Hurdles, D-072: no SteerControls are sent).
 SteerRequest.OnServerEvent:Connect(function(player: Player, dir: any, seq: any)
 	local c = riding[player]
 	local cur = c and c.current
@@ -366,6 +381,8 @@ local function rideable(player: Player, horseId: string?, card)
 	if card then
 		local ok, why = Leagues.canEnter(h, card, bestRating(h))
 		if not ok then return nil, why end
+		-- (D-077) a horse that needs its Cool-down Check waits for rated races; Practice stays open
+		if not card.practice and Legs.needsVet(h, os.time()) then return nil, Legs.REJECT end
 		local cost = costOf(card, h)
 		if cost > 0 and Horse.syncEnergy(h, os.time(), GameConfig.energy) < cost then
 			return nil, h.name .. " is napping. Try a Practice race!"
@@ -386,6 +403,7 @@ Profiles.addDecorator(function(data, view)
 			-- Class badge (D-062): First Win, Rising Star, Open or Cup, a label only.
 			hv.class = Leagues.classOf(h, hv.cupOpen)
 			hv.leagueWins = table.clone(Leagues.wins(h))
+			hv.classPath = ClassPath.view(h, hv.cupOpen) -- (D-076) the path, the next goal and the Cup bar
 		end
 	end
 	view.hallOfFame = data.hallOfFame or {}
@@ -436,6 +454,11 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	local pick = data and ((id and Profile.isStalled(data, id) and Profile.horse(data, id)) or Profile.activeHorse(data))
 	local wanted = { league = if pick then pick.league else DEFAULT_LEAGUE, cup = kind == "cup", practice = kind == "practice" }
 	local h, why = rideable(player, id, wanted)
+	if not h and why == Legs.REJECT then -- (D-077) the server turns a rated join away: the vet first
+		Profiles.notify(player, why, "stethoscope")
+		if not inLine[player] and not RaceQueues.isWaiting(waits, player) then QueueStatus:FireClient(player, false, 0, nil, nil) end
+		return
+	end
 	if not h and kind == "race" then -- (D-061 stage 2) a tired or outgrown horse still gets a race: Practice
 		local practice = { league = wanted.league, cup = false, practice = true }
 		local hp = rideable(player, id, practice)
@@ -459,11 +482,13 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	if c then
 		if RaceQueues.cardKey(c.card) == key then -- same race, maybe another horse of the league
 			chosen[player] = h.id
+			markLine(player, key, h.name)
 			return
 		end
 		if #c.queue == 1 and c.queue[1] == player then -- alone in line: the card follows the new pick
 			chosen[player] = h.id
 			claimCard(c, h.league, kind)
+			markLine(player, RaceQueues.cardKey(c.card), h.name)
 			publishCards()
 			return
 		end
@@ -473,6 +498,7 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	local want = if typeof(courseId) == "string" and courses[courseId] then courseId else nil
 	RaceQueues.join(waits, player, h.league, kind, os.clock(), want)
 	player:SetAttribute("InLine", true)
+	markLine(player, key, h.name)
 	pumpQueues()
 	if RaceQueues.isWaiting(waits, player) then
 		waitStatus(player)
@@ -555,6 +581,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 			claimCard(c, wanted.league, kind)
 			publishCards()
 		end
+		markLine(player, RaceQueues.cardKey(c.card), h.name)
 		return
 	end
 	if #c.queue >= GameConfig.lanes then
@@ -566,6 +593,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 	table.insert(c.queue, player)
 	inLine[player] = c
 	player:SetAttribute("InLine", true)
+	markLine(player, RaceQueues.cardKey(c.card), h.name)
 	chosen[player] = h.id
 	if not c.fillDeadline and not c.current then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
 	queueStatus(c)
@@ -659,6 +687,7 @@ local function runRace(c, players: { Player })
 	local horseOf: { [number]: string } = {}
 	local coatOf: { [string]: string } = {}
 	local shineOf: { [string]: boolean } = {} -- a Spa Day's shine, for this race (D-058)
+	local lookOf: { [string]: any } = {}     -- wraps and the Veteran look, for this race (D-077, D-078)
 	local riders = {}
 	for _, p in players do
 		local h = rideable(p, chosen[p], card)
@@ -668,6 +697,10 @@ local function runRace(c, players: { Player })
 		local data = Profiles.get(p)
 		if h and data and not riding[p] and (cost == 0 or Horse.spendEnergy(h, cost, os.time(), GameConfig.energy)) then
 			local rating = Horse.rating(h, cond, os.time(), RaceRating)
+			-- (D-078) the gentle Veteran decline: rated races only, from h.ageing.declineFrom; never Practice,
+			-- League Points, ceilings (bestRating) or stats
+			rating = Ageing.racedRating(rating, h.record.races, Ageing.declineFromOf(h), card.practice)
+			lookOf[tostring(p.UserId)] = HorseLook.forRace(h, Legs.takeWrap(h))
 			table.insert(humans, { id = tostring(p.UserId), name = h.name, rating = rating, isBot = false })
 			horseOf[p.UserId] = h.id
 			coatOf[tostring(p.UserId)] = h.coat
@@ -694,9 +727,11 @@ local function runRace(c, players: { Player })
 	if card.practice and GameConfig.queue.practiceEqualHorses then RaceSession.equalizeRatings(lanes) end -- D-068
 	local coats = {}
 	local shines = {}
+	local looks = {}
 	for i, lane in lanes do
 		coats[i] = coatOf[lane.id] -- bots keep the default coats
 		shines[i] = shineOf[lane.id]
+		looks[i] = lookOf[lane.id]
 	end
 	local session = RaceSession.new({
 		deps = { RaceMath = RaceMath, BurstMeter = BurstMeter, PaceMeter = PaceMeter, RaceShape = RaceShape },
@@ -748,8 +783,9 @@ local function runRace(c, players: { Player })
 	session:assignPosts(order)
 	local postCoats = {}
 	local postShines = {}
-	for post, old in order do postCoats[post], postShines[post] = coats[old], shines[old] end
-	coats, shines = postCoats, postShines
+	local postLooks = {}
+	for post, old in order do postCoats[post], postShines[post], postLooks[post] = coats[old], shines[old], looks[old] end
+	coats, shines, looks = postCoats, postShines, postLooks
 
 	-- Steering (D-054): the trip state, built after the posts (lane index = post), drawing its
 	-- two uniforms per lane after every other gate draw. Bots steer with Smart Steer and its bot
@@ -759,27 +795,37 @@ local function runRace(c, players: { Player })
 	-- which their presses pause; a rider who turned it off in Settings and has the buttons steers
 	-- alone. While the buttons are hidden everyone has Smart Steer (no kid is left at their post
 	-- with no way to move) and their tau is 0 (they can't affect their trip).
+	-- D-072: a rider in their first learner.races counted races is a learner (no shut doors, their
+	-- own presses never push tau below learner.tauFloor), and each style's baseline joins the post's
+	-- (TripBaseline.styles). A fixed-lanes race (card.fixedLanes, false by default; Hurdles later)
+	-- keeps every horse in its post lane with tau 0, and nobody gets the buttons.
 	local trip = nil
-	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string } } = {}
+	local controls: { [Player]: { shown: boolean, smart: boolean, tip: boolean, bumpTip: boolean, kind: string, pips: boolean,
+		learner: boolean, races: number } } = {}
 	local steers: { [Player]: boolean } = {}
+	local fixedLanes = card.fixedLanes == true
 	if GameConfig.steering.enabled then
 		local tripRow = TripBaseline[c.id] and TripBaseline[c.id][cond.distance]
 		if not tripRow then
 			warn(string.format("[RaceService] no trip baseline for %s %s; posts count as equal", c.id, tostring(cond.distance)))
 			tripRow = table.create(GameConfig.lanes, 0)
 		end
-		local riders = {}
+		local riders, learners = {}, {}
 		for _, p in players do
-			local ctl = Trip.riderControls(Profiles.get(p), GameConfig.steering)
-			controls[p] = ctl
-			if ctl.shown then steers[p] = true end
+			local ctl = Trip.riderControls(Profiles.get(p), GameConfig.steering, GameConfig.steerHud)
+			if not fixedLanes then
+				controls[p] = ctl
+				if ctl.shown then steers[p] = true end
+			end
 			riders[tostring(p.UserId)] = ctl.kind
+			learners[tostring(p.UserId)] = ctl.learner
 		end
-		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout, riders)
+		trip = Trip.start(GameConfig, session, cfg, plan, tripRow, rng, TrackLayout, riders,
+			{ learners = learners, fixedLanes = fixedLanes, styleRow = Trip.styleRow(TripBaseline, c.id, cond.distance) })
 	end
 
 	c.scene:dismountAll() -- anyone still sitting from this course's last race
-	c.scene:build(plan, coats, shines) -- rebuilt each race: the gate moves with the distance, riders' own coats
+	c.scene:build(plan, coats, shines, looks) -- rebuilt each race: the gate moves with the distance, riders' own coats
 	local title = if card.cup then leagueName .. " Cup" elseif card.practice then "Practice" else leagueName
 	RaceStarted:FireAllClients(title, lanesSummary(session), tStart, cond, resultAt, burstOpen, c.id)
 	if trip then
@@ -874,7 +920,10 @@ local function runRace(c, players: { Player })
 	local previewStretch: (seg: number, own: boolean?) -> () -- (below; the lock refreshes the shown chances with it, D-071)
 	local function advanceTrip(t: number)
 		if not trip or trip.locked or cur.aborted then return end
-		if Trip.advance(trip, session.live, t - tStart) then
+		debug.profilebegin("TripStep") -- (D-072 consult) the trip's ticks, learners' shadows included
+		local lockedNow = Trip.advance(trip, session.live, t - tStart)
+		debug.profileend()
+		if lockedNow then
 			tapLockAt = now()
 			session:setTrip(Trip.raceTau(trip))
 			shownLive = table.clone(session.live)
@@ -896,9 +945,11 @@ local function runRace(c, players: { Player })
 			end
 			for answer, count in trip.answers do table.insert(answers, answer .. " " .. count) end
 			table.sort(answers)
-			print(string.format("[Trip] %s %s locked at %.1f s: %s; requests: %s; held by the reverse or weave gap %d, waits dropped %d",
+			local pack = { out = 0, pass = 0, shut = 0 } -- (D-072) the field's passes and shut doors
+			for _, e in trip.packEvents do pack[e[2]] = (pack[e[2]] or 0) + 1 end
+			print(string.format("[Trip] %s %s locked at %.1f s: %s; requests: %s; held by the reverse or weave gap %d, waits dropped %d; pack: out %d, passes %d, doors shut %d%s",
 				c.id, cond.distance, trip.lockT, table.concat(parts, ", "), if #answers > 0 then table.concat(answers, ", ") else "none",
-				trip.gapHeld or 0, trip.waitDropped or 0))
+				trip.gapHeld or 0, trip.waitDropped or 0, pack.out, pack.pass, pack.shut, if trip.fixed then " (fixed lanes)" else ""))
 			-- The chances shown pick tau up at once (when the lock comes before checkpoint 1, as it
 			-- can in a Sprint, the checkpoint's own update carries it).
 			if session.closed > 0 then LiveChances:FireAllClients(session.closed, shownLive, c.id) end
@@ -937,7 +988,7 @@ local function runRace(c, players: { Player })
 		local lastStamp = tStart
 		local sentLanes, lanesAt, resend = nil, -math.huge, 0
 		local sentOwn: { [Player]: any } = {}
-		local sentBrushes = 0
+		local sentBrushes, sentPack = 0, 0
 		-- Brushes (D-057 N5) go to every screen following the course, before that tick's SteerLane,
 		-- stamped with the server time they happened: the mover leans and nods, the other nods, a
 		-- soft tick at the mover's horse, and the mover's chip. Bots and Smart Steer never brush;
@@ -957,7 +1008,19 @@ local function runRace(c, players: { Player })
 				Profiles.changed(p)
 			end
 		end
+		-- (D-072) Pack events go to every screen following the course the same way, stamped as the
+		-- samples are: "out" (a horse moves out to pass another), "pass" (it is clear and heads back in)
+		-- and "shut" (a bot shuts the door on a horse moving into its lane: RaceView turns the bot toward
+		-- it, and the rider whose press it held hears it). Drawn only; none after the lock.
+		local function sendPack()
+			while sentPack < #trip.packEvents do
+				sentPack += 1
+				local e = trip.packEvents[sentPack]
+				PackEvent:FireAllClients(e[2], e[3], e[4], e[5], tStart + e[1] + trip.dt, c.id)
+			end
+		end
 		local function sendBrushes()
+			sendPack()
 			while sentBrushes < #trip.events do
 				sentBrushes += 1
 				local e = trip.events[sentBrushes]
@@ -1213,13 +1276,22 @@ local function runRace(c, players: { Player })
 		if card.practice then
 			cash, points = 0, 0 -- the Cup winner's purse is already the locked session purse
 		end
-		table.insert(summary, { name = lane.name, place = prize.place, cash = cash, isBot = prize.isBot, id = prize.id, lane = laneIdx })
+		local row = { name = lane.name, place = prize.place, cash = cash, isBot = prize.isBot, id = prize.id, lane = laneIdx }
+		table.insert(summary, row)
 		if not prize.isBot then
 			local player = Players:GetPlayerByUserId(tonumber(prize.id))
 			local data = player and Profiles.get(player)
 			if data and horseOf[player.UserId] then
+				local hp = Profile.horse(data, horseOf[player.UserId])
+				local pointsBefore = hp and hp.points or 0
+				local leagueBefore = hp and hp.league
 				if not card.practice then
 					local before, after = Profile.recordRace(data, horseOf[player.UserId], prize.place, cash, points, os.time())
+					if hp then
+						Legs.afterRace(hp, os.time()) -- (D-077) one more counted race in a row on this horse
+						Ageing.note(hp) -- (D-078) declineFrom, the first time it's a Veteran at its peak
+					end
+					Foals.afterRace(player, data, horseOf[player.UserId], before) -- (D-080) counted race: foal ready / first race
 					-- Careers (D-059): a badge every career.badgeEvery races, Veteran at career.veteranAt.
 					local badge, veteran = Career.crossed(before, after)
 					local hc = (badge or veteran) and Profile.horse(data, horseOf[player.UserId])
@@ -1263,6 +1335,18 @@ local function runRace(c, players: { Player })
 							Profiles.notify(player, string.format("🏆 %s won the %s Cup and moves up to %s!", h.name, leagueName, nxt), "trophy")
 						end)
 						Progress.record(player, "promote", 1)
+					end
+				end
+				-- (D-076) the results card's Cup bar: League Points this race as a fill (never a number), the
+				-- next goal on the class path. Not in Practice, not after a move up, not in the top league.
+				if hp and not card.practice and GameConfig.cupBar and GameConfig.cupBar.enabled ~= false then
+					local from = ClassPath.cupFill(leagueBefore, pointsBefore)
+					if from and hp.league == leagueBefore then
+						local open = Leagues.cupOpen(hp, bestRating(hp))
+						local path = ClassPath.view(hp, open)
+						row.points = math.max(0, hp.points - pointsBefore)
+						row.cupFrom, row.cupTo, row.cupOpen = from, path.cupFill or from, path.cupOpen
+						row.classNext = path.next
 					end
 				end
 				Profiles.changed(player)
@@ -1372,6 +1456,7 @@ local function courseLoop(c)
 			local p = table.remove(c.queue, 1)
 			inLine[p] = nil
 			p:SetAttribute("InLine", nil)
+			markLine(p, nil)
 			table.insert(racers, p)
 		end
 		c.fillDeadline = nil

@@ -68,6 +68,7 @@ local TrainTogether = remotes:WaitForChild("TrainTogether")
 local Ghost = require(Shared:WaitForChild("Ghost"))
 local RideTogether = require(Shared:WaitForChild("RideTogether"))
 local HorseLegs = require(Shared:WaitForChild("HorseLegs"))
+local HorseJump = require(Shared:WaitForChild("HorseJump"))
 local CFG = GameConfig.training
 local TC = TrainingCourses
 local C = Ui.colors
@@ -138,8 +139,10 @@ end
 local function hop()
 	local rig = myRide()
 	local hh = rig and rig:FindFirstChildOfClass("Humanoid")
-	-- The horse hops; the rider stays in the saddle (their own jump stays off while riding).
-	if hh and TrainingState.phase == "ride" and hh.FloorMaterial ~= Enum.Material.Air then hh.Jump = true end
+	-- The horse hops forward (D-074), never faster than the course's own pace (RideClient sets it as
+	-- WalkSpeed) nor where the course says no (TrainingState.hopCap: 0 in the Gate Break stall);
+	-- the rider stays in the saddle (their own jump stays off while riding).
+	if hh and TrainingState.phase == "ride" then HorseJump.hop(hh, math.min(hh.WalkSpeed, TrainingState.hopCap or math.huge)) end
 end
 jumpBtn.MouseButton1Down:Connect(hop)
 
@@ -590,6 +593,7 @@ local function beginSession(course: string, n: number, seed: number, goAtServer:
 		released = false, partners = partners or {} }
 	session = s
 	TrainingState.active, TrainingState.course, TrainingState.phase = true, course, "countdown"
+	TrainingState.hopCap = nil
 	courseLabel.Text = c.emoji .. " " .. c.name
 	local dotCount = if course == "speed" or course == "stamina" then c.laps
 		elseif course == "accel" then CFG.accel.breaks else #c.elements
@@ -730,6 +734,7 @@ local function gateFrame(s, cur)
 	local hold = { ac.doorX - 5.5, gz - 3, ac.doorX - 1.5, gz + 3 }
 	setDots(CFG.accel.breaks, s.breaksDone, true)
 	fadePartners(s, s.gate ~= "dash" and TC.inRect(ac.stall, cur.x, cur.z))
+	TrainingState.hopCap = TC.hopCap(s.gate, TC.inRect(ac.stall, cur.x, cur.z)) -- (D-074) never a hop-go
 	if not TC.inRect(ac.stall, cur.x, cur.z) then
 		s.released = false
 	elseif (TrainingState.stick or 0) < STICK_DEADZONE then

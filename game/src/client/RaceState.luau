@@ -39,6 +39,12 @@ RaceState.predictSteer = function(_dir: number, _seq: number): boolean return fa
 -- A brush (D-057 N5) as RaceView starts drawing it: (courseId, mover lane, server time drawn).
 -- RaceController shows the mover's chip then, so the chip and the lean come together.
 RaceState.BrushDrawn = Instance.new("BindableEvent")
+-- A pack event (D-072) as RaceView draws it: (courseId, kind "out" | "pass" | "shut", horse, other,
+-- flag). For "shut", horse is the bot and other the horse it held; RaceController's chip for your own.
+RaceState.PackDrawn = Instance.new("BindableEvent")
+-- (D-072 consult) horse model -> how much harder its jockey pumps now (a bot holding a shut door;
+-- RaceView sets it, JockeyPose reads it; missing = 1).
+RaceState.pumpScale = setmetatable({}, { __mode = "k" }) :: { [any]: number }
 
 -- Race HUD size on small screens (D-055): the board, place badge, results card and race map
 -- shrink with the screen height. The race map's top and unscaled height place the badge under it.

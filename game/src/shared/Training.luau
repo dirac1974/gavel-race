@@ -10,6 +10,9 @@
 -- Vet (wellness clinic): a heartbeat check-up gives +1 bond once a day and the next Health
 -- Passport stamp on a new day. Nothing makes a horse ill and nothing is for sale.
 
+local Ageing = if script then require(script.Parent.Ageing) :: any else require("./Ageing")
+local Legs = if script then require(script.Parent.Legs) :: any else require("./Legs")
+
 local Training = {}
 
 Training.STATS = { "speed", "accel", "stamina", "grit" }
@@ -68,6 +71,9 @@ function Training.gain(h: any, stat: string, score: number, now: number): number
 	local room = math.max(0, (h.potential[stat] or 0) - (h.stats[stat] or 0))
 	local quality = 0.5 + 0.5 * math.clamp(score, 0, 100) / 100
 	local g = Training.K * room * quality * (if Training.isRested(h, now) then Training.RESTED_BONUS else 1)
+	-- Young horses (D-078): training x ageing.youngTrainMult for their first youngRaces counted races,
+	-- before the room and weekly caps (so it never passes Potential or the week's limit).
+	g *= Ageing.trainMult(h.record and h.record.races or 0)
 	g = math.min(g, room, Training.WEEKLY_CAP - gainedThisWeek(h, now))
 	return math.max(0, g)
 end
@@ -89,6 +95,7 @@ function Training.train(h: any, stat: string, score: number, now: number): (bool
 	h.stats[stat] = math.floor((h.stats[stat] + g) * 10 + 0.5) / 10
 	h.training.gained += g
 	h.training.lastAt = now
+	Legs.reset(h) -- a training session rests the legs from racing (D-077)
 	local msg = string.format("+%.1f %s!%s", g, game.label, if rested then " Rested bonus ✨" else "")
 	return true, g, msg
 end

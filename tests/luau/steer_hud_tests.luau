@@ -126,6 +126,9 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	plain.greyAfterSeconds = 0
 	local styles = { "masher", "ditherer", "casual", "railseek" }
 	local inN, inBad, inGrey, inTuck, outN, outBad, outGrey = 0, 0, 0, 0, 0, 0, 0
+	-- (D-072) A press a bot's shut door holds on an arrow that showed normal is a door denial, not a
+	-- room mistake: counted on its own, against the consensus gate (a lit arrow denied at most 10%).
+	local doorN, doorDenied = 0, 0
 	for ci, courseId in { "dirt", "turf" } do
 		for di, distanceName in { "Sprint", "Mile", "Marathon" } do
 			for sd = 1, 2 do
@@ -169,7 +172,14 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 									Trip.advance(c, session.live, t)
 									local works = (c.tgt[i] - trip.tgt[i]) * d > 0 or (d < 0 and c.tucking[i] == true)
 									local grey = if d < 0 then inA.grey else outA.grey
-									if d < 0 then
+									local shut = false
+									for e = #trip.packEvents + 1, #c.packEvents do
+										if c.packEvents[e][2] == "shut" and c.packEvents[e][4] == i then shut = true end
+									end
+									if not grey then doorN += 1 end
+									if shut and not grey then
+										doorDenied += 1
+									elseif d < 0 then
 										inN += 1
 										if grey then inGrey += 1 end
 										if shown.inSide == "tuck" then inTuck += 1 end
@@ -220,6 +230,9 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	check(outN > 2000 and outGrey > 0 and outBad / outN < 0.01,
 		string.format("Out ▶, behaviourally: grey when an outward press wouldn't move, normal when it would (%d presses tried, %d grey, %.2f%% wrong)",
 			outN, outGrey, 100 * outBad / math.max(outN, 1)))
+	check(doorN > 2000 and doorDenied / doorN <= 0.10,
+		string.format("(D-072) a press on a normal arrow is held by a shut door at most 10%% of the time (%d of %d, %.2f%%)",
+			doorDenied, doorN, 100 * doorDenied / math.max(doorN, 1)))
 
 	-- Messages: the wobble and "Gap!", on the server's clock --------------------------------------
 	local m = SteerHud.new()
@@ -277,12 +290,12 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	-- What reaches the rider, and who sees it ----------------------------------------------------
 	local track = TrackLayout.courses.dirt
 	local geo = TrackLayout.phaseA(track, TrackLayout.plan(track, TrackLayout.distances.Mile))
-	local st = Trip.new({ 1, 2 }, { 0.5, 0.5 }, { 0.5, 0.5, 0.5, 0.5 }, geo, STEER, { "manual", "manual" }, Trip.raceParams(GameConfig))
+	local st = Trip.new({ 1, 2 }, { 0.5, 0.5 }, table.create(18, 0.5), geo, STEER, { "manual", "manual" }, Trip.raceParams(GameConfig))
 	local out = Trip.riderLane(st, 1, {}, 0)
 	check(out.inSide == "edge" and out.wait == 0 and out.waitAt == 0 and out.tucking == false and out.tgt == 1 and out.dest == 1 and out.t == 0,
 		"Trip.riderLane: on the rail the inside is the edge; nothing waiting, no tuck-back; the state's race time")
 	-- A press held by a reverse gap: its wait for room starts when the gap ends, steadily.
-	local hold = Trip.new({ 4 }, { 1 }, { 0.5, 0.5 }, geo, STEER, { "manual" }, Trip.raceParams(GameConfig))
+	local hold = Trip.new({ 4 }, { 1 }, table.create(9, 0.5), geo, STEER, { "manual" }, Trip.raceParams(GameConfig))
 	local DT = 1 / STEER.tickHz
 	Trip.step(hold, { 1 }, { { 1, -1 } }, 1.0, DT)
 	local tick = 11
@@ -320,8 +333,8 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 			if string.find(text, word, 1, true) then kind = false end
 		end
 	end
-	check(kind and table.find(chips, "no room yet") ~= nil and table.find(chips, "gap!") ~= nil,
-		`the steering chips are kind: no blame, cost, hurry or wagering words ({#chips} chips, "No room yet" and "Gap!" among them)`)
+	check(kind and table.find(chips, "no room yet!") ~= nil and table.find(chips, "gap!") ~= nil,
+		`the steering chips are kind: no blame, cost, hurry or wagering words ({#chips} chips, "No room yet!" and "Gap!" among them)`)
 	local grownUps = fs.readFile("game/src/client/GrownUps.client.luau")
 	check(string.find(grownUps, "There's no penalty for being boxed in; a horse held wide just runs a little farther.", 1, true) ~= nil
 		and string.find(grownUps, "never costs points", 1, true) == nil,

@@ -1,6 +1,6 @@
 --!strict
 -- Stage 7 of docs/plans/horse-life-and-retention.md (D-059): careers, Legend Retirement and
--- Rehoming. No ageing or decline; a badge every 25 races; a Veteran at 100 may become a Legend
+-- Rehoming. Stats never drop; a badge every 25 races; a Veteran at 350 (= ageing.veteranAt) may become a Legend
 -- (keeps its stats, still rideable, frees its stall without shifting the others); rehoming pays
 -- half of what was paid (never the market price, never more), undo for 72 h at the same price;
 -- the starter, your last racing horse, a Legend and a busy horse stay; buy-and-rehome loops never
@@ -62,9 +62,9 @@ local function doors(p: any): { [number]: string }
 end
 
 return function(check: (boolean, string) -> (), _close: any)
-	-- Careers: badges every 25, a Veteran at 100, no decline --------------------------------
+	-- Careers: badges every 25, a Veteran at 350, stats never drop --------------------------------
 	do
-		check(GameConfig.career.badgeEvery == 25 and GameConfig.career.veteranAt == 100, "career config (D-059)")
+		check(GameConfig.career.badgeEvery == 25 and GameConfig.career.veteranAt == 350, "career config (D-059, Veteran at 350 since fun-and-return)")
 		check(Career.badges(0) == 0 and Career.badges(24) == 0 and Career.badges(25) == 1 and Career.badges(99) == 3 and Career.badges(100) == 4,
 			"a badge every 25 races")
 		check(Career.toNextBadge(0) == 25 and Career.toNextBadge(24) == 1 and Career.toNextBadge(25) == 25, "races to the next badge")
@@ -73,22 +73,29 @@ return function(check: (boolean, string) -> (), _close: any)
 		b, v = Career.crossed(25, 26)
 		check(b == nil and not v, "no badge in between")
 		b, v = Career.crossed(99, 100)
-		check(b == 100 and v, "the 100th race: a badge and Veteran")
-		b, v = Career.crossed(100, 101)
+		check(b == 100 and not v, "the 100th race: a badge, not Veteran yet")
+		b, v = Career.crossed(349, 350)
+		check(b == 350 and v, "the 350th race: a badge and Veteran")
+		b, v = Career.crossed(350, 351)
 		check(b == nil and not v, "Veteran only once")
 		local h = Horse.new("h9", "Maple", "bay", STATS, POT, T0)
 		local before = table.clone(h.stats)
-		for k = 1, 150 do
+		for k = 1, 400 do
 			Horse.recordRace(h, (k % 8) + 1, 0, 0, T0 + k)
 		end
 		local same = true
 		for _, s in Horse.STATS do same = same and h.stats[s] == before[s] end
-		check(same and h.record.races == 150, "no ageing: 150 races never lower a stat")
-		check(GameConfig.career.suggest == false and not Career.suggestLegend(h), "no Legend suggestion until breeding (career.suggest, D-068)")
+		check(same and h.record.races == 400, "400 races never lower a stat (ageing only changes the raced Rating)")
+		-- (D-080) career.suggest turns on together with breeding: Legends can be parents
+		check(GameConfig.career.suggest == GameConfig.breeding.enabled, "career.suggest follows breeding.enabled (D-068, D-080)")
+		local was = GameConfig.career.suggest
+		GameConfig.career.suggest = false
+		check(not Career.suggestLegend(h), "no Legend suggestion while career.suggest is off")
 		GameConfig.career.suggest = true
 		check(Career.isVeteran(h) and Career.suggestLegend(h), "a Veteran gets the Legend suggestion (career.suggest on)")
-		GameConfig.career.suggest = false
-		check(string.find(Career.line(150, 2, false), "Veteran") ~= nil and string.find(Career.line(150, 2, false), "2 Cups") ~= nil,
+		GameConfig.career.suggest = was
+		check(string.find(Career.line(150, 2, false), "Veteran") == nil, "150 races: not a Veteran (Prime)")
+		check(string.find(Career.line(400, 2, false), "Veteran") ~= nil and string.find(Career.line(400, 2, false), "2 Cups") ~= nil,
 			"career line: badges, Cups and Veteran")
 		check(string.find(Career.line(10, 0, false), "0 patches") ~= nil, "career line for a new horse (a career patch, D-068)")
 		-- the race hook reports what a race crossed
@@ -110,7 +117,7 @@ return function(check: (boolean, string) -> (), _close: any)
 		Profile.fillStalls(p)
 		local starter, a, b, c = p.horses[1], p.horses[2], p.horses[3], p.horses[4]
 		check(starter.stall == 1 and a.stall == 2 and b.stall == 3 and c.stall == nil, "three stalls, one in the pasture")
-		a.record.races, a.record.wins, a.record.cups = 120, 30, 2
+		a.record.races, a.record.wins, a.record.cups = 360, 30, 2
 		a.stats.speed = 77
 		check(Leagues.retire(p, b.id, T0) == nil, "not a Veteran yet: no Legend")
 		local plaque, why = Leagues.retire(p, a.id, T0)
@@ -127,21 +134,22 @@ return function(check: (boolean, string) -> (), _close: any)
 		check(#Profile.legends(p) == 1 and #Profile.pasture(p) == 0 and Profile.racers(p) == 3, "legends, pasture and racers")
 		-- the active horse moves off a new Legend
 		p.activeHorse = c.id
-		c.record.races = 100
+		c.record.races = 350
 		Leagues.retire(p, c.id, T0)
 		check(p.activeHorse ~= c.id and Profile.isStalled(p, p.activeHorse :: string), "the active horse moves to a stalled one")
 		-- your last racing horse stays racing
 		local q = stable(0)
-		q.horses[1].record.races = 200
+		q.horses[1].record.races = 400
 		local pl, w = Leagues.retire(q, q.horses[1].id, T0)
 		check(pl == nil and w ~= nil and q.horses[1].legend == nil, "the last racing horse can't retire")
 		-- suggested once
 		local r = stable(1)
-		r.horses[2].record.races = 100
+		r.horses[2].record.races = 350
+		local wasOn = GameConfig.career.suggest
 		GameConfig.career.suggest = true
-		check(Career.suggestLegend(r.horses[2]), "suggested at 100")
+		check(Career.suggestLegend(r.horses[2]), "suggested at 350")
 		check(Leagues.markAsked(r, r.horses[2].id) and not Career.suggestLegend(r.horses[2]), "never suggested twice")
-		GameConfig.career.suggest = false
+		GameConfig.career.suggest = wasOn
 		check(Career.canBeLegend(r.horses[2]), "still a Legend later, from its card")
 		-- a Legend survives a save and load
 		local saved = reload(p, T0 + DAY)
@@ -191,7 +199,7 @@ return function(check: (boolean, string) -> (), _close: any)
 		-- the stall doors follow the horses, not the list order (CareClient reads the door's HorseId)
 		local dd = doors(r)
 		check(dd[1] == r.horses[1].id and dd[2] == r.horses[3].id, "doors after a swap: stall 2 is the swapped-in horse")
-		r.horses[3].record.races = 100
+		r.horses[3].record.races = 350
 		Leagues.retire(r, r.horses[3].id, T0)
 		dd = doors(r)
 		check(dd[1] == r.horses[1].id and dd[2] == r.horses[2].id, "doors after a Legend: its stall takes the pasture horse")
@@ -297,7 +305,7 @@ return function(check: (boolean, string) -> (), _close: any)
 		local alone = Horse.new(Profile.newHorseId(solo), "Solo", "bay", STATS, POT, T0)
 		alone.origin, alone.paid = "market", 500
 		Profile.addHorse(solo, alone)
-		solo.horses[1].record.races = 100
+		solo.horses[1].record.races = 350
 		Leagues.retire(solo, solo.horses[1].id, T0) -- the starter is a Legend, Solo races
 		check(Market.rehomeBlock(solo, alone.id, {}) ~= nil, "your last racing horse stays")
 		check(Market.rehomeBlock(solo, solo.horses[1].id, {}) ~= nil, "a Legend stays")
@@ -307,7 +315,7 @@ return function(check: (boolean, string) -> (), _close: any)
 		} do
 			local why = Market.rehomeBlock(p, other.id, busy)
 			check(why ~= nil and not Market.rehome(p, other.id, T0, busy) and Profile.horse(p, other.id) ~= nil, "busy refused: " .. label)
-			check(string.find(why or "", "Rehome") ~= nil or string.find(why or "", "rehome") ~= nil, "busy says rehome: " .. label)
+			check(string.find(string.lower(why or ""), "sell") ~= nil, "busy says sell (the Riding School, D-078): " .. label)
 		end
 		check(Market.rehomeBlock(p, other.id, { ridingHorse = starter.id }) == nil, "another horse can go while you ride")
 		check(Market.rehomeBlock(p, "nope", {}) ~= nil, "only your horses")
@@ -375,7 +383,7 @@ return function(check: (boolean, string) -> (), _close: any)
 					local code = string.match(line, "^(.-)%-%-") or line
 					for lit in string.gmatch(code, "\"([^\"]*)\"") do
 						local low = string.lower(lit)
-						for _, w in { "farm", "sold", "sell", "dies", "died", "gone forever" } do
+						for _, w in { "farm", "sold", "dies", "died", "gone forever" } do -- "Sell" is the Riding School button now (D-078, David's decision)
 							check(string.find(low, "%f[%a]" .. w .. "%f[%A]") == nil, string.format("%s: no %q in %q", f, w, lit))
 						end
 					end

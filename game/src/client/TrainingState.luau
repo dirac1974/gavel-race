@@ -11,6 +11,7 @@ local TrainingState = {
 	phase = nil :: string?,       -- "countdown" | "ride"
 	target = nil,                 -- { x, z, nx, nz, half }: the next hoop's centre, forward normal, half width
 	speed = nil :: number?,       -- the course's pace right now, if it isn't the usual one
+	hopCap = nil :: number?,      -- the most forward speed a hop may have now (TC.hopCap, D-074)
 	aim = nil,                    -- { x, z }: where Easy Rein steers
 	easyRein = false,             -- the player's Easy Rein setting
 	stick = 0,                    -- how far the move stick is pushed (RideClient writes it)
@@ -21,7 +22,7 @@ TrainingState.StartRequested = Instance.new("BindableEvent") -- (course)
 
 function TrainingState.reset()
 	TrainingState.active, TrainingState.course, TrainingState.phase, TrainingState.target = false, nil, nil, nil
-	TrainingState.speed, TrainingState.aim = nil, nil
+	TrainingState.speed, TrainingState.aim, TrainingState.hopCap = nil, nil, nil
 end
 
 return TrainingState

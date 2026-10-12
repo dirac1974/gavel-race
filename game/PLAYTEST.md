@@ -690,8 +690,206 @@ Draw-only: your taps move your horse on screen before a checkpoint closes. The r
 - [ ] **Held behind a horse.** Get stuck behind a horse in your lane while tapping Perfect. After about a second held 4+ ft back, your horse bobs a little harder, leans forward a touch and kicks up an extra dust puff each stride. After 1.5 s held 6+ ft: with the ◀ ▶ buttons and a side free, "Room this way! ◀" (or ▶, toward the free side; both free: ◀) with that button's ring lit for about 1.5 s, at most once every 10 s, never after the lock, never when no side is free; without the buttons, "Keep tapping! Room soon." once in the race. It never says "boxed in" or "gap". Reduced Motion: no harder bob, lean or extra dust (the chip still shows).
 - [ ] **Steering off** (`steering.enabled = false`): good taps move your horse at every pass end from the gate (only your own taps move it; the others' scores arrive at each checkpoint); the order on screen at the last tap is the result.
 - [ ] **Own-screen nudge.** A Perfect's nudge on your own horse never makes it jump back faster than the rest of the field as the preview eases out (RaceView passes `baseFall` into the nudge).
-- [ ] **Server cost.** In a Studio Test with 20 players (or 20 test clients) and both courses racing, open the MicroProfiler on the server: the `RaceSend` label stays under 1 ms per race. Nothing is computed for a race without a human rider.
+- [ ] **Server cost.** In a Studio Test with 20 players (or 20 test clients) and both courses racing, open the MicroProfiler on the server: the `RaceSend` label stays under 1 ms per race, and `TripStep` (the trip's 10 Hz ticks, D-072 learners' passive races included) stays under 2 ms a tick with 8 fresh accounts pressing the arrows. Nothing is computed for a race without a human rider.
 - [ ] Switches: `tapPreview.enabled = false` is today's race exactly (no layer, no pass-end previews, no late-tap grace, no TapNote or TapHeld, RaceView's nudge as before). `tapPreview.messageEnabled = false` drops the message only; `tapPreview.steeringOffWholeRace = false` drops the steering-off previews; `tapPreview.heldCue` tunes the held cue and chip and `tapPreview.heldSend` when TapHeld is sent; `tapCue.enabled = false` hides the message, the pressure cue and the chip on screen; `tapCue.messageSeconds`, `.waitSeconds`, `.studsAbove`, `.minTextPx` / `.maxTextPx`, `.badgePopScale`, `.bobScale`, `.leanDeg`, `.pressureDust`, `.ringSeconds` tune the rest.
+
+## Forward jump (D-074)
+
+- [ ] **Standing hop.** Ride your horse, stop, press Space (phone: ⬆️ Hop): it hops forward about half a body length (about 5.5 studs), never straight up. Peak about 3.7 studs (lower than before).
+- [ ] **Galloping hop.** Gallop and hop: it carries forward about 2.4 lengths (about 19.5 studs) and lands without slowing to a stop, with no stutter or saw-tooth in the air (WalkSpeed holds the hop's speed). Hop with no stick held: it still keeps going forward through the air. A second press within 0.6 s does nothing.
+- [ ] **Air pose and landing.** In the air the legs stop cycling and fold (forelegs forward, hind legs back), the nose tips up on the way up and down on the way down. On landing the body squashes a touch (0.96 for 80 ms), a soft thud plays and a small dust puff rises at the hooves. Watch a friend's hop from a second account: the same pose and landing. Walking off a step or over a bump never flickers the legs. Reduced Motion on: no nose tip, squash or dust; the folded legs and the thud stay.
+- [ ] **Training.** No hop during the 3-2-1. Mud Splash: hop 1 to 4 studs before each log and every log counts ("Clean hop!"); at exactly 1 stud before a log, about 1 hop in 50 can miss (the 10 Hz sampling). Sprint Lane: hopping never makes the horse faster than the course pace, and a ride full of hops is never flagged (no low-score floor). Gate Break: press Space while waiting in the stall (after "Ready…", stick let go) and after the bell: the horse hops straight up, never moves forward, and it is never an early go or a rerun.
+- [ ] Switches: `riding.hop.forwardMin`, `.forwardBoost`, `.forwardCap`, `.cooldownSeconds`, `.tuckLegs`, `.pitchUpDeg` / `.pitchDownDeg`, `.landSquash`, `.thudVolume`, `.dustPuff`, `.remoteAirVy`; `jumpPower` also sets `TC.RIDE_HOP`.
+
+## Race arrows (D-072)
+
+- [ ] **Arrows in your first races.** (Only with `steering.introRaces = 3`, the switch-back: since D-072 phase A the buttons show from race 1.) On a fresh account (fewer than 3 races, no ◀ ▶ buttons), press ←/→, A/D and the D-pad during the race: the camera never turns and the horse doesn't move lanes. The first press shows "Smart Steer is steering for you" once; later presses show nothing.
+- [ ] **Steering off.** With `steering.enabled = false`, arrows during a race do nothing at all (no chip) and never turn the camera.
+- [ ] **Arrows with the buttons.** On an account with the buttons, ←/→ steer one lane as before; after "Lanes locked!" and through the results the arrows do nothing and the camera never turns. With a gamepad, the results card opens with Done selected and the D-pad moves between its buttons. After Done, on foot, the arrows turn the camera again.
+
+## Filing in and passing (D-072 phase A)
+
+The field now races like a field: horses file to the rail after the break, run in a loose pack, move out to pass (mostly on the straights) and sometimes shut the door on a horse moving into their lane. All of it is Trip's lane model (server, 10 Hz), so every screen sees the same race.
+
+- [ ] **Buttons from race 1, staged.** Fresh account, race 1: the ◀ ▶ buttons show, with no ghost-thumb tip (the slider coaching owns race 1). Race 2: the ghost thumb shows once, about 1.5 s after the gate. Race 3: nothing new yet (the move pips come in phase B). The button labels never change during a race.
+- [ ] **Learner safety.** In your first 3 counted races no bot ever shuts the door on you (press into a lane next to a bot: the press moves or waits for a horse, never for a door), and pressing never costs you trip (your tau is never below what it would have been without your presses).
+- [ ] **Filing in.** From about 2 s to 12 s after the gate, most horses drift toward the rail (half the bots aim for lane 1, a third for lane 2). Smart Steer takes you to the rail only when there's clear run ahead (about a length past the hold gap), so you aren't parked in a column.
+- [ ] **A pack, not columns.** Through the backstretch the horses keep shifting by half-lengths (two mixed waves). It should wander, never pulse or breathe in time; nobody slides fore or aft faster than a slow jog relative to their neighbour. Front-runners sit a little ahead and closers a little back early; that fades to nothing by the far-turn bell.
+- [ ] **Passing.** Bots held behind a slower horse move out one lane, go by, and head back in once clear (about 10 ft). Watch a few: the two horses are side by side for about a second (never a blink), the passer turns slightly outward on the way out and inward on the way back, and nothing pops or teleports. Most passes are on the straights; a few on turns.
+- [ ] **Shut doors.** With a non-learner account, press toward a lane with a bot level with you (within about two lengths): sometimes the bot holds its line. Watch it: its body turns a little toward you for about 1.5 s and a soft knock plays at it; your arrow on that side greys while a door would shut, a press waits (the ring) and "No room yet!" may show. It never brushes and never moves you.
+- [ ] **After the lock.** From "Lanes locked!" on, lanes move only to make room (as before); the drift and styles are already faded out at the bell, so no horse jumps there. Watch the far turn at 10 Hz on a weak link (network simulator 200 ms): no pops.
+- [ ] **Log line.** The `[Trip]` line ends with `pack: out N, passes N, doors shut N`. Expect a few passes a race (Sprint fewer) and a handful of shut doors.
+- [ ] **Fixed lanes (for Hurdles later).** With `card.fixedLanes = true` on a course card (set by hand in Studio), nobody changes lanes, no buttons show, the arrow keys do nothing (camera still), and every tau is 0 in the log.
+- [ ] Switches: `steering.file.enabled`, `pack.enabled`, `pass.enabled`, `doors.enabled` each turn one part off; all four off plus `introRaces = 3` is the game before D-072. `steerHud.tipRace` (2) and `pipsRace` (3) stage the onboarding; `steerView.shutYawDeg`, `shutEaseSeconds`, `shutVolume`, `shutSoundSpeed` tune the shut-door look.
+
+## Find it (fun-and-return phase 1)
+Map, GO, the phone dock, the queue card and "New!" pointers (D-075). Do the phone checks in the Device Emulator at 667 × 375 landscape with touch on.
+- [ ] **Map: 13 tiles.**
+  - 🗺️ Map shows a 5 × 3 grid of 13 tiles: My Stable, Racetrack, Race Board, Fair Street, Feed & Seed, Barn Builder, Tack & Paint, Vet & Spa, Market, Training, Riding Ring, Trail, Visit barns.
+  - Each tile has a picture, its name and a plum line of 2 words or fewer ("Buy food", "Meet horses").
+  - On a 667 × 375 phone the whole grid fits with no scrolling, and no word is cut off ("Barn Builder" and "Tack & Paint" shrink a little to fit whole).
+- [ ] **Map lines that change.**
+  - With 2 or more horses, My Stable says "2 horses".
+  - With a napping horse, Vet & Spa says "Spa today".
+  - After a horse moves up a league, Barn Builder says "New shelf".
+- [ ] **GO from far away.** Stand at your barn, open the Map and tap Market.
+  - The screen fades to cream (not a hard cut) and you arrive at the corral.
+  - The card for the first horse for sale opens by itself.
+  - Repeat for Feed & Seed (the shop card), Barn Builder (its panel), Tack & Paint (the 💎 shop), Vet & Spa (the vet card), Training and Riding Ring (the Train menu) and Race Board (the race picker, and you are not put in line).
+- [ ] **GO from nearby.** Stand on Fair Street and tap Feed & Seed on the Map (it's under 120 studs away).
+  - Golden hoofprints appear instead of a trip.
+  - When you walk to the shop, its card opens by itself.
+- [ ] **Never a trip from a line.** Join a race, then tap a far Map tile, a Stable Board GO or a pill GO.
+  - You only get hoofprints.
+  - Nothing opens when you arrive, and you stay in line.
+  - During your race the dock is hidden; if a GO is reached, it says "After your race!".
+- [ ] **Every GO uses it.** The tour's GO, the Next-thing pill's GO, and the Stable Board's horse and job GO buttons behave like the Map tiles.
+  - A far place reads "Take me ▶"; a near one reads "GO ▶".
+- [ ] **Visit barns.**
+  - The Visit barns tile opens the Friends' barns list, with ◀ Back to the grid.
+  - With no horse, it says "Pick your first horse…".
+- [ ] **Dock on PC.**
+  - The order is: cash, horse card, Jobs, Map, Book, RACE! with 🔀 Pick, Ride.
+  - Map and Book no longer swap places between sessions.
+- [ ] **Dock on a phone: 5 items.**
+  - The order is: the horse portrait (coat dot over the Energy pips), 🏁 RACE! with 🔀 Pick, 🗺️ Map, 📋 Jobs, ☰ More.
+  - Nothing covers Hop or Gallop.
+  - Tapping the portrait opens My Horses.
+  - Start a thumbstick drag on the portrait: you walk, and My Horses stays shut (D-056 reversal, D-075). If it fails, set `ui.portraitTap = false`; Horses stays in ☰ More.
+  - ☰ More holds Ride, Book, Cash and Horses.
+  - At 640 px wide, Jobs moves into ☰ More; at 568 × 320, Map moves too. Hop and Gallop are never covered.
+  - "🎈 PRACTICE" fits on one line above "with Comet ▶".
+- [ ] **🔀 Pick.** Tap 🔀 Pick when you're not in line.
+  - The picker opens with the title "Pick a race", and you are not in line.
+  - Its Join button names the line, e.g. "Join Bronze line" or "Join Practice line".
+- [ ] **Queue card, race line.** Join a league race.
+  - The card's second row names the line, e.g. "🟠 Bronze race line".
+  - The third row says "Horses like Comet race here", with your horse's name.
+  - Open gate slots read "🤖 at 0" during the countdown.
+  - On a phone the row reads "🟠 Bronze line · 1 rider".
+- [ ] **Queue card, other lines.**
+  - In the Cup line it reads "🏆 Bronze Cup line" / "Only Cup horses".
+  - In Practice it reads "🎈 Open Practice line" / "Anyone! Horses all equal".
+- [ ] **❓ How racing works.**
+  - The first time a new player is in line, a 3-picture strip opens by itself: "Join a line", "Riders fill the gate", "Bots fill spots at 0".
+  - "Got it!" or ✕ closes it, and it closes by itself at "Race time!".
+  - It never opens by itself again, even after rejoining the game.
+  - ❓ on the queue card (full card and phone row) opens it any time.
+- [ ] **"New!" pointers.**
+  - After 3 races, and at least 2 minutes after your last race, the pill says "New! Pick your own race" and the RACE! slot glows gold for about 6 s, pulsing gently.
+  - With Reduced Motion on, the glow holds still.
+  - The next pointer ("New! Your Horse Book", Market, Barn Builder, Visit barns...) comes no sooner than 3 minutes later.
+  - Pointers never show during the tour, in line, in a race, on the results card or within 2 minutes after a race. A pointer that was up before you raced does not come back on the results card or right after it.
+  - Tap RACE!, then fire `Travel` or `VisitFriend` while in line (or tap Visit barns): no trip, just "Follow the hoofprints after your race!".
+  - Each pointer shows once per profile: after 20 s on screen, or after its GO.
+  - None of them points at Tack & Paint.
+- [ ] **Signpost.**
+  - A new player arriving on Fair Street sees a wooden signpost past the fountain.
+  - It has 6 arms: Racetrack, My Stable, Feed & Seed, Vet & Spa, Market, Training.
+  - Each arm points toward its place, has a pointed tip, and has readable words on both faces.
+  - A rider on a horse can pass under or through the arms without getting stuck.
+  - **Studio check:** that the tips point outward and the words aren't mirrored.
+
+## Visible progress (fun-and-return phase 2, D-076)
+
+Switches: `GameConfig.classes.path`, `GameConfig.cupBar` (`enabled`, `results`), `GameConfig.classUp.enabled`. Step wins: `classes.topWins` (5); `classes.starIsRace` false (true = "💐 Big Race").
+
+1. Open 🐴 My Horses. Each racing horse shows five chips 🐣 🚀 🎽 💐 🏆 with the current one gold and wider with its word, then one goal line ("Next: win a race!", "🎽 Open: 2 more wins", "💐 Top Horse: 2 more wins", "Next: fill the 🏆 Cup bar"), then "🏆 Cup" with a bar and **no number**. A Champion horse has four chips and no bar.
+2. Race a Rookie race and finish in the top four. The results card shows "🏆 Cup +6" (or +10, +4...) and the bar fills from where it was with rising ticks (at most 10). Under Reduced Motion the bar just shows full-length, no ticks. The goal line sits under it.
+3. Practice race: no Cup row. A Cup win that moves you up: no Cup row (the move-up toast says it).
+4. 🏁 Race again is tappable as soon as the card shows; nothing waits for the bar.
+5. Win your first race in a league, then ride home to your Rosette Wall. Within about 40 studs: a gold sparkle burst on the wall, a ding then three claps, and "🚀 Comet is a Rising Star!". It ends by itself in under 4 s; tapping anywhere ends it at once. It never plays while racing, in line or on the results card.
+6. Rejoin the game: no ceremony replays for steps you already had.
+7. On a phone, My Horses cards are short with a "📈 Progress" button; tapping it opens the path, Cup bar, stages and Legs rows on every card ("📈 Hide" folds them). The buttons never scroll out of reach.
+8. Win a Cup and move up, then win in the new league: the ceremony still plays (it's counted per league).
+
+## Legs and the vet (fun-and-return phase 3, D-077, David's decision)
+
+Switches: `GameConfig.legs.enabled`, `GameConfig.vetCheck.enabled`. Numbers: `legs.runLimit` 6, `warnAt` 5, `careLowers` 2, `restSeconds` 1800, `fromRaces` 26, `careCooldownSeconds` 7200, `wrapRaces` 3; `vetCheck.minSeconds` 12. For a quick test in Studio set `legs.fromRaces = 0`.
+
+1. A horse with fewer than 27 counted races never builds a run (the Legs pips stay empty).
+2. Race the same horse 5 rated races in a row: the card's Legs row has 5 sky-blue pips and "🧣 Worked hard! Cool-down soon". Nothing red anywhere.
+3. One more: RACE! turns sky blue and says "🩺 VET CHECK". The results card's button says "🩺 Vet check". The Next-thing pill says "Vet check for Comet!".
+4. Tap VET CHECK: you travel to the Vet (fade) and the Cool-down Check opens. Practice from 🔀 Pick still joins.
+5. Try a rated race from 🔀 Pick with that horse: the toast "🩺 Vet check first! Practice is open." and you are **not** put in line (the server turns it away).
+6. The check: tap each of the 4 legs (gold ring, rising tick), hose each leg 3 taps (💧 then ❄️, water sound), pick a colour then tap each leg (🧶), tap the 🥕 Carrot (munch, nicker, chime, hearts). About 30 s. No price, no 💎, no 💵 anywhere. Closing early does nothing to the horse.
+7. After it: "🩺 Comet is fresh and ready!", RACE! is back, the pips are empty, and the stall horse wears coloured wraps on its legs. They show in the next 3 races (check they follow the running legs; if not, set `horseLook.wrapsInRace = false`) and then come off.
+8. Feed then brush a horse at 6: the run drops to 4 then 2. Brushing again within 2 h doesn't lower it again. A Spa Day, a training ride, or 30 min without racing that horse empties it.
+9. Words: nowhere does any screen say hurt, sore, injury, limp or sick (the lint test checks every string; also read the Grown-ups page).
+
+## The life arc and the Riding School (fun-and-return phase 4, D-078; ageing is David's decision)
+
+Switches: `GameConfig.ageing.declineScale` (1 = real decline; 0 = stages only), `GameConfig.horseLook.veteranLook`, `GameConfig.lend.enabled`, `GameConfig.rehome.enabled`. Sell bonus cap `sell.recordBonusCap` 100.
+
+1. Stage chips 🍼 Young · 💪 Prime · 🦉 Veteran · 👑 Legend on every card, the current one gold and wide enough for its word ("🦉 Veteran" fits). 🍼, not 🌱: 🌱 is the garden seeds and the Market family line. A horse under 30 races says "🍼 Young: training grows faster!" and a training ride gains about a quarter more (never past Potential or the week's cap).
+2. In Studio, set a horse's `record.races` to 345: "🦉 Veteran in 5 races". At 350 with stats near Potential: "💪 Comet is at full strength!". At 390-399: "🦉 Comet is getting wise. Soon a little slower." No number is ever shown.
+3. A Veteran (350+ races) in its stall, on a ride and in a race has a frosted (pale) muzzle and brows and a silver-and-blue rosette by its left ear; a Legend's rosette is gold. **Studio check:** the frost sits on the nose (tune `horseLook.muzzle`, `brow`, `rosette` fractions per coat model), and the horse looks wise, not ill.
+4. The 👑 Legend button appears only at 350 races (`career.veteranAt`).
+5. 🏫 School on a horse card (or the school sign at the Market Corral, prompt "Lend or sell") opens the Riding School card with that horse first. Two buttons per horse: "🏫 Lend" and "💵 Sell"; each needs a second tap ("Sure? 🏫" / "Sure? 💵").
+6. A lent horse shows only 🏠 Home (no Sell over it); selling it is refused with "Bring Comet home first!".
+7. Lend: free. The horse leaves its stall (a pasture horse moves in), can't race, its card says "🏫 At Sunny Meadow Riding School" with "🏠 Home", and it stands by the school sign at the corral with its name. 🏠 Home brings it back to a free stall (or the pasture). Your last racing horse can't be lent.
+8. Sell a Market horse: the card shows "Sell for 💵 N" = half the price paid plus 5 a win and 100 a Cup, at most +100; never more than you paid. A tamed or gifted horse shows "🏵️ Goodbye rosette" and sells for 0. The first horse never shows Sell. Undo still works for 3 days.
+9. The word "Rehome" appears nowhere on screen.
+
+## Visiting other stables (D-079)
+Setup: Studio → Test → Clients and Servers with **3 players**, or a live private server with 3 accounts. Account **A** owns the barn. Account **F** is A's Roblox friend. Account **S** is not friends with A or F. Each account picks a starter horse first, so each has a barn. Studio's local test accounts aren't Roblox friends, so the friend rows need a live server with two real accounts that are friends (or a TrainingFriends stub for Studio only).
+
+**Permission matrix** (what the server allows; a closed gate blocks every cell):
+
+| A's setting | Visitor | Come in / Map list | Tour + pin | Pat | Cheer | Treat | Post box |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 👫 Friends (default) | F (friend) | yes | yes | yes | yes | yes | yes |
+| 👫 Friends | S (stranger) | no | no | no | no | no | no |
+| 🌍 Everyone here | F | yes | yes | yes | yes | yes | yes |
+| 🌍 Everyone here | S | yes | yes | yes | yes | **no** | **no** |
+| 🔒 Nobody | F or S | no | no | no | no | no | no |
+
+Strangers also need Roblox to allow content sharing for **both** accounts (PolicyService `IsContentSharingAllowed`, and not `IsSubjectToChinaPolicies`). If it doesn't, A's barn reads as Friends for S: S sees solid walls and no listing, and is never bounced back to the gate.
+
+- [ ] **The setting.** On A, open ⚙️ → Settings. "Who can visit my stable?" shows three buttons: 👫 Friends, 🌍 Everyone here and 🔒 Nobody. Friends is gold on a new profile. All three fit beside the label.
+- [ ] **Old saves.** A profile saved before D-079 with "Club" shows Friends as gold and works as Friends.
+- [ ] **The one-time ask.** On S, open Map → Visit barns for the first time. Under the list (the list stays visible), a strip says "Let other riders visit?" and "Who can come to your barn?", with 👫 Friends (gold, the current choice), 🌍 Everyone and Not now. Not now keeps Friends; it asks again after a rejoin. Pick Friends or Everyone: close and reopen shows no ask, and rejoining still shows none. If you set Nobody in ⚙️ on a new profile first, the ask never shows and Nobody stays.
+- [ ] **Friends, the default.** A on Friends. On S: Visit barns shows no A, and A's walls are solid. On F: A shows with A's face and "👫 Friend ▶".
+- [ ] **Everyone here.** Set A to 🌍 Everyone here. On S: within a second, A's barn shows with a 🏡 picture (never A's avatar face) and "🌍 Open ▶". Friends' barns are listed first. There are no numbers, likes or rankings on any row.
+- [ ] **Teleport to the gate.** On S, tap A's barn. S lands on Barn Lane outside A's gate, facing in, never inside the fence.
+- [ ] **Arrival banner.** On S, walk through the gate. The gate bell rings once and "Welcome to A's barn!" pops in and fades after about 2.5 s. With Reduced Motion on, it shows without the pop. The top bar shows "🏡 A's barn", 4 pips, 🎉 Cheer and 🏠 Home. On F the bar also shows 👫.
+- [ ] **Walkaround.** Gold hoofprints lead to the Rosette Wall. Standing there plays a tap sound and shows "Look! Rosette Wall", and the first pip turns 📍. Each stop gives the featured thing (the wall, a stall horse, a yard piece, the paddock or the garden) a gold outline for 1.2 s and a small gold sparkle (outline only with Reduced Motion). Then the trail goes to the horses, then their yard, then the Legend paddock if A has a Legend, otherwise their garden ("Look! Their garden"). On the 4th stop, "📍 Tour pin! You toured A's barn" shows with the job-done sound and the trail stops. Visit barns and the Horse Book show one more Tour pin.
+- [ ] **Pin once per barn.** On S, leave, come back and walk all 4 stops again, even on another day: no second pin. A different open barn gives a second pin.
+- [ ] **Stranger actions.** On S at A's barn: the stall doors show **Pat** only (no Treat). The post box shows no "Drop a carrot". Pat gives "Comet nuzzles you!" with hearts, and A's horse gets no bond.
+- [ ] **Server refuses a stranger's treat.** From S's command bar, fire `VisitCare` with A's id, a horse id and "treat", and `PostBox` with A's id. Nothing happens: no bond, no carrot.
+- [ ] **Cheers.** On S, tap 🎉 Cheer: 4 buttons (👏 🎉 😍 🌈) replace the name. Tap 👏: a 👏 floats up about 3 studs from A's barn door and fades, with a clap. 🎉 plays the tap_good sound instead. S sees "Cheer sent! 👏". A sees "A visitor cheered! 👏", with no name, and the same emoji over the door if A is home. The 4th cheer in total that day says "You cheered here today. Thank you!". A sees at most one cheer toast every 30 s.
+- [ ] **Friend actions.** On F at A's barn: Pat, Treat (+1 bond, once a day) and Drop a carrot (one a day) all work, as before D-079.
+- [ ] **The owner's gate works for everyone.** With S (or F) in A's yard, A sees 🚪 Close gate. Tap it: everyone is walked out to the lane, the walls go solid, and S's barns list drops A. Tap 🔓 Open gate: "Gate open. Visitors welcome." and A is listed again.
+- [ ] **Ask to leave.** With S in A's yard, A sees 👋 Ask to leave beside 🚪 Close gate. Tap it: a list of who's in the yard. Tap S's name: S is walked out to the lane and sees "Time to head home!". For 2 minutes A's walls stay solid for S and S's barns list drops A, then A is back. F stays inside the whole time. Firing `AskToLeave` from a non-owner, or for someone outside A's yard, does nothing.
+- [ ] **No second bell.** Walk out of A's gate and straight back in: no bell and no banner, but the bar returns. After 20 s outside, it rings again.
+- [ ] **Nobody blocks all.** Set A to 🔒 Nobody while S and F are inside: both are walked out within a second, neither lists A, and every remote (VisitHello pat, cheer and stop; VisitCare; PostBox; VisitFriend) does nothing.
+- [ ] **Rate limits.** Spam VisitHello from S's command bar: at most one call each 0.5 s does anything. Spam VisitFriend: one trip each 3 s.
+- [ ] **Stop spoofing.** From S's command bar, fire `VisitHello` with A's id, "stop" and "paddock" while standing at the gate: nothing counts. Only standing at the stop does.
+- [ ] **No text anywhere.** There's no text box or typed field in any visit screen.
+- [ ] **Racing.** Join a race while visiting: the visitor bar hides, and no pats or cheers send during the race.
+- [ ] **Home.** 🏠 Home takes S back to S's own stable and clears the trail.
+- **Studio check:** PolicyService must answer for both players, or strangers are kept out (fail closed). If S can't see A on Everyone here in Studio, try a live private server. The yard stop (inward 72, across 28) and the paddock stop should stand in open ground; move them in `GameConfig.visit.tourStops` if a prop is in the way. A barn with no Legends still has the paddock stop (an empty fenced spot).
+
+## Breeding (D-080)
+Switches: `GameConfig.breeding.enabled` (with `career.suggest`; false hides the Foal Barn, its Map tile and the Family page), `GameConfig.foalLook` (the foal's shape, the tag-along). Fast setup: `GameConfig.studioTest.breedReady = true` (Studio only), then Stop and Play: the Output says `[StudioTest] ... breedReady: Comet and Maple at 30 races` and you have two parents, the Bronze fee, no wait, and a foal on the way arrives at once.
+
+- [ ] **The Map.** 🗺️ shows 14 tiles in the 5 × 3 grid; tile 14 is "💞 Foal Barn" with "Foal soon" (or "Foal here!" when a foal waits). Everything fits at 667 × 375. GO takes you to the cream-and-sky barn east of the Vet (red roof, white-rail paddock with two grazing foals, planters) and opens the panel.
+- [ ] **Pick two parents.** Two slots over your horses. Horses that can't be parents are grey with a short reason ("Needs 30 races", "Lent", "Out riding"). Tap two ready ones, then Next ▶.
+- [ ] **Your foal.** "Family 🌱🌱" (sprouts, no numbers). The Coat chances box: one row per parent coat (swatch, name, bar, 45%) and one row per Surprise coat with its own swatch and chance ("❔ Surprise: Dun 2.5%"; all rows add to 100%). Two parents with the same coat: one row at 90%. The word is "chance" everywhere. "Fee 💵 400" (higher parent's league). The confirm takes two taps: "💞 Have a foal" then "Sure? 💵 400". Diamonds are never mentioned.
+- [ ] **Refusals.** Neither parent in Bronze: "One parent needs Bronze". Not enough Green Cash: refused, nothing taken. Stable at 20: "Make room first" with "🏫 Lend or Sell". After one foal: "Next foal in N races" (counted in races, no clock).
+- [ ] **Waiting.** The panel shows both parents and "Arrives in 8 races or tomorrow" (it counts down in races). A second confirm is refused. Rejoin: the same foal is still on the way (the roll was made once at confirm).
+- [ ] **Here.** After the races (or the next day) a toast "💞 Your foal is here!", shown only once the results card is closed; the Map hint says "Foal here!". At the barn: "Meet your foal ▶".
+- [ ] **The meeting.** A side shot of the paddock: the parent stands, the foal steps out from behind its flank, turns and nuzzles twice, hearts rise; a high nicker then a lower answer, then the job-done chime. No confetti. A Surprise coat adds only "❔ A surprise coat: Dun!" and a few sparkles. Tap skips after 1 s. Reduced Motion: the foal fades in, hearts kept.
+- [ ] **Naming.** Exactly like the Starter: word chips, "🔀 New words", "That's the name!". The ✕ closes it and the foal waits at the barn. Then the name plate drops in over the foal letter by letter, it nods twice, a ding and two claps, "Hello, Pebble! 🌱".
+- [ ] **The foal.** In My Horses as a 🍼 Young Rookie, in a free stall (or the pasture). In the stall it has long legs, a small body and a big head, growing to adult size by 30 races. **Studio check:** hooves on the ground, nothing floating or sunk; the one-piece stand models look leggy, not stretched.
+- [ ] **Running legs.** A foal walking behind its parent, and riding the foal itself: legs under the body, hooves on the ground (no splayed or sunken legs). Same after it grows a step (a few races later) and in its races. If the one-piece stand foal's head looks tall instead of its legs long, set `foalLook.onePieceStretch = 0` (a uniform small foal).
+- [ ] **Tag-along.** For its first 10 races the foal stands at its parent's flank, and trots 6 studs behind when you ride the parent (never faster than the parent + 4), with a little hop every 8–14 s (no hops with Reduced Motion). Never during a race, in line or on a training ride.
+- [ ] **First race.** The foal's first counted race: once, after the results, a gold "🍼 Comet's foal!" banner (tap to skip). In the race the foal is near full size (never under 0.94).
+- [ ] **Horse Book.** 📖 → 💞 Family: the foal with "Comet + Maple", the first one marked "First foal". With no foals: "Two horses can start a family".
+- [ ] **Selling.** The foal's Sell price at the school is less than the fee paid.
+- [ ] **Legends.** A Veteran's Legend card now says "Legends can be parents!"; a Legend can be picked as a parent.
+- [ ] **Grown-ups.** ⚙️ → For grown-ups has the 💞 Foals paragraph (after Riding School, before the Parental Controls line).
+- [ ] **Words.** Nowhere: odds, mare, stallion, birth, blood.
 
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.

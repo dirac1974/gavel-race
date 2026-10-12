@@ -2,7 +2,8 @@
 -- RideClient (D-035): riding your own horse around the world.
 --   Ride / Get off button in the dock; Gallop toggle (or hold Shift) while riding.
 --   Steering: the normal move controls (thumbstick, WASD) steer the horse's Humanoid, which
---   this client owns; Space or the jump button makes the horse hop.
+--   this client owns; Space or the jump button makes the horse hop forward (HorseJump, D-074),
+--   legs folded and nose up, then down, in the air.
 --   Every ride horse (yours and other players') shows its standing model when slow and its
 --   galloping model when fast, with a little bob in step, computed on each screen.
 --   Course mode (training rides, D-053; TrainingState): held still for the 3-2-1, then the
@@ -23,6 +24,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local HorseLegs = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("HorseLegs"))
+local HorseJump = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("HorseJump"))
 local TrainingCourses = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("TrainingCourses"))
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
 local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
@@ -49,7 +51,7 @@ local rideSlot = Instance.new("Frame")
 rideSlot.Name = "RideSlot"
 rideSlot.BackgroundTransparency = 1
 rideSlot.Size = UDim2.new(0, 130, 1, 0)
-rideSlot.LayoutOrder = 6
+rideSlot.LayoutOrder = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DockLayout")).ORDER.ride
 rideSlot.Parent = dock
 local rideBtn = Ui.button(rideSlot, "🐴 Ride", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.gold, 24)
 local gui = Ui.screen("Ride", 4)
@@ -123,7 +125,11 @@ end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.LeftShift, Enum.
 local function hop()
 	if not riding or TrainingState.phase == "countdown" then return end
 	local hh = riding:FindFirstChildOfClass("Humanoid")
-	if hh and hh.FloorMaterial ~= Enum.Material.Air then hh.Jump = true end
+	-- (D-074) forward; on a training course never faster than the course's own pace, and straight up
+	-- where the course says so (TrainingState.hopCap: the Gate Break stall), so a hop is never a go
+	if hh then
+		HorseJump.hop(hh, if TrainingState.active then math.min(hh.WalkSpeed, TrainingState.hopCap or math.huge) else nil)
+	end
 end
 UserInputService.JumpRequest:Connect(hop)
 hopBtn.MouseButton1Down:Connect(hop)
@@ -227,16 +233,42 @@ RunService.RenderStepped:Connect(function()
 				steer = (steer.Unit * (1 - w) + to.Unit * w).Unit
 			end
 		end
-		hh:Move(magnet(steer, root.Position), false)
+		-- (D-074) mid-hop: keep going the way you took off, at the hop's own speed (air control agrees)
+		local flight, flightSpeed = HorseJump.flying(hh)
+		if flight then hh.WalkSpeed = flightSpeed end
+		hh:Move(if flight then flight else magnet(steer, root.Position), false)
 		return
 	end
-	hh.WalkSpeed = if galloping then GALLOP else WALK
-	hh:Move(move, true)
+	local flight, flightSpeed = HorseJump.flying(hh)
+	hh.WalkSpeed = if flight then flightSpeed elseif galloping then GALLOP else WALK
+	if flight then hh:Move(flight, false) else hh:Move(move, true) end
 end)
 
 -- Pose and bob for every ride horse on screen -------------------------------------------
 local folder = workspace:WaitForChild("RideHorses", 30)
 local phase: { [Model]: number } = {}
+-- (D-074) The airborne pose per horse: legs folded, nose up then down, a squash, a soft thud and
+-- a dust puff on landing. Your own horse's floor is FloorMaterial (this client simulates it);
+-- others' from their replicated state, or their vertical speed when that lags.
+local air: { [Model]: any } = {}
+local GuiService = game:GetService("GuiService")
+local okFx, BuildFx = pcall(require, script.Parent:WaitForChild("BuildFx", 5))
+if not okFx then BuildFx = nil end
+local HOP = GameConfig.riding.hop
+local still = false -- Reduced Motion, cached (refreshed on change)
+local function readStill()
+	local ok, on = pcall(function() return GuiService.ReducedMotionEnabled end)
+	still = ok and on == true
+end
+readStill()
+pcall(function() GuiService:GetPropertyChangedSignal("ReducedMotionEnabled"):Connect(readStill) end)
+local function airborne(rig: Model, vy: number): boolean
+	local hh = rig:FindFirstChildOfClass("Humanoid")
+	if not hh then return false end
+	if rig == riding then return hh.FloorMaterial == Enum.Material.Air end
+	local st = hh:GetState()
+	return HorseJump.remoteAirborne(st == Enum.HumanoidStateType.Jumping or st == Enum.HumanoidStateType.Freefall, vy)
+end
 RunService.RenderStepped:Connect(function(dt)
 	if not folder then return end
 	for _, rig in folder:GetChildren() do
@@ -246,8 +278,16 @@ RunService.RenderStepped:Connect(function(dt)
 			local v = root.AssemblyLinearVelocity
 			local speed = Vector3.new(v.X, 0, v.Z).Magnitude
 			local fast = speed > 22
+			local jp = air[rig] or HorseJump.newPose()
+			air[rig] = jp
+			if HorseJump.poseStep(jp, airborne(rig, v.Y), v.Y, dt, still) then
+				if Sound then Sound.play("bump_soft", HOP.thudVolume, root, HOP.thudSpeed) end -- a soft thud
+				local hum = rig:FindFirstChildOfClass("Humanoid") -- at the hooves (none under Reduced Motion)
+				if BuildFx then BuildFx.dust(root.Position - Vector3.new(0, root.Size.Y / 2 + (if hum then hum.HipHeight else 3), 0), HOP.dustPuff) end
+			end
+			local tilt = CFrame.Angles(jp.pitch, 0, 0) -- + = nose up (the rig faces -Z)
 			local anim = rig:FindFirstChild("Anim")
-			if anim then HorseLegs.apply(anim, speed * dt, dt) end -- running legs (D-051)
+			if anim then HorseLegs.apply(anim, speed * dt, dt, nil, jp.tuck) end -- running legs (D-051), folded in a hop
 			local legs = anim and HorseLegs.stateOf(anim)
 			local stand, gallop = rig:FindFirstChild("Stand"), rig:FindFirstChild("Gallop")
 			local showGallop = gallop ~= nil and (fast or stand == nil)
@@ -266,20 +306,25 @@ RunService.RenderStepped:Connect(function(dt)
 				-- Running legs (D-056): the body bobs in step with the legs, and drops by the lowest
 				-- hoof's lift so a hoof is always on the ground (no floating gallop).
 				local ride = GameConfig.riding
-				local y = ride.bobAmp * math.abs(math.sin(legs.phase * math.pi * 2)) * legs.blend
-					- HorseLegs.lowestLift(legs, ride.legLength)
-				motor.Transform = CFrame.new(0, y, 0)
+				-- (in a hop the folded legs don't pull the body down: the hooves are off the ground anyway)
+				local y = (ride.bobAmp * math.abs(math.sin(legs.phase * math.pi * 2)) * legs.blend
+					- HorseLegs.lowestLift(legs, ride.legLength)) * (1 - jp.tuck) - jp.dip
+				motor.Transform = CFrame.new(0, y, 0) * tilt
 			else
 				-- Bob in step: quicker and higher at a gallop, a gentle nod at a walk, still when stopped.
 				local hz = if fast then 2.2 else 1.6
 				phase[rig] = ((phase[rig] or 0) + dt * hz * math.min(1, speed / 8)) % 1
 				local amp = if fast then 0.45 else 0.12
 				local y = amp * math.abs(math.sin(phase[rig] * math.pi * 2)) * math.min(1, speed / 8)
-				motor.Transform = CFrame.new(0, y, 0) * CFrame.Angles(if fast then math.sin(phase[rig] * math.pi * 2) * 0.04 else 0, 0, 0)
+				motor.Transform = CFrame.new(0, y * (1 - jp.tuck) - jp.dip, 0)
+					* CFrame.Angles(if fast then math.sin(phase[rig] * math.pi * 2) * 0.04 * (1 - jp.tuck) else 0, 0, 0) * tilt
 			end
 		end
 	end
 	for rig in phase do
 		if not rig.Parent then phase[rig] = nil end
+	end
+	for rig in air do
+		if not rig.Parent then air[rig] = nil end
 	end
 end)

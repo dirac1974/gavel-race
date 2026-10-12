@@ -10,6 +10,7 @@
 
 local Horse = if script then require(script.Parent.Horse) :: any else require("./Horse")
 local Profile = if script then require(script.Parent.Profile) :: any else require("./Profile")
+local Legs = if script then require(script.Parent.Legs) :: any else require("./Legs")
 
 local Care = {}
 
@@ -58,6 +59,7 @@ function Care.feed(p: any, h: any, item: string, now: number, energyCfg: any): (
 		return false, if item == "hay" then "No hay! Muck out a stall or visit Feed & Seed" else "No grain left"
 	end
 	local _, topUp = Horse.tend(h, "feed", now, energyCfg, energyCfg.careTopUps)
+	Legs.care(h, "feed", now) -- the vet run (D-077): -2, once per kind per cooldown
 	if food.bond > 0 then Horse.addBond(h, food.bond) end
 	return true, h.name .. " munched happily!" .. (if topUp then " +1 Energy" else "")
 end
@@ -65,6 +67,7 @@ end
 function Care.groom(p: any, h: any, now: number, energyCfg: any): (boolean, string)
 	if h.care.day == today(now) and h.care.groomed then return false, h.name .. " is already shiny today" end
 	local _, topUp = Horse.tend(h, "groom", now, energyCfg, energyCfg.careTopUps)
+	Legs.care(h, "groom", now) -- the vet run (D-077)
 	return true, h.name .. " is all shiny!" .. (if topUp then " +1 Energy" else "")
 end
 

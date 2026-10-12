@@ -2,7 +2,9 @@
 -- Guide (D-035, D-043): glowing hoofprints on the ground from you to a place, for every GO
 -- button. Uses PathfindingService so the trail goes round fences and buildings, redraws as
 -- you move, and clears itself when you arrive. Hoofprints are local parts only you can see.
---   Guide.to(x, z, label?)   Guide.clear()
+--   Guide.to(x, z, onArrive?, arriveStuds?)   Guide.clear()
+-- onArrive (Find it, D-075): runs once when you get there (GoTo opens the feature); a new trail or a
+-- clear drops it.
 
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
@@ -21,6 +23,8 @@ local prints: { BasePart } = {}
 local lastPathAt = 0
 local lastFrom: Vector3? = nil
 local conn: RBXScriptConnection? = nil
+local arrived: (() -> ())? = nil
+local arriveAt = ARRIVE
 local path = PathfindingService:CreatePath({ AgentRadius = 3, AgentHeight = 7, AgentCanJump = false, WaypointSpacing = SPACING })
 
 local function rootPos(): Vector3?
@@ -88,6 +92,7 @@ end
 
 function Guide.clear()
 	target = nil
+	arrived = nil
 	clearPrints()
 	if conn then
 		conn:Disconnect()
@@ -95,20 +100,29 @@ function Guide.clear()
 	end
 end
 
-function Guide.to(x: number, z: number)
+-- Where the trail leads now (nil: no trail). The visit walkaround (D-079) clears only its own trail.
+function Guide.target(): Vector3?
+	return target
+end
+
+function Guide.to(x: number, z: number, onArrive: (() -> ())?, arriveStuds: number?)
 	if not folder or not folder.Parent then
 		folder = Instance.new("Folder")
 		folder.Name = "GuidePrints"
 		folder.Parent = workspace
 	end
 	target = Vector3.new(x, 0, z)
+	arrived = onArrive
+	arriveAt = arriveStuds or ARRIVE
 	recompute()
 	if conn then conn:Disconnect() end
 	conn = RunService.Heartbeat:Connect(function()
 		local pos = rootPos()
 		if not pos or not target then return end
-		if Vector3.new(pos.X - target.X, 0, pos.Z - target.Z).Magnitude < ARRIVE then
+		if Vector3.new(pos.X - target.X, 0, pos.Z - target.Z).Magnitude < arriveAt then
+			local fn = arrived
 			Guide.clear()
+			if fn then task.spawn(fn) end
 			return
 		end
 		-- Redraw every couple of seconds or after moving away from the trail start.

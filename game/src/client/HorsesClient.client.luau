@@ -16,18 +16,27 @@
 -- page lists the plaques and the horses at Sunny Meadow Riding School with "↩️ Undo".
 -- AAA Phase 3 (D-068): a Legend's card has "🏁 Back to races" (two taps): it races again in its
 -- league with its record (Leagues.unretire).
+-- Fun-and-return (D-076, D-077, D-078): each racing horse's card shows its class path (🐣 First Win ->
+-- 🚀 Rising Star -> 🎽 Open -> 💐 Top Horse -> 🏆 Cup) with the next goal, the 🏆 Cup bar (a fill, never a
+-- number), its life stage (🍼 Young · 💪 Prime · 🦉 Veteran · 👑 Legend) with a kind note, and a "Legs" row:
+-- six pips for races in a row, "🧣 Worked hard! Cool-down soon" at 5, "🩺 Vet check time!" at 6 with a 🩺 Vet button (GoTo).
+-- "🏫 School" opens the Riding School card for that horse (Lend or Sell). A lent horse's card says it's at
+-- the school with "🏠 Home".
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
+local GoTo = require(script.Parent:WaitForChild("GoTo")) -- Find it (D-075): GO opens this feature
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local NameGen = require(Shared:WaitForChild("NameGen"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Market = require(Shared:WaitForChild("Market"))
 local PickerText = require(Shared:WaitForChild("PickerText")) -- class badges (D-062)
+local ClassPath = require(Shared:WaitForChild("ClassPath")) -- the class path (D-076)
+local Ageing = require(Shared:WaitForChild("Ageing"))       -- life stages (D-078)
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local HudEvents = ReplicatedStorage:WaitForChild("HudEvents")
 local C = Ui.colors
@@ -60,7 +69,11 @@ list.CanvasSize = UDim2.new()
 list.ScrollBarThickness = 6
 list.Parent = panel
 local grid = Instance.new("UIGridLayout")
-grid.CellSize = UDim2.new(0.5, -8, 0, 290)
+local CARD_H = 500 -- (D-076..D-078) the path, Cup bar, stages and Legs rows, and two rows of buttons
+local CARD_H_FOLDED = 360 -- (UI/UX should-fix 4) on a phone the progress rows fold behind "📈 Progress"
+local FOLD = Ui.touchLayout()
+local showProgress = not FOLD
+grid.CellSize = UDim2.new(0.5, -8, 0, CARD_H)
 grid.CellPadding = UDim2.fromOffset(12, 12)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = list
@@ -97,6 +110,117 @@ local function statBar(parent: Instance, y: number, key: string, value: number, 
 end
 
 local render
+local openSchool, progressRows
+
+-- The Riding School card for one horse (RehomeClient listens).
+openSchool = function(id: string)
+	gui.Enabled = false
+	local ev = HudEvents:FindFirstChild("OpenRidingSchool")
+	if ev then ev:Fire(id) end
+end
+
+local function chip(parent: Instance, text: string, x: number, y: number, w: number, on: boolean, done: boolean?)
+	local f = Ui.text(parent, text, TEXT, { Position = UDim2.new(0, x, 0, y), Size = UDim2.new(0, w, 0, 24) })
+	f.TextScaled = true -- (UI/UX must-fix 2) 14-16 px, so "🦉 Veteran" fits its chip
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MinTextSize, limit.MaxTextSize = 14, TEXT
+	limit.Parent = f
+	f.BackgroundTransparency = 0
+	f.BackgroundColor3 = if on then C.gold elseif done then C.cream else C.white
+	f.TextColor3 = if on or done then C.ink else C.plum
+	Ui.corner(f, 8)
+	Ui.stroke(f, if on then 2 else 1)
+	return f
+end
+
+local function line(parent: Instance, text: string, y: number, colour: Color3?)
+	local l = Ui.text(parent, text, TEXT, { Position = UDim2.new(0, 10, 0, y), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	l.TextColor3 = colour or C.plum
+	l.TextTruncate = Enum.TextTruncate.AtEnd
+	return l
+end
+
+-- (D-076) the class path and the Cup bar; (D-078) the life stage; (D-077) the Legs row. From y = 206.
+progressRows = function(card: Frame, h)
+	local y = 206
+	local path = h.classPath
+	if path and not h.legend and not h.lent and ClassPath.enabled() then
+		-- the current step: emoji and word in a double-width chip; the others: the emoji only
+		local n = #path.steps
+		local unit = math.floor(((card.AbsoluteSize.X > 0 and card.AbsoluteSize.X or 350) - 20) / (n + 1))
+		local x = 10
+		for k, step in path.steps do
+			local on = k == path.at
+			local w = if on then 2 * unit else unit
+			chip(card, if on then ClassPath.label(step) else ClassPath.EMOJI[step], x, y, w - 6, on, k < path.at)
+			x += w
+		end
+		y += 28
+		if path.next then
+			line(card, path.next, y, C.ink)
+			y += 24
+		end
+		if path.cupFill and GameConfig.cupBar.enabled ~= false then
+			Ui.text(card, if path.cupOpen then "🏆 Cup open!" else "🏆 Cup", TEXT,
+				{ Position = UDim2.new(0, 10, 0, y), Size = UDim2.new(0, 110, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+			local bar = Instance.new("Frame")
+			bar.Size, bar.Position = UDim2.fromOffset(160, 12), UDim2.new(0, 124, 0, y + 5)
+			bar.BackgroundColor3 = C.white
+			Ui.corner(bar, 6)
+			Ui.stroke(bar, 1.5)
+			bar.Parent = card
+			local fill = Instance.new("Frame")
+			fill.Size = UDim2.fromScale(math.clamp(path.cupFill, 0.03, 1), 1)
+			fill.BackgroundColor3 = if path.cupOpen or path.cupFill >= 1 then C.gold else C.teal
+			Ui.corner(fill, 6)
+			fill.Parent = bar
+			y += 26
+		end
+	end
+	local life = h.life
+	if life then
+		local unit = math.floor(((card.AbsoluteSize.X > 0 and card.AbsoluteSize.X or 350) - 20) / 5)
+		local x = 10
+		for _, st in Ageing.STAGES do -- (UI/UX must-fix 3) the current stage double width with its word
+			local on = life.stage == st
+			local w = if on then 2 * unit else unit
+			chip(card, if on then Ageing.EMOJI[st] .. " " .. st else Ageing.EMOJI[st], x, y, w - 6, on)
+			x += w
+		end
+		y += 28
+		local name = h.name
+		if h.lent then
+			line(card, "🏫 At Sunny Meadow Riding School", y)
+		elseif life.warning then
+			local a, b = Ageing.warnLines(name)
+			line(card, a .. ". " .. b, y)
+		elseif life.toVeteran then
+			line(card, string.format("🦉 Veteran in %d races", life.toVeteran), y)
+		elseif life.peak then
+			line(card, Ageing.peakLine(name), y)
+		elseif (life.steps or 0) > 0 then
+			line(card, Ageing.WISE_LINE, y)
+		elseif life.young and not h.legend then
+			line(card, Ageing.YOUNG_LINE, y)
+		end
+		y += 24
+	end
+	local legs = h.legs
+	if legs and legs.enabled and not h.legend and not h.lent then
+		Ui.text(card, "Legs", TEXT, { Position = UDim2.new(0, 10, 0, y), Size = UDim2.new(0, 44, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
+		for k = 1, legs.limit or 6 do
+			local pip = Instance.new("Frame")
+			pip.Size, pip.Position = UDim2.fromOffset(16, 16), UDim2.new(0, 56 + (k - 1) * 20, 0, y + 3)
+			pip.BackgroundColor3 = if k <= (legs.run or 0) then Color3.fromHex("5BC0EB") else C.white -- sky blue, never red
+			Ui.corner(pip, 8)
+			Ui.stroke(pip, 1.5)
+			pip.Parent = card
+		end
+		local x = 56 + (legs.limit or 6) * 20 + 6
+		local c = line(card, (legs.chip or "") .. (if legs.wrap then " 🧶" else ""), y, if legs.needsVet then C.ink else C.plum)
+		c.Position, c.Size = UDim2.new(0, x, 0, y), UDim2.new(1, -x - 10, 0, 22)
+	end
+end
 
 local function horseCard(h, order: number)
 	local d = PlayerState.data
@@ -135,19 +259,34 @@ local function horseCard(h, order: number)
 	local cl = Ui.text(card, careerText, TEXT, { Position = UDim2.new(0, 10, 0, 180), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	cl.TextColor3 = C.plum
 	cl.TextTruncate = Enum.TextTruncate.AtEnd
+	if showProgress then progressRows(card, h) end
 	local row = Instance.new("Frame")
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, -16, 0, TAP)
-	row.Position = UDim2.new(0, 8, 1, -TAP - 10)
+	row.Size = UDim2.new(1, -16, 0, 2 * TAP + 6)
+	row.Position = UDim2.new(0, 8, 1, -2 * TAP - 16)
 	row.Parent = card
-	local rl = Instance.new("UIListLayout")
-	rl.FillDirection = Enum.FillDirection.Horizontal
-	rl.Padding = UDim.new(0, 6)
+	local rl = Instance.new("UIGridLayout") -- up to two rows of four, every button at the 64 px floor
+	rl.CellSize = UDim2.new(0.25, -5, 0, TAP)
+	rl.CellPadding = UDim2.fromOffset(6, 6)
+	rl.SortOrder = Enum.SortOrder.LayoutOrder
+	rl.VerticalAlignment = Enum.VerticalAlignment.Bottom
 	rl.Parent = row
-	local function btn(text: string, color: Color3, fn, width: number?)
-		local b = Ui.button(row, text, UDim2.fromOffset(width or 80, TAP), UDim2.new(), color, TEXT)
+	local function btn(text: string, color: Color3, fn, _width: number?)
+		local b = Ui.button(row, text, UDim2.fromOffset(80, TAP), UDim2.new(), color, TEXT)
+		b.TextWrapped = true
 		b.Activated:Connect(fn)
 		return b
+	end
+	if FOLD then
+		btn(if showProgress then "📈 Hide" else "📈 Progress", C.cream, function()
+			showProgress = not showProgress
+			render()
+		end)
+	end
+	if h.lent then -- (D-078) at the Riding School: still yours, back any time
+		btn("🏠 Home", C.green, function() gameRemotes:WaitForChild("LendHorse"):FireServer(h.id, false) end)
+		btn("🏫 School", C.sky, function() openSchool(h.id) end)
+		return
 	end
 	if h.legend then
 		btn("🐴 Ride", C.orange, function()
@@ -194,6 +333,15 @@ local function horseCard(h, order: number)
 		mode = "rename:" .. h.id
 		render()
 	end)
+	if not h.legend and h.legs and h.legs.needsVet then -- (D-077) GO to the Vet's Cool-down Check
+		btn("🩺 Vet", C.sky, function()
+			gui.Enabled = false
+			GoTo.place("vetCheck")
+		end)
+	end
+	if not h.legend and GameConfig.rehome.enabled then -- (D-078) Lend or Sell at the Riding School
+		btn("🏫 School", C.sky, function() openSchool(h.id) end)
+	end
 	if career.canBeLegend and not h.legend then -- Legend Retirement (D-059): two taps, a Veteran only
 		btn(if retiring == h.id then "Sure? 👑" else "👑 Legend", if retiring == h.id then C.red else C.gold, function()
 			if retiring == h.id then
@@ -319,7 +467,7 @@ render = function()
 		stallBtn.Visible = false
 		return renameView(string.sub(mode, 8))
 	end
-	grid.CellSize = UDim2.new(0.5, -8, 0, 290)
+	grid.CellSize = UDim2.new(0.5, -8, 0, if showProgress then CARD_H else CARD_H_FOLDED)
 	title.Text = string.format("🐴 My Horses (%d)", #d.horses)
 	local price = d.market and d.market.nextStallPrice
 	stallBtn.Visible = true
@@ -431,6 +579,19 @@ local function listingCard(id: string)
 		marketSlide()
 	end
 end
+
+-- GO to the Market (D-075): the first horse still for sale says hello (its card, as the corral's Look).
+-- Never right after a race or around one (hard rule 3): a listing card is a purchase.
+GoTo.register("market", function()
+	if require(script.Parent:WaitForChild("RaceState")).shopClosed(GameConfig.findIt.pointers.afterRaceSeconds) then return end
+	local d = PlayerState.data
+	for _, x in (d and d.market and d.market.listings) or {} do
+		if not x.bought then
+			listingCard(x.id)
+			return
+		end
+	end
+end)
 
 local function attachListing(m: Instance)
 	local id = m:GetAttribute("ListingId")

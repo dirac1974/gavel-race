@@ -86,7 +86,8 @@ GameConfig.steering = {
 	lockBellSeconds = 3,
 	smart = { homeLane = 2, turnLeadSeconds = 8, resumeSeconds = 5 },
 	bots = { turnLeadMin = 4, turnLeadMax = 12, railShare = 0.25, wideShare = 0.20 },
-	introRaces = 3,
+	introRaces = 0,                -- D-072 (provisional): the ◀ ▶ buttons from race 1, with the learner floor
+	                               -- below (UI/UX staging: steerHud.tipRace, pipsRace); 3 is the switch-back
 	stars = { 0.015, -0.005 },     -- trip three-star and two-star thresholds
 	laneBand = 0.9,                -- horses closer than this (in lanes) share a lane
 	tuckReleasePerSecond = 4,      -- a tuck-back fades this fast once nothing blocks
@@ -101,7 +102,7 @@ GameConfig.steering = {
 	chainWindow = 0.3,             -- a same-way change may start this close (lanes) to landing (D-054 0)
 	reverseGapSeconds = 0.5,       -- a change the other way starts this long after landing (D-054 0)
 	weaveGapSeconds = 2.5,         -- ...or this long, for a second reversal within the window (D-054 0)
-	weaveWindowSeconds = 7,        -- (debate 012: 5; 7 since the N1 review)
+	weaveWindowSeconds = 8,        -- (debate 012: 5; 7 since the N1 review; 8 since D-072 ruling 4, 7 in the switch-back)
 	pressBounceSeconds = 0.2,      -- a press the same way this soon after the last counts once (D-054 0)
 	glideReserveFeet = 6,          -- a horse gliding into a lane keeps this much more room (D-054 0)
 	blockedPress = "wait",         -- "wait" (D-057) or "d054": a press into a lane with no room
@@ -121,13 +122,50 @@ GameConfig.steering = {
 	brushCheckFeet = 4,            -- the payer steadies this far back (Trip's offsets)...
 	brushRecoverPerSecond = 2,     -- ...and comes back at this rate
 	steadySeconds = 1,             -- the mover can't steer for this long after a brush
+	-- D-072 phase A (race realism, provisional; src/trip.py's CONFIG is the same). Each block switches off
+	-- on its own; all off (Trip.d072Off, trip.D072_OFF) is D-057's race exactly. Per race, Hurdles runs
+	-- fixed lanes (Trip.new's fixedLanes: nobody changes lane, tau = 0). Sim: docs/reviews/race-realism-2026-10-12/phaseA-sim.md.
+	file = { enabled = true,       -- file to the rail after the break
+		homeLane = 1,              -- Smart Steer riders' home lane (smart.homeLane while off)
+		railShare = 0.5, secondShare = 0.35, -- bots' home lane 1, 2, the rest (0.15) lane 3
+		fromSeconds = 2, bySeconds = 12, -- Smart Steer and bots head in whenever there's room in this window
+		riderRoomFeet = 6 },       -- a Smart Steer rider heads in only with this much clear run ahead (boxed share)
+	pack = { enabled = true,       -- running styles and drift (extra feet on the skill target)
+		frontShare = 0.3, closerShare = 0.3, -- bots only; riders are stalkers
+		frontFeet = 14, closerFeet = -14, -- ramped in from the gate, faded to 0 at the lock
+		driftFeet = { 3.5, 2 },    -- two waves (Trip.wave, a C1 parabolic sine): amplitudes...
+		driftPeriod1 = { 11, 17 }, driftPeriod2 = { 5, 7 }, -- ...and period ranges, seconds
+		driftMaxFeetPerSecond = 1.5, -- each horse's drift moves at most this fast (3 ft/s between two)
+		driftFadeSeconds = 4 },    -- drift fades out over the last this-many seconds to the lock
+	pass = { enabled = true,       -- bots and idle Smart Steer riders move out to pass
+		triggerFeet = 6,           -- a bot held at least this far behind its target by a horse ahead in its lane...
+		riderTriggerFeet = 0,      -- ...a Smart Steer rider this far (0: looks for room behind any horse)...
+		aheadFeet = 12,            -- ...at most this far ahead...
+		triggerSeconds = 0.8,      -- ...for this long
+		straightChance = 1, turnChance = 0.25, -- each horse's pre-drawn tendency, straight / turn
+		riderTurnChance = 0.25,    -- a Smart Steer rider's, on a turn
+		returnClearFeet = 10,      -- heads back in once this far clear of the horse passed...
+		giveUpSeconds = 8,         -- ...or after this long out
+		maxPasses = 4,             -- moves out at most this many times a race
+		closingFeetPerSecond = 6,  -- while alongside the horse it passes, gains on it no faster than this...
+		alongFeet = 8 },           -- ...alongside = within this many feet lengthwise (every pass side by side ~0.8 s+)
+	doors = { enabled = true,      -- a bot can shut the door on a horse moving into its lane
+		shutChance = 0.3,          -- bots whose pre-drawn shut is under this...
+		reachFeet = 16,            -- ...within this many feet lengthwise, in the lane being moved to...
+		shutSeconds = 1.5,         -- ...hold their line this long...
+		gapSeconds = 5 },          -- ...and can't shut again for this long after
+	learner = { races = 3, tauFloor = 0 }, -- first races: no shut doors; own presses never lower tau (vs its passive race)
+	lockAt = "farTurnEntry",       -- the outcome lock (only value); lanes move draw-only after it
 }
 -- The steering controls on screen (D-054 S3; RaceController). Chips and tips only show to riders
 -- who have the buttons (from their introRaces + 1-th race).
 GameConfig.steerHud = {
 	buttonPx = 104,          -- ◀ In / Out ▶ size on big screens...
 	minButtonPx = 88,        -- ...never smaller (phones)
-	tipSeconds = 5,          -- the ghost-thumb tip on the first race with the buttons
+	tipSeconds = 5,          -- the ghost-thumb tip (once)...
+	tipRace = 2,             -- ...from this counted race (D-072 staging: race 1 shows the buttons only)
+	padHaloPx = 16,          -- (D-072 consult) a see-through halo this wide round the pad takes stray touches
+	pipsRace = 3,            -- the move pips from this race (D-072 hook for phase B; nothing draws them yet)
 	chipSeconds = 1.8,       -- "Saved ground!", "Tucked in!", the turn tip and "Lanes locked!"
 	railLane = 1.5,          -- "Saved ground!": through a turn on the rail (mean lane under this)...
 	belowField = 0.25,       -- ...or at least this many lanes inside the field's mean
@@ -165,6 +203,13 @@ GameConfig.steerView = {
 	brushNodDeg = 2,         -- a small nod, both horses
 	brushVolume = 0.5,       -- bump_soft at half volume, at the mover's horse (silent until uploaded)
 	brushLateSeconds = 1 / 30, -- a brush first drawn later than this into it starts from the beginning then
+	-- Shut doors (D-072, votes-feel R3): the bot that shuts the door turns toward the mover, drawn only.
+	shutYawDeg = 6,          -- this far toward the mover (D-072 consult: 3 didn't read)...
+	shutEaseSeconds = 0.25,  -- ...eased in and out over this long, held for steering.doors.shutSeconds
+	shutLeanFeet = 0.6,      -- ...leaning this far toward it, drawn only (a brush leans 1)
+	shutPumpScale = 1.5,     -- ...its jockey pumping this much harder while it holds the door
+	shutVolume = 0.4,        -- bump_soft at the shutting bot...
+	shutSoundSpeed = 0.9,    -- ...pitched down a little
 }
 -- How the horses move on screen (D-055). Every lane's progress is timed on lane 1 (the race
 -- clock), so the order on screen is the race order in every lane.
@@ -284,12 +329,18 @@ GameConfig.touchLayout = {
 -- Phones first (D-064, stage 1): rendered floors for the dock, whatever the screen. fitDock never
 -- scales a button below minTouchPx or a label below minTextPx; on a phone the dock is the horse
 -- card, RACE! and ☰ More (dockPhoneItems = 3), and everything else moves into More.
--- dockPhoneItems = 5 keeps today's touch dock (with the floors).
+-- dockPhoneItems = 5 (D-075) is the five-item phone dock; 6 or more keeps the full dock on phones too.
 GameConfig.ui = {
 	minTouchPx = 56,
 	minTextPx = 14,
 	labelPx = 16,
-	dockPhoneItems = 3,
+	dockPhoneItems = 5,   -- Find it (D-075): horse, RACE! with 🔀 Pick, Map, Jobs, ☰ More (3 = the D-064 short dock)
+	pickStripPx = 64,     -- Find it: the 🔀 Pick strip beside RACE!, unscaled
+	phonePortraitPx = 70, -- Find it: the phone dock's horse portrait (coat dot over Energy pips), unscaled
+	dockShrinkOrder = { "jobs", "map" }, -- Find it: on a phone too narrow for five, these go into ☰ More, in order
+	portraitTap = true,   -- Find it: tap the portrait for My Horses (a thumbstick drag from it still walks); false = display-only (D-056)
+	portraitTapMovePx = 10, -- a touch that moves further than this is a drag, not a tap
+	portraitTapSeconds = 0.5, -- a touch held longer than this is not a tap
 	phoneShortSide = 500, -- a screen whose shorter side is at most this many px is a phone
 	toastMaxWords = 10,   -- stage 3 (D-064): every toast at most this many words (Words.toastOk)
 	panelMinText = 16,    -- stage 3: the smallest text on the big panels (picker, Stable Board, My Horses), unscaled
@@ -398,6 +449,29 @@ GameConfig.tapCue = { enabled = true, messageSeconds = 1.6, waitSeconds = 2.5, s
 -- raceFirstUntilRaces (AAA Phase 2, D-067): until a player has run this many races, the pill puts
 -- "Race with Comet!" before feeding, brushing and jobs (0 = the stage 3 order).
 GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6, raceFirstUntilRaces = 3 }
+-- Find it (fun-and-return phase 1, D-075, provisional). FindIt.luau holds the rules; Lune tests them.
+--   map: the Map's 5 × 3 grid of tiles (WorldLayout.MAP), each tileW × tileH px with an iconPx icon
+--     over a wordPx word and one plum "what to do here" line (hintPx, at most hintWords words).
+--   goTo: GO walks with hoofprints when the place is at most walkMaxStuds away, else fades to Paper
+--     over fadeSeconds, travels there (the Map's own trip) and opens the feature. In a race line or a
+--     race it only draws hoofprints. arriveStuds: a walk opens the feature this close to the place.
+--     travelWaitSeconds: the most a teleport waits for the trip before it opens anyway.
+--   pointers: "New!" first-time pointers, at most one per gapSeconds, never on the tour, in line,
+--     racing or within afterRaceSeconds of your race. showSeconds on screen (or its GO) marks it seen
+--     (saved in the profile). ringSeconds: the gold ring round the dock button, pulsing at ringHz.
+--     The *Races keys are how many races a player has run before that pointer can show.
+--   howRacing: the queue card's ❓ strip (3 pictures), shown by itself once, the first time in line.
+--   signpost: the Fair Street signpost past the fountain, in view as a new player arrives (WorldLayout
+--     .arrival("plaza") faces east), built from parts (no uploads), one arm per place, each pointing at it.
+GameConfig.findIt = {
+	map = { tileW = 116, tileH = 96, gapPx = 8, headerPx = 64, iconPx = 48, wordPx = 18, hintPx = 16, hintWords = 2, columns = 5 },
+	goTo = { walkMaxStuds = 120, fadeSeconds = 0.3, arriveStuds = 14, travelWaitSeconds = 1.5, openDelaySeconds = 0.2 },
+	pointers = { enabled = true, gapSeconds = 180, afterRaceSeconds = 120, showSeconds = 20, ringSeconds = 6, ringHz = 1,
+		pickRaces = 3, bookRaces = 2, trainRaces = 3, builderRaces = 4, marketRaces = 6, visitRaces = 10 },
+	howRacing = { enabled = true, autoOnce = true, picturePx = 150, pictureW = 180 },
+	signpost = { enabled = true, x = 745, zOffset = 14, postHeight = 22, armLength = 15, armStep = 2.6,
+		arms = { "track", "stable", "feedStore", "vet", "market", "paddock" } },
+}
 -- Green Cash sink (D-070, provisional): Barn Builder at Feed & Seed (BarnCatalog, Green Cash only).
 -- enabled = false hides the counter and its pill (owned things stay in the yard). wishChip: the wished
 -- item's icon and bar on the cash card. pillAfterRaceSeconds: no "You can build" pill or shelf note this
@@ -422,12 +496,66 @@ GameConfig.visit = {
 	nearStuds = 30,           -- how far outside a friend's plot still counts as "at their barn"
 	travelGapSeconds = 3,     -- between two visits by the Friends' barns list
 	listMax = 12,             -- faces on the Friends' barns list
+	-- Visiting other stables (D-079). everyone: owners may choose "Everyone here" (false: it reads as
+	-- Friends). askOnce: "Let other riders visit?" the first time the barns list opens. Strangers may
+	-- look, walk the tour, pat and cheer; treats and the post box stay friends-only (Visits.may).
+	everyone = true,
+	askOnce = true,
+	helloGapSeconds = 0.5,    -- the server's gap between two pats, cheers or tour stops from one visitor
+	cheersPerBarnPerDay = 3,  -- preset cheers one visitor can send one barn a day
+	ownerCheerGapSeconds = 30, -- the owner's anonymous "A visitor cheered!" toast, at most this often
+	arriveCheckSeconds = 1,   -- how often the server looks for visitors walking into a barn
+	bannerSeconds = 2.5,      -- the arrival banner, then it fades
+	bellVolume = 0.4,         -- gate_bell on arrival (existing SoundSheet clip)
+	bellSpeed = 1.3,
+	stopStuds = 16,           -- the server: this near a tour stop counts as there
+	stopArriveStuds = 10,     -- the client: this near a stop sends it (inside stopStuds)
+	-- The walkaround's stops as (inward from the lane, across) on the plot (StableService's plotCF), where
+	-- you stand, and lookIn/lookAcross, the thing it features (outlined when you get there): the Rosette
+	-- Wall (52, 12), the stall fronts (barn front 88), the yard props where Barn Builder pieces stand
+	-- (82, 35), and the 4th: the Legend paddock's arch (62, -22) with a Legend, else the garden beds
+	-- (inward 26-54, across -35). Visits.stopsFor picks the 4.
+	tourStops = {
+		{ id = "wall", inward = 44, across = 12, lookIn = 52, lookAcross = 12 },
+		{ id = "horses", inward = 78, across = 0, lookIn = 88, lookAcross = 0 },
+		{ id = "decor", inward = 72, across = 28, lookIn = 82, lookAcross = 35 },
+		{ id = "paddock", inward = 56, across = -22, lookIn = 71, lookAcross = -22 },
+		{ id = "garden", inward = 40, across = -26, lookIn = 40, lookAcross = -35 },
+	},
+	lookStuds = 14,           -- the featured object is the barn piece nearest the look point, this near
+	-- PolicyService (VisitAccess): one retry this long after a failed read; until then strangers are out.
+	policyRetrySeconds = 10,
+	arriveRepeatSeconds = 20, -- walking back into the same barn this soon: no second bell or banner (N1)
+	-- Ask to leave (code review S3): the owner walks one visitor out; they can't come back in for this long.
+	askLeaveSeconds = 120,
+	askLeaveGapSeconds = 1,   -- the server's gap between two of one owner's asks
+	-- A tour stop in the world (feel consult): a gold sparkle and a gold outline on the featured thing.
+	stopFx = { sparkles = 12, sparkleLife = 0.8, sparkleSpeed = 6, color = "FFD23F", highlightSeconds = 1.2, fadeSeconds = 0.3 },
+	-- A sent cheer (feel consult): its emoji floats up from the barn door (door at plot inward 88, across 0).
+	cheerFx = { px = 64, startStuds = 4, riseStuds = 3, seconds = 1.2, fadeSeconds = 0.4, volume = 0.4, yaySpeed = 1.2,
+		doorIn = 88, doorAcross = 0 },
 }
 -- Riding your own horse (D-056).
 GameConfig.riding = {
 	hopButton = true,   -- touch: a Hop button at Roblox's own jump spot while you ride
 	bobAmp = 0.15,      -- body bob, in step with the legs (hooves stay on the ground)
 	legLength = 2.45,   -- hip to hoof, for the hoof-lift correction
+	-- The forward hop (D-074, race realism; HorseJump): free riding and training rides. A hop always
+	-- goes forward: at least forwardMin, else the speed along the facing + forwardBoost, never over
+	-- forwardCap (set below from training.maxSpeed) nor, on a training course, over the course's own
+	-- pace, and never forward at all where the course says so (TC.hopCap: the Gate Break stall), so a
+	-- hop never beats the course or makes an early go. Peak = jumpPower² /
+	-- (2 × 196.2) = 3.68 studs (TC.RIDE_HOP); airtime 2 × 38 / 196.2 = 0.39 s.
+	-- In the air the legs stop cycling and fold (tuckLegs), the body pitches pitchUpDeg nose-up while
+	-- rising and pitchDownDeg nose-down falling, and squashes to landSquash of squashHeight for
+	-- landSeconds on landing, with a soft thud (bump_soft at thudSpeed) and a dust puff (pitch,
+	-- squash and dust off under Reduced Motion; the folded legs and the thud stay). Other players'
+	-- horses count as airborne past remoteAirVy studs/s up or down when their state lags.
+	-- While a hop flies, WalkSpeed is the hop's own speed, so the Humanoid's air control holds it.
+	hop = { jumpPower = 38, forwardMin = 14, forwardBoost = 4, movingFrom = 2, forwardCap = 51, cooldownSeconds = 0.6,
+		holdSeconds = 1.2, tuckLegs = true, airDelaySeconds = 0.06, tuckRate = 10, untuckRate = 6,
+		pitchUpDeg = 9, pitchDownDeg = 7, pitchRate = 20, landSquash = 0.96, squashHeight = 4, landSeconds = 0.08,
+		thudVolume = 0.6, thudSpeed = 0.8, dustPuff = 8, remoteAirVy = 6 },
 }
 GameConfig.fans = {
 	clapOffset = { -170, -230 },  -- from the bottom-right corner (UDim2 1, x, 1, y), anchored bottom-right
@@ -484,7 +612,21 @@ GameConfig.stakesUnlockPoints = { Rookie = 100, Bronze = 200, Silver = 450, Gold
 -- (fewer than risingStarBelow), Open, or Cup when its Cup is open. Labels only: one queue per
 -- league, no demotion, never a change to win chance.
 GameConfig.firstWinBonus = 10
-GameConfig.classes = { risingStarBelow = 3 }
+GameConfig.classes = { risingStarBelow = 3,
+	-- Visible progress (fun-and-return phase 2, D-076): the class path on the horse card and the results
+	-- card, First Win -> Rising Star -> Open -> Top Horse -> Cup. topWins: wins in the league for the
+	-- Top Horse step. starIsRace = true (once the named prestige races exist) calls that step Big Race.
+	-- path = false hides the path and the Cup bar.
+	path = true, topWins = 5, starIsRace = false }
+-- The Cup bar (D-076): League Points shown as a bar, never a number (D-064 hid "pts"). On the results
+-- card the bar fills from before to after with one tick per point (at most ticksMax, speeds rising
+-- tickSpeeds[1] -> [2]) over fillSeconds; under Reduced Motion it just shows. results = false: horse card only.
+GameConfig.cupBar = { enabled = true, results = true, ticksMax = 10, tickSpeeds = { 1.0, 1.3 }, fillSeconds = 0.6, tick = "tap_ok" }
+-- The class-up ceremony at the Rosette Wall (D-076): when a horse's class path step rises, the next time
+-- you're within nearStuds of your Rosette Wall (never racing, in line or on the results card) a sparkle
+-- bursts on the wall with sound (tap_good, then clap x claps) and one line, for at most seconds; any tap skips.
+-- It never touches Race again. enabled = false: no ceremony (the path still moves).
+GameConfig.classUp = { enabled = true, seconds = 3.5, nearStuds = 40, sound = "tap_good", clap = "clap", claps = 3, sparkles = 40 }
 -- League ceilings (D-046): a horse whose best base Rating passes this has its Cup opened and
 -- its league's regular races closed. The Cup winner gets cupPurseB × B (D-048).
 -- AAA Phase 3 (D-068): an average kid wins about 36% at each ceiling, and they rise league to
@@ -536,7 +678,7 @@ GameConfig.firstMinute = {
 }
 -- One card at a time at the top centre (Ui.slot): the highest priority that wants the spot shows;
 -- toasts stack below whatever card is up. raceTime: the queue card's "Race time!" outranks the tour.
-GameConfig.topSlot = { tour = 30, queueCard = 20, raceTime = 40, gapPx = 8, sideReservePx = 134 }
+GameConfig.topSlot = { tour = 30, queueCard = 20, raceTime = 40, visit = 10, gapPx = 8, sideReservePx = 134 } -- visit: the visitor bar (D-079), under every other card
 
 -- Macro detection (D-022). Log only until a month of real data sets the threshold.
 GameConfig.integrity = {
@@ -593,7 +735,7 @@ GameConfig.comeback = {
 	studioMonthStamps = 0,
 }
 
--- Careers (D-059, stage 7): no ageing and no decline. A career badge every badgeEvery races; a
+-- Careers (D-059, stage 7; stats never drop, ageing below only changes the raced Rating). A career badge every badgeEvery races; a
 -- Veteran at veteranAt races may take an opt-in Legend Retirement (two taps; suggested once per
 -- horse): it moves to the Hall of Fame paddock beside the barn, keeps its stats, can still be
 -- ridden, and frees its stall. legacyMax is the most Potential a Legend passes to one foal once
@@ -604,9 +746,9 @@ GameConfig.comeback = {
 -- (Leagues.unretire, "🏁 Back to races" on its card). true = the stage 7 suggestion at veteranAt.
 GameConfig.career = {
 	enabled = true,
-	suggest = false,
+	suggest = true,                  -- (D-080) on with breeding.enabled: Legends can be parents
 	badgeEvery = 25,
-	veteranAt = 100,
+	veteranAt = 350,                 -- = ageing.veteranAt (one "Veteran", fun-and-return ruling 3; was 100, D-059)
 	legacyMax = 2,
 	retireNeedsVeteran = true,
 	paddockShown = 4,                -- Legends standing in the paddock (the Hall of Fame list keeps them all)
@@ -624,6 +766,147 @@ GameConfig.rehome = {
 	maxWaiting = 10,                 -- horses waiting at the school for an undo (then it's full until one settles in or comes back)
 	school = "Sunny Meadow Riding School",
 }
+
+-- Ageing (fun-and-return 2026-10-12; David asked for horses that age; numbers provisional). Counted
+-- races only, never Practice. Young: training × youngTrainMult for the first youngRaces races. Veteran
+-- at veteranAt (= career.veteranAt, a test checks). Decline counts from h.ageing.declineFrom, stored
+-- once when the horse first has veteranAt races and stats at peakShare of Potential (never un-set):
+-- −declineScale Race Rating per declinePer races, at most declineCap steps; rated races only, never
+-- League Points, ceilings or stats.
+-- Warned warnAhead races before each step. declineScale 0 = stages only. Mirrors src/life_arc.py
+-- (Ageing.luau; tests/test_life_arc.py checks these values).
+GameConfig.ageing = {
+	veteranAt = 350,
+	declinePer = 50,
+	declineCap = 4,
+	declineScale = 1,                -- 1 = real decline (sims/lifearc.py --ageing, provisional); 0 = stages only
+	youngRaces = 30,
+	youngTrainMult = 1.25,
+	warnAhead = 10,
+	peakShare = 0.90,                -- decline waits for stats at this share of Potential (h.ageing.declineFrom)
+}
+
+-- Selling at the Riding School (fun-and-return 2026-10-12): rehome.share of the price paid plus
+-- min(perWin × wins + perCup × Cups, recordBonusCap). recordBonusCap from `python sims/lifearc.py
+-- --sell` (no buy-race-sell loop). Mirrors src/life_arc.py SELL.
+GameConfig.sell = {
+	perWin = 5,
+	perCup = 100,
+	recordBonusCap = 100,            -- < half the cheapest Market horse (250): a sale never pays more than the price
+}
+
+-- Lending to the Riding School (fun-and-return phase 4, D-078): free, take back any time. A lent horse
+-- stays yours (never deleted) but leaves your racing roster: no stall, no races, shown at the school
+-- by the Market Corral (at most shownMax horses from this server stand there).
+GameConfig.lend = { enabled = true, shownMax = 6 }
+
+-- Breeding (D-080 provisional, amends D-047; docs/reviews/breeding-2026-10-12/plan.md). Two of your own
+-- horses (Prime, Veteran or Legend: minParentRaces counted races; one at needLeague or higher) make a
+-- foal for fee[higher parent league] Green Cash (never Diamonds). Foal Potential per stat =
+-- clamp(round(parentShare x parents' average + (1 - parentShare) x breedAnchor + U(-noise, noise)) + legacy,
+-- potMin, potMax), legacy = career.legacyMax on each Legend parent's best stat. Start stats =
+-- min(round(startShare x Potential), startMax). Coat: each parent's coat coatParentEach, a named Surprise
+-- coatSurprise from the `surprise` families (a pair with no family splits it back to the parents).
+-- The foal is rolled once at confirm and stored. One foal per foalEveryRaces owner races, stable-wide,
+-- counted from confirm ("Next foal in N races"); the foal
+-- arrives after foalAfterRaces owner races or the next UTC day you play. stableCap = Market.MAX_HORSES.
+-- Mirrors src/breeding.py (tests/test_breeding.py, tests/fixtures/breeding.json). enabled = false
+-- hides it all (the Foal Barn, its Map tile, the Family page); keep career.suggest the same.
+GameConfig.breeding = {
+	enabled = true,                  -- on with career.suggest (BreedingService, D-080)
+	minParentRaces = 30,
+	needLeague = "Bronze",
+	foalEveryRaces = 60,             -- one foal per 60 owner races, stable-wide, from confirm (systems ruling 1)
+	maxWaiting = 1,
+	foalAfterRaces = 8,
+	foalAfterNewDay = true,
+	fee = { Bronze = 400, Silver = 800, Gold = 1500, Champion = 2500 },
+	parentShare = 0.75,              -- systems ruling 3 (was 0.7)
+	breedAnchor = 80.5,              -- systems ruling 3 said 80 (was 75); 80.5 keeps a pure top-tier line >= 83 (sims/breeding.py, flagged)
+	noise = 5,
+	potMin = 55,
+	potMax = 100,
+	startShare = 0.60,
+	startMax = 50,                   -- gameplay vote: a 90-Potential foal still plays Rookie
+	coatParentEach = 0.45,
+	coatSurprise = 0.10,
+	youngScaleFrom = 0.80,
+	stableCap = 20,
+	bond = 10,
+	familyLevels = { 76, 84 },       -- Market.stars: expected mean Potential for 2 and 3 sprouts
+	surprise = {
+		bay = { "buckskin", "dun" }, chestnut = { "buckskin", "dun" }, black = { "buckskin", "dun" },
+		chestnut_blaze = { "buckskin", "dun" }, grey = { "white", "roan" }, palomino = { "buckskin" },
+		pinto = { "appaloosa" }, appaloosa = { "pinto" },
+		buckskin = { "dun", "palomino" }, dun = { "buckskin" }, roan = { "grey" }, white = { "grey" },
+	},
+}
+
+-- Legs and the vet (fun-and-return phase 3, D-077; David's decision: over-running can need the vet).
+-- Counted races in a row on one horse (Practice never counts). warnAt: the "🧣 Worked hard! Cool-down soon" chip;
+-- runLimit: RACE! becomes 🩺 VET CHECK for rated races (Practice stays open) and the server turns rated
+-- joins away. Feed or groom: -careLowers, once per kind per horse per careCooldownSeconds
+-- (= energy.careCooldownSeconds). restSeconds without a counted race on that horse, the Spa, a training
+-- session or the Cool-down Check reset it. The run only grows after the horse's first fromRaces counted
+-- races. Never Rating, bond, Energy or cash. Mirrors src/life_arc.py LEGS (tests/test_life_arc.py).
+-- enabled = false: no run, no chip, no VET CHECK.
+GameConfig.legs = {
+	enabled = true,
+	runLimit = 6,
+	warnAt = 5,
+	careLowers = 2,
+	restSeconds = 1800,
+	fromRaces = 26,
+	careCooldownSeconds = 7200,
+	wrapRaces = 3,                   -- the Cool-down Check's wraps show on the horse for this many races
+}
+-- The Cool-down Check at the Vet (D-077, the feel lead's B1): about 30 s in 4 tap steps (check each leg,
+-- cold hose hoseTaps per leg, soft wraps in a colour, a carrot). Free: no Green Cash, no Diamonds, no
+-- timer. The server takes it only minSeconds (less lagAllowance) after it started, at the Vet, not racing.
+-- wraps: the four wrap colours (hex). Sky-blue UI.
+GameConfig.vetCheck = { enabled = true, minSeconds = 12, lagAllowance = 1.5, hoseTaps = 3,
+	wraps = { "FF7EB6", "5BC0EB", "FFD23F", "7ED957" }, wrapNames = { "Pink", "Blue", "Gold", "Green" } }
+
+-- Studio test block (playtest 2026-10-12, game/TONIGHT.md): sets the active horse's long-horizon state on
+-- join so ageing, the legs run, the class path and the Cup bar can be seen without hundreds of races.
+-- Applied by Profiles on profile load ONLY when RunService:IsStudio() is true (StudioTest.luau); a live
+-- server never applies it. It writes the save, so set everything back to off after testing.
+-- Off by default: 0 / false. horseRaces: counted races; horseWins: wins (also in its own league);
+-- nearPotential: stats to ageing.peakShare of Potential; legsRun: the legs run; leaguePoints: points;
+-- legsFromRaces: a number overrides legs.fromRaces on this server (e.g. 0), false keeps it.
+GameConfig.studioTest = {
+	horseRaces = 0,
+	horseWins = 0,
+	nearPotential = false,
+	legsRun = 0,
+	leaguePoints = 0,
+	legsFromRaces = false :: number | boolean,
+	-- (D-080) breedReady: two eligible parents (the active horse and a second one, added if needed, at
+	-- breeding.minParentRaces races, one in breeding.needLeague), the Bronze fee in hand, no wait, and a
+	-- foal already on the way arrives at once. Off by default.
+	breedReady = false,
+}
+
+-- How a horse looks (D-077, D-078), built in code (0 Meshy): the Cool-down Check's leg wraps, and the
+-- Veteran look, a frosted muzzle and brows plus a silver-and-blue bridle rosette (gold on a Legend).
+-- The model faces -Z; positions are fractions of its bounding box (x across, y up from the ground, z
+-- along, - = front), tuned in Studio. veteranLook = false: no frost or rosette. wrapsInRace = false:
+-- wraps only in the stall and on rides (if race legs don't carry them).
+GameConfig.horseLook = { veteranLook = true, wrapsInRace = true, legendRosette = true,
+	frost = "E9ECEF", frostTransparency = 0.25, silver = "C0C7D4", blue = "2F6FDE", gold = "FFD23F",
+	muzzle = { x = 0, y = 0.70, z = -0.48, size = 0.11 }, brow = { x = 0.07, y = 0.86, z = -0.40, size = 0.05 },
+	rosette = { x = -0.09, y = 0.95, z = -0.36, size = 0.07 }, wrap = { from = 0.08, to = 0.38, grow = 1.18 } }
+
+-- A bred foal's look and life (D-080, the feel vote F2 and F7; 0 Meshy). Out of races the rig is scaled
+-- unevenly: body and head x body, legs x legY tall, both growing to 1 by growRaces counted races
+-- (smoothstep). In races a foal is one uniform scale, never under raceMinScale. For its first
+-- tagAlongRaces races it tags along behind its parent (followStuds behind, sideStuds aside, at most
+-- the parent's speed + catchUp studs/s) and hops (hopStuds high) every hopEvery seconds, with the
+-- young nicker on at most 1 hop in nickerEvery. Client only, never in a race or a training ride.
+GameConfig.foalLook = { enabled = true, body = 0.70, legY = 0.92, growRaces = 30, raceMinScale = 0.94,
+	tagAlongRaces = 10, followStuds = 6, sideStuds = 2, catchUp = 4, hopStuds = 0.6, hopEvery = { 8, 14 }, nickerEvery = 3,
+	nickerSpeed = 1.45, parentSpeed = 0.9,
+	onePieceStretch = 0.35 } -- one-piece stand models: share of the leg stretch applied upward (0 = a uniform small foal)
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
 -- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in
@@ -665,6 +948,8 @@ GameConfig.training = {
 		points = { mud = 7.5, log = 12, pole = 8.5 }, layoutPin = 0 },
 	ghostHz = 4, ghostMaxPoints = 480, ghostQuantum = 0.5, -- 480 points at 4 Hz = 120 s, a whole ride
 }
+-- A hop's forward push stays under the training ride's speed check (D-074).
+GameConfig.riding.hop.forwardCap = GameConfig.training.maxSpeed - 2
 
 -- Prize ribbons for the UI (D-016). Never use racing-wager terms in UI text. -- policy-ok
 GameConfig.ribbons = { "Blue", "Red", "Yellow", "White" }

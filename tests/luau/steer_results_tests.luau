@@ -158,7 +158,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		local params = Trip.raceParams(GameConfig)
 		params.lanes = lanes
 		local n = #posts
-		local st = Trip.new(posts, table.create(n, 1 / n), table.create(2 * n, 0.5), geo, STEER, table.create(n, "manual"), params)
+		local st = Trip.new(posts, table.create(n, 1 / n), table.create(9 * n, 0.5), geo, STEER, table.create(n, "manual"), params)
 		Trip.lock(st)
 		st.view, st.shown, st.shownTgt = table.clone(view), table.clone(posts), table.clone(posts)
 		return st

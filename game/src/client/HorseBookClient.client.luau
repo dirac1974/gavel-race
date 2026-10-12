@@ -41,7 +41,7 @@ do
 	slot.Name = "BookSlot"
 	slot.BackgroundTransparency = 1
 	slot.Size = UDim2.new(0, 70, 1, 0)
-	slot.LayoutOrder = 4
+	slot.LayoutOrder = require(Shared:WaitForChild("DockLayout")).ORDER.book -- (D-075: Map had 4 too)
 	slot.Parent = dock
 	-- icon + one word, like the other dock buttons (D-064)
 	local b = Ui.iconButton(slot, "", "📖", "Book", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream)
@@ -132,6 +132,9 @@ local TABS = {
 	{ id = "bests", icon = "🏅", word = "Bests" },
 	{ id = "cloths", icon = "🎀", word = "Cloths" },
 }
+if GameConfig.breeding and GameConfig.breeding.enabled then
+	table.insert(TABS, { id = "family", icon = "💞", word = "Family" }) -- (D-080) parents and foals
+end
 local page = "coats"
 
 local function clear()
@@ -241,11 +244,24 @@ render = function()
 	if page == "tour" then
 		local tour = book.tour or { count = 0, friends = {} }
 		if (tour.count or 0) == 0 then
-			note("No Tour pins yet. Visit a friend's barn and pat every horse!", 1)
+			note("No Tour pins yet. Walk a barn's 4 stops!", 1) -- (D-079)
 			return
 		end
 		note(string.format("👫 %d barn%s toured!", tour.count, if tour.count == 1 then "" else "s"), 0)
 		for k, uid in tour.friends or {} do friendCard(uid, k) end
+		return
+	end
+	if page == "family" then -- (D-080) each foal with its two parents; the first foal marked
+		local fam = d.breeding and d.breeding.family or {}
+		if #fam == 0 then
+			note("Two horses can start a family", 1)
+			return
+		end
+		for k, f in fam do
+			local par = f.parents or {}
+			entryCard({ earned = true, emoji = "💞", label = if f.first then f.name .. " · First foal" else f.name }, k, Ui.coatColors[f.coat],
+				string.format("%s + %s", par[1] and par[1].name or "?", par[2] and par[2].name or "?"))
+		end
 		return
 	end
 	if page == "bests" then

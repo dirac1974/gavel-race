@@ -21,6 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Profile = require(Shared:WaitForChild("Profile"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local WelcomeBack = require(Shared:WaitForChild("WelcomeBack"))
+local StudioTest = require(Shared:WaitForChild("StudioTest"))
 
 local STORE_NAME = "GiddyUp_Profiles_v1"
 local LOCK_STALE = 5 * 60
@@ -253,6 +254,15 @@ local function onPlayerAdded(player: Player)
 		if RunService:IsStudio() and (cb.studioAwayDays or 0) > 0 then seen = now() - cb.studioAwayDays * 86400 end
 		local ok, err = pcall(WelcomeBack.onJoin, data, seen, now(), cb.welcome)
 		if not ok then warn("[Profiles] welcome back: " .. tostring(err)) end
+	end
+	-- Studio test block (GameConfig.studioTest): Studio only, so a live server never applies it.
+	if RunService:IsStudio() then
+		local ok, lines = pcall(StudioTest.apply, data, now(), RunService:IsStudio(), Profile.activeHorse)
+		if not ok then
+			warn("[StudioTest] " .. tostring(lines))
+		elseif #lines > 0 then
+			print("[StudioTest] " .. player.Name .. ": " .. table.concat(lines, "; "))
+		end
 	end
 	Profile.touchDay(data, now())
 	entries[player] = {

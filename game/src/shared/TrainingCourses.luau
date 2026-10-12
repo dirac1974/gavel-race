@@ -40,7 +40,8 @@ TC.RAIL_LATERAL = W / 2 + 0.5           -- rails stand just outside the dirt
 TC.ENTRY = { x0 = 748, x1 = 772 }       -- gap in both north-straight rails (path and infield)
 TC.HILL = { u0 = 20, ramp = 40, top = 40, height = CFG.stamina.hill, halfWidth = W / 2 + 2 }
 TC.GROUND_Y = -0.5                      -- top of the ground parts (WorldScene.GROUND_Y)
-TC.RIDE_HOP = 4.5                       -- the ride rig's hop (JumpPower 42: 42² / (2 × 196.2))
+-- the ride rig's hop peak (D-074): jumpPower² / (2 × 196.2), 3.68 at JumpPower 38
+TC.RIDE_HOP = GameConfig.riding.hop.jumpPower ^ 2 / (2 * 196.2)
 
 local function gate(cx: number, cz: number, ux: number, uz: number, half: number, nx: number, nz: number): Gate
 	return { ax = cx - ux * half, az = cz - uz * half, bx = cx + ux * half, bz = cz + uz * half, nx = nx, nz = nz }
@@ -502,6 +503,15 @@ end
 
 -- The speed a course rides at here (courses ride at a gallop by themselves; Mud Splash at an
 -- arena lope with the poles at a canter).
+-- The most forward speed a hop may have on Gate Break (D-074): 0 (straight up) while waiting for
+-- or answering the bell ("ready", "bell"), and anywhere in the stall before the dash (settling, the
+-- stop on the way back), so a hop is never a go; nil (no course limit) in the dash and the loop.
+function TC.hopCap(gate: string?, inStall: boolean): number?
+	if gate == "ready" or gate == "bell" or gate == "countdown" then return 0 end
+	if inStall and gate ~= "dash" then return 0 end
+	return nil
+end
+
 function TC.speedAt(key: string, x: number, z: number): number
 	local c = TC.courses[key]
 	if c and c.kind == "arena" then

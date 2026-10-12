@@ -300,7 +300,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	end
 	local calm = { sinceRace = 300, busy = false, resultsOpen = false, raceAgain = false, touring = false }
 	local pill = Advice.buildPill(kidView(), calm)
-	check(pill ~= nil and pill.key == "build:bb_paint_mint" and pill.text == "You can build the Mint barn paint!" and pill.go == "feedStore",
+	check(pill ~= nil and pill.key == "build:bb_paint_mint" and pill.text == "You can build the Mint barn paint!" and pill.go == "barnBuilder",
 		"affordable wish: the pill says so, GO to Feed & Seed")
 	check(Advice.nextThing(kidView(), T0, calm).key == "build:bb_paint_mint", "...and it is the next thing over the day's jobs")
 	check(Advice.buildPill(kidView(), nil) == nil and Advice.nextThing(kidView(), T0).key ~= "build:bb_paint_mint", "no context, no pill")
@@ -380,7 +380,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 		return v
 	end
 	local sh = Advice.shelfPill(shelfView(), calm)
-	check(sh ~= nil and sh.text == "New shelf at Barn Builder!" and sh.go == "feedStore" and Advice.nextThing(shelfView(), T0, calm).key == "shelf:Bronze",
+	check(sh ~= nil and sh.text == "New shelf at Barn Builder!" and sh.go == "barnBuilder" and Advice.nextThing(shelfView(), T0, calm).key == "shelf:Bronze",
 		"after a promotion: the New shelf pill with GO to Feed & Seed")
 	check(Advice.shelfPill(shelfView(), { sinceRace = 60 }) == nil and Advice.shelfPill(shelfView(), { sinceRace = 300, resultsOpen = true }) == nil
 		and Advice.shelfPill(shelfView(), { sinceRace = 300, touring = true }) == nil and Advice.shelfPill(shelfView(), nil) == nil,

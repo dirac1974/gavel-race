@@ -2,7 +2,7 @@
 -- Words (D-064, stage 3): the copy rules every toast and results line follows, pure so Lune can
 -- read every string. A toast is at most ui.toastMaxWords words (a word has a letter or a digit;
 -- an emoji alone is not a word), and no game text uses a wagering word (hard rule 1) or a hurt
--- word (D-058).
+-- word (D-058), or a breeding word kept out of a kids' game (D-080).
 
 local Words = {}
 
@@ -11,6 +11,8 @@ Words.BANNED = {
 	"bet", "bets", "betting", "wager", "wagers", "odds", "stake", "stakes", "payout", "payouts", "house", "bookie", -- policy-ok (the banned list itself)
 	-- D-058: no sore, hurt or sick horses
 	"hurt", "hurts", "sore", "injury", "injured", "injuries", "limp", "limping", "sick",
+	-- D-080: breeding says "parents", "foal" and "family", never these
+	"mare", "mares", "stallion", "stallions", "mating", "pregnant", "pregnancy", "birth", "blood",
 }
 local BANNED_SET: { [string]: boolean } = {}
 for _, w in Words.BANNED do BANNED_SET[w] = true end

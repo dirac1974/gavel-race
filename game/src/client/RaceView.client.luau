@@ -239,6 +239,9 @@ remotes.RaceStarted.OnClientEvent:Connect(function(_league, laneList, start, con
 		course = courseId, cfg = cfg, start = start, plan = plan, lanes = #laneList, offset = {}, target = {},
 		lane = {}, laneTarget = {}, drawn = {}, pose = {}, steering = false, locked = false, pb = Playback.new(PLAYBACK),
 		brushes = {}, -- (D-057 N5) { at (server time), mover, other, dir, started } still to draw or drawing
+		shuts = {}, -- (D-072) { at (server time), bot, mover, dir, started }: shut doors still to draw or drawing
+		packs = {}, -- (D-072) { at, kind, horse, other, flag }: passes ("out", "pass") the screen hasn't reached
+		pumped = {}, -- (D-072 consult) lane -> its horse model while its jockey pumps harder (RaceState.pumpScale)
 		from = {}, to = {}, sampleAt = 0, -- (D-054's linear glide) the offsets' glide to the newest sample
 		done = false, len1 = len1, T = len1 / GameConfig.raceSpeedStudsPerSecond, predict = SteerPredict.new(),
 		past = RaceFx.pastLine(len1, FINISH), -- (D-067) the gallop-out
@@ -327,6 +330,23 @@ remotes.RaceOffsets.OnClientEvent:Connect(function(offsets, a, b, c)
 		race.sampleAt = os.clock()
 	else
 		for i, feet in offsets do race.target[i] = feet end
+	end
+end)
+
+-- Pack events (D-072), stamped with the server time they happened. A shut door turns the bot that
+-- shut it toward the horse it held (SteerPose.shut) and a soft knock plays at the bot, when the race on
+-- screen gets there; RaceState.PackDrawn tells the HUD (your own press held: its chip). "out" and
+-- "pass" only go to RaceState.PackDrawn, also as the screen reaches them: the lanes and offsets
+-- already draw the pass.
+local SHUT_SECONDS = (STEER.doors and STEER.doors.shutSeconds) or 1.5
+remotes:WaitForChild("PackEvent").OnClientEvent:Connect(function(kind, horse, other, flag, at, courseId)
+	local race = races[courseId or "dirt"]
+	if not race or not race.steering then return end
+	local stamp = at or serverNow()
+	if kind == "shut" then
+		table.insert(race.shuts, { at = stamp, bot = horse, mover = other, dir = flag, started = false })
+	else
+		table.insert(race.packs, { at = stamp, kind = kind, horse = horse, other = other, flag = flag })
 	end
 end)
 
@@ -575,6 +595,26 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 			end
 			if age > POSE.brushLeanSeconds + 0.1 then table.remove(race.brushes, k) end
 		end
+		-- (D-072) Shut doors: each starts when the race on screen reaches it (late ones still draw the
+		-- rest of the hold, eased); a soft knock at the bot.
+		for k = #race.shuts, 1, -1 do
+			local d = race.shuts[k]
+			local age = drawnAt - d.at
+			if not d.started and age >= 0 then
+				d.started = true
+				if age < SHUT_SECONDS then
+					local horse = horseModel(courseId, d.bot)
+					local part = horse and (horse.PrimaryPart or horse:FindFirstChildWhichIsA("BasePart", true))
+					if Sound and part then Sound.play("bump_soft", POSE.shutVolume or 0.4, part, POSE.shutSoundSpeed or 0.9) end
+					RaceState.PackDrawn:Fire(courseId, "shut", d.bot, d.mover, d.dir)
+				end
+			end
+			if age > SHUT_SECONDS + 0.1 then table.remove(race.shuts, k) end
+		end
+		while #race.packs > 0 and drawnAt >= race.packs[1].at do -- (in order, as the screen reaches each)
+			local e = table.remove(race.packs, 1)
+			RaceState.PackDrawn:Fire(courseId, e.kind, e.horse, e.other, e.flag)
+		end
 		for i = 1, race.lanes do
 			if race.steering and not EASED then
 				local f = math.clamp((clock - race.sampleAt) / SAMPLE_SECONDS, 0, 1)
@@ -620,6 +660,23 @@ RunService:BindToRenderStep("RaceView", Enum.RenderPriority.Camera.Value - 1, fu
 				local look = if i == race.myLane then SteerPredict.lookDir(race.predict, race.own, clock, race.locked) else 0
 				yaw, roll = SteerPose.step(race.pose[i], POSE, race.lane[i], dt, GameConfig.raceSpeedStudsPerSecond * speed,
 					laneWidth, look)
+			end
+			local pump = 1
+			for _, d in race.shuts do
+				if d.bot == i then
+					local age = drawnAt - d.at
+					yaw += SteerPose.shut(age, POSE, d.dir, SHUT_SECONDS)
+					leanFeet += SteerPose.shutLean(age, POSE, d.dir, SHUT_SECONDS)
+					pump = math.max(pump, 1 + ((POSE.shutPumpScale or 1) - 1) * SteerPose.shutShape(age, POSE, SHUT_SECONDS))
+				end
+			end
+			do -- (D-072 consult) the shutting bot's jockey pumps harder (JockeyPose reads RaceState.pumpScale)
+				if pump ~= 1 then
+					local model = race.pumped[i] or horseModel(courseId, i)
+					if model then RaceState.pumpScale[model], race.pumped[i] = pump, model end
+				elseif race.pumped[i] then
+					RaceState.pumpScale[race.pumped[i]], race.pumped[i] = nil, nil
+				end
 			end
 			for _, b in race.brushes do
 				if b.mover == i or b.other == i then
