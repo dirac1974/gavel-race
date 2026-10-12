@@ -129,10 +129,37 @@ WorldLayout.trail = {
 WorldLayout.meadow = { x = 1690, z = -250, radius = 110 }
 
 -- Map fast-travel (D-035). "stable" means the player's own plot.
-WorldLayout.MAP = { "stable", "track", "plaza", "vet", "trailGate" }
-WorldLayout.MAP_LABELS = { stable = "My Stable", track = "Racetrack", plaza = "Fair Street", vet = "Vet", trailGate = "Trail" }
-WorldLayout.MAP_ICONS = { stable = "map_stable", track = "map_track", plaza = "map_fair", vet = "map_vet", trailGate = "map_trail" }
-WorldLayout.MAP_EMOJI = { stable = "🏠", track = "🏁", plaza = "🎪", vet = "🩺", trailGate = "🌲" }
+-- Find it (D-075): every place is on the Map, in a 5 × 3 grid (row by row). "barnBuilder" is the
+-- counter inside Feed & Seed (MAP_ALIAS: you arrive at Feed & Seed); "visit" is not a trip but the
+-- barns list (friends' barns; phase 5 adds barns open to everyone).
+WorldLayout.MAP = {
+	"stable", "track", "raceBoard", "plaza", "feedStore",
+	"barnBuilder", "tackShop", "vet", "market", "paddock",
+	"trainingGround", "trailGate", "visit",
+}
+WorldLayout.MAP_LABELS = {
+	stable = "My Stable", track = "Racetrack", raceBoard = "Race Board", plaza = "Fair Street", feedStore = "Feed & Seed",
+	barnBuilder = "Barn Builder", tackShop = "Tack & Paint", vet = "Vet & Spa", market = "Market", paddock = "Training",
+	trainingGround = "Riding Ring", trailGate = "Trail", visit = "Visit barns",
+}
+-- Atlas art where there is some; the emoji shows otherwise (Ui.icon). One symbol per meaning (D-064).
+WorldLayout.MAP_ICONS = {
+	stable = "map_stable", track = "map_track", raceBoard = "", plaza = "map_fair", feedStore = "hay",
+	barnBuilder = "", tackShop = "", vet = "map_vet", market = "", paddock = "",
+	trainingGround = "", trailGate = "map_trail", visit = "friends",
+}
+WorldLayout.MAP_EMOJI = {
+	stable = "🏠", track = "🏁", raceBoard = "📣", plaza = "🎪", feedStore = "🌾",
+	barnBuilder = "🔨", tackShop = "🎨", vet = "🩺", market = "🐎", paddock = "🎯",
+	trainingGround = "🚩", trailGate = "🌲", visit = "👫",
+}
+WorldLayout.MAP_ALIAS = { barnBuilder = "feedStore" }
+WorldLayout.MAP_NOT_A_TRIP = { visit = true }
+
+-- Can the Map (or GO) take a player to `dest`? The server checks every Travel against this.
+function WorldLayout.isTravelDest(dest: any): boolean
+	return typeof(dest) == "string" and table.find(WorldLayout.MAP, dest) ~= nil and not WorldLayout.MAP_NOT_A_TRIP[dest]
+end
 
 -- Where a player arrives: (x, z, lookX, lookZ). Just inside your gate for "stable",
 -- otherwise on the street a little in front of the place, facing it.
@@ -142,7 +169,7 @@ function WorldLayout.arrival(dest: string, plotIndex: number?): (number, number,
 		local bx, bz = WorldLayout.plotPoint(plotIndex, 60, 0)
 		return x, z, bx, bz
 	end
-	local p = WorldLayout.places[dest] or WorldLayout.places.plaza
+	local p = WorldLayout.places[WorldLayout.MAP_ALIAS[dest] or dest] or WorldLayout.places.plaza
 	local x, z = p.x + p.fx * 18, p.z + p.fz * 18
 	return x, z, p.x, p.z
 end

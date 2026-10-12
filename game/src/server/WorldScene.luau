@@ -1,6 +1,6 @@
 --!nonstrict
 -- WorldScene: builds the world around the racecourse from parts (D-035, WorldLayout):
--- Fair Street with its fountain, lamps and bunting; the Race Board, Feed & Seed, Vet,
+-- Fair Street with its fountain, lamps, bunting and signpost (D-075); the Race Board, Feed & Seed, Vet,
 -- Training Paddock and Market Corral; Barn Lane with 20 fenced stable plots; the Trail loop
 -- with the meadow; the Training Ground with its oval and the paddock gymkhana's layouts (D-053;
 -- clients put this week's in the arena); trees. Uploaded models (ReplicatedStorage.RaceModels) replace the
@@ -224,6 +224,60 @@ end
 WorldScene.placeCF = placeCF
 
 -- Fair Street ----------------------------------------------------------------------
+-- The Fair Street signpost (Find it, D-075; findIt.signpost): a wooden post past the fountain with one
+-- arm per place, each turned toward it, with a pointed tip and the place's icon and name on both faces.
+-- Parts and SurfaceGuis only (no uploads, no Meshy). "stable" points down Barn Lane.
+local function buildSignpost(f: Instance)
+	local S = GameConfig.findIt and GameConfig.findIt.signpost
+	if not S or not S.enabled then return end
+	local px, pz = S.x, WorldLayout.STREET_Z + S.zOffset
+	local m = Instance.new("Model")
+	m.Name = "Signpost"
+	part({ Name = "Post", Size = Vector3.new(1.6, S.postHeight, 1.6), Color = C.wood, Material = Enum.Material.Wood,
+		CFrame = CFrame.new(px, GROUND_Y + S.postHeight / 2, pz) }, m)
+	part({ Name = "Cap", Size = Vector3.new(2.6, 1, 2.6), Color = C.roofRed, CFrame = CFrame.new(px, GROUND_Y + S.postHeight + 0.5, pz) }, m)
+	for k, key in S.arms do
+		local tx, tz
+		if key == "stable" then
+			tx, tz = WorldLayout.LANE_X, WorldLayout.STREET_Z
+		else
+			local p = WorldLayout.places[WorldLayout.MAP_ALIAS[key] or key]
+			if p then tx, tz = p.x, p.z end
+		end
+		if tx then
+			local dx, dz = tx - px, tz - pz
+			local len = math.max(1e-3, math.sqrt(dx * dx + dz * dz))
+			local ux, uz = dx / len, dz / len
+			local y = GROUND_Y + S.postHeight - 2 - (k - 1) * S.armStep
+			-- The arm's +X runs toward the place: yaw = atan2(-dz, dx).
+			local yaw = math.atan2(-uz, ux)
+			local centre = Vector3.new(px + ux * (S.armLength / 2 + 0.8), y, pz + uz * (S.armLength / 2 + 0.8))
+			local arm = part({ Name = "Arm_" .. key, Size = Vector3.new(S.armLength, 2.2, 0.5), Color = C.woodLight, Material = Enum.Material.Wood, CanCollide = false,
+				CFrame = CFrame.new(centre) * CFrame.Angles(0, yaw, 0) }, m)
+			-- the pointed tip, toward the place
+			local tipAt = Vector3.new(px + ux * (S.armLength + 1.8), y, pz + uz * (S.armLength + 1.8))
+			wedge({ Name = "Tip", Size = Vector3.new(0.5, 2.2, 2), Color = C.woodLight, Material = Enum.Material.Wood, CanCollide = false,
+				CFrame = CFrame.new(tipAt) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, math.pi / 2, 0) }, m)
+			for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+				local sg = Instance.new("SurfaceGui")
+				sg.Face = face
+				sg.CanvasSize = Vector2.new(S.armLength * 40, 2.2 * 40)
+				sg.LightInfluence = 0.2
+				sg.Parent = arm
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.Font = Enum.Font.FredokaOne
+				label.TextScaled = true
+				label.TextColor3 = C.ink
+				label.Text = (WorldLayout.MAP_EMOJI[key] or "") .. " " .. (WorldLayout.MAP_LABELS[key] or key)
+				label.Parent = sg
+			end
+		end
+	end
+	m.Parent = f
+end
+
 local function buildFairStreet(root: Instance)
 	local f = Instance.new("Folder")
 	f.Name = "FairStreet"
@@ -275,6 +329,7 @@ local function buildFairStreet(root: Instance)
 	end
 	WorldScene.placeModel(f, "hay_cart", CFrame.lookAt(Vector3.new(store.x - store.w / 2 - 10, GROUND_Y, Z - W / 2 - 8),
 		Vector3.new(store.x - store.w / 2 - 10, GROUND_Y, Z)))
+	buildSignpost(f)
 	f.Parent = root
 	return f
 end

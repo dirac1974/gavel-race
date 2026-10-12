@@ -722,6 +722,74 @@ The field now races like a field: horses file to the rail after the break, run i
 - [ ] **Fixed lanes (for Hurdles later).** With `card.fixedLanes = true` on a course card (set by hand in Studio), nobody changes lanes, no buttons show, the arrow keys do nothing (camera still), and every tau is 0 in the log.
 - [ ] Switches: `steering.file.enabled`, `pack.enabled`, `pass.enabled`, `doors.enabled` each turn one part off; all four off plus `introRaces = 3` is the game before D-072. `steerHud.tipRace` (2) and `pipsRace` (3) stage the onboarding; `steerView.shutYawDeg`, `shutEaseSeconds`, `shutVolume`, `shutSoundSpeed` tune the shut-door look.
 
+## Find it (fun-and-return phase 1)
+Map, GO, the phone dock, the queue card and "New!" pointers (D-075). Do the phone checks in the Device Emulator at 667 × 375 landscape with touch on.
+- [ ] **Map: 13 tiles.**
+  - 🗺️ Map shows a 5 × 3 grid of 13 tiles: My Stable, Racetrack, Race Board, Fair Street, Feed & Seed, Barn Builder, Tack & Paint, Vet & Spa, Market, Training, Riding Ring, Trail, Visit barns.
+  - Each tile has a picture, its name and a plum line of 2 words or fewer ("Buy food", "Meet horses").
+  - On a 667 × 375 phone the whole grid fits with no scrolling, and no word is cut off ("Barn Builder" and "Tack & Paint" shrink a little to fit whole).
+- [ ] **Map lines that change.**
+  - With 2 or more horses, My Stable says "2 horses".
+  - With a napping horse, Vet & Spa says "Spa today".
+  - After a horse moves up a league, Barn Builder says "New shelf".
+- [ ] **GO from far away.** Stand at your barn, open the Map and tap Market.
+  - The screen fades to cream (not a hard cut) and you arrive at the corral.
+  - The card for the first horse for sale opens by itself.
+  - Repeat for Feed & Seed (the shop card), Barn Builder (its panel), Tack & Paint (the 💎 shop), Vet & Spa (the vet card), Training and Riding Ring (the Train menu) and Race Board (the race picker, and you are not put in line).
+- [ ] **GO from nearby.** Stand on Fair Street and tap Feed & Seed on the Map (it's under 120 studs away).
+  - Golden hoofprints appear instead of a trip.
+  - When you walk to the shop, its card opens by itself.
+- [ ] **Never a trip from a line.** Join a race, then tap a far Map tile, a Stable Board GO or a pill GO.
+  - You only get hoofprints.
+  - Nothing opens when you arrive, and you stay in line.
+  - During your race the dock is hidden; if a GO is reached, it says "After your race!".
+- [ ] **Every GO uses it.** The tour's GO, the Next-thing pill's GO, and the Stable Board's horse and job GO buttons behave like the Map tiles.
+  - A far place reads "Take me ▶"; a near one reads "GO ▶".
+- [ ] **Visit barns.**
+  - The Visit barns tile opens the Friends' barns list, with ◀ Back to the grid.
+  - With no horse, it says "Pick your first horse…".
+- [ ] **Dock on PC.**
+  - The order is: cash, horse card, Jobs, Map, Book, RACE! with 🔀 Pick, Ride.
+  - Map and Book no longer swap places between sessions.
+- [ ] **Dock on a phone: 5 items.**
+  - The order is: the horse portrait (coat dot over the Energy pips), 🏁 RACE! with 🔀 Pick, 🗺️ Map, 📋 Jobs, ☰ More.
+  - Nothing covers Hop or Gallop.
+  - Tapping the portrait opens My Horses.
+  - Start a thumbstick drag on the portrait: you walk, and My Horses stays shut (D-056 reversal, D-075). If it fails, set `ui.portraitTap = false`; Horses stays in ☰ More.
+  - ☰ More holds Ride, Book, Cash and Horses.
+  - At 640 px wide, Jobs moves into ☰ More; at 568 × 320, Map moves too. Hop and Gallop are never covered.
+  - "🎈 PRACTICE" fits on one line above "with Comet ▶".
+- [ ] **🔀 Pick.** Tap 🔀 Pick when you're not in line.
+  - The picker opens with the title "Pick a race", and you are not in line.
+  - Its Join button names the line, e.g. "Join Bronze line" or "Join Practice line".
+- [ ] **Queue card, race line.** Join a league race.
+  - The card's second row names the line, e.g. "🟠 Bronze race line".
+  - The third row says "Horses like Comet race here", with your horse's name.
+  - Open gate slots read "🤖 at 0" during the countdown.
+  - On a phone the row reads "🟠 Bronze line · 1 rider".
+- [ ] **Queue card, other lines.**
+  - In the Cup line it reads "🏆 Bronze Cup line" / "Only Cup horses".
+  - In Practice it reads "🎈 Open Practice line" / "Anyone! Horses all equal".
+- [ ] **❓ How racing works.**
+  - The first time a new player is in line, a 3-picture strip opens by itself: "Join a line", "Riders fill the gate", "Bots fill spots at 0".
+  - "Got it!" or ✕ closes it, and it closes by itself at "Race time!".
+  - It never opens by itself again, even after rejoining the game.
+  - ❓ on the queue card (full card and phone row) opens it any time.
+- [ ] **"New!" pointers.**
+  - After 3 races, and at least 2 minutes after your last race, the pill says "New! Pick your own race" and the RACE! slot glows gold for about 6 s, pulsing gently.
+  - With Reduced Motion on, the glow holds still.
+  - The next pointer ("New! Your Horse Book", Market, Barn Builder, Visit barns...) comes no sooner than 3 minutes later.
+  - Pointers never show during the tour, in line, in a race, on the results card or within 2 minutes after a race. A pointer that was up before you raced does not come back on the results card or right after it.
+  - Tap RACE!, then fire `Travel` or `VisitFriend` while in line (or tap Visit barns): no trip, just "Follow the hoofprints after your race!".
+  - Each pointer shows once per profile: after 20 s on screen, or after its GO.
+  - None of them points at Tack & Paint.
+- [ ] **Signpost.**
+  - A new player arriving on Fair Street sees a wooden signpost past the fountain.
+  - It has 6 arms: Racetrack, My Stable, Feed & Seed, Vet & Spa, Market, Training.
+  - Each arm points toward its place, has a pointed tip, and has readable words on both faces.
+  - A rider on a horse can pass under or through the arms without getting stuck.
+  - **Studio check:** that the tips point outward and the words aren't mirrored.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

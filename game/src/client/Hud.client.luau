@@ -5,6 +5,11 @@
 -- Touch screens (D-056): the dock keeps clear of the bottom-right column (Hop, Gallop) and of
 -- the thumbstick zone (the cash and horse cards there are display-only; My Horses opens from a
 -- 🐴 button), and 💎 is a quiet pill at the top right. Both shop doors stay shut around races.
+-- Find it (D-075): every slot has its own LayoutOrder (DockLayout.ORDER; Map and Book used to share 4).
+-- RACE! has a 🔀 Pick strip beside it that opens the picker without joining a line. On a phone the
+-- dock is five items (ui.dockPhoneItems = 5): the horse portrait (a coat dot over the Energy pips;
+-- tap for My Horses), RACE! with Pick, Map, Jobs and ☰ More (Ride, Book, Cash, Horses). A "New!"
+-- pointer (StableBoard, PointAt) rings its dock button in gold for a few seconds.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -22,6 +27,9 @@ local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild
 local DiamondProducts = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DiamondProducts"))
 local DockLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DockLayout"))
 local Tour = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Tour"))
+local FindIt = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FindIt"))
+local ORDER = DockLayout.ORDER
+local FIVE = GameConfig.ui.dockPhoneItems == 5
 local GuiService = game:GetService("GuiService")
 local gameRemotes = ReplicatedStorage:WaitForChild("GameRemotes")
 local raceRemotes = ReplicatedStorage:WaitForChild("RaceRemotes")
@@ -98,7 +106,7 @@ local function slot(width: number, order: number): Frame
 end
 
 -- Green Cash
-local cashSlot = slot(230, 0)
+local cashSlot = slot(230, ORDER.cash)
 local cashCard = Ui.card(cashSlot, UDim2.new(1, 0, 0, 56), UDim2.new(0, 0, 1, -60), C.paper)
 Ui.icon(cashCard, "cash", "💵", UDim2.fromOffset(36, 36), UDim2.new(0, 8, 0.5, -18))
 local cashText = Ui.text(cashCard, "0", 26, { Size = UDim2.new(0.5, -50, 1, 0), Position = UDim2.new(0, 48, 0, 0) })
@@ -153,7 +161,7 @@ local function sizeCash()
 end
 
 -- Active horse
-local horseSlot = slot(250, 1)
+local horseSlot = slot(250, ORDER.horse)
 local horseCard = Ui.card(horseSlot, UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.paper)
 local coatDot = Instance.new("Frame")
 coatDot.Size = UDim2.fromOffset(48, 48)
@@ -182,6 +190,36 @@ for k = 1, GameConfig.energy.maxPerRacer do -- the one Energy icon, a horseshoe 
 	full.LayoutOrder = k
 	hoofs[k] = full
 end
+-- The phone portrait (D-075): the coat dot over a row of small Energy pips (no name, no words).
+local portraitPips = Instance.new("Frame")
+portraitPips.Name = "PortraitPips"
+portraitPips.BackgroundTransparency = 1
+portraitPips.AnchorPoint = Vector2.new(0.5, 1)
+portraitPips.Position = UDim2.new(0.5, 0, 1, -4)
+portraitPips.Size = UDim2.new(1, -6, 0, 12)
+portraitPips.Visible = false
+portraitPips.Parent = horseCard
+local ppLayout = Instance.new("UIListLayout")
+ppLayout.FillDirection = Enum.FillDirection.Horizontal
+ppLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ppLayout.Padding = UDim.new(0, 1)
+ppLayout.Parent = portraitPips
+local pips = {}
+for k = 1, GameConfig.energy.maxPerRacer do
+	local pip = Ui.icon(portraitPips, Ui.ENERGY_ICON, Ui.ENERGY_EMOJI, UDim2.fromOffset(12, 12))
+	pip.LayoutOrder = k
+	pips[k] = pip
+end
+local PORTRAIT = GameConfig.ui.phonePortraitPx or 70
+local function applyPortrait(on: boolean)
+	horseSlot.Size = UDim2.new(0, if on then PORTRAIT else 250, 1, 0)
+	horseName.Visible = not on
+	hoofRow.Visible = not on
+	portraitPips.Visible = on
+	coatDot.Size = if on then UDim2.fromOffset(44, 44) else UDim2.fromOffset(48, 48)
+	coatDot.Position = if on then UDim2.new(0.5, -22, 0, 6) else UDim2.new(0, 10, 0.5, -24)
+end
+
 -- Tap the horse card for My Horses (D-037). On touch the card sits in the thumbstick zone, so
 -- it is display-only and a 🐴 button in the button group opens My Horses instead (D-056).
 local function openHorses()
@@ -194,23 +232,50 @@ horseHit.Size = UDim2.fromScale(1, 1)
 horseHit.ZIndex = 5
 horseHit.Parent = horseCard
 horseHit.Activated:Connect(openHorses)
+-- The phone portrait's tap (D-075; consult (d), code review B2): a plain Frame that never sinks input,
+-- so a thumbstick drag that starts on it still walks. A touch released within ui.portraitTapMovePx
+-- and ui.portraitTapSeconds is a tap: My Horses. ui.portraitTap = false: display-only (D-056).
+local UIc = GameConfig.ui
+local portraitTap = Instance.new("Frame")
+portraitTap.Name = "PortraitTap"
+portraitTap.BackgroundTransparency = 1
+portraitTap.Active = false
+portraitTap.Size = UDim2.fromScale(1, 1)
+portraitTap.ZIndex = 5
+portraitTap.Visible = false
+portraitTap.Parent = horseCard
+local tapFrom: Vector3? = nil
+local tapAt = 0
+portraitTap.InputBegan:Connect(function(input: InputObject)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		tapFrom, tapAt = input.Position, os.clock()
+	end
+end)
+portraitTap.InputEnded:Connect(function(input: InputObject)
+	local from = tapFrom
+	tapFrom = nil
+	if not from or (input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseButton1) then return end
+	if (input.Position - from).Magnitude <= (UIc.portraitTapMovePx or 10) and os.clock() - tapAt <= (UIc.portraitTapSeconds or 0.5) then
+		openHorses()
+	end
+end)
 -- "Ready" from 1 Energy up, "Napping" only at 0 (D-058); no care stars here (★ means riding, D-064).
 local restLabel = Ui.text(hoofRow, "", DockLayout.LABEL_PX, { Size = UDim2.new(0, 64, 1, 0), LayoutOrder = 99,
 	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false })
 restLabel.TextColor3 = C.plum
 
 -- Icon + one word on every dock button (D-064, stage 3).
-local horsesSlot = slot(DockLayout.BUTTON_PX, 2)
+local horsesSlot = slot(DockLayout.BUTTON_PX, ORDER.horses)
 local horsesBtn = Ui.iconButton(horsesSlot, "job_ride", "🐴", "Horses", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.gold)
 horsesBtn.Activated:Connect(openHorses)
 
 -- Map (D-035)
-local mapSlot = slot(DockLayout.BUTTON_PX, 4)
+local mapSlot = slot(DockLayout.BUTTON_PX, ORDER.map)
 local mapBtn = Ui.iconButton(mapSlot, "map", "🗺️", "Map", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.sky)
 mapBtn.Activated:Connect(function() OpenMap:Fire() end)
 
 -- Stable Board (D-043): no badge, no bell.
-local boardSlot = slot(DockLayout.BUTTON_PX, 3)
+local boardSlot = slot(DockLayout.BUTTON_PX, ORDER.jobs)
 local boardBtn = Ui.iconButton(boardSlot, "clipboard", "📋", "Jobs", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream)
 boardBtn.Activated:Connect(function() OpenBoard:Fire() end)
 
@@ -218,9 +283,20 @@ boardBtn.Activated:Connect(function() OpenBoard:Fire() end)
 -- for your active horse; the queue card's "More choices" opens the picker.
 local QCARD = GameConfig.queueCard or {}
 local oneTap = QCARD.enabled ~= false and QCARD.oneTapRace ~= false
-local raceSlot = slot(if oneTap then 200 else 170, 5) -- the Ride button (RideClient) comes after it, at 6
-local raceBtn = Ui.button(raceSlot, "🏁 RACE!", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.orange, 30)
-Ui.pad(raceBtn, 5)
+local raceSlot = slot(if oneTap then DockLayout.RACE_PX else 170, ORDER.race) -- the Ride button (RideClient) comes after it
+-- 🔀 Pick (Find it, D-075): the picker without joining a line (before, only the queue card's More had it).
+local PICK = GameConfig.ui.pickStripPx or 64
+local raceBtn = Ui.button(raceSlot, "🏁 RACE!", UDim2.new(1, if oneTap then -(PICK + 4) else 0, 0, 70), UDim2.new(0, 0, 1, -74), C.orange, 30)
+local pickBtn = Ui.iconButton(raceSlot, "", "🔀", "Pick", UDim2.new(0, PICK, 0, 70), UDim2.new(1, -PICK, 1, -74), C.sky)
+pickBtn.Name = "Pick"
+pickBtn.Visible = oneTap
+local racePad = Ui.pad(raceBtn, 5)
+-- (D-075, UI/UX must-fix 2) "🎈 PRACTICE" (and later "🩺 VET CHECK") fits the 142 px face: the
+-- text scales between 18 and 30 px, and keeps 22 px clear at the bottom for "with Comet ▶".
+raceBtn.TextScaled = true
+local raceFit = Instance.new("UITextSizeConstraint")
+raceFit.MinTextSize, raceFit.MaxTextSize = 18, 30
+raceFit.Parent = raceBtn
 local raceSub = Ui.text(raceBtn, "", DockLayout.LABEL_PX, { Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 1, -20),
 	TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 raceSub.Visible = false
@@ -274,6 +350,7 @@ local function setRaceButton(state: string, detail: string?)
 	raceBtn.TextYAlignment = Enum.TextYAlignment.Center
 	raceBtn.TextSize = 30
 	raceSub.Visible = false
+	raceFit.MaxTextSize = 30
 	if state == "nohorse" then
 		raceBtn.Text, raceBtn.BackgroundColor3 = "🐴 Pick a horse", C.gold
 		leaveBtn.Visible = false
@@ -281,6 +358,7 @@ local function setRaceButton(state: string, detail: string?)
 		-- Two short lines that never clip (AAA Phase 2): "In line!" and the seconds only.
 		raceBtn.Text, raceBtn.BackgroundColor3 = "In line!", C.teal
 		raceBtn.TextSize = 26
+		raceFit.MaxTextSize = 26
 		raceBtn.TextYAlignment = Enum.TextYAlignment.Top
 		raceSub.Text = detail or ""
 		raceSub.Visible = detail ~= nil and detail ~= ""
@@ -292,6 +370,7 @@ local function setRaceButton(state: string, detail: string?)
 			local kind = oneTapKind(h)
 			raceBtn.Text = KIND_WORD[kind]
 			raceBtn.TextSize = if kind == "practice" then 24 else 30 -- one line above "with Comet ▶"
+			raceFit.MaxTextSize = raceBtn.TextSize
 			raceBtn.BackgroundColor3 = if kind == "practice" then C.sky else C.orange
 			raceBtn.TextYAlignment = Enum.TextYAlignment.Top
 			raceSub.Text = "with " .. h.name .. " ▶"
@@ -299,6 +378,7 @@ local function setRaceButton(state: string, detail: string?)
 		end
 		leaveBtn.Visible = false
 	end
+	racePad.PaddingBottom = UDim.new(0, if raceSub.Visible then 22 else 5)
 end
 
 local function render(data)
@@ -322,6 +402,7 @@ local function render(data)
 		horseName.Text = h.name
 		coatDot.BackgroundColor3 = Ui.coatColors[h.coat] or Ui.coatColors.bay
 		for k, icon in hoofs do Ui.dim(icon, k > h.energy) end
+		for k, icon in pips do Ui.dim(icon, k > h.energy) end
 		restLabel.Text = if h.resting then "Napping" else "Ready"
 		if not inLine then setRaceButton("idle") end
 	else
@@ -398,6 +479,20 @@ localEvent("QuickRace").Event:Connect(pressRace) -- the tour's first GO (D-063)
 leaveBtn.Activated:Connect(function()
 	raceRemotes:WaitForChild("JoinRace"):FireServer(false)
 end)
+local function pressPick()
+	if not PlayerState.data then
+		Ui.toast("Your stable is loading…", "hay", "🐴")
+		return
+	end
+	if not PlayerState.activeHorse() then
+		OpenStarter:Fire()
+		return
+	end
+	pickerJoinWatch() -- (N8) a join from the picker gets its reason window as the picker closes
+	OpenRacePicker:Fire()
+end
+pickBtn.Activated:Connect(pressPick)
+localEvent("PressPick").Event:Connect(pressPick) -- GoTo's Race Board tile and the "Pick" pointer
 
 raceRemotes:WaitForChild("QueueStatus").OnClientEvent:Connect(function(isIn, count, seconds, courseId)
 	inLine = isIn
@@ -417,7 +512,7 @@ end)
 -- ☰ More (D-064): on a phone the dock is the horse card, RACE! and ☰ More; Green Cash, My
 -- Horses, the Stable Board, the Map and Ride move into the More panel (the slots themselves move,
 -- so every button works as before). Any button there closes the panel.
-local moreSlot = slot(DockLayout.BUTTON_PX, 7)
+local moreSlot = slot(DockLayout.BUTTON_PX, ORDER.more)
 local moreBtn = Ui.iconButton(moreSlot, "", "☰", "More", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.white)
 moreSlot.Visible = false
 local moreGui = Ui.screen("DockMore", 6)
@@ -458,8 +553,22 @@ local function hookClose(holder: Instance)
 	end
 end
 local phoneMode = false
-local function movable(): { Frame }
-	local list = { cashSlot, horsesSlot, boardSlot, mapSlot }
+local shrunk = "" -- (D-075, UI/UX must-fix 1) what a narrow phone moved into More: "", "jobs", "jobs,map"
+local SHRINK_SLOT = { jobs = boardSlot, map = mapSlot }
+local function phoneMoves(): { string }
+	local cam = workspace.CurrentCamera
+	if not (FIVE and cam) then return {} end
+	return DockLayout.phoneMoves(cam.ViewportSize.X, GameConfig.ui, LAYOUT.movementColumn)
+end
+local function movable(on: boolean): { Frame }
+	-- (D-075) the five-item dock keeps Map and Jobs; More holds Ride, Book, Cash and Horses, and on a
+	-- narrow phone Jobs, then Map too (ui.dockShrinkOrder)
+	local list = if FIVE then { cashSlot, horsesSlot } else { cashSlot, horsesSlot, boardSlot, mapSlot }
+	if FIVE and on then
+		for _, item in phoneMoves() do
+			if SHRINK_SLOT[item] then table.insert(list, SHRINK_SLOT[item]) end
+		end
+	end
 	for _, name in { "RideSlot", "BookSlot" } do -- RideClient's and HorseBookClient's (D-063)
 		local s = dock:FindFirstChild(name) or moreBody:FindFirstChild(name)
 		if s then table.insert(list, s) end
@@ -469,7 +578,7 @@ end
 applyPhone = function()
 	local cam = workspace.CurrentCamera
 	local on = cam ~= nil and DockLayout.isPhone(touch, cam.ViewportSize.X, cam.ViewportSize.Y, GameConfig.ui)
-	if cam and touch and not on and GameConfig.ui.dockPhoneItems <= 3 then
+	if cam and touch and not on and GameConfig.ui.dockPhoneItems <= 5 then
 		-- A tablet whose full dock can't fit beside the movement column at the floor scale gets
 		-- the short dock too, so the dock never covers Hop or Gallop.
 		local full = 0
@@ -480,14 +589,30 @@ applyPhone = function()
 		end
 		on = full * DockLayout.floor(GameConfig.ui) > cam.ViewportSize.X - 24 - LAYOUT.movementColumn
 	end
-	if on == phoneMode and not (on and (dock:FindFirstChild("RideSlot") or dock:FindFirstChild("BookSlot"))) then return end
+	local moves = if on then table.concat(phoneMoves(), ",") else ""
+	if on == phoneMode and moves == shrunk and not (on and (dock:FindFirstChild("RideSlot") or dock:FindFirstChild("BookSlot"))) then return end
 	phoneMode = on
-	for _, s in movable() do
+	shrunk = moves
+	if FIVE then -- back in the dock first; a narrow phone moves some out again just below
+		for _, s in { boardSlot, mapSlot } do s.Parent = dock end
+	end
+	for _, s in movable(on) do
 		s.Parent = if on then moreBody else dock
 		if on then hookClose(s) end
 	end
 	horsesSlot.Visible = touch -- (My Horses opens from the card on PC)
 	moreSlot.Visible = on
+	if FIVE then
+		applyPortrait(on)
+		horseHit.Visible = not touch -- (D-056) never a button in the thumbstick zone...
+		portraitTap.Visible = on and UIc.portraitTap ~= false -- ...the portrait's tap lets drags through
+		local P = DockLayout.PHONE_ORDER
+		horseSlot.LayoutOrder = if on then P.horse else ORDER.horse
+		raceSlot.LayoutOrder = if on then P.race else ORDER.race
+		mapSlot.LayoutOrder = if on then P.map else ORDER.map
+		boardSlot.LayoutOrder = if on then P.jobs else ORDER.jobs
+		moreSlot.LayoutOrder = if on then P.more else ORDER.more
+	end
 	if not on then closeMore() end
 end
 dock.ChildAdded:Connect(function(ch)
@@ -508,6 +633,28 @@ local function applyTouch(on: boolean)
 end
 applyTouch(touch)
 Ui.TouchChanged.Event:Connect(applyTouch)
+
+-- "New!" pointers (D-075): StableBoard fires PointAt(ring, place); the dock button glows gold for
+-- findIt.pointers.ringSeconds at ringHz (Reduced Motion: a still ring). On a phone the Book is in More.
+local pointRing = Instance.new("Frame")
+pointRing.Name = "PointRing"
+pointRing.AnchorPoint = Vector2.new(0.5, 1)
+pointRing.Position = UDim2.new(0.5, 0, 1, -74 + 70 + 8)
+pointRing.Size = UDim2.new(1, 16, 0, 70 + 16)
+pointRing.BackgroundColor3 = C.gold
+pointRing.BorderSizePixel = 0
+pointRing.ZIndex = 0
+pointRing.Visible = false
+Ui.corner(pointRing, 22)
+local ringStart: number? = nil
+localEvent("PointAt").Event:Connect(function(ring, _place)
+	local book = dock:FindFirstChild("BookSlot")
+	local target = if ring == "jobs" then boardSlot elseif ring == "pick" then raceSlot
+		elseif ring == "book" then (book or moreSlot) else mapSlot
+	if not target or not target.Visible or target.Parent ~= dock then target = moreSlot end
+	pointRing.Parent = target
+	ringStart = os.clock()
+end)
 
 -- Hide the dock while you ride (RaceState knows your lane), while a results card is up (it
 -- would cover the replay buttons on a phone) and during the replay.
@@ -534,6 +681,16 @@ RunService.Heartbeat:Connect(function()
 		raceArrow.Position = UDim2.new(0.5, 0, 1, -84 - (if still then 0 else math.floor(6 * math.abs(math.sin(t * 4)))))
 	end
 	if FM.hideGemPill ~= false and tourRaceStep() then gemShown = false end
+	if ringStart then
+		local a = FindIt.ringAlpha(os.clock() - ringStart, reducedMotion())
+		if a == nil then
+			ringStart = nil
+			pointRing.Visible = false
+		else
+			pointRing.Visible = true
+			pointRing.BackgroundTransparency = 0.75 - 0.45 * a
+		end
+	end
 	local pill = gemOnPill()
 	if pill then
 		-- (and for a training ride's ✕ Stop, which sits top right)

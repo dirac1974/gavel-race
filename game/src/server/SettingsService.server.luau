@@ -3,6 +3,7 @@
 --   Stable visits: Friends (default) or Nobody (D-042); the plot's walls follow it.
 --   Break reminder: optional, off by default (D-045).
 --   Sound: on by default; Off mutes the client's effects and announcer (Sound.luau).
+--   Seen (D-075): the "New!" pointers and the queue card's ❓ strip, each shown once (FindIt.SEEN_IDS).
 --   Smart Steer: on by default; Off means your race horse changes lane only when you press ◀ ▶ (D-054).
 --   Play time this week: counted while playing, shown in the For grown-ups panel (D-045).
 --   The first-ten-minutes tour (D-049): each step finishes when the player does the thing
@@ -14,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tour = require(Shared:WaitForChild("Tour"))
+local FindIt = require(Shared:WaitForChild("FindIt"))
 local Profiles = require(script.Parent:WaitForChild("Profiles"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 
@@ -61,11 +63,22 @@ Profiles.addDecorator(function(data, view)
 	view.settings.breakReminder = data.settings.breakReminder
 end)
 
+local seenCount: { [Player]: number } = {}
 SetSetting.OnServerEvent:Connect(function(player: Player, key: any, value: any)
-	if os.clock() - (last[player] or 0) < 0.3 then return end
-	last[player] = os.clock()
 	local data = Profiles.get(player)
 	if not data then return end
+	-- "seen" (D-075) has its own bucket so a pointer's save is never dropped by another setting's limit:
+	-- bounded by FindIt.SEEN_IDS, so at most that many saves a session matter.
+	if key == "seen" then
+		if typeof(value) ~= "string" or not FindIt.SEEN_IDS[value] or data.flags[FindIt.seenKey(value)] then return end
+		seenCount[player] = (seenCount[player] or 0) + 1
+		if seenCount[player] > 64 then return end
+		data.flags[FindIt.seenKey(value)] = true -- a "New!" pointer or the ❓ strip, shown once
+		Profiles.changed(player)
+		return
+	end
+	if os.clock() - (last[player] or 0) < 0.3 then return end
+	last[player] = os.clock()
 	ensure(data)
 	if key == "visits" and typeof(value) == "string" and VISITS[value] then
 		data.settings.visits = value
@@ -116,4 +129,7 @@ task.spawn(function()
 	end
 end)
 
-Players.PlayerRemoving:Connect(function(player: Player) last[player] = nil end)
+Players.PlayerRemoving:Connect(function(player: Player)
+	last[player] = nil
+	seenCount[player] = nil
+end)

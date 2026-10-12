@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local QueueView = require(Shared:WaitForChild("QueueView"))
 local RaceRating = require(Shared:WaitForChild("RaceRating"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
@@ -55,7 +56,8 @@ local slideIn = Ui.fitPanel(panel, W, H) -- never shrinks text under 14 px: scro
 local QCARD = GameConfig.queueCard or {}
 local moreChoices = QCARD.enabled ~= false and QCARD.oneTapRace ~= false
 -- The title sits between the 👫 Friends button (left, 160 px) and the ✕ (D-068: never under them).
-Ui.text(panel, if moreChoices then "🔀 More choices" else "🏁 Pick a race", 32, { Position = UDim2.new(0, 170, 0, 12), Size = UDim2.new(1, -340, 0, 38) })
+-- Find it (D-075): "Pick a race" (🔀 Pick opens it before you join), and Join names the line.
+Ui.text(panel, if moreChoices then "🔀 Pick a race" else "🏁 Pick a race", 32, { Position = UDim2.new(0, 170, 0, 12), Size = UDim2.new(1, -340, 0, 38) })
 local closeBtn = Ui.closeButton(panel, UDim2.new(1, -TAP - 10, 0, 6), TAP)
 
 local cardRow = Instance.new("Frame")
@@ -85,7 +87,7 @@ hl.Padding = UDim.new(0, 10)
 hl.Parent = horseRow
 
 local renderCards, renderHorses, renderKinds -- defined below; the buttons call them
-local joinBtn = Ui.button(panel, "Join!", UDim2.fromOffset(250, TAP), UDim2.new(1, -266, 1, -TAP - 16), C.orange, 28)
+local joinBtn = Ui.button(panel, "Join!", UDim2.fromOffset(250, TAP), UDim2.new(1, -266, 1, -TAP - 16), C.orange, 24)
 
 -- Race kind for an open card: a regular race, the Cup (when the horse has the points, or
 -- is too strong for its league), or Practice (free, no prizes, open to tired horses too).
@@ -263,6 +265,10 @@ renderKinds = function()
 	end
 	-- No "pts" (D-064): the Cup button is grey with a 🔒 until the Cup is open.
 	kindButtons.cup.Text = if kindAllowed.cup then "🏆 Cup" else "🏆 Cup 🔒"
+	-- Join says which line it puts you in (D-075): "Join Bronze line", "Join Practice line".
+	if pickedCourse or (leagueQueues() and h ~= nil) then
+		joinBtn.Text = QueueView.joinWord((card and card.league) or (h and h.league) or "Rookie", pickedKind)
+	end
 end
 
 local function raceCard(c)
@@ -378,7 +384,8 @@ renderCards = function(force: boolean?)
 	for _, c in cards do raceCard(c) end
 	renderKinds()
 	local canWait = leagueQueues() and h ~= nil -- no card for us: wait in our league's line
-	joinBtn.Text = if pickedCourse then "Join!" elseif canWait then "Join the line!" else "Pick a race"
+	joinBtn.Text = if pickedCourse or canWait then QueueView.joinWord((cardFor(pickedCourse or "") or {}).league or (h and h.league) or "Rookie", pickedKind)
+		else "Pick a race"
 	joinBtn.BackgroundColor3 = if pickedCourse or canWait then C.orange else C.shade
 end
 renderHorses = function()

@@ -22,7 +22,7 @@ local Ui = require(script.Parent:WaitForChild("Ui"))
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local RaceState = require(script.Parent:WaitForChild("RaceState"))
 local TrainingState = require(script.Parent:WaitForChild("TrainingState"))
-local Guide = require(script.Parent:WaitForChild("Guide"))
+local GoTo = require(script.Parent:WaitForChild("GoTo"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Tour = require(Shared:WaitForChild("Tour"))
 local WorldLayout = require(Shared:WaitForChild("WorldLayout"))
@@ -215,20 +215,11 @@ local inLine = false
 local skipAsked = 0 -- os.clock() of the first ✕ tap (skipConfirm), 0 = not asked
 
 local function goTo(go: string?)
-	if go == "stable" then
-		local i = player:GetAttribute("PlotIndex")
-		if i then
-			local x, z = WorldLayout.plotPoint(i, 40, 0)
-			Guide.to(x, z)
-		end
-	elseif go == "race" then -- the tour's first GO: the RACE! button's one tap (D-063)
+	if go == "race" then -- the tour's first GO: the RACE! button's one tap (D-063)
 		local quick = HudEvents:FindFirstChild("QuickRace")
 		if quick then quick:Fire() end
-	elseif go == "raceBoard" then
-		local p = WorldLayout.places.raceBoard
-		Guide.to(p.x, p.z + 10)
-		local picker = HudEvents:FindFirstChild("OpenRacePicker")
-		if picker then picker:Fire() end
+	elseif go then -- (D-075) walk or a trip, then open what's there (GoTo)
+		GoTo.place(go)
 	end
 end
 

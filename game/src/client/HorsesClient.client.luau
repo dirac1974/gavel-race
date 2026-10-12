@@ -22,6 +22,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
+local GoTo = require(script.Parent:WaitForChild("GoTo")) -- Find it (D-075): GO opens this feature
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local NameGen = require(Shared:WaitForChild("NameGen"))
@@ -431,6 +432,19 @@ local function listingCard(id: string)
 		marketSlide()
 	end
 end
+
+-- GO to the Market (D-075): the first horse still for sale says hello (its card, as the corral's Look).
+-- Never right after a race or around one (hard rule 3): a listing card is a purchase.
+GoTo.register("market", function()
+	if require(script.Parent:WaitForChild("RaceState")).shopClosed(GameConfig.findIt.pointers.afterRaceSeconds) then return end
+	local d = PlayerState.data
+	for _, x in (d and d.market and d.market.listings) or {} do
+		if not x.bought then
+			listingCard(x.id)
+			return
+		end
+	end
+end)
 
 local function attachListing(m: Instance)
 	local id = m:GetAttribute("ListingId")

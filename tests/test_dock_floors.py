@@ -25,7 +25,8 @@ def test_floor_constants():
     assert ui["minTouchPx"] >= 56
     assert ui["minTextPx"] >= 14
     assert ui["labelPx"] >= 16
-    assert ui["dockPhoneItems"] == 3
+    assert ui["dockPhoneItems"] in (3, 5)  # D-075: the five-item phone dock (3 = the D-064 short dock)
+    assert ui["pickStripPx"] >= 64 and ui["phonePortraitPx"] >= 64
 
 
 def test_smallest_scale_keeps_the_floors():
@@ -34,6 +35,7 @@ def test_smallest_scale_keeps_the_floors():
     assert scale * px["BUTTON_PX"] >= 56
     assert scale * px["LEAVE_PX"] >= 56
     assert scale * px["LABEL_PX"] >= 14
+    assert scale * ui["pickStripPx"] >= 56  # the 🔀 Pick strip beside RACE! (D-075)
 
 
 def test_hud_uses_the_floors():

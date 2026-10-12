@@ -989,6 +989,11 @@ end)
 local lastTravel: { [Player]: number } = {}
 local function canTravel(player: Player): boolean
 	if player:GetAttribute("Racing") then return false end
+	-- (D-075) never a trip from a race line or a training ride, as GoTo's client rule (hoofprints there)
+	if player:GetAttribute("InLine") or player:GetAttribute("TrainingRide") then
+		Profiles.notify(player, "Follow the hoofprints after your race!", "hoofprint")
+		return false
+	end
 	-- Still on a race horse after your race: its results card's Done gets you off (D-056).
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	local seat = humanoid and humanoid.SeatPart
@@ -999,7 +1004,7 @@ local function canTravel(player: Player): boolean
 	return true
 end
 Travel.OnServerEvent:Connect(function(player: Player, dest: any)
-	if typeof(dest) ~= "string" or not table.find(WorldLayout.MAP, dest) then return end
+	if not WorldLayout.isTravelDest(dest) then return end -- every Map place but the barns list (D-075)
 	if (lastTravel[player] or 0) > os.clock() - 1.5 then return end
 	lastTravel[player] = os.clock()
 	if not canTravel(player) then return end

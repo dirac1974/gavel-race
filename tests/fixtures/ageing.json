@@ -1,0 +1,8378 @@
+{
+ "live": {
+  "cfg": {
+   "veteranAt": 350,
+   "declinePer": 50,
+   "declineCap": 4,
+   "declineScale": 1,
+   "youngRaces": 30,
+   "youngTrainMult": 1.25,
+   "warnAhead": 10,
+   "peakShare": 0.9
+  },
+  "rows": [
+   {
+    "races": -5,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 400,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 470,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 650,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 400,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 470,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 650,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 399,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 469,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 649,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 391,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 461,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 641,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 371,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 441,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 621,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 30,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 370,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 440,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 620,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 369,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 439,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 619,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 61,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 131,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 311,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 60,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 130,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 310,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 51,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 121,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 301,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 120,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 300,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 49,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 119,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 299,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 81,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 261,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 80,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 260,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 71,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 251,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 70,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 250,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 49,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 69,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 249,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 201,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 200,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 151,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 150,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 31,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 111,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 30,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 110,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 101,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 100,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 19,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 99,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   }
+  ],
+  "peaks": [
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   }
+  ]
+ },
+ "on": {
+  "cfg": {
+   "veteranAt": 350,
+   "declinePer": 50,
+   "declineCap": 4,
+   "declineScale": 1,
+   "youngRaces": 30,
+   "youngTrainMult": 1.25,
+   "warnAhead": 10,
+   "peakShare": 0.9
+  },
+  "rows": [
+   {
+    "races": -5,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 400,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 470,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 650,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 400,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 470,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 650,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 399,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 469,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 649,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 391,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 461,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 641,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 371,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 441,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 621,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 30,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 370,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 440,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 620,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 369,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 439,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 619,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 61,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 131,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 311,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 60,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 130,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 310,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 51,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 121,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 301,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 120,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 300,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 49,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 119,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 299,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 81,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 261,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 80,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 260,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 71,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 251,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 70,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 250,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 49,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 69,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 249,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 201,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 200,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 151,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 150,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 31,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 111,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 30,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 110,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 101,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 100,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 19,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 99,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   }
+  ],
+  "peaks": [
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   }
+  ]
+ },
+ "half": {
+  "cfg": {
+   "veteranAt": 350,
+   "declinePer": 50,
+   "declineCap": 4,
+   "declineScale": 0.5,
+   "youngRaces": 30,
+   "youngTrainMult": 1.25,
+   "warnAhead": 10,
+   "peakShare": 0.9
+  },
+  "rows": [
+   {
+    "races": -5,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 400,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 470,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 650,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 400,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 470,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 650,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 399,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 469,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 649,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 391,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 461,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 641,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 371,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 441,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 621,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 30,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 370,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 440,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 620,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 369,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 439,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 619,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 61,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 131,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 311,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 60,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 130,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 310,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 51,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 121,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 301,
+    "warn": false,
+    "vetSoon": true,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 120,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 300,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 49,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 119,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 299,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 81,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 261,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 80,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 260,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 71,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 251,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -0.5,
+    "raced": 61.0,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 70,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 250,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -0.5,
+    "raced": 61.0,
+    "practice": 61.5,
+    "next": 49,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 69,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 249,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -0.5,
+    "raced": 61.0,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 201,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 200,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -0.5,
+    "raced": 61.0,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 151,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -1.5,
+    "raced": 60.0,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -0.5,
+    "raced": 61.0,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 150,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -1.5,
+    "raced": 60.0,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 31,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 111,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -1.5,
+    "raced": 60.0,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 30,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 110,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -1.5,
+    "raced": 60.0,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 101,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 100,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -1.0,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 19,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 99,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -1.5,
+    "raced": 60.0,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 50,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -2.0,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   }
+  ],
+  "peaks": [
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   }
+  ]
+ },
+ "systems": {
+  "cfg": {
+   "veteranAt": 300,
+   "declinePer": 25,
+   "declineCap": 6,
+   "declineScale": 1,
+   "youngRaces": 30,
+   "youngTrainMult": 1.25,
+   "warnAhead": 10,
+   "peakShare": 0.9
+  },
+  "rows": [
+   {
+    "races": -5,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 375,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 445,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": -5,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 625,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 375,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 445,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 0,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 625,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 374,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 444,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 1,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 624,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 366,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 436,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 9.7,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 616,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": null,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 350,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 346,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 420,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 416,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 29,
+    "from": 600,
+    "stage": "Young",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 596,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.25
+   },
+   {
+    "races": 30,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 345,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 415,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 30,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 595,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": null,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 350,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 344,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 420,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 414,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 31,
+    "from": 600,
+    "stage": "Prime",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 594,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 36,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 106,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 339,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 286,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 35,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 105,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 340,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 285,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 26,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 96,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 349,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 276,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 25,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 95,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 350,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 275,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 24,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 94,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 351,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 274,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 11,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 56,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 389,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 236,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 10,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 55,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 390,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 235,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 46,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 399,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 226,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 25,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 45,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 400,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 225,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 2,
+    "offset": -2,
+    "raced": 59.5,
+    "practice": 61.5,
+    "next": 24,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 44,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 401,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 224,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 449,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 176,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": 25,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 1,
+    "offset": -1,
+    "raced": 60.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 450,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 175,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 5,
+    "offset": -5,
+    "raced": 56.5,
+    "practice": 61.5,
+    "next": 1,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 499,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 126,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 3,
+    "offset": -3,
+    "raced": 58.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 500,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 125,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": 6,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 539,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 86,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 4,
+    "offset": -4,
+    "raced": 57.5,
+    "practice": 61.5,
+    "next": 5,
+    "warn": true,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 540,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 85,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 5,
+    "offset": -5,
+    "raced": 56.5,
+    "practice": 61.5,
+    "next": 21,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 549,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 76,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 5,
+    "offset": -5,
+    "raced": 56.5,
+    "practice": 61.5,
+    "next": 20,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 550,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 75,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 5,
+    "offset": -5,
+    "raced": 56.5,
+    "practice": 61.5,
+    "next": 19,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 551,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 74,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 600,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": 25,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": null,
+    "stage": "Veteran",
+    "steps": 0,
+    "offset": 0.0,
+    "raced": 61.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 350,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 420,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   },
+   {
+    "races": 1000000000000.0,
+    "from": 600,
+    "stage": "Veteran",
+    "steps": 6,
+    "offset": -6,
+    "raced": 55.5,
+    "practice": 61.5,
+    "next": null,
+    "warn": false,
+    "vetSoon": false,
+    "train": 1.0
+   }
+  ],
+  "peaks": [
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 45,
+     "accel": 45,
+     "stamina": 45,
+     "grit": 45
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.5836922268907563,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 349
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 72,
+     "accel": 68,
+     "stamina": 63,
+     "grit": 77
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9031372549019607,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 71.9,
+     "accel": 67.5,
+     "stamina": 63,
+     "grit": 76.5
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.8996875,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": null
+   },
+   {
+    "stats": {
+     "speed": 90,
+     "accel": 10,
+     "stamina": 70,
+     "grit": 85
+    },
+    "pot": {
+     "speed": 80,
+     "accel": 75,
+     "stamina": 70,
+     "grit": 85
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.7833333333333333,
+    "atPeak": false,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 349
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 349,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 350
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 350,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": null,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 400
+   },
+   {
+    "stats": {
+     "speed": 50,
+     "accel": 50,
+     "stamina": 50,
+     "grit": 50
+    },
+    "pot": {
+     "speed": 0,
+     "accel": 55,
+     "stamina": 55,
+     "grit": 55
+    },
+    "races": 400,
+    "from": 360,
+    "share": 0.9318181818181818,
+    "atPeak": true,
+    "update": 360
+   }
+  ]
+ }
+}

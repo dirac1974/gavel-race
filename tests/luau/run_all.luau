@@ -227,6 +227,8 @@ require("./tap_preview_tests")(check, close) -- D-071: the draw-only pre-lock pr
 require("./tap_wiring_tests")(check, close) -- D-071 wiring: RaceService, RaceView, TapCue, TapMessage
 require("./greencash_tests")(check, close) -- Green Cash sink, game half (D-070): Barn Builder
 require("./horse_jump_tests")(check, close) -- D-074: the forward hop and its air pose; D-072: steer keys in a race saddle
+require("./findit_tests")(check, close) -- Find it (fun-and-return phase 1, D-075): Map, GO, pointers, queue lines, phone dock
+require("./ageing_tests")(check, close) -- fun-and-return life arc: Ageing.luau parity with src/life_arc.py
 
 print(`{checks - failures}/{checks} checks passed`)
 if failures > 0 then process.exit(1) end

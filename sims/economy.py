@@ -200,6 +200,7 @@ def silver_report(thresholds=(600, 700, 750, 800, 1400), players: int = 200, see
 # at most about 35% at the league's ceiling.
 
 import race_rating as rr  # noqa: E402
+import life_arc as la  # noqa: E402
 
 TRAIN_K = 0.12               # Training.K
 WEEKLY_CAP = 6               # Training.WEEKLY_CAP, stat points per horse per week (a test checks)
@@ -293,17 +294,26 @@ def ladder_race(rng: random.Random, league: str, rating: float, kid: str, anchor
 
 def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
            kappa: dict | None = None, stop_at: str | None = None, purses: dict | None = None,
-           ledger: list | None = None) -> dict:
+           ledger: list | None = None, ageing: dict | None = None, min_played: int = 0,
+           trace: list | None = None, start: tuple | None = None) -> dict:
     """One horse from a fresh starter until it reaches Champion (or max_weeks). Per league:
     entry Rating, counted races to open the Cup, races in the league (Cup tries included), week
     and races played when it moved up, cash, and the live win chance over its first and last ten
     regular races there. With `ledger` (a list) it runs all max_weeks and appends (league, race
-    cash) per session; `purses` overrides LEAGUE_B (Green Cash sim, D-070)."""
+    cash) per session; `purses` overrides LEAGUE_B (Green Cash sim, D-070). `ageing` (a
+    life_arc.AGEING dict) adds the Youngster training boost and the Veteran decline to rated races;
+    `min_played` keeps a Champion horse racing until that many counted races; `trace` collects
+    (counted races before, league, live win chance, place, cash, Cup, raced Rating, declineFrom) per race (sims/lifearc.py);
+    `start` = (stats, potential) races a Market horse instead of a starter."""
     purses = purses or LEAGUE_B
     anchors, stakes, ceilings = params["anchors"], params["stakes"], params["ceilings"]
-    stats = {k: float(STARTER_STAT) for k in rr.STATS}
-    potential = {k: rng.randint(*POTENTIAL) for k in rr.STATS}
+    if start:
+        stats, potential = {k: float(v) for k, v in start[0].items()}, dict(start[1])
+    else:
+        stats = {k: float(STARTER_STAT) for k in rr.STATS}
+        potential = {k: rng.randint(*POTENTIAL) for k in rr.STATS}
     bond, league, points, played, best = 0.0, "Rookie", 0, 0, None
+    decline_from = None
     out = {lg: {"entry_rating": None, "unlock": None, "races": 0, "week": None, "played": None, "cash": 0,
                 "p": [], "wins": 0, "regular": 0, "first_win": False, "closed": False, "closed_at_entry": False,
                 "cup_p": []} for lg in LEAGUES}
@@ -315,7 +325,8 @@ def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
         for s in range(prof.sessions):
             rides = (1 if s in sessions_with_ride else 0) + (extra_rides if s == 0 else 0)
             if rides and gained < WEEKLY_CAP - 1e-9:
-                gained += _train_rides(stats, potential, rides, prof.train_score, WEEKLY_CAP - gained)
+                mult = la.train_mult(played, ageing) if ageing else 1.0
+                gained += _train_rides(stats, potential, rides, prof.train_score, WEEKLY_CAP - gained, mult)
                 best = None
             bond = min(BOND_CAP, bond + prof.bond)
             before = sum(x["cash"] for x in out.values())
@@ -336,15 +347,19 @@ def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
                 cond = {"distance": rng.choice(_distances(league)), "surface": rng.choice(SURFACES),
                         "weather": rng.choice(WEATHERS)}
                 rating = rr.rating(stats, cond, prof.care, 0, None, bond / BOND_CAP)
+                if ageing:
+                    decline_from = la.update_decline_from(decline_from, played, stats, potential, ageing)
+                    rating = la.raced_rating(rating, played, decline_from, False, ageing)
                 place, p0, q0 = ladder_race(rng, league, rating, prof.kid, anchors,
                                             (kappa or {}).get(league, 1.0))
                 lg["races"] += 1
-                played += 1
                 B = purses[league]
-                if place == 1:
-                    lg["cash"] += CUP_PURSE_B * B if cup_open else math.floor(B / q0 + 0.5)
-                elif place <= 4:
-                    lg["cash"] += round(B * PLACE_PRIZES[place - 2])
+                won = (CUP_PURSE_B * B if cup_open else math.floor(B / q0 + 0.5)) if place == 1 else (
+                    round(B * PLACE_PRIZES[place - 2]) if place <= 4 else 0)
+                lg["cash"] += won
+                if trace is not None:
+                    trace.append((played, league, p0, place, won, cup_open, rating, decline_from))
+                played += 1
                 if cup_open:
                     lg["cup_p"].append(p0)
                     if place == 1:
@@ -367,12 +382,13 @@ def career(rng: random.Random, prof: Profile, params: dict, max_weeks: int = 60,
                         points += FIRST_WIN_BONUS
             if ledger is not None:
                 ledger.append((league, sum(x["cash"] for x in out.values()) - before))
-        if ledger is None and league == "Champion" and out["Champion"]["races"] >= 30:
+        if ledger is None and league == "Champion" and out["Champion"]["races"] >= 30 and played >= min_played:
             break
     return out
 
 
-def _train_rides(stats: dict, potential: dict, rides: int, score: float, cap_left: float) -> float:
+def _train_rides(stats: dict, potential: dict, rides: int, score: float, cap_left: float,
+                 mult: float = 1.0) -> float:
     gained = 0.0
     for _ in range(rides):
         if gained >= cap_left - 1e-9:
@@ -381,7 +397,7 @@ def _train_rides(stats: dict, potential: dict, rides: int, score: float, cap_lef
         room = potential[stat] - stats[stat]
         if room < MIN_GAIN:
             break
-        g = TRAIN_K * room * (0.5 + 0.5 * score / 100) * RESTED_BONUS
+        g = TRAIN_K * room * (0.5 + 0.5 * score / 100) * RESTED_BONUS * mult
         g = min(g, room, cap_left - gained)
         g = max(math.floor(g * 10 + 0.5) / 10, MIN_GAIN)
         g = min(g, math.floor(room * 10) / 10, cap_left - gained)

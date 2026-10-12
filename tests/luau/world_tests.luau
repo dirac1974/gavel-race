@@ -2300,7 +2300,7 @@ return function(check: (boolean, string) -> (), close: (number, number, number) 
 	Profile.addHorse(rp, r2)
 	r1.record.races, r1.record.wins = 40, 9
 	check(Leagues.retire(rp, r1.id, T0) == nil, "Legend Retirement waits for a Veteran (D-059)")
-	r1.record.races = 100
+	r1.record.races = GameConfig.career.veteranAt
 	local plaque = Leagues.retire(rp, r1.id, T0)
 	check(plaque and plaque.wins == 9 and #rp.horses == 2 and r1.legend == T0 and rp.activeHorse == r2.id and rp.hallOfFame[1].name == "Old Timer",
 		"retiring keeps a Hall of Fame plaque, and the Legend stays (D-059)")

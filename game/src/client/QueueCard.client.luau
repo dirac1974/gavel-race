@@ -13,6 +13,10 @@
 --   For a player's first queueCard.warmUpRaces races the row has a "Warm up" button: a practice
 --   slider in place of the gate. It counts nothing and sends nothing to the server.
 --   Nothing here is ever scaled under the floors (14 px text, 56 px buttons).
+-- Find it (D-075): the card names your line and why ("🟠 Bronze race line · Horses like Comet race
+-- here"; QueueView.lineTitle / lineWhy from the server's LineKey and LineHorse), and the phone row
+-- reads "🟠 Bronze line · 3 riders". A ❓ opens the "how racing works" strip (HowRacing), which also
+-- shows by itself the first time you're in line.
 -- STATUS: written without Studio access; verify in Studio before relying on it.
 
 local Players = game:GetService("Players")
@@ -31,6 +35,7 @@ local QueueView = require(Shared:WaitForChild("QueueView"))
 local DockLayout = require(Shared:WaitForChild("DockLayout"))
 local PanelFit = require(Shared:WaitForChild("PanelFit"))
 local PaceMeter = require(Shared:WaitForChild("PaceMeter"))
+local HowRacing = require(script.Parent:WaitForChild("HowRacing"))
 local raceRemotes = ReplicatedStorage:WaitForChild("RaceRemotes")
 
 local CFG = GameConfig.queueCard or {}
@@ -49,7 +54,7 @@ end
 
 -- Layout (unscaled px). The full card's smallest text is 16 px and its smallest button 64 px, so
 -- its shrink floor (PanelFit.floor) keeps them at 14 and 56 rendered.
-local W, H = 672, 156
+local W, H = 672, 178
 local RING, DOTS = 104, 20
 local SLOT_W, SLOT_H, GAP = 110, 38, 6
 local MIN_SCALE = PanelFit.floor(16, 64, GameConfig.ui)
@@ -94,9 +99,13 @@ local bigNum = Ui.text(ring, "", 44, { Size = UDim2.fromOffset(RING - 30, 52), P
 
 local left = 10 + RING + 12
 local right = 10 + 64 + 10 -- the button column
-local title = Ui.text(full, "", 26, { Position = UDim2.fromOffset(left, 6), Size = UDim2.new(1, -(left + right), 0, 30),
+local HELP = 64 -- the ❓ beside the ✕ (the card's 64 px button floor: it shrinks to 0.875 at most)
+local title = Ui.text(full, "", 26, { Position = UDim2.fromOffset(left, 6), Size = UDim2.new(1, -(left + right + HELP + 8), 0, 30),
 	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
-local subtitle = Ui.text(full, "", 18, { Position = UDim2.fromOffset(left, 36), Size = UDim2.new(1, -(left + right), 0, 22),
+-- Which line, and why (D-075): "🟠 Bronze race line", then "Horses like Comet race here".
+local lineName = Ui.text(full, "", 18, { Position = UDim2.fromOffset(left, 36), Size = UDim2.new(1, -(left + right + HELP + 8), 0, 22),
+	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+local subtitle = Ui.text(full, "", 16, { Position = UDim2.fromOffset(left, 60), Size = UDim2.new(1, -(left + right + HELP + 8), 0, 20),
 	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 subtitle.TextColor3 = C.plum
 
@@ -104,7 +113,7 @@ subtitle.TextColor3 = C.plum
 local hoofRow = Instance.new("Frame")
 hoofRow.BackgroundTransparency = 1
 hoofRow.Size = UDim2.new(1, -(left + right), 0, 24)
-hoofRow.Position = UDim2.fromOffset(left, 35)
+hoofRow.Position = UDim2.fromOffset(left, 58)
 hoofRow.Visible = false
 hoofRow.Parent = full
 local hl = Instance.new("UIListLayout")
@@ -123,7 +132,7 @@ goLabel.TextColor3 = C.textWarn
 -- The gate: two rows of four slots (lane order), each a coat dot and the horse's name.
 local gate = Instance.new("Frame")
 gate.BackgroundTransparency = 1
-gate.Position = UDim2.fromOffset(left, 62)
+gate.Position = UDim2.fromOffset(left, 84)
 gate.Size = UDim2.fromOffset(4 * SLOT_W + 3 * GAP, 2 * SLOT_H + GAP)
 gate.Parent = card
 local grid = Instance.new("UIGridLayout")
@@ -164,6 +173,10 @@ moreBtn.Activated:Connect(function()
 	local open = events and events:FindFirstChild("OpenRacePicker")
 	if open then open:Fire() end
 end)
+-- ❓ how racing works (D-075): three pictures, any time.
+local helpBtn = Ui.button(card, "❓", UDim2.fromOffset(HELP, HELP), UDim2.new(1, -74 - HELP - 8, 0, 12), C.white, 26)
+helpBtn.ZIndex = 3
+helpBtn.Activated:Connect(function() HowRacing.open() end)
 
 -- Compact phone row ----------------------------------------------------------------------------
 local row = Instance.new("Frame")
@@ -181,17 +194,17 @@ Ui.corner(secs, (ROW_H - 12) // 2)
 local secsStroke = Ui.stroke(secs, 3, C.orange)
 secs.Parent = row
 local secsText = Ui.text(secs, "", 24, { Size = UDim2.fromScale(1, 1), TextWrapped = false })
-local line = Ui.text(row, "", 20, { Position = UDim2.fromOffset(ROW_H + 2, 0), Size = UDim2.new(1, -(ROW_H + 2) - 72, 1, 0),
+local line = Ui.text(row, "", 20, { Position = UDim2.fromOffset(ROW_H + 2, 0), Size = UDim2.new(1, -(ROW_H + 2) - 72 - 70, 1, 0),
 	TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
 -- Tap the row to open or close the gate (the ✕ and Warm up sit on top of it).
 local rowHit = Instance.new("TextButton")
 rowHit.Name = "OpenGate"
 rowHit.BackgroundTransparency = 1
 rowHit.Text = ""
-rowHit.Size = UDim2.new(1, -72, 1, 0)
+rowHit.Size = UDim2.new(1, -72 - 70, 1, 0)
 rowHit.ZIndex = 2
 rowHit.Parent = row
-local warmBtn = Ui.button(row, "🎯 Warm up", UDim2.fromOffset(132, BTN), UDim2.new(1, -72 - 140, 0.5, -BTN / 2), C.gold, 18)
+local warmBtn = Ui.button(row, "🎯 Warm up", UDim2.fromOffset(132, BTN), UDim2.new(1, -72 - 70 - 140, 0.5, -BTN / 2), C.gold, 18)
 warmBtn.ZIndex = 3
 warmBtn.Visible = false
 
@@ -281,6 +294,7 @@ local function arrange(width: number)
 		moreBtn.Position = UDim2.new(1, -72, 0, ROW_H + 4)
 		leaveBtn.Size = UDim2.fromOffset(BTN, BTN)
 		leaveBtn.Position = UDim2.new(1, -BTN - 8, 0, (ROW_H - BTN) // 2)
+		helpBtn.Position = UDim2.new(1, -BTN - 8 - HELP - 6, 0, (ROW_H - HELP) // 2)
 		warm.Position = UDim2.fromOffset(8, ROW_H + 4)
 		warm.Size = UDim2.new(1, -16, 0, 64)
 		gate.Visible = opened and not warming
@@ -289,13 +303,14 @@ local function arrange(width: number)
 		card.Size = UDim2.fromOffset(width, ROW_H + (if opened then EXTRA_H else 0))
 	else
 		grid.CellSize = UDim2.fromOffset(SLOT_W, SLOT_H)
-		gate.Position = UDim2.fromOffset(left, 62)
+		gate.Position = UDim2.fromOffset(left, 84)
 		gate.Size = UDim2.fromOffset(4 * SLOT_W + 3 * GAP, 2 * SLOT_H + GAP)
 		moreBtn.Position = UDim2.new(1, -74, 0, 78)
 		leaveBtn.Size = UDim2.fromOffset(64, 64)
 		leaveBtn.Position = UDim2.new(1, -74, 0, 8)
+		helpBtn.Position = UDim2.new(1, -74 - HELP - 8, 0, 12)
 		-- the warm-up (desktop and tablet): in place of the gate, under the title
-		warm.Position = UDim2.fromOffset(left, 70)
+		warm.Position = UDim2.fromOffset(left, 92)
 		warm.Size = UDim2.new(1, -(left + right), 0, 64)
 		gate.Visible = not warming
 		warm.Visible = warming
@@ -376,7 +391,7 @@ RunService.Heartbeat:Connect(function()
 	if not offerWarm then warming = false end
 	warmBtn.Visible = compact and offerWarm
 	if warmBtn.Visible then warmBtn.Text = if warming then "🎯 Done" else "🎯 Warm up" end
-	line.Size = UDim2.new(1, -(ROW_H + 2) - 72 - (if warmBtn.Visible then 140 else 0), 1, 0)
+	line.Size = UDim2.new(1, -(ROW_H + 2) - 72 - 70 - (if warmBtn.Visible then 140 else 0), 1, 0)
 	if compact then
 		scale.Scale = 1 -- the row is built at the floors: never shrunk
 	else
@@ -395,8 +410,16 @@ RunService.Heartbeat:Connect(function()
 	arrange(if compact then width else W)
 	title.Text = v.title
 	title.TextSize = if racetime then 30 else 26
-	subtitle.Text = if warming and not compact then "Practice taps: they don't count" else v.subtitle
-	line.Text = QueueView.compactLine(v)
+	-- (D-075) row 2 names the line, row 3 says why; the open gate slots say "🤖 at 0" in its place.
+	local key = player:GetAttribute("LineKey")
+	local why = QueueView.lineWhy(key, player:GetAttribute("LineHorse"), (GameConfig.queue or {}).practiceEqualHorses == true)
+	lineName.Text = QueueView.lineTitle(key)
+	lineName.Visible = not racetime
+	subtitle.Text = if warming and not compact then "Practice taps: they don't count" elseif why ~= "" then why else v.subtitle
+	local short = QueueView.lineShort(key)
+	line.Text = if short ~= "" then QueueView.compactLine(v, short) else QueueView.compactLine(v)
+	helpBtn.Visible = not racetime
+	if v.showLeave then HowRacing.maybeAuto() end -- the first time in line, once
 	secsText.Text = if racetime then "GO" elseif v.seconds then tostring(v.seconds) else "🏇"
 	secsStroke.Color = if v.seconds and v.seconds <= 5 then C.orangeDark else C.orange
 	secsText.TextColor3 = if v.seconds and v.seconds <= 5 then C.textWarn else C.ink
@@ -445,7 +468,7 @@ RunService.Heartbeat:Connect(function()
 		else
 			ui.frame.BackgroundColor3 = C.cream
 			ui.dot.Visible = false
-			ui.name.Text = if racetime then "🤖 bot" else "open"
+			ui.name.Text = if racetime then "🤖 bot" elseif v.phase == "countdown" then "🤖 at 0" else "open"
 			ui.name.TextTransparency = 0.45
 			ui.stroke.Transparency = 0.6
 		end

@@ -329,12 +329,18 @@ GameConfig.touchLayout = {
 -- Phones first (D-064, stage 1): rendered floors for the dock, whatever the screen. fitDock never
 -- scales a button below minTouchPx or a label below minTextPx; on a phone the dock is the horse
 -- card, RACE! and ☰ More (dockPhoneItems = 3), and everything else moves into More.
--- dockPhoneItems = 5 keeps today's touch dock (with the floors).
+-- dockPhoneItems = 5 (D-075) is the five-item phone dock; 6 or more keeps the full dock on phones too.
 GameConfig.ui = {
 	minTouchPx = 56,
 	minTextPx = 14,
 	labelPx = 16,
-	dockPhoneItems = 3,
+	dockPhoneItems = 5,   -- Find it (D-075): horse, RACE! with 🔀 Pick, Map, Jobs, ☰ More (3 = the D-064 short dock)
+	pickStripPx = 64,     -- Find it: the 🔀 Pick strip beside RACE!, unscaled
+	phonePortraitPx = 70, -- Find it: the phone dock's horse portrait (coat dot over Energy pips), unscaled
+	dockShrinkOrder = { "jobs", "map" }, -- Find it: on a phone too narrow for five, these go into ☰ More, in order
+	portraitTap = true,   -- Find it: tap the portrait for My Horses (a thumbstick drag from it still walks); false = display-only (D-056)
+	portraitTapMovePx = 10, -- a touch that moves further than this is a drag, not a tap
+	portraitTapSeconds = 0.5, -- a touch held longer than this is not a tap
 	phoneShortSide = 500, -- a screen whose shorter side is at most this many px is a phone
 	toastMaxWords = 10,   -- stage 3 (D-064): every toast at most this many words (Words.toastOk)
 	panelMinText = 16,    -- stage 3: the smallest text on the big panels (picker, Stable Board, My Horses), unscaled
@@ -443,6 +449,29 @@ GameConfig.tapCue = { enabled = true, messageSeconds = 1.6, waitSeconds = 2.5, s
 -- raceFirstUntilRaces (AAA Phase 2, D-067): until a player has run this many races, the pill puts
 -- "Race with Comet!" before feeding, brushing and jobs (0 = the stage 3 order).
 GameConfig.nextThing = { enabled = true, pipHintSeconds = 20, stillStuds = 6, raceFirstUntilRaces = 3 }
+-- Find it (fun-and-return phase 1, D-075, provisional). FindIt.luau holds the rules; Lune tests them.
+--   map: the Map's 5 × 3 grid of tiles (WorldLayout.MAP), each tileW × tileH px with an iconPx icon
+--     over a wordPx word and one plum "what to do here" line (hintPx, at most hintWords words).
+--   goTo: GO walks with hoofprints when the place is at most walkMaxStuds away, else fades to Paper
+--     over fadeSeconds, travels there (the Map's own trip) and opens the feature. In a race line or a
+--     race it only draws hoofprints. arriveStuds: a walk opens the feature this close to the place.
+--     travelWaitSeconds: the most a teleport waits for the trip before it opens anyway.
+--   pointers: "New!" first-time pointers, at most one per gapSeconds, never on the tour, in line,
+--     racing or within afterRaceSeconds of your race. showSeconds on screen (or its GO) marks it seen
+--     (saved in the profile). ringSeconds: the gold ring round the dock button, pulsing at ringHz.
+--     The *Races keys are how many races a player has run before that pointer can show.
+--   howRacing: the queue card's ❓ strip (3 pictures), shown by itself once, the first time in line.
+--   signpost: the Fair Street signpost past the fountain, in view as a new player arrives (WorldLayout
+--     .arrival("plaza") faces east), built from parts (no uploads), one arm per place, each pointing at it.
+GameConfig.findIt = {
+	map = { tileW = 116, tileH = 96, gapPx = 8, headerPx = 64, iconPx = 48, wordPx = 18, hintPx = 16, hintWords = 2, columns = 5 },
+	goTo = { walkMaxStuds = 120, fadeSeconds = 0.3, arriveStuds = 14, travelWaitSeconds = 1.5, openDelaySeconds = 0.2 },
+	pointers = { enabled = true, gapSeconds = 180, afterRaceSeconds = 120, showSeconds = 20, ringSeconds = 6, ringHz = 1,
+		pickRaces = 3, bookRaces = 2, trainRaces = 3, builderRaces = 4, marketRaces = 6, visitRaces = 10 },
+	howRacing = { enabled = true, autoOnce = true, picturePx = 150, pictureW = 180 },
+	signpost = { enabled = true, x = 745, zOffset = 14, postHeight = 22, armLength = 15, armStep = 2.6,
+		arms = { "track", "stable", "feedStore", "vet", "market", "paddock" } },
+}
 -- Green Cash sink (D-070, provisional): Barn Builder at Feed & Seed (BarnCatalog, Green Cash only).
 -- enabled = false hides the counter and its pill (owned things stay in the yard). wishChip: the wished
 -- item's icon and bar on the cash card. pillAfterRaceSeconds: no "You can build" pill or shelf note this
@@ -654,7 +683,7 @@ GameConfig.comeback = {
 	studioMonthStamps = 0,
 }
 
--- Careers (D-059, stage 7): no ageing and no decline. A career badge every badgeEvery races; a
+-- Careers (D-059, stage 7; stats never drop, ageing below only changes the raced Rating). A career badge every badgeEvery races; a
 -- Veteran at veteranAt races may take an opt-in Legend Retirement (two taps; suggested once per
 -- horse): it moves to the Hall of Fame paddock beside the barn, keeps its stats, can still be
 -- ridden, and frees its stall. legacyMax is the most Potential a Legend passes to one foal once
@@ -667,7 +696,7 @@ GameConfig.career = {
 	enabled = true,
 	suggest = false,
 	badgeEvery = 25,
-	veteranAt = 100,
+	veteranAt = 350,                 -- = ageing.veteranAt (one "Veteran", fun-and-return ruling 3; was 100, D-059)
 	legacyMax = 2,
 	retireNeedsVeteran = true,
 	paddockShown = 4,                -- Legends standing in the paddock (the Hall of Fame list keeps them all)
@@ -684,6 +713,34 @@ GameConfig.rehome = {
 	undoHours = 72,
 	maxWaiting = 10,                 -- horses waiting at the school for an undo (then it's full until one settles in or comes back)
 	school = "Sunny Meadow Riding School",
+}
+
+-- Ageing (fun-and-return 2026-10-12; David asked for horses that age; numbers provisional). Counted
+-- races only, never Practice. Young: training × youngTrainMult for the first youngRaces races. Veteran
+-- at veteranAt (= career.veteranAt, a test checks). Decline counts from h.ageing.declineFrom, stored
+-- once when the horse first has veteranAt races and stats at peakShare of Potential (never un-set):
+-- −declineScale Race Rating per declinePer races, at most declineCap steps; rated races only, never
+-- League Points, ceilings or stats.
+-- Warned warnAhead races before each step. declineScale 0 = stages only. Mirrors src/life_arc.py
+-- (Ageing.luau; tests/test_life_arc.py checks these values).
+GameConfig.ageing = {
+	veteranAt = 350,
+	declinePer = 50,
+	declineCap = 4,
+	declineScale = 1,                -- 1 = real decline (sims/lifearc.py --ageing, provisional); 0 = stages only
+	youngRaces = 30,
+	youngTrainMult = 1.25,
+	warnAhead = 10,
+	peakShare = 0.90,                -- decline waits for stats at this share of Potential (h.ageing.declineFrom)
+}
+
+-- Selling at the Riding School (fun-and-return 2026-10-12): rehome.share of the price paid plus
+-- min(perWin × wins + perCup × Cups, recordBonusCap). recordBonusCap from `python sims/lifearc.py
+-- --sell` (no buy-race-sell loop). Mirrors src/life_arc.py SELL.
+GameConfig.sell = {
+	perWin = 5,
+	perCup = 100,
+	recordBonusCap = 100,            -- < half the cheapest Market horse (250): a sale never pays more than the price
 }
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and

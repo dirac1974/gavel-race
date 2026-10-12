@@ -32,6 +32,7 @@ local TweenService = game:GetService("TweenService")
 local ContextActionService = game:GetService("ContextActionService")
 
 local Ui = require(script.Parent:WaitForChild("Ui"))
+local GoTo = require(script.Parent:WaitForChild("GoTo")) -- Find it (D-075): GO opens this feature
 local PlayerState = require(script.Parent:WaitForChild("PlayerState"))
 local okSound, Sound = pcall(require, script.Parent:WaitForChild("Sound", 5))
 if not okSound then Sound = nil end
@@ -837,6 +838,11 @@ if GameConfig.spa.enabled then -- the wash bay beside the Vet (D-058)
 	local sx, sz = WorldLayout.placePoint("vet", WorldLayout.SPA.across, WorldLayout.SPA.out)
 	promptAt("SpaPrompt", sx, sz, "Spa Day", "Wash bay", function() vetMenu(true) end)
 end
+
+-- GO (D-075): the Training and Riding Ring tiles open the Train menu; the Vet & Spa tile the vet card.
+GoTo.register("train", trainingMenu)
+GoTo.register("vet", function() vetMenu(false) end)
+if GameConfig.spa.enabled then GoTo.register("spa", function() vetMenu(true) end) end
 
 -- Your queued race starting closes the paddock card (the race HUD needs the screen and keys).
 game:GetService("Players").LocalPlayer:GetAttributeChangedSignal("Racing"):Connect(function()

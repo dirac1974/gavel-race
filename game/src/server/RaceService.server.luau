@@ -271,9 +271,16 @@ local function waitStatus(player: Player)
 	QueueGate:FireClient(player, nil, gateRiders(list), GameConfig.lanes, nil, false)
 end
 
+-- Find it (D-075): the queue card names your line and why from these (QueueView.lineTitle, lineWhy).
+local function markLine(player: Player, key: string?, horseName: string?)
+	player:SetAttribute("LineKey", key)
+	player:SetAttribute("LineHorse", if key then horseName else nil)
+end
+
 local function leaveLine(player: Player)
 	if RaceQueues.leave(waits, player) then
 		player:SetAttribute("InLine", nil)
+		markLine(player, nil)
 		QueueStatus:FireClient(player, false, 0, nil, nil)
 	end
 	local c = inLine[player]
@@ -281,6 +288,7 @@ local function leaveLine(player: Player)
 	RaceTime:FireClient(player, c.id, true) -- cancels a "Race time!" already shown (D-061 stage 2)
 	inLine[player] = nil
 	player:SetAttribute("InLine", nil)
+	markLine(player, nil)
 	local i = table.find(c.queue, player)
 	if i then table.remove(c.queue, i) end
 	if #c.queue == 0 then
@@ -461,11 +469,13 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	if c then
 		if RaceQueues.cardKey(c.card) == key then -- same race, maybe another horse of the league
 			chosen[player] = h.id
+			markLine(player, key, h.name)
 			return
 		end
 		if #c.queue == 1 and c.queue[1] == player then -- alone in line: the card follows the new pick
 			chosen[player] = h.id
 			claimCard(c, h.league, kind)
+			markLine(player, RaceQueues.cardKey(c.card), h.name)
 			publishCards()
 			return
 		end
@@ -475,6 +485,7 @@ local function joinQueue(player: Player, courseId: any, horseId: any, kind: stri
 	local want = if typeof(courseId) == "string" and courses[courseId] then courseId else nil
 	RaceQueues.join(waits, player, h.league, kind, os.clock(), want)
 	player:SetAttribute("InLine", true)
+	markLine(player, key, h.name)
 	pumpQueues()
 	if RaceQueues.isWaiting(waits, player) then
 		waitStatus(player)
@@ -557,6 +568,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 			claimCard(c, wanted.league, kind)
 			publishCards()
 		end
+		markLine(player, RaceQueues.cardKey(c.card), h.name)
 		return
 	end
 	if #c.queue >= GameConfig.lanes then
@@ -568,6 +580,7 @@ JoinRace.OnServerEvent:Connect(function(player: Player, want: any, courseId: any
 	table.insert(c.queue, player)
 	inLine[player] = c
 	player:SetAttribute("InLine", true)
+	markLine(player, RaceQueues.cardKey(c.card), h.name)
 	chosen[player] = h.id
 	if not c.fillDeadline and not c.current then c.fillDeadline = os.clock() + GameConfig.lobbyFillSeconds end
 	queueStatus(c)
@@ -1401,6 +1414,7 @@ local function courseLoop(c)
 			local p = table.remove(c.queue, 1)
 			inLine[p] = nil
 			p:SetAttribute("InLine", nil)
+			markLine(p, nil)
 			table.insert(racers, p)
 		end
 		c.fillDeadline = nil

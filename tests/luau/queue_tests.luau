@@ -261,7 +261,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	-- Dock floors (D-064): never under 56 px buttons or 14 px labels, at any width.
 	do
 		local U = GameConfig.ui
-		check(U.minTouchPx >= 56 and U.minTextPx >= 14 and U.labelPx >= 16 and U.dockPhoneItems == 3, "ui floors in GameConfig")
+		check(U.minTouchPx >= 56 and U.minTextPx >= 14 and U.labelPx >= 16 and U.dockPhoneItems == 5, "ui floors in GameConfig (D-075: the five-item phone dock)")
 		local ok = true
 		for room = 50, 2000, 25 do
 			for width = 300, 1400, 100 do

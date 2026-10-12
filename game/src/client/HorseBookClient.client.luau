@@ -41,7 +41,7 @@ do
 	slot.Name = "BookSlot"
 	slot.BackgroundTransparency = 1
 	slot.Size = UDim2.new(0, 70, 1, 0)
-	slot.LayoutOrder = 4
+	slot.LayoutOrder = require(Shared:WaitForChild("DockLayout")).ORDER.book -- (D-075: Map had 4 too)
 	slot.Parent = dock
 	-- icon + one word, like the other dock buttons (D-064)
 	local b = Ui.iconButton(slot, "", "📖", "Book", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 1, -74), C.cream)

@@ -1,3 +1,4 @@
 - [Tap preview D-071 findings](project_tap_preview_d071.md) — own-pace preview, lane-room limits, boxed riders, D-070/D-071 clash
 - [Python CRLF on Windows](feedback_windows_python_crlf.md) — scripted edits: newline='' + utf-8 or Edit tool; never sed -i
 - [Race realism D-072 findings](project_race_realism_d072.md) — boxed-share lever riderRoomFeet, rider baseline entry, gates that conflict
+- [Life arc sims](project_life_arc.md) — ageing plateau at 1.2-1.5k races, keen kids hit hardest, sell cap < half min price, vet run in Rookie

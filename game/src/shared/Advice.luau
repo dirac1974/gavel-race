@@ -85,7 +85,7 @@ local function jobReady(j: any): boolean
 end
 
 -- Barn Builder's "You can build the <item>!" (D-070): your wish is affordable, once per item (until
--- profile.style.wishTold names it), with GO to Feed & Seed. It ranks below racing first, job prizes,
+-- profile.style.wishTold names it), with GO to Barn Builder (D-075; you arrive at Feed & Seed). It ranks below racing first, job prizes,
 -- feeding, brushing and the Cup (nextThing's order). Never without a context, never while the tour
 -- runs, while you're in line, racing or training, on the results card or while Race again shows, and
 -- never within greenCash.pillAfterRaceSeconds of your race.
@@ -101,11 +101,11 @@ function Advice.buildPill(profile: any, ctx: BuildCtx?): Next?
 	local it, fill = Style.wishProgress(profile)
 	if not it or fill < 1 or not Style.tierOpen(profile, it) then return nil end
 	if typeof(profile.style) == "table" and profile.style.wishTold == it.id then return nil end
-	return { key = "build:" .. it.id, emoji = it.emoji, icon = "cash", text = "You can build the " .. it.name .. "!", go = "feedStore" }
+	return { key = "build:" .. it.id, emoji = it.emoji, icon = "cash", text = "You can build the " .. it.name .. "!", go = "barnBuilder" }
 end
 
 -- "New shelf at Barn Builder!" (D-070, the UI/UX consult): once after a horse reaches a new league
--- (bestLeague above style.shelfSeen), with GO to Feed & Seed. The same calm-moment rules as buildPill.
+-- (bestLeague above style.shelfSeen), with GO to Barn Builder. The same calm-moment rules as buildPill.
 function Advice.shelfPill(profile: any, ctx: BuildCtx?): Next?
 	local cfg = GameConfig.greenCash
 	if not cfg or cfg.enabled == false or cfg.shelfNote == false or not ctx or not profile then return nil end
@@ -114,7 +114,7 @@ function Advice.shelfPill(profile: any, ctx: BuildCtx?): Next?
 	local best = BarnCatalog.tierIndex(profile.bestLeague)
 	local seen = typeof(profile.style) == "table" and BarnCatalog.tierIndex(profile.style.shelfSeen) or nil
 	if not best or not seen or best <= seen then return nil end
-	return { key = "shelf:" .. profile.bestLeague, emoji = "🔨", icon = "cash", text = "New shelf at Barn Builder!", go = "feedStore" }
+	return { key = "shelf:" .. profile.bestLeague, emoji = "🔨", icon = "cash", text = "New shelf at Barn Builder!", go = "barnBuilder" }
 end
 
 function Advice.nextThing(profile: any, now: number, ctx: BuildCtx?): Next
