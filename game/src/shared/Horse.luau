@@ -13,7 +13,7 @@ local Horse = {}
 Horse.STATS = { "speed", "accel", "stamina", "grit" }
 Horse.COATS = { "bay", "chestnut", "grey", "black", "palomino", "pinto", "appaloosa", "buckskin", "dun", "roan", "white", "chestnut_blaze" }
 Horse.STYLES = { "FrontRunner", "Stalker", "Closer" }
-Horse.ORIGINS = { "starter", "market", "tamed", "gift" }
+Horse.ORIGINS = { "starter", "market", "tamed", "gift", "bred" } -- "bred": a foal (D-080)
 
 export type Stats = { speed: number, accel: number, stamina: number, grit: number }
 export type Care = { day: number, fed: boolean, groomed: boolean, feedAt: number, groomAt: number }
@@ -37,7 +37,8 @@ export type Horse = {
 	lastRaceAt: number,
 	daily: { day: number, treats: number, petted: boolean },
 	-- Careers and rehoming (D-059, stage 7)
-	origin: string?,   -- "starter" | "market" | "tamed" | "gift": how it came home
+	origin: string?,   -- "starter" | "market" | "tamed" | "gift" | "bred": how it came home
+	parents: { string }?, -- a bred foal's two parents' ids (D-080), kept when they leave
 	paid: number?,     -- Green Cash paid for it (0 unless bought at the market)
 	stall: number?,    -- its stall (1..stalls), nil in the pasture or as a Legend
 	legend: number?,   -- when it became a Legend (os.time()), nil while racing
@@ -221,6 +222,7 @@ function Horse.view(h: Horse, now: number, cfg: EnergyConfig): { [string]: any }
 		stamps = table.clone(h.stamps),
 		-- careers and rehoming (D-059): the client never decides with these, the server does
 		origin = h.origin,
+		parents = if typeof((h :: any).parents) == "table" then table.clone((h :: any).parents) else nil, -- (D-080)
 		paid = h.paid or 0,
 		goodbyeRosette = h.goodbyeRosette == true,
 		stall = h.stall,
@@ -274,6 +276,13 @@ function Horse.repair(h: any, now: number): Horse
 	h.name = if typeof(h.name) == "string" and #h.name > 0 then string.sub(h.name, 1, 40) else "Comet"
 	-- Careers and rehoming (D-059): where it came from, what was paid, its stall, Legend status.
 	if not table.find(Horse.ORIGINS, h.origin) then h.origin = nil end
+	-- A bred foal's parents (D-080): two horse ids, or nothing.
+	local par = h.parents
+	if typeof(par) == "table" and typeof(par[1]) == "string" and typeof(par[2]) == "string" and #par[1] <= 20 and #par[2] <= 20 then
+		h.parents = { par[1], par[2] }
+	else
+		h.parents = nil
+	end
 	h.paid = math.max(0, math.floor(tonumber(h.paid) or 0))
 	local stall = tonumber(h.stall)
 	h.stall = if stall and stall >= 1 and stall == math.floor(stall) then stall else nil

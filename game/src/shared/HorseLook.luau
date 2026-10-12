@@ -34,11 +34,39 @@ function HorseLook.of(h: any): any?
 	return look
 end
 
--- The look for a race: `wrap` is what Legs.takeWrap gave this race (wraps only when wrapsInRace).
+-- A bred foal's shape (D-080, GameConfig.foalLook): { body, legY } growing to 1 by growRaces counted
+-- races (smoothstep), or nil for a grown or never-bred horse. Out of races only.
+function HorseLook.foal(h: any): any?
+	local F = GameConfig.foalLook
+	if not F or F.enabled == false or h == nil or h.origin ~= "bred" then return nil end
+	local races = tonumber(h.record and h.record.races) or 0
+	local t = math.clamp(races / math.max(1, F.growRaces), 0, 1)
+	if t >= 1 then return nil end
+	local s = t * t * (3 - 2 * t)
+	return { body = F.body + (1 - F.body) * s, legY = F.legY + (1 - F.legY) * s }
+end
+
+-- In races a foal is one uniform size, never under foalLook.raceMinScale (nil = full size).
+function HorseLook.raceScale(h: any): number?
+	local f = HorseLook.foal(h)
+	if not f then return nil end
+	local k = math.max(GameConfig.foalLook.raceMinScale, f.body)
+	return if k < 1 then k else nil
+end
+
+-- A short key for the foal shape (the barn rebuilds as it grows), in 0.05 steps.
+function HorseLook.foalKey(h: any): string
+	local f = HorseLook.foal(h)
+	return if f then "F" .. math.floor(f.body * 20 + 0.5) else ""
+end
+
+-- The look for a race: `wrap` is what Legs.takeWrap gave this race (wraps only when wrapsInRace);
+-- `scale` a foal's uniform race size (D-080).
 function HorseLook.forRace(h: any, wrap: string?): any?
 	local look = HorseLook.of(h) or {}
 	look.wrap = if cfg().wrapsInRace ~= false then wrap else nil
-	if not look.wrap and not look.veteran then return nil end
+	look.scale = HorseLook.raceScale(h)
+	if not look.wrap and not look.veteran and not look.scale then return nil end
 	return look
 end
 
@@ -158,6 +186,48 @@ local function veteranLook(model: Model, legend: boolean)
 	end
 	piece(model, "VeteranRosette", Vector3.new(px * 0.25, px * 0.5, px * 0.5), centre * CFrame.new(-px * 0.05, 0, 0),
 		Color3.fromHex(c.blue or "2F6FDE"), body, Enum.PartType.Ball, Enum.Material.SmoothPlastic)
+end
+
+-- A foal's shape on a horse model already placed where it stands (D-080, the feel vote F2): the
+-- whole model scaled by foal.body, then legs stretched to legY (relative to the body) from the hip
+-- down; a one-piece model gets a gentler stretch upward instead. The hooves stay on the ground it
+-- stood on. Call before welding or seating anything to the model.
+function HorseLook.shapeFoal(model: Instance?, foal: any?)
+	if not model or not foal or not model:IsA("Model") then return end
+	local ok, err = pcall(function()
+		local cf0, size0 = model:GetBoundingBox()
+		local ground = cf0.Position.Y - size0.Y / 2
+		model:ScaleTo(model:GetScale() * foal.body)
+		local stretch = foal.legY / foal.body
+		local legs = {}
+		for _, n in LEG_NAMES do
+			local leg = find(model, n)
+			if leg then table.insert(legs, leg) end
+		end
+		if #legs > 0 then
+			for _, leg in legs do
+				local add = leg.Size.Y * (stretch - 1)
+				local hip = leg.CFrame * CFrame.new(0, leg.Size.Y / 2, 0)
+				leg.Size = Vector3.new(leg.Size.X, leg.Size.Y + add, leg.Size.Z)
+				leg.CFrame = hip * CFrame.new(0, -leg.Size.Y / 2, 0)
+			end
+		else
+			-- one piece: stretch everything upward a little from the hooves (long-legged, not squashed)
+			local k = 1 + (stretch - 1) * 0.35
+			local cf, size = model:GetBoundingBox()
+			local bottom = cf.Position.Y - size.Y / 2
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") then
+					local p = d.Position
+					d.Size = Vector3.new(d.Size.X, d.Size.Y * k, d.Size.Z)
+					d.CFrame = d.CFrame + Vector3.new(0, (p.Y - bottom) * (k - 1), 0)
+				end
+			end
+		end
+		local cf1, size1 = model:GetBoundingBox()
+		model:PivotTo(model:GetPivot() + Vector3.new(0, ground - (cf1.Position.Y - size1.Y / 2), 0))
+	end)
+	if not ok then warn("[HorseLook] foal: " .. tostring(err)) end
 end
 
 -- Put a look on a horse model (already placed where it stands).

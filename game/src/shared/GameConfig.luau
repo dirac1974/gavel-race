@@ -746,7 +746,7 @@ GameConfig.comeback = {
 -- (Leagues.unretire, "🏁 Back to races" on its card). true = the stage 7 suggestion at veteranAt.
 GameConfig.career = {
 	enabled = true,
-	suggest = false,
+	suggest = true,                  -- (D-080) on with breeding.enabled: Legends can be parents
 	badgeEvery = 25,
 	veteranAt = 350,                 -- = ageing.veteranAt (one "Veteran", fun-and-return ruling 3; was 100, D-059)
 	legacyMax = 2,
@@ -800,6 +800,48 @@ GameConfig.sell = {
 -- by the Market Corral (at most shownMax horses from this server stand there).
 GameConfig.lend = { enabled = true, shownMax = 6 }
 
+-- Breeding (D-080 provisional, amends D-047; docs/reviews/breeding-2026-10-12/plan.md). Two of your own
+-- horses (Prime, Veteran or Legend: minParentRaces counted races; one at needLeague or higher) make a
+-- foal for fee[higher parent league] Green Cash (never Diamonds). Foal Potential per stat =
+-- clamp(round(parentShare x parents' average + (1 - parentShare) x breedAnchor + U(-noise, noise)) + legacy,
+-- potMin, potMax), legacy = career.legacyMax on each Legend parent's best stat. Start stats =
+-- min(round(startShare x Potential), startMax). Coat: each parent's coat coatParentEach, a named Surprise
+-- coatSurprise from the `surprise` families (a pair with no family splits it back to the parents).
+-- The foal is rolled once at confirm and stored. One foal per foalEveryRaces owner races, stable-wide,
+-- counted from confirm ("Next foal in N races"); the foal
+-- arrives after foalAfterRaces owner races or the next UTC day you play. stableCap = Market.MAX_HORSES.
+-- Mirrors src/breeding.py (tests/test_breeding.py, tests/fixtures/breeding.json). enabled = false
+-- hides it all (the Foal Barn, its Map tile, the Family page); keep career.suggest the same.
+GameConfig.breeding = {
+	enabled = true,                  -- on with career.suggest (BreedingService, D-080)
+	minParentRaces = 30,
+	needLeague = "Bronze",
+	foalEveryRaces = 60,             -- one foal per 60 owner races, stable-wide, from confirm (systems ruling 1)
+	maxWaiting = 1,
+	foalAfterRaces = 8,
+	foalAfterNewDay = true,
+	fee = { Bronze = 400, Silver = 800, Gold = 1500, Champion = 2500 },
+	parentShare = 0.75,              -- systems ruling 3 (was 0.7)
+	breedAnchor = 80.5,              -- systems ruling 3 said 80 (was 75); 80.5 keeps a pure top-tier line >= 83 (sims/breeding.py, flagged)
+	noise = 5,
+	potMin = 55,
+	potMax = 100,
+	startShare = 0.60,
+	startMax = 50,                   -- gameplay vote: a 90-Potential foal still plays Rookie
+	coatParentEach = 0.45,
+	coatSurprise = 0.10,
+	youngScaleFrom = 0.80,
+	stableCap = 20,
+	bond = 10,
+	familyLevels = { 76, 84 },       -- Market.stars: expected mean Potential for 2 and 3 sprouts
+	surprise = {
+		bay = { "buckskin", "dun" }, chestnut = { "buckskin", "dun" }, black = { "buckskin", "dun" },
+		chestnut_blaze = { "buckskin", "dun" }, grey = { "white", "roan" }, palomino = { "buckskin" },
+		pinto = { "appaloosa" }, appaloosa = { "pinto" },
+		buckskin = { "dun", "palomino" }, dun = { "buckskin" }, roan = { "grey" }, white = { "grey" },
+	},
+}
+
 -- Legs and the vet (fun-and-return phase 3, D-077; David's decision: over-running can need the vet).
 -- Counted races in a row on one horse (Practice never counts). warnAt: the "🧣 Worked hard! Cool-down soon" chip;
 -- runLimit: RACE! becomes 🩺 VET CHECK for rated races (Practice stays open) and the server turns rated
@@ -839,6 +881,10 @@ GameConfig.studioTest = {
 	legsRun = 0,
 	leaguePoints = 0,
 	legsFromRaces = false :: number | boolean,
+	-- (D-080) breedReady: two eligible parents (the active horse and a second one, added if needed, at
+	-- breeding.minParentRaces races, one in breeding.needLeague), the Bronze fee in hand, no wait, and a
+	-- foal already on the way arrives at once. Off by default.
+	breedReady = false,
 }
 
 -- How a horse looks (D-077, D-078), built in code (0 Meshy): the Cool-down Check's leg wraps, and the
@@ -850,6 +896,16 @@ GameConfig.horseLook = { veteranLook = true, wrapsInRace = true, legendRosette =
 	frost = "E9ECEF", frostTransparency = 0.25, silver = "C0C7D4", blue = "2F6FDE", gold = "FFD23F",
 	muzzle = { x = 0, y = 0.70, z = -0.48, size = 0.11 }, brow = { x = 0.07, y = 0.86, z = -0.40, size = 0.05 },
 	rosette = { x = -0.09, y = 0.95, z = -0.36, size = 0.07 }, wrap = { from = 0.08, to = 0.38, grow = 1.18 } }
+
+-- A bred foal's look and life (D-080, the feel vote F2 and F7; 0 Meshy). Out of races the rig is scaled
+-- unevenly: body and head x body, legs x legY tall, both growing to 1 by growRaces counted races
+-- (smoothstep). In races a foal is one uniform scale, never under raceMinScale. For its first
+-- tagAlongRaces races it tags along behind its parent (followStuds behind, sideStuds aside, at most
+-- the parent's speed + catchUp studs/s) and hops (hopStuds high) every hopEvery seconds, with the
+-- young nicker on at most 1 hop in nickerEvery. Client only, never in a race or a training ride.
+GameConfig.foalLook = { enabled = true, body = 0.70, legY = 0.92, growRaces = 30, raceMinScale = 0.94,
+	tagAlongRaces = 10, followStuds = 6, sideStuds = 2, catchUp = 4, hopStuds = 0.6, hopEvery = { 8, 14 }, nickerEvery = 3,
+	nickerSpeed = 1.45, parentSpeed = 0.9 }
 
 -- Training rides (D-053): ride-through courses on your own horse at the Training Ground and
 -- the paddock arena, scored by the server from 10 Hz samples of the ride rig. Geometry is in

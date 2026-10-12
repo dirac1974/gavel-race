@@ -173,6 +173,11 @@ local function grownUpsTab()
 		GameConfig.legs.runLimit, GameConfig.legs.restSeconds // 60), 16, 65)
 	para(string.format("🏫 Riding School: a horse can be lent to %s for free and brought home any time (it stays yours), or sold there. A sale pays half of what your child paid plus a small bonus for its wins (never more than the price; nothing for a tamed or gifted horse, which earns a goodbye rosette instead). It takes two taps, and for %d days a sold horse can come back for the same Green Cash. The first horse is never sold and the last racing horse always stays. Horses are never traded between players.",
 		rehome.school, rehome.undoHours // 24), 16, 66)
+	local breed = GameConfig.breeding
+	if breed and breed.enabled then
+		para(string.format("💞 Foals: two of your child's own horses (each with %d races, one in %s or higher) can have a foal at the Foal Barn for Green Cash, which is earned in the game and never sold. Before paying, the card shows every coat the foal can have and its chance, so nothing is a hidden surprise; Diamonds and Robux can't be used, and nothing can be re-rolled. The foal arrives after %d races or the next day they play, with no clock, and one foal can start every %d races. Foals are never traded between players and never come to harm.",
+			breed.minParentRaces, breed.needLeague, breed.foalAfterRaces, breed.foalEveryRaces), 16, 67)
+	end
 	para("🔒 Spending limits, chat and play-time controls live in Roblox's Parental Controls (Settings → Parental Controls on roblox.com).", 16, 70)
 end
 

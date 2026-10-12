@@ -2,7 +2,7 @@
 -- Find it (fun-and-return phase 1, D-075, provisional): the rules behind the every-place Map, GO
 -- (GoTo.luau) and the "New!" first-time pointers. Pure, works on the client's profile view, so Lune
 -- tests it. Numbers live in GameConfig.findIt.
---   FindIt.tiles(): the Map's 13 tiles in grid order, with their row and column.
+--   FindIt.tiles(): the Map's 14 tiles in grid order, with their row and column.
 --   FindIt.hint(id, profile): the tile's "what to do here" line, at most map.hintWords words. Facts
 --     only: no red, no counts of things owed, no badges (D-043).
 --   FindIt.goPlan(place, distance, state): what GO does (walk, teleport, just open, or wait).
@@ -44,6 +44,7 @@ FindIt.HINTS = {
 	stable = "Your barn", track = "Watch races", raceBoard = "Pick races", plaza = "Shops here", feedStore = "Buy food",
 	barnBuilder = "Build things", tackShop = "Dress up", vet = "Check-ups", market = "Meet horses", paddock = "Train here",
 	trainingGround = "Ride courses", trailGate = "Wild horses", visit = "Look around", -- (D-079: friends' and open barns)
+	foalBarn = "Foal soon", -- (D-080) "Foal here!" once a foal is waiting to meet you
 }
 
 local function activeHorse(profile: any): any
@@ -67,6 +68,8 @@ function FindIt.hint(id: string, profile: any?): string
 		local best = BarnCatalog.tierIndex(p.bestLeague)
 		local seen = typeof(p.style) == "table" and BarnCatalog.tierIndex(p.style.shelfSeen) or nil
 		if best and seen and best > seen then return "New shelf" end
+	elseif id == "foalBarn" then
+		if typeof(p.breeding) == "table" and p.breeding.ready == true then return "Foal here!" end
 	end
 	return FindIt.HINTS[id] or ""
 end

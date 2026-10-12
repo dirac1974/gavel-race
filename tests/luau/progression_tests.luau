@@ -175,10 +175,13 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 
 	-- No Legend suggestion until breeding; careers off means no Legends ----------------------------
 	do
-		check(GameConfig.career.suggest == false, "career.suggest = false")
+		check(GameConfig.career.suggest == GameConfig.breeding.enabled, "career.suggest goes with breeding (D-080)")
+		local wasSuggest = GameConfig.career.suggest
+		GameConfig.career.suggest = false
 		local h = Horse.new("v", "Vet", "bay", STATS, POT, T0)
 		h.record.races = 400
 		check(not Career.suggestLegend(h) and Career.canBeLegend(h), "a Veteran isn't asked, but can still choose Legend")
+		GameConfig.career.suggest = wasSuggest
 		GameConfig.career.enabled = false
 		check(not Career.canBeLegend(h), "career.enabled = false: no Legend button")
 		local v = Career.view(h)

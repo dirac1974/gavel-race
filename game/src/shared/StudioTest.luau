@@ -10,15 +10,19 @@
 --   legsRun       h.legs.run, h.legs.raceAt = now   (Legs: chip at warnAt, VET CHECK at runLimit)
 --   leaguePoints  h.points                          (the Cup bar: points / stakesUnlockPoints[league])
 --   legsFromRaces GameConfig.legs.fromRaces on this server (false = keep the real value)
+--   breedReady    (D-080) two parents ready: the active horse and a second (added if needed) at
+--                 breeding.minParentRaces races, the active one in breeding.needLeague; cash >= the
+--                 needLeague fee; p.breeding.nextAt cleared; a foal on the way arrives at once
 
 local GameConfig = if script then require(script.Parent.GameConfig) :: any else require("./GameConfig")
 local Ageing = if script then require(script.Parent.Ageing) :: any else require("./Ageing")
 local Legs = if script then require(script.Parent.Legs) :: any else require("./Legs")
 local Leagues = if script then require(script.Parent.Leagues) :: any else require("./Leagues")
+local Horse = if script then require(script.Parent.Horse) :: any else require("./Horse")
 
 local StudioTest = {}
 
-StudioTest.KEYS = { "horseRaces", "horseWins", "nearPotential", "legsRun", "leaguePoints", "legsFromRaces" }
+StudioTest.KEYS = { "horseRaces", "horseWins", "nearPotential", "legsRun", "leaguePoints", "legsFromRaces", "breedReady" }
 
 local function count(x: any): number?
 	local n = tonumber(x)
@@ -31,7 +35,43 @@ function StudioTest.active(cfg: any?): boolean
 	local c = cfg or GameConfig.studioTest
 	if typeof(c) ~= "table" then return false end
 	return count(c.horseRaces) ~= nil or count(c.horseWins) ~= nil or c.nearPotential == true
-		or count(c.legsRun) ~= nil or count(c.leaguePoints) ~= nil or typeof(c.legsFromRaces) == "number"
+		or count(c.legsRun) ~= nil or count(c.leaguePoints) ~= nil or typeof(c.legsFromRaces) == "number" or c.breedReady == true
+end
+
+-- (D-080) Two horses ready to be parents, the fee in hand, no wait.
+local function breedReady(data: any, h: any, now: number, lines: { string })
+	local B = GameConfig.breeding
+	local need = B.minParentRaces
+	local order = Leagues.ORDER or { "Rookie", "Bronze", "Silver", "Gold", "Champion" }
+	local function atLeast(league: any): boolean
+		return (table.find(order, league) or 1) >= (table.find(order, B.needLeague) or 2)
+	end
+	h.record.races = math.max(h.record.races, need)
+	if not atLeast(h.league) then h.league = B.needLeague end
+	local other = nil
+	for _, o in data.horses do
+		if o ~= h and o.lent == nil then other = o break end
+	end
+	if not other and #data.horses < B.stableCap - 1 then
+		local id = "h" .. (tonumber(data.nextHorseId) or (#data.horses + 1))
+		data.nextHorseId = (tonumber(data.nextHorseId) or (#data.horses + 1)) + 1
+		local s = Horse.STARTER_STAT
+		other = Horse.new(id, "Maple", "grey", { speed = s, accel = s, stamina = s, grit = s },
+			{ speed = 78, accel = 78, stamina = 78, grit = 78 }, now)
+		other.origin, other.paid = "gift", 0
+		Legs.ensure(other)
+		Ageing.ensure(other)
+		table.insert(data.horses, other) -- in the pasture (no stall): parents need none
+		table.insert(lines, "added Maple (grey) as the second parent")
+	end
+	if other then other.record.races = math.max(other.record.races, need) end
+	local fee = B.fee[B.needLeague] or 0
+	data.cash = math.max(tonumber(data.cash) or 0, fee)
+	if typeof(data.breeding) == "table" then
+		data.breeding.nextAt = nil
+		for _, e in (if typeof(data.breeding.pending) == "table" then data.breeding.pending else {}) do e.atRaces = 0 end
+	end
+	table.insert(lines, string.format("breedReady: %s and %s at %d races, cash %d", h.name, other and other.name or "?", need, data.cash))
 end
 
 -- Apply the block to profile `data` (Profile shape) at `now`. Returns the log lines (empty when off or
@@ -80,6 +120,7 @@ function StudioTest.apply(data: any, now: number, isStudio: boolean, activeHorse
 		l.run, l.raceAt = math.min(run, 1000), now -- raceAt = now, or the rest rule clears the run
 		table.insert(lines, "legs run = " .. l.run)
 	end
+	if c.breedReady == true then breedReady(data, h, now, lines) end
 	local points = count(c.leaguePoints)
 	if points then
 		h.points = points

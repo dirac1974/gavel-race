@@ -232,6 +232,8 @@ require("./ageing_tests")(check, close) -- fun-and-return life arc: Ageing.luau 
 require("./progress_tests")(check, close) -- fun-and-return phase 2 (D-076): class path, Cup bar, class-up ceremony
 require("./legs_tests")(check, close) -- fun-and-return phase 3 (D-077): legs run, Cool-down Check, VET CHECK, hurt-word lint
 require("./lifearc_tests")(check, close) -- fun-and-return phase 4 (D-078): stages, decline wiring, Veteran look, Riding School
+require("./breeding_tests")(check, close) -- D-080: Breeding.luau parity with src/breeding.py, roll once at confirm
+require("./breeding_game_tests")(check, close) -- D-080: the game flow, permissions, saves, no reroll, the Foal Barn
 require("./studiotest_tests")(check, close) -- playtest 2026-10-12: GameConfig.studioTest, Studio-only, off by default
 
 print(`{checks - failures}/{checks} checks passed`)

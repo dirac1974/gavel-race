@@ -132,6 +132,9 @@ local TABS = {
 	{ id = "bests", icon = "🏅", word = "Bests" },
 	{ id = "cloths", icon = "🎀", word = "Cloths" },
 }
+if GameConfig.breeding and GameConfig.breeding.enabled then
+	table.insert(TABS, { id = "family", icon = "💞", word = "Family" }) -- (D-080) parents and foals
+end
 local page = "coats"
 
 local function clear()
@@ -246,6 +249,19 @@ render = function()
 		end
 		note(string.format("👫 %d barn%s toured!", tour.count, if tour.count == 1 then "" else "s"), 0)
 		for k, uid in tour.friends or {} do friendCard(uid, k) end
+		return
+	end
+	if page == "family" then -- (D-080) each foal with its two parents; the first foal marked
+		local fam = d.breeding and d.breeding.family or {}
+		if #fam == 0 then
+			note("Two horses can start a family", 1)
+			return
+		end
+		for k, f in fam do
+			local par = f.parents or {}
+			entryCard({ earned = true, emoji = "💞", label = if f.first then f.name .. " · First foal" else f.name }, k, Ui.coatColors[f.coat],
+				string.format("%s + %s", par[1] and par[1].name or "?", par[2] and par[2].name or "?"))
+		end
 		return
 	end
 	if page == "bests" then

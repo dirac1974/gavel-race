@@ -111,7 +111,7 @@ task.spawn(function()
 end)
 
 -- Map -----------------------------------------------------------------------------
--- Find it (D-075): every place, 13 tiles in a 5 × 3 grid (findIt.map: 116 × 96 tiles, a 48 px icon
+-- Find it (D-075): every place, 14 tiles in a 5 × 3 grid (the 💞 Foal Barn is tile 14, D-080) (findIt.map: 116 × 96 tiles, a 48 px icon
 -- over an 18 px word and one plum "what to do here" line of 2 words or fewer, FindIt.hint). A tile
 -- is GO (GoTo.place): it takes you there and opens what's there. "Visit barns" opens the barns list.
 local MAPC = GameConfig.findIt.map
@@ -196,6 +196,7 @@ end
 -- The barns list (D-060, D-079) is the "Visit barns" tile: whatever the server's FriendBarns sends
 -- (Visits.list), friends' barns and barns open to everyone here.
 tiles.visit.button.Visible = GameConfig.visit.enabled and GameConfig.visit.mapList
+tiles.foalBarn.button.Visible = GameConfig.breeding.enabled == true -- (D-080) the Foal Barn only while breeding is on
 PlayerState.Changed.Event:Connect(function()
 	if gui.Enabled and row.Visible then renderHints() end
 end)

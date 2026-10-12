@@ -268,7 +268,43 @@ function Profile.migrate(data: any, now: number): Profile
 	HorseBook.repair(p) -- the Horse Book and personal bests (D-063)
 	Profile.repairCareers(p, now)
 	Profile.repairBarnBuilder(p)
+	Profile.repairBreeding(p)
 	return p :: Profile
+end
+
+-- Breeding (D-080): p.breeding = { pending = { foal on the way }, nextAt = owner races }. The foal was
+-- rolled once at confirm, so a load keeps every rolled number exactly (never re-rolls) and drops only
+-- a broken entry. Older saves have none.
+Profile.MAX_PENDING_FOALS = 3
+function Profile.repairBreeding(p: any)
+	local b = if typeof(p.breeding) == "table" then p.breeding else {}
+	local pending = {}
+	local function num(x: any): number?
+		local n = tonumber(x)
+		if n == nil or n ~= n or n < 0 or n > 1e9 then return nil end
+		return n
+	end
+	local function stats(t: any): { [string]: number }?
+		if typeof(t) ~= "table" then return nil end
+		local out = {}
+		for _, k in Horse.STATS do
+			local v = num(t[k])
+			if v == nil then return nil end
+			out[k] = math.clamp(math.floor(v), 0, 100)
+		end
+		return out
+	end
+	for _, e in (if typeof(b.pending) == "table" then b.pending else {}) do
+		local par = typeof(e) == "table" and e.parents
+		local pot, st = typeof(e) == "table" and stats(e.potential), typeof(e) == "table" and stats(e.stats)
+		if typeof(par) == "table" and typeof(par[1]) == "string" and typeof(par[2]) == "string" and pot and st
+			and table.find(Horse.COATS, e.coat) and num(e.atRaces) and num(e.day) and #pending < Profile.MAX_PENDING_FOALS then
+			table.insert(pending, { parents = { par[1], par[2] }, fee = math.floor(num(e.fee) or 0), potential = pot, stats = st,
+				coat = e.coat, atRaces = math.floor(num(e.atRaces) :: number), day = math.floor(num(e.day) :: number) })
+		end
+	end
+	local nextAt = num(b.nextAt)
+	p.breeding = { pending = pending, nextAt = if nextAt then math.floor(nextAt) else nil }
 end
 
 -- Barn Builder (D-070) -----------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# Tonight's playtest (2026-10-12): about 60–75 minutes
+# Tonight's playtest (2026-10-12): about 70–85 minutes
 
 Everything below was built since the last playtest (D-071 to D-079). It has passed every automated test, but none of it has run in Roblox Studio yet. Go in order; stop and note anything that breaks (a screenshot of the Output window helps most). The full checklists are in `PLAYTEST.md`, section names in brackets.
 
@@ -27,7 +27,7 @@ studioTest: all off. Race 3 or 4 times.
 
 ## 3. Find it (10 min) [Find it]
 studioTest: all off. Device emulator at 667 × 375 landscape, touch on, for the phone checks.
-- 🗺️ **Map**: 13 tiles in a 5 × 3 grid, each with a picture and a short line. All fit on the phone with nothing cut off.
+- 🗺️ **Map**: 14 tiles in a 5 × 3 grid (the 14th is 💞 Foal Barn, step 8), each with a picture and a short line. All fit on the phone with nothing cut off.
 - **GO**: from your barn tap Market: a cream fade, you arrive, and the first horse card opens. From Fair Street tap Feed & Seed: golden hoofprints instead of a trip.
 - **Phone dock**: 5 items: horse portrait, 🏁 RACE! with 🔀 Pick, 🗺️ Map, 📋 Jobs, ☰ More. Nothing covers Hop or Gallop. Dragging the thumbstick from the portrait walks you and doesn't open My Horses.
 - **Queue card ❓**: join a race: the card names the line ("🟠 Bronze race line"). The first time, a 3-picture "How racing works" strip opens by itself; ❓ opens it again any time.
@@ -61,6 +61,14 @@ studioTest: all off. Test → Clients and Servers → **3 players**; each picks 
 - Follow the gold hoofprints through 4 stops for a 📍 Tour pin. Strangers get Pat only (no Treat, no post box). 🎉 Cheer floats an emoji over the door.
 - Player 1's 🚪 Close gate walks everyone out; 🔒 Nobody does too.
 - **The friend rows need a live server**: Studio's test accounts aren't Roblox friends, so 👫 Friend rows, Treat and the post box can't be checked here.
+
+## 8. Breeding (10 min) [Breeding (D-080)]
+studioTest: `breedReady = true` (others off). Stop, Play. Output: `[StudioTest] ... breedReady`.
+- 🗺️ Map → 💞 Foal Barn: you arrive at a cream-and-sky barn east of the Vet and "Pick two parents" opens.
+- Pick Comet and Maple, Next ▶: "Family 🌱", the Coat chances box (45% / 45% / ❔ Surprise 10%), "Fee 💵 400". Tap "💞 Have a foal", then "Sure? 💵 400".
+- "Arrives in 8 races or tomorrow". Stop and Play again (breedReady makes it arrive at once): "💞 Your foal is here!". Back at the barn: "Meet your foal ▶": the foal steps out, nuzzles, hearts, two nickers. Name it with the word chips.
+- The foal in its stall: small body, long legs. Ride its parent: it trots along behind. Its first race: "🍼 Comet's foal!" after the results. 📖 → 💞 Family lists it.
+- Set `breedReady` back to false.
 
 ## What to send back
 - Screenshots of any red errors in Output, and what you were doing.

@@ -219,6 +219,7 @@ local function build(player: Player, h, at: CFrame): Model
 	for name, m in { Stand = stand, Gallop = gallop, Anim = anim } do
 		if m then
 			m:PivotTo(at)
+			HorseLook.shapeFoal(m, HorseLook.foal(h)) -- (D-080) a bred foal's shape, before it's welded to the rig
 			local _, size = m:GetBoundingBox()
 			height = math.max(height, size.Y)
 			attach(m, visualRoot, name)

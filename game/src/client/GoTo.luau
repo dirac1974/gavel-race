@@ -35,6 +35,7 @@ GoTo.OPENS = {
 	vet = "vet", spa = "spa", market = "market", paddock = "train", trainingGround = "train",
 	board = "board", book = "book", horses = "horses", visit = "visit",
 	vetCheck = "coolDown", -- (D-077) VET CHECK and the vet Advice: the Vet, then the Cool-down Check
+	foalBarn = "foalBarn", -- (D-080) the 💞 Foal Barn: the parents picker, the waiting card or meeting your foal
 }
 -- Places that stand at another place ("vetCheck" is the Vet).
 GoTo.AT = { vetCheck = "vet" }

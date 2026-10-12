@@ -51,6 +51,7 @@ local Legs = require(Shared:WaitForChild("Legs"))           -- the vet run (fun-
 local Ageing = require(Shared:WaitForChild("Ageing"))       -- the gentle Veteran decline (phase 4, D-078)
 local ClassPath = require(Shared:WaitForChild("ClassPath")) -- the class path and Cup bar (phase 2, D-076)
 local HorseLook = require(Shared:WaitForChild("HorseLook")) -- wraps and the Veteran look (D-077, D-078)
+local Foals = require(script.Parent:WaitForChild("Foals")) -- a foal ready, a foal's first race (D-080)
 
 local DEFAULT_LEAGUE = "Rookie" -- an open card (nobody in line yet) shows this until the first rider sets it
 local COUNTDOWN = GameConfig.gateCountdownSeconds -- "3, 2, 1" on every screen (D-055)
@@ -1290,6 +1291,7 @@ local function runRace(c, players: { Player })
 						Legs.afterRace(hp, os.time()) -- (D-077) one more counted race in a row on this horse
 						Ageing.note(hp) -- (D-078) declineFrom, the first time it's a Veteran at its peak
 					end
+					Foals.afterRace(player, data, horseOf[player.UserId], before) -- (D-080) counted race: foal ready / first race
 					-- Careers (D-059): a badge every career.badgeEvery races, Veteran at career.veteranAt.
 					local badge, veteran = Career.crossed(before, after)
 					local hc = (badge or veteran) and Profile.horse(data, horseOf[player.UserId])

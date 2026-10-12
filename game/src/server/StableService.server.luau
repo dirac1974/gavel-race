@@ -513,6 +513,10 @@ local function buildBarn(i: number, owner: Player, data)
 				if d:IsA("BasePart") then d.Anchored, d.CanCollide = true, false end
 			end
 			hm:SetAttribute("Rest", pose or "")
+			local foal = HorseLook.foal(h) -- (D-080) a bred foal: long legs, small body, growing up (napping: just small)
+			if foal and pose == "nap" then foal = { body = foal.body, legY = foal.body } end
+			HorseLook.shapeFoal(hm, foal)
+			hm:SetAttribute("HorseId", h.id) -- (D-080) FoalLife finds the foal and its parent by id
 			HorseLook.apply(hm, HorseLook.of(h)) -- (D-077, D-078) wraps after a Cool-down Check; the Veteran look
 			hm.Parent = barn
 			if pose == "nap" then
@@ -859,6 +863,7 @@ local function signature(data, now: number, player: Player?): string
 		local golds = table.concat(Profile.rosettes(h), ",")
 		table.insert(parts, h.id .. ":" .. h.coat .. ":" .. h.name .. ":" .. golds) -- gold rosettes (D-053)
 		table.insert(parts, HorseLook.key(HorseLook.of(h))) -- wraps and the Veteran look (D-077, D-078)
+		table.insert(parts, HorseLook.foalKey(h)) -- a foal grows (D-080)
 	end
 	for k = 1, data.stalls do -- rest cues (D-058): yawning or napping
 		local h = Profile.stallHorse(data, k)

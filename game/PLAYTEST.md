@@ -870,6 +870,26 @@ Strangers also need Roblox to allow content sharing for **both** accounts (Polic
 - [ ] **Home.** 🏠 Home takes S back to S's own stable and clears the trail.
 - **Studio check:** PolicyService must answer for both players, or strangers are kept out (fail closed). If S can't see A on Everyone here in Studio, try a live private server. The yard stop (inward 72, across 28) and the paddock stop should stand in open ground; move them in `GameConfig.visit.tourStops` if a prop is in the way. A barn with no Legends still has the paddock stop (an empty fenced spot).
 
+## Breeding (D-080)
+Switches: `GameConfig.breeding.enabled` (with `career.suggest`; false hides the Foal Barn, its Map tile and the Family page), `GameConfig.foalLook` (the foal's shape, the tag-along). Fast setup: `GameConfig.studioTest.breedReady = true` (Studio only), then Stop and Play: the Output says `[StudioTest] ... breedReady: Comet and Maple at 30 races` and you have two parents, the Bronze fee, no wait, and a foal on the way arrives at once.
+
+- [ ] **The Map.** 🗺️ shows 14 tiles in the 5 × 3 grid; tile 14 is "💞 Foal Barn" with "Foal soon" (or "Foal here!" when a foal waits). Everything fits at 667 × 375. GO takes you to the cream-and-sky barn east of the Vet (red roof, white-rail paddock with two grazing foals, planters) and opens the panel.
+- [ ] **Pick two parents.** Two slots over your horses. Horses that can't be parents are grey with a short reason ("Needs 30 races", "Lent", "Out riding"). Tap two ready ones, then Next ▶.
+- [ ] **Your foal.** "Family 🌱🌱" (sprouts, no numbers). The Coat chances box: one row per parent coat (swatch, name, bar, 45%) and "❔ Surprise: Dun or Buckskin" with 10%. Two parents with the same coat: one row at 90%. The word is "chance" everywhere. "Fee 💵 400" (higher parent's league). The confirm takes two taps: "💞 Have a foal" then "Sure? 💵 400". Diamonds are never mentioned.
+- [ ] **Refusals.** Neither parent in Bronze: "One parent needs Bronze". Not enough Green Cash: refused, nothing taken. Stable at 20: "Make room first" with "🏫 Lend or Sell". After one foal: "Next foal in N races" (counted in races, no clock).
+- [ ] **Waiting.** The panel shows both parents and "Arrives in 8 races or tomorrow" (it counts down in races). A second confirm is refused. Rejoin: the same foal is still on the way (the roll was made once at confirm).
+- [ ] **Here.** After the races (or the next day) a toast "💞 Your foal is here!" (never during a race or its results) and the Map hint "Foal here!". At the barn: "Meet your foal ▶".
+- [ ] **The meeting.** A side shot of the paddock: the parent stands, the foal steps out from behind its flank, turns and nuzzles twice, hearts rise; a high nicker then a lower answer, then the job-done chime. No confetti. A Surprise coat adds only "❔ A surprise coat: Dun!" and a few sparkles. Tap skips after 1 s. Reduced Motion: the foal fades in, hearts kept.
+- [ ] **Naming.** Exactly like the Starter: word chips, "🔀 New words", "That's the name!". The ✕ closes it and the foal waits at the barn. Then the name plate drops in over the foal letter by letter, it nods twice, a ding and two claps, "Hello, Pebble! 🌱".
+- [ ] **The foal.** In My Horses as a 🍼 Young Rookie, in a free stall (or the pasture). In the stall it has long legs, a small body and a big head, growing to adult size by 30 races. **Studio check:** hooves on the ground, nothing floating or sunk; the one-piece stand models look leggy, not stretched.
+- [ ] **Tag-along.** For its first 10 races the foal stands at its parent's flank, and trots 6 studs behind when you ride the parent (never faster than the parent + 4), with a little hop every 8–14 s (no hops with Reduced Motion). Never during a race, in line or on a training ride.
+- [ ] **First race.** The foal's first counted race: once, after the results, a gold "🍼 Comet's foal!" banner (tap to skip). In the race the foal is near full size (never under 0.94).
+- [ ] **Horse Book.** 📖 → 💞 Family: the foal with "Comet + Maple", the first one marked "First foal". With no foals: "Two horses can start a family".
+- [ ] **Selling.** The foal's Sell price at the school is less than the fee paid.
+- [ ] **Legends.** A Veteran's Legend card now says "Legends can be parents!"; a Legend can be picked as a parent.
+- [ ] **Grown-ups.** ⚙️ → For grown-ups has the 💞 Foals paragraph (after Riding School, before the Parental Controls line).
+- [ ] **Words.** Nowhere: odds, mare, stallion, birth, blood.
+
 ## Network and edge cases
 - [ ] Studio Test → Clients and Servers with 2–3 players: everyone sees the same lanes and chances.
 - [ ] Network simulator at 200 ms latency: well-timed taps still score well.

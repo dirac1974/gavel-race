@@ -115,8 +115,10 @@ local function ensure(p: any)
 end
 Market.ensure = ensure
 
+-- A foal on the way (D-080) holds its place in the stable.
 function Market.canAddHorse(p: any): boolean
-	return #p.horses < Market.MAX_HORSES
+	local waiting = if typeof(p.breeding) == "table" and typeof(p.breeding.pending) == "table" then #p.breeding.pending else 0
+	return #p.horses + waiting < Market.MAX_HORSES
 end
 
 -- Buy listing `id` from this week's stock. Returns (ok, message, horse?).
@@ -234,7 +236,8 @@ local GameConfig = if script then require(script.Parent.GameConfig) :: any else 
 function Market.rehomeValue(h: any): number
 	local origin = h.origin
 	local paid = math.max(0, math.floor(tonumber(h.paid) or 0))
-	if not (origin == "market" or (origin == nil and paid > 0)) then return 0 end
+	-- (D-080) a bred foal sells like a Market horse with paid = the fee: always under the fee
+	if not (origin == "market" or origin == "bred" or (origin == nil and paid > 0)) then return 0 end
 	local base = math.min(paid, math.floor(paid * GameConfig.rehome.share))
 	local rec = if typeof(h.record) == "table" then h.record else {}
 	local wins = math.max(0, math.floor(tonumber(rec.wins) or 0))

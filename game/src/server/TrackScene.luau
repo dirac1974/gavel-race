@@ -473,6 +473,15 @@ function Course:build(plan, coats: { string? }?, shines: { [number]: boolean }?,
 			or modelFor("horse_" .. COATS[i]) or placeholderHorse(i)
 		horse.Name = "Lane" .. i
 		horse:PivotTo(self:laneCFrame(i, 0))
+		-- (D-080) a young foal races at one uniform size, never under foalLook.raceMinScale (HorseLook.forRace),
+		-- hooves kept on the ground; scaled before the saddle and cloth are measured.
+		local raceScale = looks and looks[i] and looks[i].scale
+		if typeof(raceScale) == "number" and raceScale > 0 and raceScale < 1 then
+			local cf0, size0 = horse:GetBoundingBox()
+			pcall(function() horse:ScaleTo(horse:GetScale() * raceScale) end)
+			local cf1, size1 = horse:GetBoundingBox()
+			horse:PivotTo(horse:GetPivot() + Vector3.new(0, (cf0.Position.Y - size0.Y / 2) - (cf1.Position.Y - size1.Y / 2), 0))
+		end
 		badge(i).Parent = horse
 		-- The saddle is anchored inside the model, so pivoting the horse moves it, and a
 		-- seated rider (welded to it by the Seat) moves with the horse.

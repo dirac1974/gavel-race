@@ -55,7 +55,7 @@ return function(check: (boolean, string) -> (), _close: (number, number, number)
 	-- The Map: every place, a 5 × 3 grid, a short "what to do" line -------------------------------------
 	do
 		local tiles = FindIt.tiles()
-		check(#tiles == 13 and #WorldLayout.MAP == 13, "13 places on the Map")
+		check(#tiles == 14 and #WorldLayout.MAP == 14, "14 places on the Map (the 💞 Foal Barn is 14th, D-080)")
 		local ids, maxRow, ok = {}, 0, true
 		for k, t in tiles do
 			if ids[t.id] then ok = false end

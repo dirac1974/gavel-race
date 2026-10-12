@@ -83,6 +83,9 @@ WorldLayout.places = {
 	track = { x = 525, z = -500, fx = -1, fz = 0, label = "Racetrack" },
 	-- Training Ground (D-053): the training oval, south of the paddock (x 650-950, z -70 to 70).
 	trainingGround = { x = 800, z = -70, fx = 0, fz = -1, label = "Training Ground", w = 300, d = 140 },
+	-- The 💞 Foal Barn (D-080): east of the Vet on the north side, a small cream-and-sky barn (west half)
+	-- and a white-rail paddock (east half), built in code by BreedingService.
+	foalBarn = { x = 995, z = N - 4, fx = 0, fz = 1, label = "Foal Barn", w = 90, d = 44 },
 } :: { [string]: Place }
 
 -- The gate in the paddock's south fence and the path from it to the Training Ground. The link
@@ -129,29 +132,29 @@ WorldLayout.trail = {
 WorldLayout.meadow = { x = 1690, z = -250, radius = 110 }
 
 -- Map fast-travel (D-035). "stable" means the player's own plot.
--- Find it (D-075): every place is on the Map, in a 5 × 3 grid (row by row). "barnBuilder" is the
+-- Find it (D-075): every place is on the Map, in a 5 × 3 grid (row by row); the 💞 Foal Barn is tile 14 (D-080). "barnBuilder" is the
 -- counter inside Feed & Seed (MAP_ALIAS: you arrive at Feed & Seed); "visit" is not a trip but the
 -- barns list (friends' barns; phase 5 adds barns open to everyone).
 WorldLayout.MAP = {
 	"stable", "track", "raceBoard", "plaza", "feedStore",
 	"barnBuilder", "tackShop", "vet", "market", "paddock",
-	"trainingGround", "trailGate", "visit",
+	"trainingGround", "trailGate", "visit", "foalBarn", -- (D-080) tile 14
 }
 WorldLayout.MAP_LABELS = {
 	stable = "My Stable", track = "Racetrack", raceBoard = "Race Board", plaza = "Fair Street", feedStore = "Feed & Seed",
 	barnBuilder = "Barn Builder", tackShop = "Tack & Paint", vet = "Vet & Spa", market = "Market", paddock = "Training",
-	trainingGround = "Riding Ring", trailGate = "Trail", visit = "Visit barns",
+	trainingGround = "Riding Ring", trailGate = "Trail", visit = "Visit barns", foalBarn = "Foal Barn",
 }
 -- Atlas art where there is some; the emoji shows otherwise (Ui.icon). One symbol per meaning (D-064).
 WorldLayout.MAP_ICONS = {
 	stable = "map_stable", track = "map_track", raceBoard = "", plaza = "map_fair", feedStore = "hay",
 	barnBuilder = "", tackShop = "", vet = "map_vet", market = "", paddock = "",
-	trainingGround = "", trailGate = "map_trail", visit = "friends",
+	trainingGround = "", trailGate = "map_trail", visit = "friends", foalBarn = "family", -- (no "family" art yet: 💞 shows)
 }
 WorldLayout.MAP_EMOJI = {
 	stable = "🏠", track = "🏁", raceBoard = "📣", plaza = "🎪", feedStore = "🌾",
 	barnBuilder = "🔨", tackShop = "🎨", vet = "🩺", market = "🐎", paddock = "🎯",
-	trainingGround = "🚩", trailGate = "🌲", visit = "👫",
+	trainingGround = "🚩", trailGate = "🌲", visit = "👫", foalBarn = "💞",
 }
 WorldLayout.MAP_ALIAS = { barnBuilder = "feedStore" }
 WorldLayout.MAP_NOT_A_TRIP = { visit = true }
