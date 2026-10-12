@@ -50,7 +50,7 @@ One item blocks the next commit: the commit message names a specific Claude mode
 
 ### B1. The commit message names a specific Claude model (CLAUDE.md hard rule 5)
 
-- **Where:** commit `67f503f` (and the earlier `bed9d9e`), trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- **Where:** commit `67f503f` (and the earlier `bed9d9e`), trailer `Co-Authored-By:` naming a specific model.
 - **Problem:** Hard rule 5 says "Never mention a specific Claude model in commits". Commits before this run used `Co-Authored-By: Claude <noreply@anthropic.com>` (for example `ee4615c`, `45c0c87`). The CLAUDE.md rule takes precedence over the session's default attribution text. `scripts/policy_guard.sh` uses `git grep`, so it only scans tracked files and never sees commit messages. That's why this got through.
 - **Fix:**
   - **Do not amend or rewrite `67f503f` or `bed9d9e`.** Hard rule 6 forbids it, and the branch is already pushed.
